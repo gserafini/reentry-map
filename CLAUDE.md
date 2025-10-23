@@ -2,9 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+**📦 This project uses [Agent Success Pack](https://github.com/gserafini/agent-success-pack)**
+
+A framework for structured, AI-optimized project management. Key docs:
+
+- **[PROGRESS.md](PROGRESS.md)** - Current status & session notes
+- **[IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)** - Phase breakdown
+- **[ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md)** - Technical decisions (ADRs)
+
+**At session start**: Read PROGRESS.md to understand current state.
+
+---
+
 ## Project Context
 
-**Reentry Map** is a mobile-first web application helping individuals navigating reentry find resources in their community. The app uses Next.js 15, Supabase, and AI agents to maintain an accurate, up-to-date directory of services.
+**Reentry Map** is a mobile-first web application helping individuals navigating reentry find resources in their community. The app uses Next.js 16, Supabase, and AI agents to maintain an accurate, up-to-date directory of services.
 
 - **Owner**: Gabriel Serafini (gserafini@gmail.com)
 - **Repository**: github.com/gserafini/reentry-map.git

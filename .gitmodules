@@ -1,0 +1,3 @@
+[submodule ".agent-success-pack"]
+	path = .agent-success-pack
+	url = https://github.com/gserafini/agent-success-pack.git

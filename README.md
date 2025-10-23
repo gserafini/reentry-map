@@ -70,9 +70,31 @@ Our solution is a community-driven, AI-enhanced resource directory that:
 - Supabase Cloud (database, auth, storage)
 - Progressive Web App (PWA)
 
+## Project Management
+
+This project uses **[Agent Success Pack](https://github.com/gserafini/agent-success-pack)** for project management and documentation—a framework optimized for AI-assisted development.
+
+**Key Documents**:
+
+- [PROGRESS.md](PROGRESS.md) - Current status, session notes, metrics
+- [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md) - Phase-based task breakdown
+- [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) - Key technical decisions (ADRs)
+- [CLAUDE.md](CLAUDE.md) - Quick reference for AI assistants
+
+**Why this approach?**
+
+- 🎯 Clear scope and requirements from day one
+- 📊 Track progress across sessions
+- 🤖 Optimized for AI-assisted development (Claude Code, GitHub Copilot)
+- ✅ Enforced quality standards
+- 📝 Document decisions for future reference
+
+Learn more: [Agent Success Pack on GitHub](https://github.com/gserafini/agent-success-pack)
+
 ## Project Status
 
-**Phase 1 MVP** - In Development (5-week timeline)
+**Phase 0: Foundation** - ✅ Complete
+**Phase 1: MVP** - In Development (5-week timeline)
 
 - [x] Week 1: Foundation & Core Infrastructure
 - [ ] Week 2: Location Features & Map View
