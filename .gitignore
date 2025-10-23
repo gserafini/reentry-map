@@ -1,3 +1,5 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 # macOS
 .DS_Store
 
@@ -7,39 +9,32 @@
 *.sublime-project
 *.sublime-workspace
 
-# Node
-node_modules/
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-lock.yaml
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-env/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
+# testing
+/coverage
 
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-.eggs/
+# next.js
+/.next/
+/out/
 
-# Logs
-*.log
-logs/
+# production
+/build
 
-# Environment files
-.env
-.env.*
-secrets.yml
-
-# Misc
+# misc
+*.pem
 *.swp
 *.tmp
 .coverage
@@ -47,11 +42,37 @@ coverage.xml
 coverage/
 pytest_cache/
 
-# Temporary macOS Finder files
-._*
+# Logs
+*.log
+logs/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files (can opt-in for committing if needed)
+.env*.local
+.env
+.env.*
+
+# Vercel
+.vercel
+
+# pnpm
+.pnpm-debug.log*
 
 # Local project settings
 .localrc
 
+# Temporary macOS Finder files
+._*
+
 # Next.js build output
 .next/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
