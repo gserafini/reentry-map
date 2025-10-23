@@ -555,7 +555,7 @@ Every Friday:
 ## Resources & References
 
 ### Documentation
-- Next.js 15: https://nextjs.org/docs
+- Next.js 16: https://nextjs.org/docs
 - Supabase: https://supabase.com/docs
 - Tailwind CSS: https://tailwindcss.com/docs
 - shadcn/ui: https://ui.shadcn.com

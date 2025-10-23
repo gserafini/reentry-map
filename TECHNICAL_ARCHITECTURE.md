@@ -31,14 +31,14 @@
 ## Tech Stack (Latest Stable Versions)
 
 ### Frontend
-- **Framework**: Next.js 15.0.x (App Router, React Server Components)
+- **Framework**: Next.js 16.0.x (App Router, React Server Components)
 - **React**: React 19.x (latest stable)
 - **Language**: TypeScript 5.7.x
 - **Styling**: Tailwind CSS 4.0.x (new CSS-first engine)
 - **UI Components**: shadcn/ui (latest) + Lucide React 0.460.x
 - **State Management**: React Hooks + Server Components
 - **Maps**: @googlemaps/js-api-loader 1.16.x
-- **PWA**: @ducanh2912/next-pwa 10.x (Next.js 15 compatible)
+- **PWA**: @ducanh2912/next-pwa 10.x (Next.js 16 compatible)
 - **Forms**: react-hook-form 7.53.x + zod 3.23.x
 
 ### Backend
@@ -58,7 +58,7 @@
 - **Web Scraping**: cheerio 1.0.x
 
 ### Infrastructure
-- **Hosting**: Vercel (Next.js 15 optimized)
+- **Hosting**: Vercel (Next.js 16 optimized)
 - **Database**: Supabase Cloud
 - **CDN**: Vercel Edge Network
 - **Analytics**: Vercel Analytics + Speed Insights
@@ -765,7 +765,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## Performance Optimizations
 
-### Next.js 15 Features
+### Next.js 16 Features
 - React Server Components (reduce client JS)
 - Streaming SSR for faster initial load
 - Partial Prerendering (PPR) for hybrid pages

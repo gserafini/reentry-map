@@ -5,7 +5,7 @@
 - **Repository**: github.com/gserafini/reentry-map.git
 - **Owner**: Gabriel Serafini (gserafini@gmail.com)
 - **Version**: 0.1.0 (Phase 1 MVP)
-- **Tech Stack**: Next.js 14, Supabase, TypeScript, Tailwind CSS
+- **Tech Stack**: Next.js 16, Supabase, TypeScript, Tailwind CSS
 
 ## Mission Statement
 Build a comprehensive, AI-powered resource directory that helps people navigate reentry 

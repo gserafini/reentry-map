@@ -5,7 +5,7 @@ This document provides specific instructions for Claude Code to build the Reentr
 ## Project Context
 
 You are building **Reentry Map**, a web application that helps people navigating reentry
-find resources in their community. The app uses Next.js 15, Supabase, and AI agents.
+find resources in their community. The app uses Next.js 16, Supabase, and AI agents.
 
 **Owner**: Gabriel Serafini (gserafini@gmail.com)  
 **Repository**: github.com/gserafini/reentry-map.git  

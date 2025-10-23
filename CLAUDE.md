@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4.0
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4.0
 - **UI Components**: shadcn/ui + Lucide React
 - **Backend**: Next.js API Routes, Supabase (PostgreSQL 16, Auth, Storage, Realtime)
 - **Maps**: Google Maps JavaScript API (@googlemaps/js-api-loader)

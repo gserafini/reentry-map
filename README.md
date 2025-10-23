@@ -5,7 +5,7 @@
 A mobile-first web application that provides an accurate, up-to-date directory of reentry resources powered by community knowledge and AI automation.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green)](https://supabase.com/)
 
@@ -42,7 +42,7 @@ Our solution is a community-driven, AI-enhanced resource directory that:
 ## Tech Stack
 
 **Frontend**
-- Next.js 15 (App Router) with React Server Components
+- Next.js 16 (App Router) with React Server Components
 - TypeScript 5.7 (strict mode)
 - Tailwind CSS 4.0 for styling
 - shadcn/ui component library
