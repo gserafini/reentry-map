@@ -96,27 +96,65 @@ cp .env.example .env.local
 Edit `.env.local` with your credentials:
 
 ```bash
-# Supabase
+# ============================================================================
+# REQUIRED FOR DEVELOPMENT
+# ============================================================================
+
+# Supabase (get from: https://app.supabase.com/project/_/settings/api)
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your-service-role-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJhbGc...your-anon-key
 
-# Google Maps
-NEXT_PUBLIC_GOOGLE_MAPS_KEY=AIza...your-maps-key
-GOOGLE_MAPS_KEY=AIza...your-maps-key
+# ============================================================================
+# OPTIONAL (Can add later when needed)
+# ============================================================================
 
-# OpenAI
-OPENAI_API_KEY=sk-...your-openai-key
+# Supabase service role (only needed for admin operations that bypass RLS)
+# SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your-service-role-key
 
-# App URL (development)
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+# Google Maps (needed for Phase 4: Location Features)
+# NEXT_PUBLIC_GOOGLE_MAPS_KEY=AIza...your-maps-key
+# GOOGLE_MAPS_KEY=AIza...your-maps-key
 
-# Optional: Cron secret (generate random string)
-CRON_SECRET=your-random-secret-string
+# OpenAI (needed for Phase 10: AI Agents)
+# OPENAI_API_KEY=sk-...your-openai-key
 
-# Optional: Phone validation
-ABSTRACT_API_KEY=your-abstract-api-key
+# App URL (auto-detects localhost:3000 in development)
+# NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+### Environment Variable Validation
+
+This project uses [T3 Env](https://env.t3.gg) for type-safe, validated environment variables:
+
+**Benefits**:
+
+- Catches missing or invalid env vars at build time (not runtime)
+- TypeScript autocomplete for all env vars
+- Prevents accidental exposure of server-only secrets to the client
+- Clear error messages when something is misconfigured
+
+**How it works**:
+
+- All env vars are defined in `lib/env.ts` with Zod validation schemas
+- Import env vars from `@/lib/env` instead of using `process.env` directly
+- Build will fail with helpful error if required vars are missing
+
+**Example usage**:
+
+```typescript
+// ❌ DON'T do this:
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+// ✅ DO this instead:
+import { env } from '@/lib/env'
+const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe, validated
+```
+
+**Required vs Optional**:
+
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are required
+- All others are optional and only needed for specific features
+- See `.env.example` for complete list and when each is needed
 
 ## Step 7: Run Development Server
 

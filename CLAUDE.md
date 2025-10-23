@@ -191,6 +191,43 @@ if (error) {
 }
 ```
 
+### Environment Variables
+
+Always use type-safe environment variables via `@/lib/env`:
+
+```typescript
+// ❌ DON'T use process.env directly
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+// ✅ DO use the env import
+import { env } from '@/lib/env'
+const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe, validated
+```
+
+**Benefits**:
+
+- Build fails immediately if required vars are missing
+- TypeScript autocomplete for all environment variables
+- Prevents exposing server secrets to client
+- Clear validation errors with helpful messages
+
+**Available Environment Variables**:
+
+- `env.NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (required)
+- `env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Supabase anon key (required)
+- `env.SUPABASE_SERVICE_ROLE_KEY` - Server-only admin key (optional)
+- `env.OPENAI_API_KEY` - OpenAI API key for AI agents (optional)
+- `env.GOOGLE_MAPS_KEY` - Server-side Google Maps key (optional)
+- `env.NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Client-side Maps key (optional)
+- `env.NEXT_PUBLIC_APP_URL` - Application URL for redirects (optional)
+
+**Adding New Environment Variables**:
+
+1. Add to schema in `lib/env.ts` (server or client section)
+2. Add to runtimeEnv mapping
+3. Add to `.env.example` with documentation
+4. Update `SETUP_GUIDE.md` if it's required
+
 ## Key Implementation Guidelines
 
 ### TypeScript
@@ -240,6 +277,71 @@ if (error) {
 - Focus indicators visible
 - Alt text on all images
 
+### Testing
+
+**Test Strategy**:
+
+- Unit tests with Vitest for components and utilities
+- E2E tests with Playwright for critical user flows
+- Target 70%+ code coverage
+- Test before commit (pre-commit hooks run tests on changed files)
+
+**Writing Unit Tests**:
+
+```typescript
+// __tests__/ResourceCard.test.tsx
+import { render, screen } from '@testing-library/react'
+import { ResourceCard } from '@/components/resources/ResourceCard'
+
+describe('ResourceCard', () => {
+  const mockResource = {
+    id: '1',
+    name: 'Test Resource',
+    category: 'employment',
+    address: '123 Main St'
+  }
+
+  it('renders resource name', () => {
+    render(<ResourceCard resource={mockResource} />)
+    expect(screen.getByText('Test Resource')).toBeInTheDocument()
+  })
+
+  it('displays category badge', () => {
+    render(<ResourceCard resource={mockResource} />)
+    expect(screen.getByText('employment')).toBeInTheDocument()
+  })
+})
+```
+
+**Writing E2E Tests**:
+
+```typescript
+// e2e/search.spec.ts
+import { test, expect } from '@playwright/test'
+
+test('search for resources', async ({ page }) => {
+  await page.goto('/')
+
+  // Type in search box
+  await page.fill('[placeholder="Search resources..."]', 'housing')
+
+  // Wait for results
+  await page.waitForSelector('[data-testid="resource-card"]')
+
+  // Verify results contain search term
+  const results = await page.locator('[data-testid="resource-card"]').all()
+  expect(results.length).toBeGreaterThan(0)
+})
+```
+
+**Test Philosophy**:
+
+- E2E tests run **headless by default** for fast feedback
+- Only use `npm run test:e2e:ui` when demoing to user
+- Test critical paths: auth, search, favorites, reviews, admin flows
+- Mock external APIs (Google Maps, OpenAI) in tests
+- Use test IDs for stable selectors: `data-testid="resource-card"`
+
 ## AI Agent System
 
 Three primary agents:
@@ -268,8 +370,10 @@ npm run test:e2e:headed      # Run E2E tests in headed mode
 # Type checking
 npm run type-check           # Run TypeScript checks
 
-# Linting
+# Linting & Formatting
 npm run lint                 # Run ESLint
+npm run format               # Format all files with Prettier
+npm run format:check         # Check if files need formatting
 
 # Building
 npm run build                # Production build

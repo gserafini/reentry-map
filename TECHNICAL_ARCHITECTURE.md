@@ -74,10 +74,30 @@
 
 - **Version Control**: Git + GitHub
 - **Package Manager**: npm 10.x or pnpm 9.x (faster)
-- **Linting**: ESLint 9.x (flat config)
-- **Formatting**: Prettier 3.3.x
-- **Type Checking**: TypeScript 5.7.x (strict mode)
-- **Testing**: Vitest 2.x + React Testing Library 16.x
+- **Linting**: ESLint 9.x (flat config) + eslint-config-prettier
+- **Formatting**: Prettier 3.3.x + prettier-plugin-tailwindcss
+- **Type Checking**: TypeScript 5.7.x (strict mode) + @total-typescript/ts-reset
+- **Environment Validation**: @t3-oss/env-nextjs + zod 3.23.x
+- **Git Hooks**: husky 9.x + lint-staged
+
+### Testing & Quality
+
+- **Unit Testing**: Vitest 2.x
+  - @vitejs/plugin-react for JSX support
+  - jsdom for DOM simulation
+  - @testing-library/react 16.x for component testing
+  - @testing-library/dom for DOM utilities
+  - vite-tsconfig-paths for import aliases
+- **E2E Testing**: Playwright 1.48.x
+  - Configured for Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari
+  - Headless by default for CI/CD
+  - Headed mode available for debugging
+- **Coverage**: @vitest/coverage-v8
+  - Target: 70%+ coverage for lines, functions, branches, statements
+- **Code Quality**:
+  - Pre-commit hooks run ESLint + Prettier on staged files
+  - TypeScript strict mode with enhanced type safety (ts-reset)
+  - Environment variable validation at build time
 
 ## Database Schema
 
