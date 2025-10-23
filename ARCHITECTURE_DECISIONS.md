@@ -195,18 +195,18 @@ Use Tailwind CSS 4.0 as the primary styling framework.
 
 ---
 
-## ADR-005: Component Library Decision - PENDING
+## ADR-005: HeroUI for Component Library
 
 **Date**: 2025-10-23
-**Status**: Proposed
-**Deciders**: Gabriel Serafini, Claude Code (pending)
+**Status**: Accepted
+**Deciders**: Gabriel Serafini, Claude Code
 **Tags**: ui, components, accessibility
 
 ### Context
 Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly NextUI) for component library.
 
 ### Decision
-**PENDING USER INPUT** - Evaluation in progress.
+**Use HeroUI** as the primary component library for the application.
 
 ### Options
 
@@ -243,8 +243,8 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - Slightly larger bundle size
 - May need to override some styles
 
-### Recommendation
-**Switch to HeroUI** for the following reasons:
+### Rationale
+**HeroUI was chosen** for the following reasons:
 1. **Accessibility First**: Reentry population has diverse needs; built-in ARIA compliance is critical
 2. **AI Development Speed**: MCP server integration will significantly accelerate development
 3. **4th Grade Reading Level**: Better defaults for clear, simple interfaces
@@ -260,13 +260,18 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 5. Update documentation
 
 ### Consequences
-**If HeroUI is chosen**:
-- **Positive**: Faster development, better accessibility, AI assistance
-- **Negative**: Some rework needed, new API to learn
+**Positive**:
+- Faster development with complete component library
+- Built-in accessibility (WAI-ARIA compliant) - critical for target users
+- AI assistance via MCP server significantly accelerates development
+- Better default aesthetics and mobile patterns
+- Zero runtime styles for optimal performance
+- Strong support for 4th grade reading level interfaces
 
-**If shadcn/ui is kept**:
-- **Positive**: No migration needed, full control
-- **Negative**: Slower development, manual accessibility work, no AI tooling
+**Negative**:
+- Need to remove/replace current shadcn/ui components
+- Learning new component API
+- Slightly larger bundle size than shadcn/ui
 
 ### Alternatives Considered
 - **Material UI (MUI)**: Too heavy, poor Tailwind integration
@@ -274,7 +279,13 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - **Headless UI**: Too low-level, need to build everything
 - **Ant Design**: Not Tailwind-based, heavier bundle
 
-**STATUS**: Awaiting user decision on UI library
+### Implementation Plan
+1. Install HeroUI and configure Tailwind integration
+2. Set up HeroUI MCP server for AI-assisted development
+3. Audit and document current shadcn/ui components in use
+4. Migrate components one-by-one to HeroUI equivalents
+5. Test accessibility with screen readers
+6. Update all documentation with HeroUI patterns
 
 ---
 
@@ -522,7 +533,7 @@ Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 | 002 | Supabase for Backend | ✅ Accepted | Critical |
 | 003 | TypeScript Strict Mode | ✅ Accepted | High |
 | 004 | Tailwind CSS | ✅ Accepted | High |
-| 005 | **UI Library (HeroUI vs shadcn)** | ⏳ **PENDING** | **Critical** |
+| 005 | HeroUI for Component Library | ✅ Accepted | Critical |
 | 006 | Vitest + Playwright Testing | 📝 Proposed | High |
 | 007 | T3 Env Validation | 📝 Proposed | Medium |
 | 008 | ESLint + Prettier | 📝 Proposed | Medium |
