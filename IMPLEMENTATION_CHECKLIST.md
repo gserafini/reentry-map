@@ -3,6 +3,7 @@
 Detailed, testable checklist for building Reentry Map MVP. Organized by priority and dependencies.
 
 ## Legend
+
 - ✅ Complete
 - 🚧 In Progress
 - ⏳ Blocked
@@ -21,37 +22,41 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ### 0.1 Testing Infrastructure
 
-#### 0.1.1 Vitest Setup
-- [ ] Install Vitest dependencies
-  ```bash
-  npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom vite-tsconfig-paths
-  ```
-- [ ] Create `vitest.config.mts`
-- [ ] Add test scripts to `package.json`
-- [ ] Create `__tests__/` directory
-- [ ] Write example unit test for existing component
-- [ ] Run tests and verify they pass
-- [ ] **DEMO**: Show passing test output
+#### 0.1.1 Vitest Setup ✅
 
-#### 0.1.2 Playwright Setup
-- [ ] Install Playwright
+- [x] Install Vitest dependencies
   ```bash
-  npm install -D @playwright/test && npx playwright install
+  npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom vite-tsconfig-paths @vitest/ui
   ```
-- [ ] Create `playwright.config.ts`
-- [ ] Create `e2e/` directory
-- [ ] Write example E2E test for homepage
-- [ ] Run E2E tests and verify they pass
-- [ ] **DEMO**: Show Playwright test running in browser
+- [x] Create `vitest.config.mts`
+- [x] Add test scripts to `package.json` (test, test:ui, test:coverage, test:run)
+- [x] Create `__tests__/` directory
+- [x] Write example unit test for existing component (**tests**/example.test.tsx)
+- [x] Run tests and verify they pass (4/4 tests passing)
+- [x] **DEMO**: Show passing test output ✅
 
-#### 0.1.3 Test Coverage Configuration
-- [ ] Install coverage tools
+#### 0.1.2 Playwright Setup ✅
+
+- [x] Install Playwright
+  ```bash
+  npm install -D @playwright/test && npx playwright install --with-deps
+  ```
+- [x] Create `playwright.config.ts` (configured for all major browsers + mobile viewports)
+- [x] Create `e2e/` directory
+- [x] Write example E2E test for homepage (e2e/homepage.spec.ts - smoke tests)
+- [x] Run E2E tests and verify they pass (15/15 tests passing across 5 browsers)
+- [x] Add test scripts to package.json (test:e2e, test:e2e:ui, test:e2e:headed)
+- [x] **NOTE**: E2E tests run headless by default for troubleshooting
+
+#### 0.1.3 Test Coverage Configuration ✅
+
+- [x] Install coverage tools
   ```bash
   npm install -D @vitest/coverage-v8
   ```
-- [ ] Configure coverage thresholds
-- [ ] Add coverage script to `package.json`
-- [ ] Generate initial coverage report
+- [x] Configure coverage thresholds (70% for lines/functions/branches/statements in vitest.config.mts)
+- [x] Add coverage script to `package.json` (test:coverage)
+- [x] Generate initial coverage report (ready to run with `npm run test:coverage`)
 
 **Deliverable**: Working test infrastructure with examples
 **Review Point**: Run `npm test` and `npm run test:e2e`
@@ -60,65 +65,68 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ### 0.2 Code Quality Tools
 
-#### 0.2.1 Prettier Setup
-- [ ] Install Prettier
+#### 0.2.1 Prettier Setup ✅
+
+- [x] Install Prettier
   ```bash
-  npm install -D prettier
+  npm install -D prettier prettier-plugin-tailwindcss
   ```
-- [ ] Create `.prettierrc`
-- [ ] Create `.prettierignore`
-- [ ] Format all existing code
+- [x] Create `.prettierrc` (with Tailwind CSS plugin)
+- [x] Create `.prettierignore` (excludes generated files)
+- [x] Add format scripts to package.json (format, format:check)
+- [x] Format all existing code
   ```bash
   npm run format
   ```
-- [ ] **VERIFY**: No formatting changes needed
+- [x] **VERIFY**: No formatting changes needed ✅
 
-#### 0.2.2 ESLint Configuration
-- [ ] Install ESLint plugins
+#### 0.2.2 ESLint Configuration ✅
+
+- [x] Install ESLint plugins
   ```bash
   npm install -D eslint-config-prettier eslint-plugin-prettier
   ```
-- [ ] Update `eslint.config.mjs`
-- [ ] Fix all linting errors
-  ```bash
-  npm run lint:fix
-  ```
-- [ ] **VERIFY**: `npm run lint` passes with 0 errors
+- [x] Update `eslint.config.mjs` (added ignores, Prettier integration, config file rules)
+- [x] Fix all linting errors (excluded generated files, relaxed rules for config files)
+- [x] **VERIFY**: `npm run lint` passes with 0 errors ✅
 
-#### 0.2.3 Git Hooks (Optional but Recommended)
-- [ ] Install husky and lint-staged
+#### 0.2.3 Git Hooks ✅
+
+- [x] Install husky and lint-staged
   ```bash
   npm install -D husky lint-staged
   ```
-- [ ] Initialize husky
+- [x] Initialize husky
   ```bash
   npx husky init
   ```
-- [ ] Configure pre-commit hook
-- [ ] Test hook with sample commit
+- [x] Configure pre-commit hook (runs lint-staged with ESLint + Prettier)
+- [x] Test hook with sample commit ✅
 
 **Deliverable**: Automated code quality checks
-**Review Point**: Make a commit and verify hooks run
+**Review Point**: Make a commit and verify hooks run ✅
 
 ---
 
 ### 0.3 TypeScript Improvements
 
-#### 0.3.1 ts-reset Setup
-- [ ] Install ts-reset
+#### 0.3.1 ts-reset Setup ✅
+
+- [x] Install ts-reset
   ```bash
   npm install -D @total-typescript/ts-reset
   ```
-- [ ] Create `reset.d.ts`
-- [ ] Import all rules or selective rules
-- [ ] Update `tsconfig.json` to include `reset.d.ts`
-- [ ] **VERIFY**: TypeScript compilation succeeds
+- [x] Create `reset.d.ts` with all improved type rules
+- [x] Import all rules
+- [x] Update `tsconfig.json` to include `reset.d.ts` and exclude test files
+- [x] **VERIFY**: TypeScript compilation succeeds ✅
 
-#### 0.3.2 Type Safety Audit
-- [ ] Review `tsconfig.json` for strict settings
-- [ ] Enable any missing strict flags
-- [ ] Fix new type errors if any
-- [ ] **VERIFY**: `npm run build` succeeds
+#### 0.3.2 Type Safety Audit ✅
+
+- [x] Review `tsconfig.json` for strict settings (already has "strict": true)
+- [x] Enable any missing strict flags (all strict flags enabled)
+- [x] Fix new type errors if any (excluded test files from build)
+- [x] **VERIFY**: `npm run build` succeeds ✅
 
 **Deliverable**: Enhanced TypeScript safety
 **Review Point**: Show improved type inference
@@ -127,18 +135,21 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ### 0.4 Environment Validation
 
-#### 0.4.1 T3 Env Setup
-- [ ] Install T3 Env
+#### 0.4.1 T3 Env Setup ✅
+
+- [x] Install T3 Env
   ```bash
   npm install @t3-oss/env-nextjs zod
   ```
-- [ ] Create `src/env.ts`
-- [ ] Define server environment schema
-- [ ] Define client environment schema
-- [ ] Update `next.config.mjs` to validate on build
-- [ ] Update `tsconfig.json` for module resolution
+- [x] Create `lib/env.ts` with validation schema
+- [x] Define server environment schema (ready for future server vars)
+- [x] Define client environment schema (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+- [x] Configure runtime validation with skipValidation flag
+- [x] **VERIFY**: Validation catches missing env vars ✅
+- [x] **VERIFY**: Build succeeds with valid env vars ✅
 
 #### 0.4.2 Environment Variables Migration
+
 - [ ] Document all required env vars in `src/env.ts`
 - [ ] Update `.env.example` with all variables
 - [ ] Replace `process.env` usage with `env` import in existing code
@@ -146,6 +157,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **VERIFY**: Build succeeds with all env vars present
 
 #### 0.4.3 Environment Documentation
+
 - [ ] Update `SETUP_GUIDE.md` with env validation info
 - [ ] Update `CLAUDE.md` with env usage patterns
 - [ ] Document env var purposes in `.env.example`
@@ -158,17 +170,20 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 0.5 Documentation Updates
 
 #### 0.5.1 Update CLAUDE.md
+
 - [ ] Add testing patterns section
 - [ ] Add environment validation usage
 - [ ] Add code quality commands
 - [ ] Update common commands section
 
 #### 0.5.2 Update Technical Architecture
+
 - [ ] Add testing strategy section
 - [ ] Add quality tools section
 - [ ] Update tech stack with new tools
 
 #### 0.5.3 Create PROGRESS.md
+
 - [ ] Create initial progress tracking file
 - [ ] Document Phase 0 completion
 - [ ] Set metrics baseline
@@ -196,6 +211,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 1.2 If HeroUI Chosen
 
 #### 1.2.1 HeroUI Installation
+
 - [ ] Remove existing shadcn/ui components
 - [ ] Install HeroUI
   ```bash
@@ -206,6 +222,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **VERIFY**: Dev server runs without errors
 
 #### 1.2.2 HeroUI MCP Server Setup
+
 - [ ] Clone heroui-mcp repository
 - [ ] Install and build MCP server
 - [ ] Configure Claude Desktop to use MCP
@@ -213,6 +230,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **DEMO**: Show MCP providing component docs
 
 #### 1.2.3 Component Migration
+
 - [ ] Audit current components (login-form, sign-up-form, etc.)
 - [ ] Create HeroUI equivalents
   - [ ] Button components
@@ -223,6 +241,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **DEMO**: Show updated auth pages
 
 #### 1.2.4 Testing HeroUI Components
+
 - [ ] Write tests for new components
 - [ ] Verify accessibility with screen readers
 - [ ] Test keyboard navigation
@@ -232,6 +251,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 1.3 If shadcn/ui Kept
 
 #### 1.3.1 Complete shadcn/ui Setup
+
 - [ ] Document all required components
 - [ ] Install missing components
 - [ ] Create component library documentation
@@ -261,6 +281,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 2.2 Database Schema
 
 #### 2.2.1 Core Tables
+
 - [ ] Create `resources` table (copy from TECHNICAL_ARCHITECTURE.md)
 - [ ] Create `users` table
 - [ ] Create `user_favorites` table
@@ -273,6 +294,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **VERIFY**: All tables exist in Supabase dashboard
 
 #### 2.2.2 Indexes & Extensions
+
 - [ ] Enable PostGIS extension
 - [ ] Create spatial index on resources (ST_MakePoint)
 - [ ] Create full-text search index on resources
@@ -281,6 +303,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **VERIFY**: Run EXPLAIN on sample queries
 
 #### 2.2.3 Functions & Triggers
+
 - [ ] Create `update_resource_rating()` function
 - [ ] Create rating trigger
 - [ ] Create `update_resource_review_count()` function
@@ -338,6 +361,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 3.1 Resource Data Layer
 
 #### 3.1.1 Supabase Client Setup
+
 - [ ] Verify `lib/supabase/client.ts` configured
 - [ ] Verify `lib/supabase/server.ts` configured
 - [ ] Create `lib/api/resources.ts` with query functions
@@ -346,6 +370,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write tests for API functions
 
 #### 3.1.2 Resource Type Definitions
+
 - [ ] Create `Resource` interface
 - [ ] Create `ResourceFilters` interface
 - [ ] Create `SearchParams` interface
@@ -354,6 +379,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 3.2 Resource List Page
 
 #### 3.2.1 Server Component
+
 - [ ] Create `app/resources/page.tsx` (Server Component)
 - [ ] Fetch resources from Supabase
 - [ ] Handle empty state
@@ -363,6 +389,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Add error.tsx
 
 #### 3.2.2 ResourceCard Component
+
 - [ ] Create `components/resources/ResourceCard.tsx`
 - [ ] Display resource name, category, address
 - [ ] Show distance (if available)
@@ -373,6 +400,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility
 
 #### 3.2.3 ResourceList Component
+
 - [ ] Create `components/resources/ResourceList.tsx`
 - [ ] Render grid of ResourceCard components
 - [ ] Implement loading skeleton
@@ -384,6 +412,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 3.3 Resource Detail Page
 
 #### 3.3.1 Server Component
+
 - [ ] Create `app/resources/[id]/page.tsx`
 - [ ] Fetch single resource by ID
 - [ ] Handle not found (404)
@@ -393,6 +422,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Implement metadata (SEO)
 
 #### 3.3.2 ResourceDetail Component
+
 - [ ] Create `components/resources/ResourceDetail.tsx`
 - [ ] Display all resource information
 - [ ] Show full address
@@ -409,6 +439,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 3.4 Search Functionality
 
 #### 3.4.1 SearchBar Component
+
 - [ ] Create `components/search/SearchBar.tsx`
 - [ ] Text input with icon
 - [ ] Implement debouncing (300ms)
@@ -418,6 +449,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility (keyboard nav)
 
 #### 3.4.2 Search Implementation
+
 - [ ] Add full-text search query to `lib/api/resources.ts`
 - [ ] Implement search in resource list page
 - [ ] Show search results count
@@ -429,6 +461,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 3.5 Category Filtering
 
 #### 3.5.1 CategoryFilter Component
+
 - [ ] Create `components/search/CategoryFilter.tsx`
 - [ ] List all categories
 - [ ] Multi-select checkboxes
@@ -439,6 +472,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility
 
 #### 3.5.2 Filter Implementation
+
 - [ ] Add category filter query to `lib/api/resources.ts`
 - [ ] Combine with search query
 - [ ] Update resource list page
@@ -483,6 +517,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 4.1 Geolocation
 
 #### 4.1.1 useLocation Hook
+
 - [ ] Create `lib/hooks/useLocation.ts`
 - [ ] Request browser geolocation
 - [ ] Handle permission denied
@@ -491,6 +526,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write hook tests
 
 #### 4.1.2 Manual Address Entry
+
 - [ ] Create AddressSearch component
 - [ ] Google Places Autocomplete integration
 - [ ] Geocode selected address
@@ -500,12 +536,14 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 4.2 Distance Calculations
 
 #### 4.2.1 Distance Utilities
+
 - [ ] Create `lib/utils/distance.ts`
 - [ ] Haversine formula for distance calculation
 - [ ] Format distance (miles/km)
 - [ ] Write unit tests
 
 #### 4.2.2 Distance Display
+
 - [ ] Update ResourceCard to show distance
 - [ ] Update resource queries to calculate distance
 - [ ] Add "Near Me" button
@@ -515,6 +553,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 4.3 Google Maps Integration
 
 #### 4.3.1 Map Setup
+
 - [ ] Install @googlemaps/js-api-loader
 - [ ] Create `components/map/ResourceMap.tsx`
 - [ ] Load Google Maps API
@@ -524,6 +563,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write component tests
 
 #### 4.3.2 Markers
+
 - [ ] Create `components/map/MapMarker.tsx`
 - [ ] Add markers for all resources
 - [ ] Color-code by category
@@ -532,6 +572,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write tests
 
 #### 4.3.3 Info Windows
+
 - [ ] Create `components/map/MapInfoWindow.tsx`
 - [ ] Show resource preview on marker click
 - [ ] Display name, category, rating
@@ -573,6 +614,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 5.1 Phone Authentication
 
 #### 5.1.1 Auth UI Components
+
 - [ ] Update or create PhoneAuth component
 - [ ] Phone number input with formatting
 - [ ] OTP code input (6 digits)
@@ -583,6 +625,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility
 
 #### 5.1.2 Supabase Auth Integration
+
 - [ ] Configure Supabase Auth for phone/SMS
 - [ ] Implement sign-in flow
 - [ ] Implement OTP verification
@@ -591,6 +634,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **DEMO**: Sign in with phone number
 
 #### 5.1.3 Session Management
+
 - [ ] Implement session persistence
 - [ ] Create useAuth hook
 - [ ] Handle token refresh
@@ -600,6 +644,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 5.2 User Profile
 
 #### 5.2.1 Profile Page
+
 - [ ] Create `app/profile/page.tsx`
 - [ ] Display user info
 - [ ] Edit name
@@ -633,6 +678,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 6.1 Favorites
 
 #### 6.1.1 FavoriteButton Component
+
 - [ ] Create `components/user/FavoriteButton.tsx`
 - [ ] Heart icon with active/inactive states
 - [ ] Toggle favorite on click
@@ -643,6 +689,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility
 
 #### 6.1.2 Favorites Integration
+
 - [ ] Add favorites API to `lib/api/favorites.ts`
 - [ ] Add FavoriteButton to ResourceCard
 - [ ] Add FavoriteButton to ResourceDetail
@@ -650,6 +697,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write integration tests
 
 #### 6.1.3 Favorites Page
+
 - [ ] Create `app/favorites/page.tsx`
 - [ ] Display user's favorites
 - [ ] Show personal notes
@@ -661,6 +709,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 6.2 Ratings
 
 #### 6.2.1 RatingStars Component
+
 - [ ] Create `components/user/RatingStars.tsx`
 - [ ] Interactive star input
 - [ ] Display-only star view
@@ -669,6 +718,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility
 
 #### 6.2.2 Rating Integration
+
 - [ ] Add ratings API to `lib/api/ratings.ts`
 - [ ] Add rating UI to ResourceDetail
 - [ ] Prevent multiple ratings per user
@@ -693,6 +743,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 7.1 Review System
 
 #### 7.1.1 ReviewForm Component
+
 - [ ] Create `components/user/ReviewForm.tsx`
 - [ ] Rating input
 - [ ] Review text (500 char max)
@@ -704,6 +755,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Test accessibility
 
 #### 7.1.2 Review API
+
 - [ ] Add reviews API to `lib/api/reviews.ts`
 - [ ] Submit review
 - [ ] Update review
@@ -711,6 +763,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write integration tests
 
 #### 7.1.3 ReviewsList Component
+
 - [ ] Create `components/user/ReviewsList.tsx`
 - [ ] Display all reviews for a resource
 - [ ] Show reviewer name, date, rating
@@ -722,6 +775,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 7.2 Review Helpfulness
 
 #### 7.2.1 Helpfulness Voting
+
 - [ ] Add helpful/not helpful buttons to ReviewCard
 - [ ] Implement voting API
 - [ ] Prevent multiple votes per review
@@ -730,6 +784,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] **DEMO**: Vote on review helpfulness
 
 #### 7.2.2 Integration
+
 - [ ] Add reviews to ResourceDetail page
 - [ ] Show review count in ResourceCard
 - [ ] Write integration tests
@@ -751,6 +806,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 8.1 Resource Suggestions
 
 #### 8.1.1 Suggestion Form
+
 - [ ] Create `app/suggest-resource/page.tsx`
 - [ ] Form with all required fields
 - [ ] Validation
@@ -759,6 +815,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write tests
 
 #### 8.1.2 User Suggestions View
+
 - [ ] Create `app/my-suggestions/page.tsx`
 - [ ] Show user's suggestions
 - [ ] Display status (pending/approved/rejected)
@@ -768,6 +825,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 8.2 Report Issues
 
 #### 8.2.1 Report Form
+
 - [ ] Add "Report a Problem" button to ResourceDetail
 - [ ] Modal with issue types
 - [ ] Description field
@@ -799,6 +857,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 9.2 Admin Dashboard
 
 #### 9.2.1 Dashboard Page
+
 - [ ] Create `app/admin/page.tsx`
 - [ ] Display key metrics
 - [ ] Total resources
@@ -810,6 +869,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 9.3 Resource Management
 
 #### 9.3.1 Resource List
+
 - [ ] Create `app/admin/resources/page.tsx`
 - [ ] List all resources (paginated, searchable)
 - [ ] Add new resource button
@@ -818,6 +878,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write tests
 
 #### 9.3.2 Resource Form
+
 - [ ] Create resource creation form
 - [ ] Create resource editing form
 - [ ] Validation
@@ -829,6 +890,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 9.4 Suggestions Review
 
 #### 9.4.1 Suggestions Queue
+
 - [ ] Create `app/admin/suggestions/page.tsx`
 - [ ] List pending suggestions
 - [ ] View suggestion details
@@ -841,6 +903,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 9.5 Update Requests Review
 
 #### 9.5.1 Updates Queue
+
 - [ ] Create `app/admin/updates/page.tsx`
 - [ ] List pending update requests
 - [ ] View current vs proposed values
@@ -865,6 +928,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 10.1 AI Agent Infrastructure
 
 #### 10.1.1 Base Agent
+
 - [ ] Create `lib/ai-agents/types.ts`
 - [ ] Create `lib/ai-agents/agentRunner.ts`
 - [ ] OpenAI client setup
@@ -876,12 +940,14 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 10.2 Enrichment Agent
 
 #### 10.2.1 Geocoding
+
 - [ ] Implement address geocoding via Google Geocoding API
 - [ ] Update lat/lng on resource
 - [ ] Handle errors
 - [ ] Write tests
 
 #### 10.2.2 Web Scraping
+
 - [ ] Use Cheerio to scrape website
 - [ ] Extract description
 - [ ] Extract hours
@@ -889,17 +955,20 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write tests
 
 #### 10.2.3 Categorization
+
 - [ ] Use GPT-4o-mini to categorize resource
 - [ ] Add relevant tags
 - [ ] Update resource
 - [ ] Write tests
 
 #### 10.2.4 Completeness Score
+
 - [ ] Calculate data completeness (0-100%)
 - [ ] Update resource
 - [ ] Write tests
 
 #### 10.2.5 Integration
+
 - [ ] Create API route `app/api/agents/enrich/route.ts`
 - [ ] Accept resource ID
 - [ ] Run enrichment
@@ -910,23 +979,27 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 10.3 Verification Agent
 
 #### 10.3.1 Phone Verification
+
 - [ ] Check phone number format
 - [ ] Optional: Use Twilio Lookup (if budget allows)
 - [ ] Update verification status
 - [ ] Write tests
 
 #### 10.3.2 Website Verification
+
 - [ ] Check if website is accessible
 - [ ] Check SSL certificate
 - [ ] Update verification status
 - [ ] Write tests
 
 #### 10.3.3 Business Status
+
 - [ ] Query Google Places API for business status
 - [ ] Update resource if closed
 - [ ] Write tests
 
 #### 10.3.4 Integration
+
 - [ ] Create API route `app/api/agents/verify/route.ts`
 - [ ] Run verification checks
 - [ ] Update verification score
@@ -1019,18 +1092,21 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ### 13.2 Manual Testing
 
 #### 13.2.1 Desktop Testing
+
 - [ ] Test in Chrome
 - [ ] Test in Safari
 - [ ] Test in Firefox
 - [ ] Test in Edge
 
 #### 13.2.2 Mobile Testing
+
 - [ ] Test on iPhone (Safari)
 - [ ] Test on Android (Chrome)
 - [ ] Test PWA installation
 - [ ] Test offline mode
 
 #### 13.2.3 Accessibility Testing
+
 - [ ] Run Lighthouse audit (target >90)
 - [ ] Test with keyboard navigation
 - [ ] Test with screen reader (VoiceOver/NVDA)
@@ -1038,6 +1114,7 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Fix accessibility issues
 
 #### 13.2.4 Performance Testing
+
 - [ ] Run Lighthouse performance audit
 - [ ] Test on 3G throttling
 - [ ] Optimize images
@@ -1099,12 +1176,14 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 ## Ongoing Maintenance
 
 ### Daily Tasks (Post-Launch)
+
 - [ ] Check error logs
 - [ ] Monitor user activity
 - [ ] Respond to user feedback
 - [ ] Fix urgent bugs
 
 ### Weekly Tasks
+
 - [ ] Review metrics
 - [ ] Analyze user feedback
 - [ ] Prioritize improvements

@@ -1,6 +1,7 @@
 # Reentry Map - Technical Architecture
 
 ## Architecture Overview
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Client Layer                          │
@@ -31,6 +32,7 @@
 ## Tech Stack (Latest Stable Versions)
 
 ### Frontend
+
 - **Framework**: Next.js 16.0.x (App Router, React Server Components)
 - **React**: React 19.x (latest stable)
 - **Language**: TypeScript 5.7.x
@@ -42,6 +44,7 @@
 - **Forms**: react-hook-form 7.53.x + zod 3.23.x
 
 ### Backend
+
 - **Platform**: Next.js 15 Route Handlers (App Router)
 - **Database**: Supabase (PostgreSQL 16)
 - **ORM/Client**: @supabase/ssr 0.5.x (latest SSR package)
@@ -50,6 +53,7 @@
 - **Realtime**: Supabase Realtime
 
 ### AI & Automation
+
 - **LLM**: OpenAI SDK 4.68.x
   - Model: gpt-4o-mini (cost-effective, fast)
   - Vision: gpt-4o (for future document scanning)
@@ -58,6 +62,7 @@
 - **Web Scraping**: cheerio 1.0.x
 
 ### Infrastructure
+
 - **Hosting**: Vercel (Next.js 16 optimized)
 - **Database**: Supabase Cloud
 - **CDN**: Vercel Edge Network
@@ -66,6 +71,7 @@
 - **Cron Jobs**: Vercel Cron (native)
 
 ### Development Tools
+
 - **Version Control**: Git + GitHub
 - **Package Manager**: npm 10.x or pnpm 9.x (faster)
 - **Linting**: ESLint 9.x (flat config)
@@ -78,23 +84,25 @@
 ### Core Tables
 
 #### resources
+
 Primary table for all reentry resources.
+
 ```sql
 CREATE TABLE resources (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  
+
   -- Basic Information
   name TEXT NOT NULL,
   description TEXT,
   services_offered TEXT[],
-  
+
   -- Contact
   phone TEXT,
   phone_verified BOOLEAN DEFAULT false,
   phone_last_verified TIMESTAMPTZ,
   email TEXT,
   website TEXT,
-  
+
   -- Location
   address TEXT NOT NULL,
   city TEXT,
@@ -102,47 +110,47 @@ CREATE TABLE resources (
   zip TEXT,
   latitude DOUBLE PRECISION NOT NULL,
   longitude DOUBLE PRECISION NOT NULL,
-  
+
   -- Schedule
   hours JSONB,
   timezone TEXT DEFAULT 'America/Los_Angeles',
-  
+
   -- Categorization
   primary_category TEXT NOT NULL,
   categories TEXT[],
   tags TEXT[],
-  
+
   -- Eligibility
   eligibility_requirements TEXT,
   accepts_records BOOLEAN DEFAULT true,
   appointment_required BOOLEAN DEFAULT false,
-  
+
   -- Media
   photos JSONB[],
   logo_url TEXT,
-  
+
   -- AI Metadata
   ai_discovered BOOLEAN DEFAULT false,
   ai_enriched BOOLEAN DEFAULT false,
   ai_last_verified TIMESTAMPTZ,
   ai_verification_score DOUBLE PRECISION,
   data_completeness_score DOUBLE PRECISION,
-  
+
   -- Verification
   verified BOOLEAN DEFAULT false,
   verified_by UUID REFERENCES auth.users(id),
   verified_date TIMESTAMPTZ,
-  
+
   -- Community Stats
   rating_average DOUBLE PRECISION DEFAULT 0,
   rating_count INTEGER DEFAULT 0,
   review_count INTEGER DEFAULT 0,
   view_count INTEGER DEFAULT 0,
-  
+
   -- Status
   status TEXT DEFAULT 'active',
   status_reason TEXT,
-  
+
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -152,11 +160,11 @@ CREATE TABLE resources (
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- Add spatial index
-CREATE INDEX idx_resources_location ON resources 
+CREATE INDEX idx_resources_location ON resources
 USING GIST (ST_MakePoint(longitude, latitude)::geography);
 
 -- Add search index
-CREATE INDEX idx_resources_search ON resources 
+CREATE INDEX idx_resources_search ON resources
 USING GIN (to_tsvector('english', name || ' ' || COALESCE(description, '')));
 
 -- Add category index
@@ -166,7 +174,9 @@ CREATE INDEX idx_resources_rating ON resources(rating_average DESC);
 ```
 
 #### users
+
 Extended user profile (Supabase Auth integration).
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -181,17 +191,19 @@ CREATE TABLE users (
 -- RLS Policies
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own profile" 
-  ON users FOR SELECT 
+CREATE POLICY "Users can view own profile"
+  ON users FOR SELECT
   USING (auth.uid() = id);
 
-CREATE POLICY "Users can update own profile" 
-  ON users FOR UPDATE 
+CREATE POLICY "Users can update own profile"
+  ON users FOR UPDATE
   USING (auth.uid() = id);
 ```
 
 #### user_favorites
+
 Users' saved/favorited resources.
+
 ```sql
 CREATE TABLE user_favorites (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -208,25 +220,27 @@ CREATE INDEX idx_favorites_resource ON user_favorites(resource_id);
 -- RLS Policies
 ALTER TABLE user_favorites ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own favorites" 
-  ON user_favorites FOR SELECT 
+CREATE POLICY "Users can view own favorites"
+  ON user_favorites FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert own favorites" 
-  ON user_favorites FOR INSERT 
+CREATE POLICY "Users can insert own favorites"
+  ON user_favorites FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete own favorites" 
-  ON user_favorites FOR DELETE 
+CREATE POLICY "Users can delete own favorites"
+  ON user_favorites FOR DELETE
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own favorites" 
-  ON user_favorites FOR UPDATE 
+CREATE POLICY "Users can update own favorites"
+  ON user_favorites FOR UPDATE
   USING (auth.uid() = user_id);
 ```
 
 #### resource_ratings
+
 User ratings for resources (1-5 stars).
+
 ```sql
 CREATE TABLE resource_ratings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -244,27 +258,29 @@ CREATE INDEX idx_ratings_user ON resource_ratings(user_id);
 -- RLS Policies
 ALTER TABLE resource_ratings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Everyone can view ratings" 
-  ON resource_ratings FOR SELECT 
+CREATE POLICY "Everyone can view ratings"
+  ON resource_ratings FOR SELECT
   USING (true);
 
-CREATE POLICY "Users can insert own ratings" 
-  ON resource_ratings FOR INSERT 
+CREATE POLICY "Users can insert own ratings"
+  ON resource_ratings FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own ratings" 
-  ON resource_ratings FOR UPDATE 
+CREATE POLICY "Users can update own ratings"
+  ON resource_ratings FOR UPDATE
   USING (auth.uid() = user_id);
 ```
 
 #### resource_reviews
+
 Detailed user reviews with text feedback.
+
 ```sql
 CREATE TABLE resource_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  
+
   -- Review content
   rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
   review_text TEXT,
@@ -274,25 +290,25 @@ CREATE TABLE resource_reviews (
   pros TEXT,
   cons TEXT,
   tips TEXT,
-  
+
   -- Verification
   verified_visit BOOLEAN DEFAULT false,
-  
+
   -- Moderation
   flagged BOOLEAN DEFAULT false,
   flag_reason TEXT,
   approved BOOLEAN DEFAULT true,
   moderated_by UUID REFERENCES users(id),
   moderated_at TIMESTAMPTZ,
-  
+
   -- Community engagement
   helpful_count INTEGER DEFAULT 0,
   not_helpful_count INTEGER DEFAULT 0,
-  
+
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   UNIQUE(user_id, resource_id)
 );
 
@@ -303,21 +319,23 @@ CREATE INDEX idx_reviews_helpful ON resource_reviews(helpful_count DESC);
 -- RLS Policies
 ALTER TABLE resource_reviews ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Everyone can view approved reviews" 
-  ON resource_reviews FOR SELECT 
+CREATE POLICY "Everyone can view approved reviews"
+  ON resource_reviews FOR SELECT
   USING (approved = true);
 
-CREATE POLICY "Users can insert own reviews" 
-  ON resource_reviews FOR INSERT 
+CREATE POLICY "Users can insert own reviews"
+  ON resource_reviews FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own reviews" 
-  ON resource_reviews FOR UPDATE 
+CREATE POLICY "Users can update own reviews"
+  ON resource_reviews FOR UPDATE
   USING (auth.uid() = user_id);
 ```
 
 #### review_helpfulness
+
 Users vote on review helpfulness.
+
 ```sql
 CREATE TABLE review_helpfulness (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -333,22 +351,24 @@ CREATE INDEX idx_helpfulness_review ON review_helpfulness(review_id);
 -- RLS Policies
 ALTER TABLE review_helpfulness ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can vote on reviews" 
-  ON review_helpfulness FOR INSERT 
+CREATE POLICY "Users can vote on reviews"
+  ON review_helpfulness FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can view all votes" 
-  ON review_helpfulness FOR SELECT 
+CREATE POLICY "Users can view all votes"
+  ON review_helpfulness FOR SELECT
   USING (true);
 ```
 
 #### resource_suggestions
+
 User-submitted resource suggestions.
+
 ```sql
 CREATE TABLE resource_suggestions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   suggested_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  
+
   -- Suggested resource details
   name TEXT NOT NULL,
   address TEXT,
@@ -356,20 +376,20 @@ CREATE TABLE resource_suggestions (
   website TEXT,
   description TEXT,
   category TEXT,
-  
+
   -- Context
   reason TEXT,
   personal_experience TEXT,
-  
+
   -- Review workflow
   status TEXT DEFAULT 'pending', -- pending, approved, rejected, duplicate
   reviewed_by UUID REFERENCES users(id),
   reviewed_at TIMESTAMPTZ,
   review_notes TEXT,
-  
+
   -- If approved
   created_resource_id UUID REFERENCES resources(id),
-  
+
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -379,32 +399,34 @@ CREATE INDEX idx_suggestions_user ON resource_suggestions(suggested_by);
 -- RLS Policies
 ALTER TABLE resource_suggestions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own suggestions" 
-  ON resource_suggestions FOR SELECT 
+CREATE POLICY "Users can view own suggestions"
+  ON resource_suggestions FOR SELECT
   USING (auth.uid() = suggested_by);
 
-CREATE POLICY "Users can create suggestions" 
-  ON resource_suggestions FOR INSERT 
+CREATE POLICY "Users can create suggestions"
+  ON resource_suggestions FOR INSERT
   WITH CHECK (auth.uid() = suggested_by);
 ```
 
 #### resource_updates
+
 User-reported updates/corrections to resources.
+
 ```sql
 CREATE TABLE resource_updates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
   reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  
+
   update_type TEXT NOT NULL, -- hours_changed, closed, moved, phone_changed, etc.
   old_value TEXT,
   new_value TEXT,
   description TEXT,
-  
+
   status TEXT DEFAULT 'pending', -- pending, applied, rejected
   reviewed_by UUID REFERENCES users(id),
   reviewed_at TIMESTAMPTZ,
-  
+
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -414,34 +436,36 @@ CREATE INDEX idx_updates_status ON resource_updates(status);
 -- RLS Policies
 ALTER TABLE resource_updates ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can submit updates" 
-  ON resource_updates FOR INSERT 
+CREATE POLICY "Users can submit updates"
+  ON resource_updates FOR INSERT
   WITH CHECK (auth.uid() = reported_by);
 
-CREATE POLICY "Users can view all updates" 
-  ON resource_updates FOR SELECT 
+CREATE POLICY "Users can view all updates"
+  ON resource_updates FOR SELECT
   USING (true);
 ```
 
 #### ai_agent_logs
+
 Logging for AI agent operations.
+
 ```sql
 CREATE TABLE ai_agent_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_type TEXT NOT NULL, -- discovery, enrichment, verification, categorization
   resource_id UUID REFERENCES resources(id) ON DELETE SET NULL,
-  
+
   action TEXT NOT NULL,
   input JSONB,
   output JSONB,
-  
+
   success BOOLEAN,
   error_message TEXT,
   confidence_score DOUBLE PRECISION,
-  
+
   cost DOUBLE PRECISION, -- API costs in USD
   duration_ms INTEGER,
-  
+
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -452,25 +476,26 @@ CREATE INDEX idx_agent_logs_resource ON ai_agent_logs(resource_id);
 ## Database Functions & Triggers
 
 ### Auto-update resource rating average
+
 ```sql
 CREATE OR REPLACE FUNCTION update_resource_rating()
 RETURNS TRIGGER AS $$
 BEGIN
   UPDATE resources
-  SET 
+  SET
     rating_average = (
       SELECT COALESCE(AVG(rating), 0)::DOUBLE PRECISION
-      FROM resource_ratings 
+      FROM resource_ratings
       WHERE resource_id = COALESCE(NEW.resource_id, OLD.resource_id)
     ),
     rating_count = (
-      SELECT COUNT(*) 
-      FROM resource_ratings 
+      SELECT COUNT(*)
+      FROM resource_ratings
       WHERE resource_id = COALESCE(NEW.resource_id, OLD.resource_id)
     ),
     updated_at = NOW()
   WHERE id = COALESCE(NEW.resource_id, OLD.resource_id);
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -482,21 +507,22 @@ EXECUTE FUNCTION update_resource_rating();
 ```
 
 ### Auto-update review count
+
 ```sql
 CREATE OR REPLACE FUNCTION update_resource_review_count()
 RETURNS TRIGGER AS $$
 BEGIN
   UPDATE resources
-  SET 
+  SET
     review_count = (
-      SELECT COUNT(*) 
-      FROM resource_reviews 
+      SELECT COUNT(*)
+      FROM resource_reviews
       WHERE resource_id = COALESCE(NEW.resource_id, OLD.resource_id)
         AND approved = true
     ),
     updated_at = NOW()
   WHERE id = COALESCE(NEW.resource_id, OLD.resource_id);
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -508,27 +534,28 @@ EXECUTE FUNCTION update_resource_review_count();
 ```
 
 ### Auto-update review helpfulness count
+
 ```sql
 CREATE OR REPLACE FUNCTION update_review_helpfulness_count()
 RETURNS TRIGGER AS $$
 BEGIN
   UPDATE resource_reviews
-  SET 
+  SET
     helpful_count = (
-      SELECT COUNT(*) 
-      FROM review_helpfulness 
+      SELECT COUNT(*)
+      FROM review_helpfulness
       WHERE review_id = COALESCE(NEW.review_id, OLD.review_id)
         AND helpful = true
     ),
     not_helpful_count = (
-      SELECT COUNT(*) 
-      FROM review_helpfulness 
+      SELECT COUNT(*)
+      FROM review_helpfulness
       WHERE review_id = COALESCE(NEW.review_id, OLD.review_id)
         AND helpful = false
     ),
     updated_at = NOW()
   WHERE id = COALESCE(NEW.review_id, OLD.review_id);
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -540,6 +567,7 @@ EXECUTE FUNCTION update_review_helpfulness_count();
 ```
 
 ### Auto-create user profile on signup
+
 ```sql
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
@@ -557,6 +585,7 @@ EXECUTE FUNCTION handle_new_user();
 ```
 
 ## API Routes Structure
+
 ```
 app/api/
 ├── resources/
@@ -588,6 +617,7 @@ app/api/
 ```
 
 ## File Structure
+
 ```
 reentry-map/
 ├── app/
@@ -712,6 +742,7 @@ reentry-map/
 ```
 
 ## Environment Variables
+
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
@@ -738,18 +769,21 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ## Security Considerations
 
 ### Authentication
+
 - Phone-based OTP (SMS) via Supabase Auth
 - No passwords to manage
 - Session-based authentication
 - HTTP-only cookies for tokens
 
 ### Row Level Security (RLS)
+
 - All tables have RLS enabled
 - Users can only access/modify their own data
 - Resources are public (read-only for anonymous)
 - Admin actions require is_admin flag
 
 ### API Security
+
 - Rate limiting on all endpoints
 - Input validation using Zod schemas
 - SQL injection prevention (parameterized queries)
@@ -757,6 +791,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - CORS configured for app domain only
 
 ### Data Privacy
+
 - Phone numbers hashed
 - User data encrypted at rest (Supabase)
 - HTTPS enforced (Vercel)
@@ -766,6 +801,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ## Performance Optimizations
 
 ### Next.js 16 Features
+
 - React Server Components (reduce client JS)
 - Streaming SSR for faster initial load
 - Partial Prerendering (PPR) for hybrid pages
@@ -773,12 +809,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Font Optimization with next/font
 
 ### Database
+
 - Proper indexing on frequently queried fields
 - PostGIS for efficient geospatial queries
 - Connection pooling via Supabase
 - Query result caching where appropriate
 
 ### Frontend
+
 - Code splitting by route
 - Lazy loading for heavy components
 - Image lazy loading and responsive images
@@ -786,6 +824,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Debounced search inputs
 
 ### API
+
 - Response caching with Cache-Control headers
 - Pagination for large result sets
 - Selective field fetching (don't over-fetch)
@@ -794,21 +833,25 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ## Monitoring & Analytics
 
 ### Vercel Analytics
+
 - Core Web Vitals monitoring
 - Page view tracking
 - User flow analysis
 
 ### Error Tracking
+
 - Vercel error logging
 - Client-side error boundary
 - API error responses logged
 
 ### Performance
+
 - Vercel Speed Insights
 - Lighthouse CI in deployment
 - Bundle size monitoring
 
 ### Custom Metrics
+
 - Resource search queries
 - User engagement (favorites, reviews)
 - AI agent success rates

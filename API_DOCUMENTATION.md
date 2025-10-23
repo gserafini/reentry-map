@@ -6,6 +6,7 @@ This document describes the Reentry Map REST API endpoints, authentication,
 request/response formats, and error handling.
 
 ## Base URL
+
 ```
 Development: http://localhost:3000/api
 Production: https://reentry-map.vercel.app/api
@@ -23,6 +24,7 @@ Most endpoints require authentication via Supabase session cookies.
 4. **Sign Out** - Clear session
 
 ### Headers
+
 ```http
 Content-Type: application/json
 Cookie: sb-access-token=...; sb-refresh-token=...
@@ -36,18 +38,19 @@ Cookie: sb-access-token=...; sb-refresh-token=...
 
 ## Common Response Codes
 
-| Code | Meaning |
-|------|---------|
-| 200 | Success |
-| 201 | Created |
-| 400 | Bad Request (validation error) |
-| 401 | Unauthorized (not authenticated) |
-| 403 | Forbidden (insufficient permissions) |
-| 404 | Not Found |
-| 429 | Too Many Requests (rate limited) |
-| 500 | Internal Server Error |
+| Code | Meaning                              |
+| ---- | ------------------------------------ |
+| 200  | Success                              |
+| 201  | Created                              |
+| 400  | Bad Request (validation error)       |
+| 401  | Unauthorized (not authenticated)     |
+| 403  | Forbidden (insufficient permissions) |
+| 404  | Not Found                            |
+| 429  | Too Many Requests (rate limited)     |
+| 500  | Internal Server Error                |
 
 ## Error Response Format
+
 ```json
 {
   "error": "Error message",
@@ -70,25 +73,27 @@ Get a paginated list of active resources.
 
 **Query Parameters**:
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `search` | string | Search by name, description, tags | - |
-| `category` | string | Filter by primary category | - |
-| `categories` | string[] | Filter by multiple categories (comma-separated) | - |
-| `lat` | number | User latitude for distance calculation | - |
-| `lng` | number | User longitude for distance calculation | - |
-| `radius` | number | Search radius in miles (requires lat/lng) | 25 |
-| `page` | number | Page number | 1 |
-| `limit` | number | Results per page (max 100) | 20 |
-| `sort` | string | Sort by: `name`, `distance`, `rating`, `created_at` | `name` |
-| `order` | string | Sort order: `asc`, `desc` | `asc` |
+| Parameter    | Type     | Description                                         | Default |
+| ------------ | -------- | --------------------------------------------------- | ------- |
+| `search`     | string   | Search by name, description, tags                   | -       |
+| `category`   | string   | Filter by primary category                          | -       |
+| `categories` | string[] | Filter by multiple categories (comma-separated)     | -       |
+| `lat`        | number   | User latitude for distance calculation              | -       |
+| `lng`        | number   | User longitude for distance calculation             | -       |
+| `radius`     | number   | Search radius in miles (requires lat/lng)           | 25      |
+| `page`       | number   | Page number                                         | 1       |
+| `limit`      | number   | Results per page (max 100)                          | 20      |
+| `sort`       | string   | Sort by: `name`, `distance`, `rating`, `created_at` | `name`  |
+| `order`      | string   | Sort order: `asc`, `desc`                           | `asc`   |
 
 **Example Request**:
+
 ```http
 GET /api/resources?search=employment&lat=37.8044&lng=-122.2712&radius=10&sort=distance&limit=20
 ```
 
 **Example Response**:
+
 ```json
 {
   "data": [
@@ -108,11 +113,11 @@ GET /api/resources?search=employment&lat=37.8044&lng=-122.2712&radius=10&sort=di
       "categories": ["employment", "education"],
       "tags": ["job training", "resume help", "second chance"],
       "hours": {
-        "monday": {"open": "09:00", "close": "17:00"},
-        "tuesday": {"open": "09:00", "close": "17:00"},
-        "wednesday": {"open": "09:00", "close": "17:00"},
-        "thursday": {"open": "09:00", "close": "17:00"},
-        "friday": {"open": "09:00", "close": "17:00"}
+        "monday": { "open": "09:00", "close": "17:00" },
+        "tuesday": { "open": "09:00", "close": "17:00" },
+        "wednesday": { "open": "09:00", "close": "17:00" },
+        "thursday": { "open": "09:00", "close": "17:00" },
+        "friday": { "open": "09:00", "close": "17:00" }
       },
       "rating_average": 4.5,
       "rating_count": 10,
@@ -147,11 +152,13 @@ Get detailed information about a specific resource.
 **Endpoint**: `GET /api/resources/:id`
 
 **Example Request**:
+
 ```http
 GET /api/resources/550e8400-e29b-41d4-a716-446655440000
 ```
 
 **Example Response**:
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -176,11 +183,11 @@ GET /api/resources/550e8400-e29b-41d4-a716-446655440000
   "categories": ["employment", "education"],
   "tags": ["job training", "resume help", "second chance"],
   "hours": {
-    "monday": {"open": "09:00", "close": "17:00"},
-    "tuesday": {"open": "09:00", "close": "17:00"},
-    "wednesday": {"open": "09:00", "close": "17:00"},
-    "thursday": {"open": "09:00", "close": "17:00"},
-    "friday": {"open": "09:00", "close": "17:00"}
+    "monday": { "open": "09:00", "close": "17:00" },
+    "tuesday": { "open": "09:00", "close": "17:00" },
+    "wednesday": { "open": "09:00", "close": "17:00" },
+    "thursday": { "open": "09:00", "close": "17:00" },
+    "friday": { "open": "09:00", "close": "17:00" }
   },
   "eligibility_requirements": "Open to all adults seeking employment",
   "accepts_records": true,
@@ -202,6 +209,7 @@ GET /api/resources/550e8400-e29b-41d4-a716-446655440000
 ```
 
 **Error Responses**:
+
 ```json
 {
   "error": "Resource not found",
@@ -220,6 +228,7 @@ Create a new resource.
 **Authentication**: Required (Admin)
 
 **Request Body**:
+
 ```json
 {
   "name": "New Resource Center",
@@ -231,7 +240,7 @@ Create a new resource.
   "categories": ["housing"],
   "services_offered": ["Emergency shelter", "Case management"],
   "hours": {
-    "monday": {"open": "08:00", "close": "20:00"}
+    "monday": { "open": "08:00", "close": "20:00" }
   },
   "eligibility_requirements": "Adults 18+",
   "accepts_records": true
@@ -239,6 +248,7 @@ Create a new resource.
 ```
 
 **Validation**:
+
 - `name`: Required, 1-200 characters
 - `address`: Required, will be geocoded automatically
 - `primary_category`: Required, must be valid category
@@ -246,11 +256,12 @@ Create a new resource.
 - `website`: Must be valid URL
 
 **Example Response**:
+
 ```json
 {
   "id": "660f9500-f39c-52e5-b827-557766550111",
   "name": "New Resource Center",
-  "latitude": 37.7850,
+  "latitude": 37.785,
   "longitude": -122.2364,
   "status": "active",
   "verified": false,
@@ -259,18 +270,21 @@ Create a new resource.
 ```
 
 **Error Responses**:
+
 ```json
 {
   "error": "Authentication required",
   "code": "UNAUTHORIZED"
 }
 ```
+
 ```json
 {
   "error": "Admin access required",
   "code": "FORBIDDEN"
 }
 ```
+
 ```json
 {
   "error": "Validation failed",
@@ -293,18 +307,20 @@ Update an existing resource.
 **Authentication**: Required (Admin)
 
 **Request Body** (all fields optional):
+
 ```json
 {
   "name": "Updated Name",
   "phone": "(510) 555-9999",
   "hours": {
-    "monday": {"open": "09:00", "close": "18:00"}
+    "monday": { "open": "09:00", "close": "18:00" }
   },
   "verified": true
 }
 ```
 
 **Example Response**:
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -324,6 +340,7 @@ Soft delete a resource (sets status to 'inactive').
 **Authentication**: Required (Admin)
 
 **Example Response**:
+
 ```json
 {
   "message": "Resource deleted successfully",
@@ -344,6 +361,7 @@ Get list of user's favorite resources.
 **Authentication**: Required
 
 **Example Response**:
+
 ```json
 {
   "data": [
@@ -375,6 +393,7 @@ Add a resource to user's favorites.
 **Authentication**: Required
 
 **Request Body** (optional):
+
 ```json
 {
   "notes": "Remember to bring resume"
@@ -382,6 +401,7 @@ Add a resource to user's favorites.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Resource added to favorites",
@@ -390,6 +410,7 @@ Add a resource to user's favorites.
 ```
 
 **Error Responses**:
+
 ```json
 {
   "error": "Resource already in favorites",
@@ -408,6 +429,7 @@ Remove a resource from user's favorites.
 **Authentication**: Required
 
 **Example Response**:
+
 ```json
 {
   "message": "Resource removed from favorites"
@@ -427,6 +449,7 @@ Rate a resource (1-5 stars).
 **Authentication**: Required
 
 **Request Body**:
+
 ```json
 {
   "rating": 5
@@ -434,9 +457,11 @@ Rate a resource (1-5 stars).
 ```
 
 **Validation**:
+
 - `rating`: Required, integer between 1-5
 
 **Example Response**:
+
 ```json
 {
   "message": "Rating submitted successfully",
@@ -460,13 +485,14 @@ Get reviews for a specific resource.
 
 **Query Parameters**:
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `page` | number | Page number | 1 |
-| `limit` | number | Reviews per page | 20 |
-| `sort` | string | Sort by: `helpful`, `recent`, `rating` | `helpful` |
+| Parameter | Type   | Description                            | Default   |
+| --------- | ------ | -------------------------------------- | --------- |
+| `page`    | number | Page number                            | 1         |
+| `limit`   | number | Reviews per page                       | 20        |
+| `sort`    | string | Sort by: `helpful`, `recent`, `rating` | `helpful` |
 
 **Example Response**:
+
 ```json
 {
   "data": [
@@ -508,6 +534,7 @@ Write a review for a resource.
 **Authentication**: Required
 
 **Request Body**:
+
 ```json
 {
   "rating": 5,
@@ -522,11 +549,13 @@ Write a review for a resource.
 ```
 
 **Validation**:
+
 - `rating`: Required, 1-5
 - `review_text`: Optional, max 1000 characters
 - `tips`: Optional, max 500 characters
 
 **Example Response**:
+
 ```json
 {
   "message": "Review submitted successfully",
@@ -535,6 +564,7 @@ Write a review for a resource.
 ```
 
 **Error Responses**:
+
 ```json
 {
   "error": "You have already reviewed this resource",
@@ -553,6 +583,7 @@ Update your own review.
 **Authentication**: Required (must be review author)
 
 **Request Body** (all fields optional):
+
 ```json
 {
   "rating": 4,
@@ -562,6 +593,7 @@ Update your own review.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Review updated successfully",
@@ -580,6 +612,7 @@ Vote on review helpfulness.
 **Authentication**: Required
 
 **Request Body**:
+
 ```json
 {
   "helpful": true
@@ -587,6 +620,7 @@ Vote on review helpfulness.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Vote recorded",
@@ -609,6 +643,7 @@ Suggest a new resource to be added.
 **Authentication**: Required
 
 **Request Body**:
+
 ```json
 {
   "name": "Suggested Resource",
@@ -623,12 +658,14 @@ Suggest a new resource to be added.
 ```
 
 **Validation**:
+
 - `name`: Required, 1-200 characters
 - `address`: Required
 - `description`: Required, 1-1000 characters
 - `category`: Required, must be valid category
 
 **Example Response**:
+
 ```json
 {
   "message": "Suggestion submitted successfully. We'll review it soon!",
@@ -647,6 +684,7 @@ Get list of user's submitted suggestions.
 **Authentication**: Required
 
 **Example Response**:
+
 ```json
 {
   "data": [
@@ -674,11 +712,12 @@ Get all pending resource suggestions.
 
 **Query Parameters**:
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `status` | string | Filter by status: `pending`, `approved`, `rejected` | `pending` |
+| Parameter | Type   | Description                                         | Default   |
+| --------- | ------ | --------------------------------------------------- | --------- |
+| `status`  | string | Filter by status: `pending`, `approved`, `rejected` | `pending` |
 
 **Example Response**:
+
 ```json
 {
   "data": [
@@ -711,6 +750,7 @@ Approve a suggestion and create the resource.
 **Authentication**: Required (Admin)
 
 **Request Body** (optional):
+
 ```json
 {
   "review_notes": "Verified with organization, looks good"
@@ -718,6 +758,7 @@ Approve a suggestion and create the resource.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Suggestion approved and resource created",
@@ -726,6 +767,7 @@ Approve a suggestion and create the resource.
 ```
 
 **Note**: This will:
+
 1. Create the resource in the database
 2. Mark suggestion as approved
 3. Trigger AI enrichment agent automatically
@@ -742,6 +784,7 @@ Reject a suggestion.
 **Authentication**: Required (Admin)
 
 **Request Body** (optional):
+
 ```json
 {
   "review_notes": "Duplicate of existing resource"
@@ -749,6 +792,7 @@ Reject a suggestion.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Suggestion rejected"
@@ -768,6 +812,7 @@ Manually trigger AI enrichment for a resource.
 **Authentication**: Required (Admin)
 
 **Request Body**:
+
 ```json
 {
   "resource_id": "550e8400-e29b-41d4-a716-446655440000"
@@ -775,6 +820,7 @@ Manually trigger AI enrichment for a resource.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Enrichment started",
@@ -784,6 +830,7 @@ Manually trigger AI enrichment for a resource.
 ```
 
 **Process**:
+
 1. Geocode address (if not already done)
 2. Scrape website for additional info
 3. Get photos from Google Maps
@@ -793,6 +840,7 @@ Manually trigger AI enrichment for a resource.
 7. Calculate completeness score
 
 **Completion** (check status endpoint):
+
 ```json
 {
   "job_id": "enrichment-job-123",
@@ -817,18 +865,17 @@ Manually trigger verification for resources.
 **Authentication**: Required (Admin)
 
 **Request Body** (optional):
+
 ```json
 {
-  "resource_ids": [
-    "550e8400-e29b-41d4-a716-446655440000",
-    "660f9500-f39c-52e5-b827-557766550111"
-  ]
+  "resource_ids": ["550e8400-e29b-41d4-a716-446655440000", "660f9500-f39c-52e5-b827-557766550111"]
 }
 ```
 
 **Note**: If no `resource_ids` provided, verifies all resources not verified in past 90 days.
 
 **Example Response**:
+
 ```json
 {
   "message": "Verification started",
@@ -838,6 +885,7 @@ Manually trigger verification for resources.
 ```
 
 **Verification Checks**:
+
 - Phone number still works
 - Website still accessible
 - Business status (not permanently closed)
@@ -855,6 +903,7 @@ Trigger AI discovery of new resources.
 **Authentication**: Required (Admin)
 
 **Request Body**:
+
 ```json
 {
   "city": "Oakland",
@@ -864,6 +913,7 @@ Trigger AI discovery of new resources.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Discovery started",
@@ -872,6 +922,7 @@ Trigger AI discovery of new resources.
 ```
 
 **Process**:
+
 1. Search 211 directory
 2. Search Google for reentry services
 3. Scrape government websites
@@ -890,6 +941,7 @@ Request OTP code sent via SMS.
 **Endpoint**: `POST /api/auth/otp`
 
 **Request Body**:
+
 ```json
 {
   "phone": "+15551234567"
@@ -897,10 +949,12 @@ Request OTP code sent via SMS.
 ```
 
 **Validation**:
+
 - Phone must be valid US format
 - Rate limited: 3 requests per phone per hour
 
 **Example Response**:
+
 ```json
 {
   "message": "OTP sent to +1 (555) 123-4567"
@@ -908,6 +962,7 @@ Request OTP code sent via SMS.
 ```
 
 **Error Responses**:
+
 ```json
 {
   "error": "Too many OTP requests. Please wait before trying again.",
@@ -915,6 +970,7 @@ Request OTP code sent via SMS.
   "retry_after": 3600
 }
 ```
+
 ```json
 {
   "error": "Invalid phone number",
@@ -931,6 +987,7 @@ Verify OTP code and create session.
 **Endpoint**: `POST /api/auth/verify`
 
 **Request Body**:
+
 ```json
 {
   "phone": "+15551234567",
@@ -939,6 +996,7 @@ Verify OTP code and create session.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Authentication successful",
@@ -954,6 +1012,7 @@ Verify OTP code and create session.
 **Note**: Sets session cookies automatically
 
 **Error Responses**:
+
 ```json
 {
   "error": "Invalid or expired code",
@@ -972,6 +1031,7 @@ Get authenticated user's profile.
 **Authentication**: Required
 
 **Example Response**:
+
 ```json
 {
   "id": "user-uuid",
@@ -983,6 +1043,7 @@ Get authenticated user's profile.
 ```
 
 **Error Responses**:
+
 ```json
 {
   "error": "Not authenticated",
@@ -1001,6 +1062,7 @@ Update user's profile information.
 **Authentication**: Required
 
 **Request Body**:
+
 ```json
 {
   "name": "John Doe"
@@ -1008,6 +1070,7 @@ Update user's profile information.
 ```
 
 **Example Response**:
+
 ```json
 {
   "message": "Profile updated successfully",
@@ -1030,6 +1093,7 @@ End user session.
 **Authentication**: Required
 
 **Example Response**:
+
 ```json
 {
   "message": "Signed out successfully"
@@ -1051,6 +1115,7 @@ Get key metrics for admin dashboard.
 **Authentication**: Required (Admin)
 
 **Example Response**:
+
 ```json
 {
   "resources": {
@@ -1092,6 +1157,7 @@ Get key metrics for admin dashboard.
 Triggered when resource is created or updated.
 
 **Payload**:
+
 ```json
 {
   "event": "resource.updated",
@@ -1110,6 +1176,7 @@ Triggered when resource is created or updated.
 Triggered when new review submitted.
 
 **Payload**:
+
 ```json
 {
   "event": "review.created",
@@ -1128,113 +1195,115 @@ Triggered when new review submitted.
 ## SDK Examples
 
 ### JavaScript/TypeScript
+
 ```typescript
 // lib/api/client.ts
 export class ReentryMapAPI {
-  private baseUrl: string;
+  private baseUrl: string
 
   constructor(baseUrl = '/api') {
-    this.baseUrl = baseUrl;
+    this.baseUrl = baseUrl
   }
 
   async getResources(params: ResourceSearchParams) {
-    const query = new URLSearchParams(params as any);
-    const response = await fetch(`${this.baseUrl}/resources?${query}`);
-    
+    const query = new URLSearchParams(params as any)
+    const response = await fetch(`${this.baseUrl}/resources?${query}`)
+
     if (!response.ok) {
-      throw new Error('Failed to fetch resources');
+      throw new Error('Failed to fetch resources')
     }
-    
-    return response.json();
+
+    return response.json()
   }
 
   async getResource(id: string) {
-    const response = await fetch(`${this.baseUrl}/resources/${id}`);
-    
+    const response = await fetch(`${this.baseUrl}/resources/${id}`)
+
     if (!response.ok) {
       if (response.status === 404) {
-        throw new Error('Resource not found');
+        throw new Error('Resource not found')
       }
-      throw new Error('Failed to fetch resource');
+      throw new Error('Failed to fetch resource')
     }
-    
-    return response.json();
+
+    return response.json()
   }
 
   async favoriteResource(id: string, notes?: string) {
     const response = await fetch(`${this.baseUrl}/resources/${id}/favorite`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notes })
-    });
-    
+      body: JSON.stringify({ notes }),
+    })
+
     if (!response.ok) {
-      throw new Error('Failed to favorite resource');
+      throw new Error('Failed to favorite resource')
     }
-    
-    return response.json();
+
+    return response.json()
   }
 
   async rateResource(id: string, rating: number) {
     const response = await fetch(`${this.baseUrl}/resources/${id}/rate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rating })
-    });
-    
+      body: JSON.stringify({ rating }),
+    })
+
     if (!response.ok) {
-      throw new Error('Failed to rate resource');
+      throw new Error('Failed to rate resource')
     }
-    
-    return response.json();
+
+    return response.json()
   }
 
   async submitReview(id: string, review: ReviewData) {
     const response = await fetch(`${this.baseUrl}/resources/${id}/review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(review)
-    });
-    
+      body: JSON.stringify(review),
+    })
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to submit review');
+      const error = await response.json()
+      throw new Error(error.message || 'Failed to submit review')
     }
-    
-    return response.json();
+
+    return response.json()
   }
 }
 
 // Usage
-const api = new ReentryMapAPI();
+const api = new ReentryMapAPI()
 
 // Search for resources
 const results = await api.getResources({
   search: 'employment',
   lat: 37.8044,
   lng: -122.2712,
-  radius: 10
-});
+  radius: 10,
+})
 
 // Get specific resource
-const resource = await api.getResource('550e8400-...');
+const resource = await api.getResource('550e8400-...')
 
 // Favorite a resource
-await api.favoriteResource('550e8400-...', 'Great job program');
+await api.favoriteResource('550e8400-...', 'Great job program')
 
 // Rate a resource
-await api.rateResource('550e8400-...', 5);
+await api.rateResource('550e8400-...', 5)
 
 // Submit review
 await api.submitReview('550e8400-...', {
   rating: 5,
   review_text: 'Excellent service!',
-  tips: 'Call ahead'
-});
+  tips: 'Call ahead',
+})
 ```
 
 ### React Hooks
-```typescript
+
+````typescript
 // lib/hooks/useResourcesAPI.ts
 import { useState, useEffect } from 'react';
 import { ReentryMapAPI } from '@/lib/api/client';
@@ -1307,7 +1376,7 @@ All responses include rate limit information:
 X-RateLimit-Limit: 300
 X-RateLimit-Remaining: 299
 X-RateLimit-Reset: 1706025600
-```
+````
 
 ---
 
@@ -1316,11 +1385,13 @@ X-RateLimit-Reset: 1706025600
 Paginated endpoints follow this structure:
 
 **Request**:
+
 ```http
 GET /api/resources?page=2&limit=20
 ```
 
 **Response**:
+
 ```json
 {
   "data": [...],
@@ -1337,6 +1408,7 @@ GET /api/resources?page=2&limit=20
 ```
 
 **Link Headers** (optional):
+
 ```http
 Link: </api/resources?page=3&limit=20>; rel="next",
       </api/resources?page=1&limit=20>; rel="prev",
@@ -1349,6 +1421,7 @@ Link: </api/resources?page=3&limit=20>; rel="next",
 ## CORS
 
 CORS is configured to allow requests from:
+
 - `http://localhost:3000` (development)
 - `https://reentry-map.vercel.app` (production)
 
@@ -1359,6 +1432,7 @@ CORS is configured to allow requests from:
 Current version: `v1` (implicit)
 
 Future versions will use URL prefix:
+
 - `/api/v2/resources`
 
 ---
@@ -1366,6 +1440,7 @@ Future versions will use URL prefix:
 ## Support
 
 For API support:
+
 - Email: gserafini@gmail.com
 - Documentation: https://reentry-map.vercel.app/docs
 - GitHub Issues: https://github.com/gserafini/reentry-map/issues

@@ -6,6 +6,7 @@ step-by-step.
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - Node.js 20.x or later ([download](https://nodejs.org))
 - npm 10.x or pnpm 9.x
 - Git ([download](https://git-scm.com))
@@ -75,6 +76,7 @@ Before you begin, ensure you have:
 6. **Important**: Save this key securely - you can't view it again
 
 ## Step 5: Clone and Install
+
 ```bash
 # Clone the repository
 git clone https://github.com/gserafini/reentry-map.git
@@ -92,6 +94,7 @@ cp .env.example .env.local
 ## Step 6: Configure Environment Variables
 
 Edit `.env.local` with your credentials:
+
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
@@ -116,6 +119,7 @@ ABSTRACT_API_KEY=your-abstract-api-key
 ```
 
 ## Step 7: Run Development Server
+
 ```bash
 npm run dev
 ```
@@ -134,9 +138,11 @@ You should see the Reentry Map home page with the map and search interface.
    - Copy the User UID
    - Go to SQL Editor
    - Run this query (replace with your UID):
+
 ```sql
    UPDATE users SET is_admin = true WHERE id = 'your-user-uid';
 ```
+
 4. Refresh the app - you should now see "Admin" in navigation
 
 ## Step 9: Verify Installation
@@ -154,6 +160,7 @@ Test each feature:
 - [ ] Admin dashboard accessible (if admin)
 
 ## Step 10: Optional - Install Recommended VS Code Extensions
+
 ```json
 {
   "recommendations": [
@@ -169,27 +176,32 @@ Test each feature:
 ## Troubleshooting
 
 ### Database Connection Fails
+
 - Check Supabase project is running
 - Verify `NEXT_PUBLIC_SUPABASE_URL` is correct
 - Check firewall isn't blocking Supabase
 
 ### Map Doesn't Load
+
 - Verify Google Maps API key is correct
 - Check API is enabled in Google Cloud Console
 - Check browser console for errors
 - Verify HTTP referrer restrictions allow localhost
 
 ### Authentication Fails
+
 - Check Supabase Auth is enabled
 - Verify phone auth is configured in Supabase
 - Check you have phone credits (Supabase gives free credits)
 
 ### AI Agents Fail
+
 - Verify OpenAI API key is correct
 - Check you have API credits
 - Check OpenAI API status
 
 ### Build Errors
+
 - Clear `.next` folder: `rm -rf .next`
 - Delete `node_modules` and reinstall
 - Check Node.js version is 20.x+

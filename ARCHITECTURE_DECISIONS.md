@@ -5,6 +5,7 @@ This document tracks significant architectural and technical decisions made duri
 ## Format
 
 Each decision follows this template:
+
 ```markdown
 ## ADR-XXX: Decision Title
 
@@ -14,18 +15,23 @@ Each decision follows this template:
 **Tags**: [relevant tags]
 
 ### Context
+
 What is the issue/situation we're addressing?
 
 ### Decision
+
 What did we decide to do?
 
 ### Rationale
+
 Why did we make this decision?
 
 ### Consequences
+
 What are the implications (positive and negative)?
 
 ### Alternatives Considered
+
 What other options did we evaluate?
 ```
 
@@ -39,12 +45,15 @@ What other options did we evaluate?
 **Tags**: framework, react, ssr
 
 ### Context
+
 Need to select a modern React framework for building a progressive web app with server-side rendering, authentication, and database integration.
 
 ### Decision
+
 Use Next.js 16 with the App Router (not Pages Router).
 
 ### Rationale
+
 - Latest stable version with React 19 support
 - Excellent server components for reduced client JS
 - Built-in API routes for backend logic
@@ -55,18 +64,22 @@ Use Next.js 16 with the App Router (not Pages Router).
 - Active community and extensive documentation
 
 ### Consequences
+
 **Positive**:
+
 - Modern React features (Server Components, Streaming)
 - Excellent performance out of the box
 - Strong typing with TypeScript
 - Great developer experience
 
 **Negative**:
+
 - App Router is still evolving (some patterns not fully stabilized)
 - Learning curve for Server Components paradigm
 - Some third-party libraries may not be compatible yet
 
 ### Alternatives Considered
+
 - **Remix**: Excellent routing but less mature ecosystem
 - **Create React App**: Too basic, lacks SSR
 - **Vite + React**: More configuration needed, no SSR built-in
@@ -81,12 +94,15 @@ Use Next.js 16 with the App Router (not Pages Router).
 **Tags**: database, auth, backend
 
 ### Context
+
 Need a backend solution for PostgreSQL database, authentication, and real-time subscriptions.
 
 ### Decision
+
 Use Supabase as the backend-as-a-service platform.
 
 ### Rationale
+
 - PostgreSQL 16 with PostGIS for geospatial queries
 - Built-in authentication with phone/SMS OTP
 - Row Level Security for data protection
@@ -97,18 +113,22 @@ Use Supabase as the backend-as-a-service platform.
 - Generous free tier for development
 
 ### Consequences
+
 **Positive**:
+
 - Fast development with managed infrastructure
 - Built-in security features
 - Scalable to production
 - Cost-effective for MVP
 
 **Negative**:
+
 - Vendor lock-in (mitigated by using standard PostgreSQL)
 - Some advanced PostgreSQL features limited
 - Performance depends on Supabase SLA
 
 ### Alternatives Considered
+
 - **Firebase**: Good but less SQL-focused, weaker for complex queries
 - **AWS RDS + Cognito**: More complex setup, higher cost
 - **Self-hosted PostgreSQL**: More control but significantly more operational overhead
@@ -123,12 +143,15 @@ Use Supabase as the backend-as-a-service platform.
 **Tags**: typescript, type-safety
 
 ### Context
+
 Need to decide on TypeScript configuration and strictness level.
 
 ### Decision
+
 Use TypeScript in strict mode with additional type safety via ts-reset.
 
 ### Rationale
+
 - Catch errors at compile time vs runtime
 - Better IDE autocomplete and refactoring
 - Self-documenting code with types
@@ -136,18 +159,22 @@ Use TypeScript in strict mode with additional type safety via ts-reset.
 - Industry best practice for production apps
 
 ### Consequences
+
 **Positive**:
+
 - Fewer runtime errors
 - Better code maintainability
 - Improved developer experience
 - Easier to refactor
 
 **Negative**:
+
 - Initial development slightly slower
 - Some third-party libraries have poor types
 - Learning curve for less experienced developers
 
 ### Alternatives Considered
+
 - **JavaScript**: Faster initially but more bugs in production
 - **TypeScript non-strict**: Middle ground but loses key benefits
 
@@ -161,12 +188,15 @@ Use TypeScript in strict mode with additional type safety via ts-reset.
 **Tags**: css, styling, ui
 
 ### Context
+
 Need a styling solution that enables rapid development, mobile-first design, and consistent UI.
 
 ### Decision
+
 Use Tailwind CSS 4.0 as the primary styling framework.
 
 ### Rationale
+
 - Utility-first approach for rapid development
 - Mobile-first by default
 - Excellent dark mode support
@@ -176,7 +206,9 @@ Use Tailwind CSS 4.0 as the primary styling framework.
 - JIT compiler for development speed
 
 ### Consequences
+
 **Positive**:
+
 - Fast UI development
 - Consistent design system
 - Small production bundle
@@ -184,11 +216,13 @@ Use Tailwind CSS 4.0 as the primary styling framework.
 - Easy to customize
 
 **Negative**:
+
 - HTML can be verbose with many classes
 - Learning curve for developers unfamiliar with utility CSS
 - Some design decisions constrained by default theme
 
 ### Alternatives Considered
+
 - **CSS Modules**: More traditional but slower development
 - **Styled Components**: Runtime overhead, not optimal for SSR
 - **Vanilla CSS**: Too much boilerplate, hard to maintain
@@ -203,15 +237,19 @@ Use Tailwind CSS 4.0 as the primary styling framework.
 **Tags**: ui, components, accessibility
 
 ### Context
+
 Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly NextUI) for component library.
 
 ### Decision
+
 **Use HeroUI** as the primary component library for the application.
 
 ### Options
 
 #### Option A: Continue with shadcn/ui
+
 **Pros**:
+
 - Already partially implemented in project
 - Copy-paste approach gives full control
 - Radix UI primitives are excellent
@@ -219,6 +257,7 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - No additional dependencies
 
 **Cons**:
+
 - Need to implement each component manually
 - More development time
 - No MCP server support for AI assistance
@@ -226,7 +265,9 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - Less comprehensive out of the box
 
 #### Option B: Switch to HeroUI
+
 **Pros**:
+
 - Full component library ready to use
 - Built-in accessibility (WAI-ARIA compliant)
 - Zero runtime styles (Tailwind-based)
@@ -238,13 +279,16 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - Critical for reentry population accessibility needs
 
 **Cons**:
+
 - Need to remove current shadcn/ui components
 - Learning new component API
 - Slightly larger bundle size
 - May need to override some styles
 
 ### Rationale
+
 **HeroUI was chosen** for the following reasons:
+
 1. **Accessibility First**: Reentry population has diverse needs; built-in ARIA compliance is critical
 2. **AI Development Speed**: MCP server integration will significantly accelerate development
 3. **4th Grade Reading Level**: Better defaults for clear, simple interfaces
@@ -253,6 +297,7 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 6. **Time Savings**: Full component library vs building each piece
 
 ### Migration Path
+
 1. Document current shadcn/ui components in use
 2. Install HeroUI and MCP server
 3. Replace components one-by-one with HeroUI equivalents
@@ -260,7 +305,9 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 5. Update documentation
 
 ### Consequences
+
 **Positive**:
+
 - Faster development with complete component library
 - Built-in accessibility (WAI-ARIA compliant) - critical for target users
 - AI assistance via MCP server significantly accelerates development
@@ -269,17 +316,20 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - Strong support for 4th grade reading level interfaces
 
 **Negative**:
+
 - Need to remove/replace current shadcn/ui components
 - Learning new component API
 - Slightly larger bundle size than shadcn/ui
 
 ### Alternatives Considered
+
 - **Material UI (MUI)**: Too heavy, poor Tailwind integration
 - **Chakra UI**: Good but runtime styles are a performance concern
 - **Headless UI**: Too low-level, need to build everything
 - **Ant Design**: Not Tailwind-based, heavier bundle
 
 ### Implementation Plan
+
 1. Install HeroUI and configure Tailwind integration
 2. Set up HeroUI MCP server for AI-assisted development
 3. Audit and document current shadcn/ui components in use
@@ -297,23 +347,29 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 **Tags**: testing, quality, ci-cd
 
 ### Context
+
 Need a comprehensive testing strategy to ensure code quality, catch bugs early, and enable confident refactoring.
 
 ### Decision
+
 Implement multi-layer testing approach:
+
 1. **Unit Tests**: Vitest + React Testing Library
 2. **Integration Tests**: Vitest for API routes and data flows
 3. **E2E Tests**: Playwright for critical user paths
 4. **Component Tests**: Storybook (future)
 
 ### Rationale
+
 - **Vitest**: Fast, ESM-first, excellent DX, better than Jest for Next.js
 - **Playwright**: Modern, reliable E2E testing across browsers
 - **React Testing Library**: Best practices for testing React components
 - **Multi-layer**: Catch different types of bugs at appropriate levels
 
 ### Consequences
+
 **Positive**:
+
 - Catch bugs before production
 - Enable confident refactoring
 - Documentation via tests
@@ -321,11 +377,13 @@ Implement multi-layer testing approach:
 - CI/CD ready
 
 **Negative**:
+
 - Initial setup time
 - Need to maintain tests alongside code
 - Slower initial development
 
 ### Implementation Plan
+
 1. Set up Vitest configuration
 2. Create example unit tests
 3. Set up Playwright configuration
@@ -334,6 +392,7 @@ Implement multi-layer testing approach:
 6. Establish coverage targets (70%+ goal)
 
 ### Alternatives Considered
+
 - **Jest**: Slower, more configuration needed
 - **Cypress**: Good but Playwright has better parallelization
 - **No tests**: Not viable for production app
@@ -348,12 +407,15 @@ Implement multi-layer testing approach:
 **Tags**: configuration, security, dx
 
 ### Context
+
 Environment variables are critical for app functionality (API keys, database URLs, etc.). Need to ensure they're properly configured and validated.
 
 ### Decision
+
 Use @t3-oss/env-nextjs for type-safe environment variable validation.
 
 ### Rationale
+
 - Build-time validation prevents deployment with missing env vars
 - Type safety for all environment variables
 - Clear error messages when variables are missing/invalid
@@ -362,17 +424,21 @@ Use @t3-oss/env-nextjs for type-safe environment variable validation.
 - Zod schema validation
 
 ### Consequences
+
 **Positive**:
+
 - Catch configuration errors early
 - Type-safe access to env vars
 - Better security
 - Clear documentation of required variables
 
 **Negative**:
+
 - Additional setup
 - Build fails if env vars missing (good thing, but can be surprising)
 
 ### Implementation Plan
+
 1. Install @t3-oss/env-nextjs and zod
 2. Create src/env.ts with schemas
 3. Update next.config.mjs to import env validation
@@ -381,6 +447,7 @@ Use @t3-oss/env-nextjs for type-safe environment variable validation.
 6. Update .env.example with all required variables
 
 ### Alternatives Considered
+
 - **Manual validation**: Error-prone, no type safety
 - **dotenv**: No validation, just loading
 - **Custom solution**: Reinventing the wheel
@@ -395,12 +462,15 @@ Use @t3-oss/env-nextjs for type-safe environment variable validation.
 **Tags**: code-quality, dx, formatting
 
 ### Context
+
 Need consistent code formatting and quality checks across the project and team.
 
 ### Decision
+
 Use ESLint 9 with Next.js config + Prettier for formatting.
 
 ### Rationale
+
 - ESLint catches potential bugs and enforces patterns
 - Prettier ensures consistent formatting
 - Prevents bikeshedding on style
@@ -409,18 +479,22 @@ Use ESLint 9 with Next.js config + Prettier for formatting.
 - Pre-commit hooks enforce standards
 
 ### Consequences
+
 **Positive**:
+
 - Consistent code style
 - Catch bugs before runtime
 - Better code reviews
 - Professional codebase
 
 **Negative**:
+
 - Initial configuration time
 - May conflict with developer preferences
 - Build can fail on linting errors
 
 ### Implementation Plan
+
 1. Configure ESLint 9 with Next.js config
 2. Add Prettier with eslint-config-prettier
 3. Create .prettierrc with team standards
@@ -429,6 +503,7 @@ Use ESLint 9 with Next.js config + Prettier for formatting.
 6. Document exceptions and when to use eslint-disable
 
 ### Alternatives Considered
+
 - **No linting**: Not viable for production code
 - **TSLint**: Deprecated
 - **Prettier only**: Doesn't catch logic errors
@@ -443,12 +518,15 @@ Use ESLint 9 with Next.js config + Prettier for formatting.
 **Tags**: ai, cost-optimization, automation
 
 ### Context
+
 Need AI capabilities for resource discovery, enrichment, and verification while managing costs.
 
 ### Decision
+
 Use OpenAI's GPT-4o-mini model for AI agent operations.
 
 ### Rationale
+
 - Cost-effective (~15x cheaper than GPT-4)
 - Sufficient capability for structured tasks
 - Fast response times
@@ -457,21 +535,26 @@ Use OpenAI's GPT-4o-mini model for AI agent operations.
 - Can upgrade to GPT-4 for specific complex tasks if needed
 
 ### Consequences
+
 **Positive**:
+
 - Manageable API costs for frequent automation
 - Fast responses for near-real-time enrichment
 - Good enough for most resource processing tasks
 
 **Negative**:
+
 - May miss some nuances vs GPT-4
 - Need to monitor quality and adjust if needed
 
 ### Future Considerations
+
 - Use GPT-4 Vision for document scanning (Phase 2)
 - Consider GPT-4 for complex categorization if needed
 - Monitor OpenAI pricing and model improvements
 
 ### Alternatives Considered
+
 - **GPT-4**: More capable but cost-prohibitive for frequent automation
 - **Claude**: Good but less mature API
 - **Open-source models**: More complex deployment, less reliable
@@ -486,12 +569,15 @@ Use OpenAI's GPT-4o-mini model for AI agent operations.
 **Tags**: maps, geolocation, ux
 
 ### Context
+
 Need robust mapping and geocoding capabilities for location-based resource search.
 
 ### Decision
+
 Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 
 ### Rationale
+
 - Most comprehensive POI data
 - Reliable geocoding and reverse geocoding
 - Excellent mobile support
@@ -501,24 +587,29 @@ Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 - Business hours and photos via Places API
 
 ### Consequences
+
 **Positive**:
+
 - Best-in-class mapping experience
 - Rich data about businesses
 - Familiar to users
 - Well-documented
 
 **Negative**:
+
 - API costs can scale with usage
 - Requires API key management
 - Vendor lock-in
 
 ### Cost Mitigation
+
 - Implement client-side caching
 - Use static maps for non-interactive views
 - Monitor usage and set budget alerts
 - Consider lazy loading maps
 
 ### Alternatives Considered
+
 - **Mapbox**: Good alternative, slightly cheaper, but less POI data
 - **OpenStreetMap/Leaflet**: Free but requires more work and less POI data
 - **Apple Maps**: Limited to Apple ecosystem
@@ -527,18 +618,18 @@ Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 
 ## Decision Status Summary
 
-| ADR | Title | Status | Priority |
-|-----|-------|--------|----------|
-| 001 | Next.js 16 with App Router | ✅ Accepted | Critical |
-| 002 | Supabase for Backend | ✅ Accepted | Critical |
-| 003 | TypeScript Strict Mode | ✅ Accepted | High |
-| 004 | Tailwind CSS | ✅ Accepted | High |
+| ADR | Title                        | Status      | Priority |
+| --- | ---------------------------- | ----------- | -------- |
+| 001 | Next.js 16 with App Router   | ✅ Accepted | Critical |
+| 002 | Supabase for Backend         | ✅ Accepted | Critical |
+| 003 | TypeScript Strict Mode       | ✅ Accepted | High     |
+| 004 | Tailwind CSS                 | ✅ Accepted | High     |
 | 005 | HeroUI for Component Library | ✅ Accepted | Critical |
-| 006 | Vitest + Playwright Testing | 📝 Proposed | High |
-| 007 | T3 Env Validation | 📝 Proposed | Medium |
-| 008 | ESLint + Prettier | 📝 Proposed | Medium |
-| 009 | OpenAI GPT-4o-mini | ✅ Accepted | Medium |
-| 010 | Google Maps | ✅ Accepted | High |
+| 006 | Vitest + Playwright Testing  | 📝 Proposed | High     |
+| 007 | T3 Env Validation            | 📝 Proposed | Medium   |
+| 008 | ESLint + Prettier            | 📝 Proposed | Medium   |
+| 009 | OpenAI GPT-4o-mini           | ✅ Accepted | Medium   |
+| 010 | Google Maps                  | ✅ Accepted | High     |
 
 ---
 

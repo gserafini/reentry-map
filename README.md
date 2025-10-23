@@ -14,6 +14,7 @@ A mobile-first web application that provides an accurate, up-to-date directory o
 Reentry Map addresses a critical need: people leaving incarceration struggle to find accurate information about resources that accept them. Resource information is scattered, outdated, and hard to search by location.
 
 Our solution is a community-driven, AI-enhanced resource directory that:
+
 - Makes it easy to find resources near you
 - Shows which resources accept people with criminal records
 - Provides real reviews from people who've used the services
@@ -23,6 +24,7 @@ Our solution is a community-driven, AI-enhanced resource directory that:
 ## Key Features
 
 ### For Users
+
 - **Location-Based Search** - Find resources near you with interactive map view
 - **Smart Search & Filtering** - Search by category, distance, and keywords
 - **Community Reviews** - Read honest feedback from people who've been there
@@ -30,11 +32,13 @@ Our solution is a community-driven, AI-enhanced resource directory that:
 - **Mobile-First PWA** - Install to your phone's home screen, works offline
 
 ### For the Community
+
 - **Suggest Resources** - Know a helpful place? Share it with others
 - **Report Issues** - Keep information accurate by reporting changes
 - **Rate & Review** - Help others make informed decisions
 
 ### For Administrators
+
 - **AI Automation** - Automated resource discovery and enrichment
 - **Verification System** - Quarterly checks on phone numbers and websites
 - **Moderation Dashboard** - Review community suggestions and reports
@@ -42,22 +46,26 @@ Our solution is a community-driven, AI-enhanced resource directory that:
 ## Tech Stack
 
 **Frontend**
+
 - Next.js 16 (App Router) with React Server Components
 - TypeScript 5.7 (strict mode)
 - Tailwind CSS 4.0 for styling
 - shadcn/ui component library
 
 **Backend**
+
 - Next.js API Routes
 - Supabase (PostgreSQL 16 with PostGIS)
 - Supabase Auth (Phone/SMS OTP)
 - Row Level Security (RLS)
 
 **Integrations**
+
 - Google Maps JavaScript API (maps, geocoding)
 - OpenAI API (GPT-4o-mini for AI agents)
 
 **Infrastructure**
+
 - Vercel (hosting, edge network)
 - Supabase Cloud (database, auth, storage)
 - Progressive Web App (PWA)
@@ -129,18 +137,22 @@ Comprehensive documentation is available:
 ## Architecture Highlights
 
 ### Database
+
 - PostgreSQL 16 with PostGIS for geospatial queries
 - Full-text search indexes for fast resource lookup
 - Database triggers for automatic aggregate calculations
 - Row Level Security on all tables
 
 ### AI Agent System
+
 Three autonomous agents keep data fresh:
+
 - **Discovery Agent** - Finds new resources from 211 directories and government sites
 - **Enrichment Agent** - Fills in missing data via web scraping and APIs
 - **Verification Agent** - Quarterly checks on phone numbers and business status
 
 ### Security & Privacy
+
 - Phone-based authentication (no passwords)
 - All API keys secured server-side
 - Row Level Security enforces data access
@@ -158,6 +170,7 @@ Three autonomous agents keep data fresh:
 ## Contributing
 
 We welcome contributions! Whether you're:
+
 - A developer who wants to code
 - Someone with knowledge of reentry resources
 - A user with feedback on the experience
@@ -167,9 +180,11 @@ Please reach out or submit an issue.
 ## Roadmap
 
 ### Phase 1 (Current) - Core Directory
+
 Basic resource directory with search, map, reviews, and favorites
 
 ### Phase 2 - Enhanced Features
+
 - Document scanning (release papers)
 - Calendar reminders for appointments
 - Multi-stop transportation routing
@@ -177,6 +192,7 @@ Basic resource directory with search, map, reviews, and favorites
 - Push notifications
 
 ### Phase 3 - Community Features
+
 - Coach messaging
 - Check-in tracking
 - Goal setting
@@ -184,6 +200,7 @@ Basic resource directory with search, map, reviews, and favorites
 - Job matching
 
 ### Phase 4 - Scale & Integration
+
 - Native mobile apps (iOS/Android)
 - Voice search and SMS interface
 - Integration with case management systems
@@ -202,6 +219,7 @@ MIT License - see [LICENSE](LICENSE) file for details
 ## Acknowledgments
 
 Built with support from the reentry community and powered by:
+
 - Next.js and Vercel
 - Supabase
 - Google Maps Platform

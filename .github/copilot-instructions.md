@@ -17,6 +17,7 @@
 ## 🎯 Core Principles (NEVER COMPROMISE ON THESE)
 
 ### 1. Quality Over Speed
+
 - ❌ Do NOT take shortcuts
 - ❌ Do NOT skip tests
 - ❌ Do NOT use placeholder/dummy code
@@ -24,6 +25,7 @@
 - ✅ Complete features fully before moving on
 
 ### 2. Test Everything
+
 ```bash
 # After every feature:
 npm test              # Unit tests must pass
@@ -32,17 +34,20 @@ npm run build         # Build must succeed
 ```
 
 ### 3. Commit Frequently
+
 - Commit after each completed subtask (15-30 min of work)
 - Use clear commit messages: `feat:`, `fix:`, `test:`, `docs:`
 - NEVER commit failing tests or build errors
 
 ### 4. Mobile-First, Accessible Always
+
 - Design for mobile screens first (375px width)
 - 4th grade reading level for all UI text
 - WCAG 2.1 AA compliance (keyboard nav, screen readers, contrast)
 - Touch targets minimum 44x44px
 
 ### 5. TypeScript Strict Mode
+
 - No `any` types without explicit reason
 - All functions have return types
 - Props interfaces for all components
@@ -53,6 +58,7 @@ npm run build         # Build must succeed
 ## 📋 Your Workflow
 
 ### Step 1: Understand Current State
+
 ```bash
 # What's the current phase/task?
 Read: PROGRESS.md (lines 10-30)
@@ -65,12 +71,14 @@ Read: CLAUDE.md (relevant section)
 ```
 
 ### Step 2: Before Coding
+
 - [ ] Understand the full requirement
 - [ ] Check existing similar code for patterns
 - [ ] Know what tests you'll write
 - [ ] Identify which files need to change
 
 ### Step 3: Implement
+
 - Write the feature following established patterns (see CLAUDE.md)
 - Use HeroUI components (NOT shadcn/ui)
 - Server Components by default, 'use client' only when needed
@@ -79,10 +87,17 @@ Read: CLAUDE.md (relevant section)
 - Make it mobile-responsive
 
 ### Step 4: Test
+
 ```bash
 # Write tests first or alongside code
-npm test                    # Run unit tests
+npm test                    # Run unit tests (watch mode)
+npm run test:run            # Run tests once
 npm run test:coverage       # Check coverage (70%+ required)
+
+# E2E tests (HEADLESS by default - for troubleshooting, not demos)
+npm run test:e2e            # Run Playwright E2E tests (headless)
+npm run test:e2e:ui         # Only use when demoing to user
+npm run test:e2e:headed     # Only use when debugging specific UI issues
 
 # Manual testing
 npm run dev                 # Test in browser
@@ -90,7 +105,14 @@ npm run dev                 # Test in browser
 # Test keyboard navigation
 ```
 
+**IMPORTANT Testing Philosophy:**
+
+- ✅ **Run E2E tests headless** - Don't interrupt your workflow with browser windows
+- ✅ **Test before showing user** - Verify everything works first
+- ❌ **Don't show UI tests unless demoing** - User doesn't need to see every test run
+
 ### Step 5: Quality Check
+
 ```bash
 npm run lint               # Fix all errors
 npm run build              # Must succeed
@@ -98,6 +120,7 @@ npm test                   # All tests pass
 ```
 
 ### Step 6: Commit
+
 ```bash
 git add <files>
 git commit -m "feat: specific feature description"
@@ -110,6 +133,7 @@ git commit -m "feat: specific feature description"
 ## 🏗️ Architecture Quick Reference
 
 ### Tech Stack (Critical - Don't Use Alternatives)
+
 - **Framework**: Next.js 16 (App Router, Server Components)
 - **UI Library**: **HeroUI** (NOT shadcn/ui anymore - migration in progress)
 - **Database**: Supabase (PostgreSQL 16 with PostGIS)
@@ -119,6 +143,7 @@ git commit -m "feat: specific feature description"
 - **Maps**: Google Maps JavaScript API
 
 ### File Structure (Where Things Go)
+
 ```
 app/
 ├── page.tsx                    # Routes (Server Components)
@@ -145,6 +170,7 @@ e2e/                           # Playwright E2E tests
 ### Code Patterns (Follow These Exactly)
 
 #### Server Component (Default)
+
 ```typescript
 // app/resources/page.tsx
 import { createClient } from '@/lib/supabase/server'
@@ -166,6 +192,7 @@ export default async function ResourcesPage() {
 ```
 
 #### Client Component (When Needed)
+
 ```typescript
 // components/SearchBar.tsx
 'use client'
@@ -188,6 +215,7 @@ export function SearchBar() {
 ```
 
 #### API Route
+
 ```typescript
 // app/api/resources/route.ts
 import { NextRequest, NextResponse } from 'next/server'
@@ -196,23 +224,19 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
+    const { data, error } = await supabase.from('resources').select('*')
 
     if (error) throw error
     return NextResponse.json(data)
   } catch (error) {
     console.error('API Error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 ```
 
 #### Component with Props
+
 ```typescript
 // components/resources/ResourceCard.tsx
 import { Card, CardBody, CardHeader } from '@heroui/react'
@@ -238,6 +262,7 @@ export function ResourceCard({ resource, onFavorite }: ResourceCardProps) {
 ```
 
 #### Writing Tests
+
 ```typescript
 // __tests__/ResourceCard.test.tsx
 import { render, screen } from '@testing-library/react'
@@ -269,6 +294,7 @@ describe('ResourceCard', () => {
 ## ❌ Common Mistakes to AVOID
 
 ### DON'T:
+
 - ❌ Use `any` type without explicit reason
 - ❌ Skip writing tests ("I'll add them later")
 - ❌ Use console.log instead of proper error handling
@@ -281,6 +307,7 @@ describe('ResourceCard', () => {
 - ❌ Create new patterns - follow existing ones
 
 ### DO:
+
 - ✅ Follow established patterns from existing code
 - ✅ Write tests before or alongside features
 - ✅ Handle all error cases
@@ -297,6 +324,7 @@ describe('ResourceCard', () => {
 ## 🚨 Critical Requirements (MUST FOLLOW)
 
 ### Accessibility (Non-Negotiable)
+
 ```typescript
 // ✅ GOOD - Accessible
 <button aria-label="Close dialog" onClick={handleClose}>
@@ -310,6 +338,7 @@ describe('ResourceCard', () => {
 ```
 
 ### Error Handling (Always Required)
+
 ```typescript
 // ✅ GOOD - Proper error handling
 try {
@@ -327,6 +356,7 @@ return data // What if there's an error?
 ```
 
 ### Loading States (Always Show)
+
 ```typescript
 // ✅ GOOD - Loading state
 function ResourceList() {
@@ -349,6 +379,7 @@ function ResourceList() {
 ## 📊 Quality Metrics (Your Targets)
 
 After implementing a feature, verify:
+
 - ✅ All tests pass (`npm test`)
 - ✅ No TypeScript errors (`npm run build`)
 - ✅ No linting errors (`npm run lint`)
@@ -361,21 +392,22 @@ After implementing a feature, verify:
 
 ## 📖 When You Need More Context
 
-| Question | Check This File |
-|----------|----------------|
-| What's the current task? | [PROGRESS.md](../PROGRESS.md) |
-| What are all the tasks? | [IMPLEMENTATION_CHECKLIST.md](../IMPLEMENTATION_CHECKLIST.md) |
-| How do I structure code? | [CLAUDE.md](../CLAUDE.md) |
-| What was decided and why? | [ARCHITECTURE_DECISIONS.md](../ARCHITECTURE_DECISIONS.md) |
-| What are the features? | [PRODUCT_REQUIREMENTS.md](../PRODUCT_REQUIREMENTS.md) |
-| What's the database schema? | [TECHNICAL_ARCHITECTURE.md](../TECHNICAL_ARCHITECTURE.md) |
-| How do I test? | [TESTING_STRATEGY.md](../TESTING_STRATEGY.md) |
+| Question                    | Check This File                                               |
+| --------------------------- | ------------------------------------------------------------- |
+| What's the current task?    | [PROGRESS.md](../PROGRESS.md)                                 |
+| What are all the tasks?     | [IMPLEMENTATION_CHECKLIST.md](../IMPLEMENTATION_CHECKLIST.md) |
+| How do I structure code?    | [CLAUDE.md](../CLAUDE.md)                                     |
+| What was decided and why?   | [ARCHITECTURE_DECISIONS.md](../ARCHITECTURE_DECISIONS.md)     |
+| What are the features?      | [PRODUCT_REQUIREMENTS.md](../PRODUCT_REQUIREMENTS.md)         |
+| What's the database schema? | [TECHNICAL_ARCHITECTURE.md](../TECHNICAL_ARCHITECTURE.md)     |
+| How do I test?              | [TESTING_STRATEGY.md](../TESTING_STRATEGY.md)                 |
 
 ---
 
 ## 🎯 Success Checklist (Every Task)
 
 Before marking a task complete:
+
 - [ ] Feature works as specified in IMPLEMENTATION_CHECKLIST.md
 - [ ] Tests written and passing
 - [ ] No TypeScript errors
@@ -393,6 +425,7 @@ Before marking a task complete:
 ## 💬 Communication Style
 
 When you encounter an issue:
+
 1. **Check documentation first** (files listed above)
 2. **Look for similar code** in the codebase
 3. **If still stuck**, explain:
@@ -425,6 +458,7 @@ Every time you continue work:
 ## 🎓 Remember
 
 **Claude Code is the architect**. You are the implementer.
+
 - Claude designed the system → You build it
 - Claude makes decisions → You follow them
 - Claude writes specs → You implement them
@@ -432,6 +466,7 @@ Every time you continue work:
 **Your job**: Write **high-quality**, **tested**, **accessible** code that follows established patterns.
 
 **Not your job**:
+
 - Redesign architecture
 - Skip tests to move faster
 - Take shortcuts

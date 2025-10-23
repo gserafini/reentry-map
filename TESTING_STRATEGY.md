@@ -8,6 +8,7 @@ integration tests, E2E tests, and manual testing procedures.
 ## Testing Philosophy
 
 **Key Principles**:
+
 1. Test user-facing behavior, not implementation details
 2. Prioritize integration tests over unit tests
 3. Manual testing for UX and accessibility
@@ -15,6 +16,7 @@ integration tests, E2E tests, and manual testing procedures.
 5. Security testing for auth and data access
 
 **Coverage Goals**:
+
 - Critical paths: 100% coverage
 - API routes: 90% coverage
 - Components: 70% coverage
@@ -23,12 +25,14 @@ integration tests, E2E tests, and manual testing procedures.
 ## Testing Stack
 
 ### Framework
+
 - **Vitest 2.x**: Fast, modern test runner (Vite-native)
 - **React Testing Library 16.x**: Component testing
 - **Playwright**: E2E testing
 - **MSW (Mock Service Worker)**: API mocking
 
 ### Installation
+
 ```bash
 npm install -D vitest @vitejs/plugin-react
 npm install -D @testing-library/react @testing-library/jest-dom
@@ -40,10 +44,11 @@ npm install -D msw
 ### Configuration Files
 
 #### vitest.config.ts
+
 ```typescript
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
@@ -54,33 +59,28 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        '.next/',
-        'coverage/',
-        '**/*.config.*',
-        '**/types/*'
-      ]
-    }
+      exclude: ['node_modules/', '.next/', 'coverage/', '**/*.config.*', '**/types/*'],
+    },
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './')
-    }
-  }
-});
+      '@': path.resolve(__dirname, './'),
+    },
+  },
+})
 ```
 
 #### vitest.setup.ts
+
 ```typescript
-import '@testing-library/jest-dom';
-import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import '@testing-library/jest-dom'
+import { cleanup } from '@testing-library/react'
+import { afterEach, vi } from 'vitest'
 
 // Cleanup after each test
 afterEach(() => {
-  cleanup();
-});
+  cleanup()
+})
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -94,7 +94,7 @@ vi.mock('next/navigation', () => ({
   }),
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
-}));
+}))
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/client', () => ({
@@ -102,26 +102,26 @@ vi.mock('@/lib/supabase/client', () => ({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          single: vi.fn(() => Promise.resolve({ data: null, error: null }))
-        }))
+          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        })),
       })),
       insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
       update: vi.fn(() => Promise.resolve({ data: null, error: null })),
-      delete: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      delete: vi.fn(() => Promise.resolve({ data: null, error: null })),
     })),
     auth: {
       getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
       signInWithOtp: vi.fn(() => Promise.resolve({ error: null })),
       verifyOtp: vi.fn(() => Promise.resolve({ error: null })),
-      signOut: vi.fn(() => Promise.resolve({ error: null }))
-    }
-  })
-}));
+      signOut: vi.fn(() => Promise.resolve({ error: null })),
+    },
+  }),
+}))
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -131,7 +131,7 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
-});
+})
 
 // Mock Google Maps
 global.google = {
@@ -141,13 +141,14 @@ global.google = {
     InfoWindow: vi.fn(),
     LatLng: vi.fn(),
     // Add other Maps API mocks as needed
-  }
-} as any;
+  },
+} as any
 ```
 
 #### playwright.config.ts
+
 ```typescript
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
@@ -180,7 +181,7 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
   },
-});
+})
 ```
 
 ## Unit Tests
@@ -188,6 +189,7 @@ export default defineConfig({
 ### Testing Components
 
 #### Example: ResourceCard.test.tsx
+
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -210,7 +212,7 @@ describe('ResourceCard', () => {
 
   it('renders resource information', () => {
     render(<ResourceCard resource={mockResource} />);
-    
+
     expect(screen.getByText('Test Resource')).toBeInTheDocument();
     expect(screen.getByText('A test resource')).toBeInTheDocument();
     expect(screen.getByText('123 Main St')).toBeInTheDocument();
@@ -218,7 +220,7 @@ describe('ResourceCard', () => {
 
   it('displays rating correctly', () => {
     render(<ResourceCard resource={mockResource} />);
-    
+
     expect(screen.getByText('4.5')).toBeInTheDocument();
     expect(screen.getByText('(10 reviews)')).toBeInTheDocument();
   });
@@ -226,29 +228,29 @@ describe('ResourceCard', () => {
   it('calls onFavorite when favorite button clicked', async () => {
     const onFavorite = vi.fn();
     const user = userEvent.setup();
-    
+
     render(<ResourceCard resource={mockResource} onFavorite={onFavorite} />);
-    
+
     const favoriteButton = screen.getByRole('button', { name: /save/i });
     await user.click(favoriteButton);
-    
+
     expect(onFavorite).toHaveBeenCalledWith('123');
   });
 
   it('displays distance when userLocation provided', () => {
     render(
-      <ResourceCard 
-        resource={mockResource} 
+      <ResourceCard
+        resource={mockResource}
         userLocation={{ lat: 37.8000, lng: -122.2700 }}
       />
     );
-    
+
     expect(screen.getByText(/mi$/)).toBeInTheDocument();
   });
 
   it('shows category badge', () => {
     render(<ResourceCard resource={mockResource} />);
-    
+
     expect(screen.getByText('Employment')).toBeInTheDocument();
   });
 });
@@ -257,115 +259,121 @@ describe('ResourceCard', () => {
 ### Testing Custom Hooks
 
 #### Example: useResources.test.ts
-```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { useResources } from '@/lib/hooks/useResources';
-import { createClient } from '@/lib/supabase/client';
 
-vi.mock('@/lib/supabase/client');
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, waitFor } from '@testing-library/react'
+import { useResources } from '@/lib/hooks/useResources'
+import { createClient } from '@/lib/supabase/client'
+
+vi.mock('@/lib/supabase/client')
 
 describe('useResources', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+  })
 
   it('fetches resources successfully', async () => {
     const mockResources = [
       { id: '1', name: 'Resource 1', status: 'active' },
-      { id: '2', name: 'Resource 2', status: 'active' }
-    ];
+      { id: '2', name: 'Resource 2', status: 'active' },
+    ]
 
     vi.mocked(createClient).mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ 
-            data: mockResources, 
-            error: null 
-          }))
-        }))
-      }))
-    } as any);
+          eq: vi.fn(() =>
+            Promise.resolve({
+              data: mockResources,
+              error: null,
+            })
+          ),
+        })),
+      })),
+    } as any)
 
-    const { result } = renderHook(() => useResources());
+    const { result } = renderHook(() => useResources())
 
-    expect(result.current.loading).toBe(true);
+    expect(result.current.loading).toBe(true)
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
+      expect(result.current.loading).toBe(false)
+    })
 
-    expect(result.current.resources).toEqual(mockResources);
-    expect(result.current.error).toBeNull();
-  });
+    expect(result.current.resources).toEqual(mockResources)
+    expect(result.current.error).toBeNull()
+  })
 
   it('handles fetch error', async () => {
-    const mockError = { message: 'Failed to fetch' };
+    const mockError = { message: 'Failed to fetch' }
 
     vi.mocked(createClient).mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ 
-            data: null, 
-            error: mockError 
-          }))
-        }))
-      }))
-    } as any);
+          eq: vi.fn(() =>
+            Promise.resolve({
+              data: null,
+              error: mockError,
+            })
+          ),
+        })),
+      })),
+    } as any)
 
-    const { result } = renderHook(() => useResources());
+    const { result } = renderHook(() => useResources())
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
+      expect(result.current.loading).toBe(false)
+    })
 
-    expect(result.current.resources).toEqual([]);
-    expect(result.current.error).toBe('Failed to fetch');
-  });
-});
+    expect(result.current.resources).toEqual([])
+    expect(result.current.error).toBe('Failed to fetch')
+  })
+})
 ```
 
 ### Testing Utility Functions
 
 #### Example: distance.test.ts
+
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { calculateDistance, formatDistance } from '@/lib/utils/distance';
+import { describe, it, expect } from 'vitest'
+import { calculateDistance, formatDistance } from '@/lib/utils/distance'
 
 describe('distance utilities', () => {
   describe('calculateDistance', () => {
     it('calculates distance between two points correctly', () => {
-      const point1 = { lat: 37.8044, lng: -122.2712 }; // Oakland
-      const point2 = { lat: 37.7749, lng: -122.4194 }; // San Francisco
-      
-      const distance = calculateDistance(point1, point2);
-      
+      const point1 = { lat: 37.8044, lng: -122.2712 } // Oakland
+      const point2 = { lat: 37.7749, lng: -122.4194 } // San Francisco
+
+      const distance = calculateDistance(point1, point2)
+
       // Expect approximately 10 miles
-      expect(distance).toBeGreaterThan(9);
-      expect(distance).toBeLessThan(11);
-    });
+      expect(distance).toBeGreaterThan(9)
+      expect(distance).toBeLessThan(11)
+    })
 
     it('returns 0 for same location', () => {
-      const point = { lat: 37.8044, lng: -122.2712 };
-      
-      const distance = calculateDistance(point, point);
-      
-      expect(distance).toBe(0);
-    });
-  });
+      const point = { lat: 37.8044, lng: -122.2712 }
+
+      const distance = calculateDistance(point, point)
+
+      expect(distance).toBe(0)
+    })
+  })
 
   describe('formatDistance', () => {
     it('formats distance in miles', () => {
-      expect(formatDistance(5.2)).toBe('5.2 mi');
-      expect(formatDistance(0.5)).toBe('0.5 mi');
-      expect(formatDistance(15.789)).toBe('15.8 mi');
-    });
+      expect(formatDistance(5.2)).toBe('5.2 mi')
+      expect(formatDistance(0.5)).toBe('0.5 mi')
+      expect(formatDistance(15.789)).toBe('15.8 mi')
+    })
 
     it('handles zero distance', () => {
-      expect(formatDistance(0)).toBe('0.0 mi');
-    });
-  });
-});
+      expect(formatDistance(0)).toBe('0.0 mi')
+    })
+  })
+})
 ```
 
 ## Integration Tests
@@ -373,52 +381,49 @@ describe('distance utilities', () => {
 ### Testing API Routes
 
 #### Example: resources.api.test.ts
+
 ```typescript
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GET, POST } from '@/app/api/resources/route';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { GET, POST } from '@/app/api/resources/route'
+import { NextRequest } from 'next/server'
 
 describe('/api/resources', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+  })
 
   describe('GET', () => {
     it('returns all active resources', async () => {
-      const request = new NextRequest('http://localhost:3000/api/resources');
-      
-      const response = await GET(request);
-      const data = await response.json();
-      
-      expect(response.status).toBe(200);
-      expect(Array.isArray(data)).toBe(true);
-      expect(data.every(r => r.status === 'active')).toBe(true);
-    });
+      const request = new NextRequest('http://localhost:3000/api/resources')
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(data)).toBe(true)
+      expect(data.every((r) => r.status === 'active')).toBe(true)
+    })
 
     it('filters by category', async () => {
-      const request = new NextRequest(
-        'http://localhost:3000/api/resources?category=employment'
-      );
-      
-      const response = await GET(request);
-      const data = await response.json();
-      
-      expect(response.status).toBe(200);
-      expect(data.every(r => r.primary_category === 'employment')).toBe(true);
-    });
+      const request = new NextRequest('http://localhost:3000/api/resources?category=employment')
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.every((r) => r.primary_category === 'employment')).toBe(true)
+    })
 
     it('handles search query', async () => {
-      const request = new NextRequest(
-        'http://localhost:3000/api/resources?search=food'
-      );
-      
-      const response = await GET(request);
-      const data = await response.json();
-      
-      expect(response.status).toBe(200);
-      expect(data.length).toBeGreaterThan(0);
-    });
-  });
+      const request = new NextRequest('http://localhost:3000/api/resources?search=food')
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.length).toBeGreaterThan(0)
+    })
+  })
 
   describe('POST', () => {
     it('creates new resource (admin only)', async () => {
@@ -427,62 +432,60 @@ describe('/api/resources', () => {
         address: '123 Test St',
         latitude: 37.8044,
         longitude: -122.2712,
-        primary_category: 'employment'
-      };
+        primary_category: 'employment',
+      }
 
       const request = new NextRequest('http://localhost:3000/api/resources', {
         method: 'POST',
-        body: JSON.stringify(resourceData)
-      });
-      
-      const response = await POST(request);
-      const data = await response.json();
-      
-      expect(response.status).toBe(201);
-      expect(data.name).toBe('New Resource');
-      expect(data.id).toBeDefined();
-    });
+        body: JSON.stringify(resourceData),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.name).toBe('New Resource')
+      expect(data.id).toBeDefined()
+    })
 
     it('requires authentication', async () => {
       const request = new NextRequest('http://localhost:3000/api/resources', {
         method: 'POST',
-        body: JSON.stringify({})
-      });
-      
-      const response = await POST(request);
-      
-      expect(response.status).toBe(401);
-    });
+        body: JSON.stringify({}),
+      })
+
+      const response = await POST(request)
+
+      expect(response.status).toBe(401)
+    })
 
     it('validates required fields', async () => {
       const request = new NextRequest('http://localhost:3000/api/resources', {
         method: 'POST',
-        body: JSON.stringify({ name: 'Test' }) // Missing required fields
-      });
-      
-      const response = await POST(request);
-      
-      expect(response.status).toBe(400);
-    });
-  });
-});
+        body: JSON.stringify({ name: 'Test' }), // Missing required fields
+      })
+
+      const response = await POST(request)
+
+      expect(response.status).toBe(400)
+    })
+  })
+})
 ```
 
 ### Testing Database Queries
 
 #### Example: resources.db.test.ts
+
 ```typescript
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
 
 // Use test database
-const supabase = createClient(
-  process.env.TEST_SUPABASE_URL!,
-  process.env.TEST_SUPABASE_KEY!
-);
+const supabase = createClient(process.env.TEST_SUPABASE_URL!, process.env.TEST_SUPABASE_KEY!)
 
 describe('resources database', () => {
-  let testResourceId: string;
+  let testResourceId: string
 
   beforeEach(async () => {
     // Insert test data
@@ -494,69 +497,66 @@ describe('resources database', () => {
         latitude: 37.8044,
         longitude: -122.2712,
         primary_category: 'employment',
-        status: 'active'
+        status: 'active',
       })
       .select()
-      .single();
-    
-    testResourceId = data.id;
-  });
+      .single()
+
+    testResourceId = data.id
+  })
 
   afterEach(async () => {
     // Clean up test data
-    await supabase
-      .from('resources')
-      .delete()
-      .eq('id', testResourceId);
-  });
+    await supabase.from('resources').delete().eq('id', testResourceId)
+  })
 
   it('fetches resource by id', async () => {
     const { data, error } = await supabase
       .from('resources')
       .select('*')
       .eq('id', testResourceId)
-      .single();
+      .single()
 
-    expect(error).toBeNull();
-    expect(data.name).toBe('Test Resource');
-  });
+    expect(error).toBeNull()
+    expect(data.name).toBe('Test Resource')
+  })
 
   it('updates resource', async () => {
     const { error } = await supabase
       .from('resources')
       .update({ name: 'Updated Resource' })
-      .eq('id', testResourceId);
+      .eq('id', testResourceId)
 
-    expect(error).toBeNull();
+    expect(error).toBeNull()
 
     const { data } = await supabase
       .from('resources')
       .select('name')
       .eq('id', testResourceId)
-      .single();
+      .single()
 
-    expect(data.name).toBe('Updated Resource');
-  });
+    expect(data.name).toBe('Updated Resource')
+  })
 
   it('enforces unique constraint on favorites', async () => {
-    const userId = 'test-user-id';
+    const userId = 'test-user-id'
 
     // First favorite should succeed
     const { error: error1 } = await supabase
       .from('user_favorites')
-      .insert({ user_id: userId, resource_id: testResourceId });
+      .insert({ user_id: userId, resource_id: testResourceId })
 
-    expect(error1).toBeNull();
+    expect(error1).toBeNull()
 
     // Duplicate favorite should fail
     const { error: error2 } = await supabase
       .from('user_favorites')
-      .insert({ user_id: userId, resource_id: testResourceId });
+      .insert({ user_id: userId, resource_id: testResourceId })
 
-    expect(error2).not.toBeNull();
-    expect(error2?.code).toBe('23505'); // Unique constraint violation
-  });
-});
+    expect(error2).not.toBeNull()
+    expect(error2?.code).toBe('23505') // Unique constraint violation
+  })
+})
 ```
 
 ## End-to-End Tests
@@ -564,223 +564,223 @@ describe('resources database', () => {
 ### Testing User Flows
 
 #### Example: search-resources.e2e.ts
+
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 test.describe('Resource Search', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-  });
+    await page.goto('/')
+  })
 
   test('searches for resources by keyword', async ({ page }) => {
     // Type in search box
-    await page.fill('input[placeholder*="Search"]', 'employment');
-    
+    await page.fill('input[placeholder*="Search"]', 'employment')
+
     // Wait for results
-    await page.waitForSelector('[data-testid="resource-card"]');
-    
+    await page.waitForSelector('[data-testid="resource-card"]')
+
     // Verify results contain employment resources
-    const cards = page.locator('[data-testid="resource-card"]');
-    const count = await cards.count();
-    
-    expect(count).toBeGreaterThan(0);
-    
+    const cards = page.locator('[data-testid="resource-card"]')
+    const count = await cards.count()
+
+    expect(count).toBeGreaterThan(0)
+
     // Check first result contains "employment"
-    const firstCard = cards.first();
-    await expect(firstCard).toContainText(/employment/i);
-  });
+    const firstCard = cards.first()
+    await expect(firstCard).toContainText(/employment/i)
+  })
 
   test('filters by category', async ({ page }) => {
     // Click category filter
-    await page.click('text=Employment');
-    
+    await page.click('text=Employment')
+
     // Wait for filtered results
-    await page.waitForSelector('[data-testid="resource-card"]');
-    
+    await page.waitForSelector('[data-testid="resource-card"]')
+
     // Verify all results are employment category
-    const badges = page.locator('[data-testid="category-badge"]');
-    const count = await badges.count();
-    
+    const badges = page.locator('[data-testid="category-badge"]')
+    const count = await badges.count()
+
     for (let i = 0; i < count; i++) {
-      await expect(badges.nth(i)).toHaveText('Employment');
+      await expect(badges.nth(i)).toHaveText('Employment')
     }
-  });
+  })
 
   test('combines search and category filter', async ({ page }) => {
     // Enter search term
-    await page.fill('input[placeholder*="Search"]', 'downtown');
-    
+    await page.fill('input[placeholder*="Search"]', 'downtown')
+
     // Select category
-    await page.click('text=Food');
-    
+    await page.click('text=Food')
+
     // Wait for results
-    await page.waitForSelector('[data-testid="resource-card"]');
-    
+    await page.waitForSelector('[data-testid="resource-card"]')
+
     // Verify results match both criteria
-    const cards = page.locator('[data-testid="resource-card"]');
-    await expect(cards.first()).toContainText(/downtown/i);
-    
-    const badge = cards.first().locator('[data-testid="category-badge"]');
-    await expect(badge).toHaveText('Food');
-  });
+    const cards = page.locator('[data-testid="resource-card"]')
+    await expect(cards.first()).toContainText(/downtown/i)
+
+    const badge = cards.first().locator('[data-testid="category-badge"]')
+    await expect(badge).toHaveText('Food')
+  })
 
   test('clears filters', async ({ page }) => {
     // Apply filters
-    await page.fill('input[placeholder*="Search"]', 'test');
-    await page.click('text=Housing');
-    
+    await page.fill('input[placeholder*="Search"]', 'test')
+    await page.click('text=Housing')
+
     // Click clear button
-    await page.click('button:has-text("Clear filters")');
-    
+    await page.click('button:has-text("Clear filters")')
+
     // Verify search input is empty
-    const searchInput = page.locator('input[placeholder*="Search"]');
-    await expect(searchInput).toHaveValue('');
-    
+    const searchInput = page.locator('input[placeholder*="Search"]')
+    await expect(searchInput).toHaveValue('')
+
     // Verify category filter is cleared
-    const housingFilter = page.locator('button:has-text("Housing")');
-    await expect(housingFilter).not.toHaveClass(/active/);
-  });
-});
+    const housingFilter = page.locator('button:has-text("Housing")')
+    await expect(housingFilter).not.toHaveClass(/active/)
+  })
+})
 ```
 
 #### Example: user-authentication.e2e.ts
+
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 test.describe('User Authentication', () => {
   test('signs in with phone number', async ({ page }) => {
-    await page.goto('/');
-    
+    await page.goto('/')
+
     // Click sign in button
-    await page.click('button:has-text("Sign In")');
-    
+    await page.click('button:has-text("Sign In")')
+
     // Enter phone number
-    await page.fill('input[type="tel"]', '5551234567');
-    
+    await page.fill('input[type="tel"]', '5551234567')
+
     // Click send code
-    await page.click('button:has-text("Send Code")');
-    
+    await page.click('button:has-text("Send Code")')
+
     // Should show OTP input
-    await expect(page.locator('input[placeholder*="6-digit"]')).toBeVisible();
-    
+    await expect(page.locator('input[placeholder*="6-digit"]')).toBeVisible()
+
     // In test mode, use test OTP: 123456
-    await page.fill('input[placeholder*="6-digit"]', '123456');
-    
+    await page.fill('input[placeholder*="6-digit"]', '123456')
+
     // Click verify
-    await page.click('button:has-text("Verify")');
-    
+    await page.click('button:has-text("Verify")')
+
     // Should be signed in
-    await expect(page.locator('text=Profile')).toBeVisible();
-  });
+    await expect(page.locator('text=Profile')).toBeVisible()
+  })
 
   test('shows favorites after sign in', async ({ page }) => {
     // Sign in first
     await test.step('sign in', async () => {
-      await page.goto('/');
-      await page.click('button:has-text("Sign In")');
-      await page.fill('input[type="tel"]', '5551234567');
-      await page.click('button:has-text("Send Code")');
-      await page.fill('input[placeholder*="6-digit"]', '123456');
-      await page.click('button:has-text("Verify")');
-    });
-    
+      await page.goto('/')
+      await page.click('button:has-text("Sign In")')
+      await page.fill('input[type="tel"]', '5551234567')
+      await page.click('button:has-text("Send Code")')
+      await page.fill('input[placeholder*="6-digit"]', '123456')
+      await page.click('button:has-text("Verify")')
+    })
+
     // Navigate to favorites
-    await page.click('text=Favorites');
-    
+    await page.click('text=Favorites')
+
     // Should show favorites page
-    await expect(page).toHaveURL(/\/favorites/);
-    await expect(page.locator('h1')).toHaveText('My Favorites');
-  });
+    await expect(page).toHaveURL(/\/favorites/)
+    await expect(page.locator('h1')).toHaveText('My Favorites')
+  })
 
   test('requires auth for protected actions', async ({ page }) => {
-    await page.goto('/resources/test-id');
-    
+    await page.goto('/resources/test-id')
+
     // Try to favorite without auth
-    await page.click('button:has-text("Save")');
-    
+    await page.click('button:has-text("Save")')
+
     // Should show sign in modal
-    await expect(page.locator('text=Sign in to save favorites')).toBeVisible();
-  });
-});
+    await expect(page.locator('text=Sign in to save favorites')).toBeVisible()
+  })
+})
 ```
 
 #### Example: resource-detail.e2e.ts
+
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 test.describe('Resource Detail Page', () => {
   test('displays complete resource information', async ({ page }) => {
-    await page.goto('/resources/test-resource-id');
-    
+    await page.goto('/resources/test-resource-id')
+
     // Check all sections are present
-    await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('text=Description')).toBeVisible();
-    await expect(page.locator('text=Contact Information')).toBeVisible();
-    await expect(page.locator('text=Hours')).toBeVisible();
-    await expect(page.locator('text=Location')).toBeVisible();
-    await expect(page.locator('[data-testid="map"]')).toBeVisible();
-  });
+    await expect(page.locator('h1')).toBeVisible()
+    await expect(page.locator('text=Description')).toBeVisible()
+    await expect(page.locator('text=Contact Information')).toBeVisible()
+    await expect(page.locator('text=Hours')).toBeVisible()
+    await expect(page.locator('text=Location')).toBeVisible()
+    await expect(page.locator('[data-testid="map"]')).toBeVisible()
+  })
 
   test('can call resource phone number', async ({ page }) => {
-    await page.goto('/resources/test-resource-id');
-    
-    const callButton = page.locator('a[href^="tel:"]');
-    await expect(callButton).toBeVisible();
-    await expect(callButton).toHaveAttribute('href', /tel:\+1/);
-  });
+    await page.goto('/resources/test-resource-id')
+
+    const callButton = page.locator('a[href^="tel:"]')
+    await expect(callButton).toBeVisible()
+    await expect(callButton).toHaveAttribute('href', /tel:\+1/)
+  })
 
   test('can get directions', async ({ page }) => {
-    await page.goto('/resources/test-resource-id');
-    
-    const directionsButton = page.locator('a:has-text("Get Directions")');
-    await expect(directionsButton).toBeVisible();
-    
+    await page.goto('/resources/test-resource-id')
+
+    const directionsButton = page.locator('a:has-text("Get Directions")')
+    await expect(directionsButton).toBeVisible()
+
     // Should open Google Maps
-    await expect(directionsButton).toHaveAttribute(
-      'href',
-      /google\.com\/maps/
-    );
-  });
+    await expect(directionsButton).toHaveAttribute('href', /google\.com\/maps/)
+  })
 
   test('displays reviews', async ({ page }) => {
-    await page.goto('/resources/test-resource-id');
-    
+    await page.goto('/resources/test-resource-id')
+
     // Scroll to reviews section
-    await page.locator('text=Reviews').scrollIntoViewIfNeeded();
-    
+    await page.locator('text=Reviews').scrollIntoViewIfNeeded()
+
     // Should show reviews
-    const reviews = page.locator('[data-testid="review-card"]');
-    expect(await reviews.count()).toBeGreaterThan(0);
-  });
+    const reviews = page.locator('[data-testid="review-card"]')
+    expect(await reviews.count()).toBeGreaterThan(0)
+  })
 
   test('can write a review when authenticated', async ({ page }) => {
     // Sign in first
     await test.step('sign in', async () => {
-      await page.goto('/');
-      await page.click('button:has-text("Sign In")');
-      await page.fill('input[type="tel"]', '5551234567');
-      await page.click('button:has-text("Send Code")');
-      await page.fill('input[placeholder*="6-digit"]', '123456');
-      await page.click('button:has-text("Verify")');
-    });
-    
-    await page.goto('/resources/test-resource-id');
-    
+      await page.goto('/')
+      await page.click('button:has-text("Sign In")')
+      await page.fill('input[type="tel"]', '5551234567')
+      await page.click('button:has-text("Send Code")')
+      await page.fill('input[placeholder*="6-digit"]', '123456')
+      await page.click('button:has-text("Verify")')
+    })
+
+    await page.goto('/resources/test-resource-id')
+
     // Click write review
-    await page.click('button:has-text("Write a Review")');
-    
+    await page.click('button:has-text("Write a Review")')
+
     // Fill out review form
-    await page.click('[data-testid="rating-star-5"]');
-    await page.fill('textarea[placeholder*="experience"]', 'Great service!');
-    await page.fill('textarea[placeholder*="tips"]', 'Go early in the morning.');
-    
+    await page.click('[data-testid="rating-star-5"]')
+    await page.fill('textarea[placeholder*="experience"]', 'Great service!')
+    await page.fill('textarea[placeholder*="tips"]', 'Go early in the morning.')
+
     // Submit review
-    await page.click('button:has-text("Submit Review")');
-    
+    await page.click('button:has-text("Submit Review")')
+
     // Should show success message
-    await expect(page.locator('text=Review submitted')).toBeVisible();
-  });
-});
+    await expect(page.locator('text=Review submitted')).toBeVisible()
+  })
+})
 ```
 
 ## Performance Testing
@@ -788,6 +788,7 @@ test.describe('Resource Detail Page', () => {
 ### Lighthouse CI Configuration
 
 #### lighthouserc.json
+
 ```json
 {
   "ci": {
@@ -803,14 +804,14 @@ test.describe('Resource Detail Page', () => {
     "assert": {
       "preset": "lighthouse:recommended",
       "assertions": {
-        "categories:performance": ["warn", {"minScore": 0.9}],
-        "categories:accessibility": ["error", {"minScore": 0.9}],
-        "categories:best-practices": ["warn", {"minScore": 0.9}],
-        "categories:seo": ["warn", {"minScore": 0.9}],
-        "first-contentful-paint": ["warn", {"maxNumericValue": 2000}],
-        "largest-contentful-paint": ["warn", {"maxNumericValue": 2500}],
-        "cumulative-layout-shift": ["warn", {"maxNumericValue": 0.1}],
-        "total-blocking-time": ["warn", {"maxNumericValue": 300}]
+        "categories:performance": ["warn", { "minScore": 0.9 }],
+        "categories:accessibility": ["error", { "minScore": 0.9 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:seo": ["warn", { "minScore": 0.9 }],
+        "first-contentful-paint": ["warn", { "maxNumericValue": 2000 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }]
       }
     },
     "upload": {
@@ -823,51 +824,52 @@ test.describe('Resource Detail Page', () => {
 ### Load Testing
 
 #### Example: k6-load-test.js
+
 ```javascript
-import http from 'k6/http';
-import { check, sleep } from 'k6';
+import http from 'k6/http'
+import { check, sleep } from 'k6'
 
 export let options = {
   stages: [
-    { duration: '1m', target: 10 },  // Ramp up to 10 users
-    { duration: '3m', target: 10 },  // Stay at 10 users
-    { duration: '1m', target: 50 },  // Spike to 50 users
-    { duration: '3m', target: 50 },  // Stay at 50 users
-    { duration: '1m', target: 0 },   // Ramp down
+    { duration: '1m', target: 10 }, // Ramp up to 10 users
+    { duration: '3m', target: 10 }, // Stay at 10 users
+    { duration: '1m', target: 50 }, // Spike to 50 users
+    { duration: '3m', target: 50 }, // Stay at 50 users
+    { duration: '1m', target: 0 }, // Ramp down
   ],
   thresholds: {
     http_req_duration: ['p(95)<500'], // 95% of requests under 500ms
-    http_req_failed: ['rate<0.01'],   // Less than 1% failure rate
+    http_req_failed: ['rate<0.01'], // Less than 1% failure rate
   },
-};
+}
 
-const BASE_URL = 'https://your-staging-url.vercel.app';
+const BASE_URL = 'https://your-staging-url.vercel.app'
 
 export default function () {
   // Test homepage
-  let res = http.get(`${BASE_URL}/`);
+  let res = http.get(`${BASE_URL}/`)
   check(res, {
     'homepage status 200': (r) => r.status === 200,
     'homepage loads fast': (r) => r.timings.duration < 1000,
-  });
-  sleep(1);
+  })
+  sleep(1)
 
   // Test resource list
-  res = http.get(`${BASE_URL}/api/resources`);
+  res = http.get(`${BASE_URL}/api/resources`)
   check(res, {
     'resources API status 200': (r) => r.status === 200,
     'resources API fast': (r) => r.timings.duration < 500,
     'returns array': (r) => Array.isArray(JSON.parse(r.body)),
-  });
-  sleep(1);
+  })
+  sleep(1)
 
   // Test search
-  res = http.get(`${BASE_URL}/api/resources?search=food`);
+  res = http.get(`${BASE_URL}/api/resources?search=food`)
   check(res, {
     'search API status 200': (r) => r.status === 200,
     'search API fast': (r) => r.timings.duration < 500,
-  });
-  sleep(2);
+  })
+  sleep(2)
 }
 ```
 
@@ -876,60 +878,61 @@ export default function () {
 ### Automated Checks
 
 #### Example: accessibility.test.ts
+
 ```typescript
-import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { test, expect } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
 test.describe('Accessibility', () => {
   test('homepage meets WCAG AA standards', async ({ page }) => {
-    await page.goto('/');
-    
+    await page.goto('/')
+
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
-      .analyze();
-    
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
+      .analyze()
+
+    expect(accessibilityScanResults.violations).toEqual([])
+  })
 
   test('resource detail page meets WCAG AA standards', async ({ page }) => {
-    await page.goto('/resources/test-id');
-    
+    await page.goto('/resources/test-id')
+
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
-      .analyze();
-    
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
+      .analyze()
+
+    expect(accessibilityScanResults.violations).toEqual([])
+  })
 
   test('keyboard navigation works', async ({ page }) => {
-    await page.goto('/');
-    
+    await page.goto('/')
+
     // Tab through interactive elements
-    await page.keyboard.press('Tab');
-    await expect(page.locator(':focus')).toBeVisible();
-    
-    await page.keyboard.press('Tab');
-    await expect(page.locator(':focus')).toBeVisible();
-    
+    await page.keyboard.press('Tab')
+    await expect(page.locator(':focus')).toBeVisible()
+
+    await page.keyboard.press('Tab')
+    await expect(page.locator(':focus')).toBeVisible()
+
     // Should be able to activate with Enter/Space
-    await page.keyboard.press('Enter');
-  });
+    await page.keyboard.press('Enter')
+  })
 
   test('color contrast is sufficient', async ({ page }) => {
-    await page.goto('/');
-    
+    await page.goto('/')
+
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(['wcag2aa'])
       .options({ rules: { 'color-contrast': { enabled: true } } })
-      .analyze();
-    
+      .analyze()
+
     const contrastViolations = accessibilityScanResults.violations.filter(
-      v => v.id === 'color-contrast'
-    );
-    
-    expect(contrastViolations).toEqual([]);
-  });
-});
+      (v) => v.id === 'color-contrast'
+    )
+
+    expect(contrastViolations).toEqual([])
+  })
+})
 ```
 
 ## Manual Testing Checklist
@@ -937,6 +940,7 @@ test.describe('Accessibility', () => {
 ### Pre-Release Testing Checklist
 
 #### Functionality
+
 - [ ] All features work as specified in PRD
 - [ ] Search returns relevant results
 - [ ] Filters work correctly
@@ -948,6 +952,7 @@ test.describe('Accessibility', () => {
 - [ ] Admin features work (if applicable)
 
 #### Cross-Browser
+
 - [ ] Chrome (latest)
 - [ ] Safari (latest)
 - [ ] Firefox (latest)
@@ -956,6 +961,7 @@ test.describe('Accessibility', () => {
 - [ ] Mobile Chrome (Android)
 
 #### Devices
+
 - [ ] iPhone (latest)
 - [ ] iPhone (2-3 years old)
 - [ ] Android phone (latest)
@@ -966,12 +972,14 @@ test.describe('Accessibility', () => {
 - [ ] Small laptop 1280x720
 
 #### Network Conditions
+
 - [ ] Fast 4G (normal use case)
 - [ ] Slow 3G (stress test)
 - [ ] Offline (PWA functionality)
 - [ ] Intermittent connection
 
 #### Accessibility
+
 - [ ] Keyboard navigation works throughout
 - [ ] Screen reader announces content correctly (VoiceOver/NVDA)
 - [ ] Focus indicators visible
@@ -981,6 +989,7 @@ test.describe('Accessibility', () => {
 - [ ] Form errors announced to screen readers
 
 #### Performance
+
 - [ ] Lighthouse score > 90 (all categories)
 - [ ] Page loads in < 3 seconds on 3G
 - [ ] No layout shift (CLS < 0.1)
@@ -988,6 +997,7 @@ test.describe('Accessibility', () => {
 - [ ] Map loads quickly with 100+ markers
 
 #### Security
+
 - [ ] Cannot access other users' data
 - [ ] Admin features hidden from non-admins
 - [ ] Authentication required where appropriate
@@ -996,6 +1006,7 @@ test.describe('Accessibility', () => {
 - [ ] XSS prevented
 
 #### Edge Cases
+
 - [ ] Very long resource names display correctly
 - [ ] Resources with no reviews display appropriately
 - [ ] Empty search results show helpful message
@@ -1004,6 +1015,7 @@ test.describe('Accessibility', () => {
 - [ ] Form validation works for all edge cases
 
 #### User Experience
+
 - [ ] Clear error messages (no technical jargon)
 - [ ] Loading states prevent confusion
 - [ ] Success feedback for actions
@@ -1012,6 +1024,7 @@ test.describe('Accessibility', () => {
 - [ ] Mobile UX feels native
 
 #### Content
+
 - [ ] All text free of typos
 - [ ] Resource information accurate
 - [ ] Categories make sense
@@ -1022,6 +1035,7 @@ test.describe('Accessibility', () => {
 ### Bug Severity Classification
 
 **Critical (P0)** - Fix immediately, blocks launch
+
 - App crashes or is completely unusable
 - Data loss or corruption
 - Security vulnerability
@@ -1029,6 +1043,7 @@ test.describe('Accessibility', () => {
 - No resources display
 
 **High (P1)** - Fix before launch
+
 - Feature doesn't work as specified
 - Significant UX issue
 - Performance issue affecting all users
@@ -1036,6 +1051,7 @@ test.describe('Accessibility', () => {
 - Error that affects > 10% of users
 
 **Medium (P2)** - Fix soon after launch
+
 - Minor feature issue
 - Cosmetic issue
 - Performance issue in edge case
@@ -1043,6 +1059,7 @@ test.describe('Accessibility', () => {
 - Workaround available
 
 **Low (P3)** - Fix when time permits
+
 - Minor cosmetic issue
 - Nice-to-have feature
 - Affects very few users
@@ -1053,6 +1070,7 @@ test.describe('Accessibility', () => {
 ### GitHub Actions Workflow
 
 #### .github/workflows/test.yml
+
 ```yaml
 name: Test
 
@@ -1166,19 +1184,20 @@ jobs:
 ### Creating Test Data
 
 #### scripts/seed-test-data.ts
+
 ```typescript
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.TEST_SUPABASE_URL!,
   process.env.TEST_SUPABASE_SERVICE_KEY!
-);
+)
 
 async function seedTestData() {
-  console.log('Seeding test data...');
+  console.log('Seeding test data...')
 
   // Clear existing test data
-  await supabase.from('resources').delete().ilike('name', 'Test%');
+  await supabase.from('resources').delete().ilike('name', 'Test%')
 
   // Create test resources
   const testResources = [
@@ -1192,34 +1211,31 @@ async function seedTestData() {
       categories: ['employment'],
       description: 'Test employment services',
       status: 'active',
-      verified: true
+      verified: true,
     },
     {
       name: 'Test Housing Services',
       address: '456 Test Ave, Oakland, CA 94601',
-      latitude: 37.7850,
+      latitude: 37.785,
       longitude: -122.2364,
       phone: '(555) 234-5678',
       primary_category: 'housing',
       categories: ['housing'],
       description: 'Test housing services',
       status: 'active',
-      verified: true
+      verified: true,
     },
     // Add more test resources...
-  ];
+  ]
 
-  const { data: resources, error } = await supabase
-    .from('resources')
-    .insert(testResources)
-    .select();
+  const { data: resources, error } = await supabase.from('resources').insert(testResources).select()
 
   if (error) {
-    console.error('Error seeding resources:', error);
-    process.exit(1);
+    console.error('Error seeding resources:', error)
+    process.exit(1)
   }
 
-  console.log(`Created ${resources.length} test resources`);
+  console.log(`Created ${resources.length} test resources`)
 
   // Create test reviews
   const testReviews = [
@@ -1229,7 +1245,7 @@ async function seedTestData() {
       rating: 5,
       review_text: 'Great service, very helpful staff!',
       was_helpful: true,
-      approved: true
+      approved: true,
     },
     {
       resource_id: resources[0].id,
@@ -1237,66 +1253,57 @@ async function seedTestData() {
       rating: 4,
       review_text: 'Good experience overall.',
       was_helpful: true,
-      approved: true
-    }
-  ];
+      approved: true,
+    },
+  ]
 
-  const { error: reviewError } = await supabase
-    .from('resource_reviews')
-    .insert(testReviews);
+  const { error: reviewError } = await supabase.from('resource_reviews').insert(testReviews)
 
   if (reviewError) {
-    console.error('Error seeding reviews:', reviewError);
-    process.exit(1);
+    console.error('Error seeding reviews:', reviewError)
+    process.exit(1)
   }
 
-  console.log('Test data seeded successfully!');
+  console.log('Test data seeded successfully!')
 }
 
-seedTestData();
+seedTestData()
 ```
 
 ### Cleaning Up Test Data
 
 #### scripts/cleanup-test-data.ts
+
 ```typescript
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.TEST_SUPABASE_URL!,
   process.env.TEST_SUPABASE_SERVICE_KEY!
-);
+)
 
 async function cleanupTestData() {
-  console.log('Cleaning up test data...');
+  console.log('Cleaning up test data...')
 
   // Delete test reviews
-  await supabase
-    .from('resource_reviews')
-    .delete()
-    .ilike('review_text', '%test%');
+  await supabase.from('resource_reviews').delete().ilike('review_text', '%test%')
 
   // Delete test resources
-  await supabase
-    .from('resources')
-    .delete()
-    .ilike('name', 'Test%');
+  await supabase.from('resources').delete().ilike('name', 'Test%')
 
   // Delete test users
-  await supabase
-    .from('users')
-    .delete()
-    .ilike('phone', '555%');
+  await supabase.from('users').delete().ilike('phone', '555%')
 
-  console.log('Test data cleaned up!');
+  console.log('Test data cleaned up!')
 }
 
-cleanupTestData();
+cleanupTestData()
 ```
 
 ## Package.json Scripts
 
 Add these to your package.json:
+
 ```json
 {
   "scripts": {
@@ -1322,6 +1329,7 @@ Add these to your package.json:
 ## Testing Best Practices
 
 ### General Principles
+
 1. **Test behavior, not implementation**
    - Focus on what users see and do
    - Don't test internal state or methods
@@ -1346,7 +1354,9 @@ Add these to your package.json:
    - Permission denied
 
 ### What to Test
+
 ✅ **Do Test**:
+
 - User interactions and flows
 - API endpoints
 - Data validation
@@ -1356,24 +1366,26 @@ Add these to your package.json:
 - Security
 
 ❌ **Don't Test**:
+
 - Third-party libraries
 - Framework internals
 - Obvious code (getters/setters)
 - Implementation details
 
 ### Test Naming Convention
+
 ```typescript
 // Good: Describes behavior
-test('displays error when resource not found', async () => {});
+test('displays error when resource not found', async () => {})
 
 // Bad: Describes implementation
-test('sets error state to true', async () => {});
+test('sets error state to true', async () => {})
 
 // Good: User perspective
-test('user can favorite a resource after signing in', async () => {});
+test('user can favorite a resource after signing in', async () => {})
 
 // Bad: Technical perspective
-test('favoriteResource function is called', async () => {});
+test('favoriteResource function is called', async () => {})
 ```
 
 ## Debugging Failed Tests
@@ -1381,22 +1393,26 @@ test('favoriteResource function is called', async () => {});
 ### Common Issues and Solutions
 
 **Issue**: Tests fail locally but pass in CI
+
 - **Solution**: Check for timing issues, use proper waitFor
 - **Solution**: Ensure test data is seeded consistently
 - **Solution**: Check environment variables
 
 **Issue**: Flaky tests (pass/fail intermittently)
+
 - **Solution**: Add proper waits instead of arbitrary timeouts
 - **Solution**: Mock time-dependent functions
 - **Solution**: Isolate tests properly (no shared state)
 
 **Issue**: Tests are too slow
+
 - **Solution**: Use unit tests instead of E2E where possible
 - **Solution**: Mock external API calls
 - **Solution**: Run tests in parallel
 - **Solution**: Use test database with less data
 
 **Issue**: Hard to maintain tests
+
 - **Solution**: Create test utilities and helpers
 - **Solution**: Use page object pattern for E2E
 - **Solution**: Extract common setup to fixtures
@@ -1406,6 +1422,7 @@ test('favoriteResource function is called', async () => {});
 ### Coverage Reports
 
 Generate and view coverage:
+
 ```bash
 npm run test:unit
 open coverage/index.html
@@ -1414,6 +1431,7 @@ open coverage/index.html
 ### E2E Test Reports
 
 Generate and view Playwright reports:
+
 ```bash
 npm run test:e2e
 npx playwright show-report
@@ -1422,6 +1440,7 @@ npx playwright show-report
 ### Lighthouse Reports
 
 Generate and view Lighthouse reports:
+
 ```bash
 npm run lighthouse
 open .lighthouseci/
@@ -1432,6 +1451,7 @@ open .lighthouseci/
 Before deploying to production:
 
 1. **Run full test suite**
+
 ```bash
    npm run test:all
 ```
@@ -1474,6 +1494,7 @@ After deployment:
 ## Conclusion
 
 Testing is continuous:
+
 - Write tests as you build features
 - Run tests before committing
 - Review test failures carefully

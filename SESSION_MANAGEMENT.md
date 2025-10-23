@@ -5,6 +5,7 @@ Best practices for working efficiently with Claude Code across multiple sessions
 ## Token Conservation Strategies
 
 ### 1. Use Reference Documents Instead of Rereading
+
 **DON'T**: Ask Claude to reread entire documentation files every session
 **DO**: Reference specific sections or create summary documents
 
@@ -15,6 +16,7 @@ Best practices for working efficiently with Claude Code across multiple sessions
 ```
 
 ### 2. Leverage Task Agents for Research
+
 **DON'T**: Do extensive research in the main conversation thread
 **DO**: Use the Task agent (general-purpose) for research and web fetching
 
@@ -26,6 +28,7 @@ Best practices for working efficiently with Claude Code across multiple sessions
 **Token Savings**: Research in Task agents doesn't consume main thread tokens
 
 ### 3. Use Exploration Agents for Codebase Discovery
+
 **DON'T**: Manually grep and glob through the codebase repeatedly
 **DO**: Use Task agent with subagent_type=Explore for codebase questions
 
@@ -35,7 +38,9 @@ Best practices for working efficiently with Claude Code across multiple sessions
 ```
 
 ### 4. Create Checkpoint Documents
+
 After major milestones, create summary documents:
+
 - `PROGRESS.md` - What's been completed
 - `NEXT_STEPS.md` - What's queued up
 - `BLOCKERS.md` - Current issues
@@ -43,6 +48,7 @@ After major milestones, create summary documents:
 This allows quick context restoration without reading git history.
 
 ### 5. Use TodoWrite Extensively
+
 **Critical**: TodoWrite provides persistent context across sessions
 
 ```typescript
@@ -59,55 +65,69 @@ TodoWrite: Ensure all current work is tracked
 ## Context Management Strategies
 
 ### 1. Focused Sessions
+
 Each session should have a clear, scoped goal:
+
 - ✅ "Set up testing infrastructure"
 - ✅ "Implement resource list component"
 - ❌ "Build the entire app"
 
 ### 2. Session Handoff Template
+
 At the end of each session, create a handoff:
 
 ```markdown
 ## Session Summary - [Date]
 
 ### Completed
+
 - Task 1
 - Task 2
 
 ### In Progress
+
 - Task 3 (blocked by X)
 
 ### Next Session Should
+
 1. Complete Task 3
 2. Start Task 4
 3. Test Task 1-2
 
 ### Key Decisions
+
 - Decision 1: Rationale
 - Decision 2: Rationale
 
 ### Files Modified
+
 - file1.ts
 - file2.tsx
 ```
 
 ### 3. Architecture Decision Records (ADRs)
+
 Document significant decisions in `ARCHITECTURE_DECISIONS.md`:
+
 - What was decided
 - Why it was decided
 - What alternatives were considered
 - Impact on the project
 
 ### 4. Progress Tracking
+
 Maintain `PROGRESS.md` with:
+
 ```markdown
 ## Week 1: Foundation (Current)
+
 - [x] Project initialization
 - [x] Documentation setup
 - [ ] Testing infrastructure
 - [ ] Database setup
 
 ## Metrics
+
 - Files created: 45
 - Tests passing: 0/0
 - Coverage: 0%
@@ -118,16 +138,19 @@ Maintain `PROGRESS.md` with:
 ### Pattern 1: Planning → Implementation → Testing → Documentation
 
 **Session 1: Planning**
+
 - Review requirements
 - Create task checklist
 - Make architectural decisions
 
 **Session 2: Implementation**
+
 - Implement features from checklist
 - Mark todos as complete
 - Create tests
 
 **Session 3: Testing & Documentation**
+
 - Run tests
 - Fix bugs
 - Update documentation
@@ -156,23 +179,29 @@ This creates natural checkpoints and reviewable progress.
 ## File Organization for Sessions
 
 ### Keep These Files Updated
+
 **Critical** (update every session):
+
 - `TODO.md` or TodoWrite state
 - `PROGRESS.md`
 - `.env.local` (when adding new variables)
 
 **Important** (update when relevant):
+
 - `ARCHITECTURE_DECISIONS.md`
 - `BLOCKERS.md`
 - `CHANGELOG.md`
 
 **Reference** (rarely update):
+
 - `TECHNICAL_ARCHITECTURE.md`
 - `PRODUCT_REQUIREMENTS.md`
 - `CLAUDE.md`
 
 ### Create These Working Files
+
 For complex tasks, create temporary working docs:
+
 - `WORKING_AUTH_IMPLEMENTATION.md`
 - `WORKING_MAP_COMPONENT.md`
 
@@ -181,6 +210,7 @@ Delete or archive when complete.
 ## Git Commit Strategies
 
 ### Small, Focused Commits
+
 **DON'T**: One massive commit per session
 **DO**: Multiple small commits with clear messages
 
@@ -193,7 +223,9 @@ Delete or archive when complete.
 ```
 
 ### Commit After Each Feature
+
 This creates natural review points:
+
 ```bash
 # Complete feature
 git add .
@@ -207,12 +239,15 @@ git commit -m "feat: add phone validation component"
 ## Session Length Management
 
 ### Optimal Session Length
+
 - **Short focused sessions**: 15-30 minutes (specific task)
 - **Medium sessions**: 1-2 hours (feature implementation)
 - **Long sessions**: 2-4 hours (multiple features)
 
 ### Break Points
+
 Natural places to pause:
+
 - ✅ After completing a feature
 - ✅ After all tests pass
 - ✅ After documentation update
@@ -223,14 +258,18 @@ Natural places to pause:
 ## Review and Demo Strategy
 
 ### When to Show Progress
+
 Ask for review at these milestones:
+
 1. **Feature completion**: "Phone validation is working, want to try it?"
 2. **Visual changes**: "New UI component ready, take a look at localhost:3000"
 3. **Major decisions**: "Should we use HeroUI or shadcn/ui? Here's my analysis..."
 4. **Blockers**: "Stuck on Supabase auth error, here's what I've tried..."
 
 ### Demo Preparation
+
 Before asking for review:
+
 1. Ensure code compiles (`npm run build`)
 2. Tests pass (`npm test`)
 3. Linting clean (`npm run lint`)
@@ -240,17 +279,20 @@ Before asking for review:
 ## Token Budget Management
 
 ### Token Budget Awareness
+
 - **Total tokens**: ~200k per session
 - **Reserve**: Keep 20k for end-of-session tasks
 - **Alert threshold**: When 50k tokens remaining, wrap up
 
 ### High Token Activities (Avoid)
+
 - ❌ Reading entire large files repeatedly
 - ❌ Multiple WebFetch calls in main thread
 - ❌ Extensive code generation without planning
 - ❌ Long back-and-forth on design decisions
 
 ### Low Token Activities (Prefer)
+
 - ✅ Using Task agents for research
 - ✅ Referencing docs with specific line numbers
 - ✅ Small, focused file edits
@@ -261,6 +303,7 @@ Before asking for review:
 ### Starting a New Session
 
 **Quick Start (5 minutes)**:
+
 ```bash
 # 1. Check todos
 "Show me the current TodoWrite state and recent commits"
@@ -276,6 +319,7 @@ Before asking for review:
 ```
 
 **Full Context Start (15 minutes)**:
+
 ```bash
 # 1. Review progress
 "Read PROGRESS.md and last 5 git commits"
@@ -296,6 +340,7 @@ Before asking for review:
 ### Handling Interrupted Sessions
 
 If a session is interrupted:
+
 1. Commit current work (even if incomplete)
 2. Add TODO comments in code
 3. Update TodoWrite with current status
@@ -304,44 +349,53 @@ If a session is interrupted:
 ## Common Pitfalls to Avoid
 
 ### 1. Context Loss
+
 **Problem**: Starting fresh each session without reviewing
 **Solution**: Always check PROGRESS.md and TodoWrite state first
 
 ### 2. Scope Creep
+
 **Problem**: Trying to do too much in one session
 **Solution**: Stick to 3-5 focused todos per session
 
 ### 3. No Checkpoints
+
 **Problem**: Working for hours without commits
 **Solution**: Commit every 15-30 minutes or after each feature
 
 ### 4. Poor Communication
+
 **Problem**: Making big decisions without discussing
 **Solution**: Ask for input on architectural choices
 
 ### 5. Token Exhaustion
+
 **Problem**: Running out of tokens mid-feature
 **Solution**: Monitor token count, use Task agents, wrap up early
 
 ## Metrics to Track
 
 Keep these in `PROGRESS.md`:
+
 ```markdown
 ## Project Metrics
 
 ### Code
+
 - Total files: 150
 - Lines of code: 5,432
 - Test files: 25
 - Test coverage: 75%
 
 ### Quality
+
 - ESLint errors: 0
 - TypeScript errors: 0
 - Failing tests: 0
 - Security issues: 0
 
 ### Progress
+
 - Week 1: 80% complete
 - Features completed: 12
 - Features in progress: 3
@@ -354,15 +408,18 @@ Keep these in `PROGRESS.md`:
 
 ```markdown
 ## Session Goal
+
 Implement [Feature Name]
 
 ## Pre-Session Check
+
 - [ ] Read last session's handoff
 - [ ] Check TodoWrite state
 - [ ] Review relevant PRD section
 - [ ] Run `git pull` and `npm install`
 
 ## Tasks
+
 1. [ ] Write tests for feature
 2. [ ] Implement feature
 3. [ ] Update documentation
@@ -370,6 +427,7 @@ Implement [Feature Name]
 5. [ ] Commit and push
 
 ## Post-Session
+
 - [ ] Update PROGRESS.md
 - [ ] Update TodoWrite
 - [ ] Create handoff if interrupted
@@ -380,14 +438,17 @@ Implement [Feature Name]
 
 ```markdown
 ## Session Goal
+
 Fix [Bug Description]
 
 ## Pre-Session Check
+
 - [ ] Reproduce bug locally
 - [ ] Check error logs
 - [ ] Review related tests
 
 ## Tasks
+
 1. [ ] Write failing test that reproduces bug
 2. [ ] Fix bug
 3. [ ] Verify test passes
@@ -395,6 +456,7 @@ Fix [Bug Description]
 5. [ ] Update changelog
 
 ## Post-Session
+
 - [ ] Commit with fix reference
 - [ ] Close related issue
 - [ ] Deploy to staging
@@ -404,9 +466,11 @@ Fix [Bug Description]
 
 ```markdown
 ## Session Goal
+
 Set up [Tool/Infrastructure]
 
 ## Tasks
+
 1. [ ] Research best practices
 2. [ ] Install dependencies
 3. [ ] Create configuration files
@@ -415,6 +479,7 @@ Set up [Tool/Infrastructure]
 6. [ ] Update CLAUDE.md with usage patterns
 
 ## Post-Session
+
 - [ ] Ensure `npm run build` works
 - [ ] Ensure `npm test` works
 - [ ] Document in appropriate guide
@@ -423,7 +488,9 @@ Set up [Tool/Infrastructure]
 ## Advanced Techniques
 
 ### 1. Parallel Task Execution
+
 For independent tasks, create multiple Task agents:
+
 ```typescript
 // Run these in parallel
 Task(1): "Set up Playwright configuration"
@@ -432,7 +499,9 @@ Task(3): "Write database migration for users table"
 ```
 
 ### 2. Incremental Context Loading
+
 Load context progressively:
+
 ```typescript
 // Session start
 "Show me PROGRESS.md" (100 tokens)
@@ -445,7 +514,9 @@ Load context progressively:
 ```
 
 ### 3. Cached Context
+
 Create context caches for common scenarios:
+
 - `CONTEXT_AUTH.md` - Everything about auth implementation
 - `CONTEXT_DATABASE.md` - Database schema and patterns
 - `CONTEXT_UI.md` - UI component standards

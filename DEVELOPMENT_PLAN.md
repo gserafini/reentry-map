@@ -12,13 +12,16 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Week 1: Foundation & Core Infrastructure
 
 ### Goals
+
 - Complete project setup
 - Build core resource display
 - Implement basic search
 - Deploy to staging
 
 ### Day 1: Project Setup (Monday)
+
 **Tasks**:
+
 - [ ] Create Supabase project
 - [ ] Set up database schema
 - [ ] Seed initial data (10 resources)
@@ -30,7 +33,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Project runs locally with database connected
 
 ### Day 2: Core UI Components (Tuesday)
+
 **Tasks**:
+
 - [ ] Install shadcn/ui components
 - [ ] Create layout components (Header, Footer, Navigation)
 - [ ] Build ResourceCard component
@@ -41,7 +46,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Resource list displays with cards
 
 ### Day 3: Resource Detail & Navigation (Wednesday)
+
 **Tasks**:
+
 - [ ] Create resource detail page (`/resources/[id]`)
 - [ ] Display all resource information
 - [ ] Add "Get Directions" button
@@ -52,7 +59,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Can navigate to and view any resource
 
 ### Day 4: Search & Filtering (Thursday)
+
 **Tasks**:
+
 - [ ] Build SearchBar component
 - [ ] Implement text search (Supabase full-text search)
 - [ ] Add debouncing (300ms)
@@ -64,7 +73,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Search and filtering works smoothly
 
 ### Day 5: Testing & Deployment (Friday)
+
 **Tasks**:
+
 - [ ] Manual testing of all features
 - [ ] Fix critical bugs
 - [ ] Add loading states
@@ -78,13 +89,16 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Week 2: Location Features & Map View
 
 ### Goals
+
 - Add geolocation
 - Implement map view
 - Add distance-based search
 - Enhance resource discovery
 
 ### Day 6: Geolocation (Monday)
+
 **Tasks**:
+
 - [ ] Create useLocation hook
 - [ ] Request user location permission
 - [ ] Handle permission denied gracefully
@@ -96,7 +110,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Distance-based sorting works
 
 ### Day 7: Google Maps Integration (Tuesday)
+
 **Tasks**:
+
 - [ ] Set up Google Maps JavaScript API
 - [ ] Create ResourceMap component
 - [ ] Display map with resource markers
@@ -108,7 +124,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Map displays all resources with markers
 
 ### Day 8: Map Interactivity (Wednesday)
+
 **Tasks**:
+
 - [ ] Implement marker click to show resource preview
 - [ ] Create map info window component
 - [ ] Add "View Details" button in info window
@@ -120,7 +138,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Interactive map fully functional
 
 ### Day 9: Location Search & Filters (Thursday)
+
 **Tasks**:
+
 - [ ] Add "Near Me" button
 - [ ] Implement distance filter slider (1-50 miles)
 - [ ] Add manual address search
@@ -132,7 +152,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Advanced location filtering works
 
 ### Day 10: Polish & Testing (Friday)
+
 **Tasks**:
+
 - [ ] Add loading states for map
 - [ ] Handle location errors gracefully
 - [ ] Mobile map UX improvements
@@ -147,13 +169,16 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Week 3: User Authentication & Favorites
 
 ### Goals
+
 - Implement phone-based authentication
 - Build user profiles
 - Add favorites functionality
 - Start rating system
 
 ### Day 11: Authentication Setup (Monday)
+
 **Tasks**:
+
 - [ ] Configure Supabase Auth (phone/SMS)
 - [ ] Create AuthModal component
 - [ ] Build PhoneAuth component (phone number entry)
@@ -165,7 +190,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Users can sign in with phone
 
 ### Day 12: User Session & Profile (Tuesday)
+
 **Tasks**:
+
 - [ ] Implement session persistence
 - [ ] Create UserProfile component
 - [ ] Add profile page
@@ -177,7 +204,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: User sessions work correctly
 
 ### Day 13: Favorites System (Wednesday)
+
 **Tasks**:
+
 - [ ] Create FavoriteButton component
 - [ ] Implement toggle favorite functionality
 - [ ] Add favorites to resource cards
@@ -189,7 +218,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Users can save and view favorites
 
 ### Day 14: Ratings System (Thursday)
+
 **Tasks**:
+
 - [ ] Create RatingStars component
 - [ ] Implement rating submission
 - [ ] Update resource average rating
@@ -202,7 +233,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Rating system fully functional
 
 ### Day 15: Testing & Polish (Friday)
+
 **Tasks**:
+
 - [ ] Test auth flow thoroughly
 - [ ] Test favorites across devices
 - [ ] Test rating calculations
@@ -217,13 +250,16 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Week 4: Reviews, Suggestions & AI Agents
 
 ### Goals
+
 - Build review system
 - Add community suggestions
 - Implement AI enrichment
 - Set up admin dashboard
 
 ### Day 16: Review System (Monday)
+
 **Tasks**:
+
 - [ ] Create ReviewForm component
 - [ ] Implement review submission
 - [ ] Add review validation
@@ -236,7 +272,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Users can write and view reviews
 
 ### Day 17: Review Helpfulness (Tuesday)
+
 **Tasks**:
+
 - [ ] Add "Helpful" / "Not Helpful" buttons
 - [ ] Implement vote recording
 - [ ] Update helpfulness counts
@@ -248,7 +286,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Review helpfulness system works
 
 ### Day 18: Community Suggestions (Wednesday)
+
 **Tasks**:
+
 - [ ] Create suggestion form page
 - [ ] Implement suggestion submission
 - [ ] Validate suggestion data
@@ -260,7 +300,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Users can suggest resources and report issues
 
 ### Day 19: AI Agent Implementation (Thursday)
+
 **Tasks**:
+
 - [ ] Create AI agent base classes
 - [ ] Implement enrichment agent
   - Geocoding
@@ -277,7 +319,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: AI agents can enrich resources
 
 ### Day 20: Admin Dashboard (Friday)
+
 **Tasks**:
+
 - [ ] Create admin layout
 - [ ] Build admin dashboard with metrics
 - [ ] Create resource management page
@@ -294,13 +338,16 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Week 5: Polish, Testing & Launch
 
 ### Goals
+
 - Add PWA functionality
 - Complete testing
 - Add real content
 - Soft launch
 
 ### Day 21: PWA Setup (Monday)
+
 **Tasks**:
+
 - [ ] Configure next-pwa
 - [ ] Create manifest.json
 - [ ] Generate app icons (192x192, 512x512)
@@ -312,7 +359,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: App installable as PWA
 
 ### Day 22: Content Population (Tuesday)
+
 **Tasks**:
+
 - [ ] Research Oakland reentry resources
 - [ ] Add 50+ verified resources
 - [ ] Balance across categories
@@ -325,7 +374,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: 50+ high-quality resources in database
 
 ### Day 23: Comprehensive Testing (Wednesday)
+
 **Tasks**:
+
 - [ ] Test all user flows manually
 - [ ] Test on multiple devices
   - iPhone (Safari)
@@ -342,7 +393,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: Comprehensive bug list
 
 ### Day 24: Bug Fixes & Polish (Thursday)
+
 **Tasks**:
+
 - [ ] Fix critical bugs
 - [ ] Fix high-priority bugs
 - [ ] Improve error messages
@@ -356,7 +409,9 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 **Deliverable**: All critical and high-priority bugs fixed
 
 ### Day 25: Launch Preparation & Soft Launch (Friday)
+
 **Tasks**:
+
 - [ ] Final testing pass
 - [ ] Set up production environment variables
 - [ ] Deploy to production
@@ -373,12 +428,14 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Post-Launch Week 1
 
 ### Goals
+
 - Monitor usage and errors
 - Gather user feedback
 - Fix urgent issues
 - Plan Phase 2
 
 ### Daily Tasks
+
 - [ ] Check error logs
 - [ ] Monitor user activity
 - [ ] Respond to user feedback
@@ -386,6 +443,7 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 - [ ] Update documentation
 
 ### Week 1 Review
+
 - [ ] Analyze usage metrics
 - [ ] Review user feedback
 - [ ] Identify pain points
@@ -395,6 +453,7 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 ## Development Best Practices
 
 ### Git Workflow
+
 ```bash
 # Feature branch workflow
 git checkout main
@@ -409,6 +468,7 @@ git push origin feature/resource-map
 ```
 
 ### Commit Message Format
+
 ```
 feat: add new feature
 fix: fix bug
@@ -420,6 +480,7 @@ chore: maintenance tasks
 ```
 
 ### Code Review Checklist
+
 - [ ] Code follows project style guide
 - [ ] No console.logs left in production code
 - [ ] Error handling implemented
@@ -430,6 +491,7 @@ chore: maintenance tasks
 - [ ] Security reviewed (no exposed secrets)
 
 ### Testing Checklist (Per Feature)
+
 - [ ] Feature works as expected
 - [ ] Edge cases handled
 - [ ] Error cases handled
@@ -441,6 +503,7 @@ chore: maintenance tasks
 ## Deployment Process
 
 ### Staging Deployment
+
 ```bash
 # Push to staging branch
 git checkout staging
@@ -450,6 +513,7 @@ git push origin staging
 ```
 
 ### Production Deployment
+
 ```bash
 # Create release
 git checkout main
@@ -459,6 +523,7 @@ git push origin v0.1.0
 ```
 
 ### Rollback Procedure
+
 ```bash
 # If production has critical bug
 # Vercel dashboard > Deployments > Previous deployment > Promote to Production
@@ -470,6 +535,7 @@ git push origin main
 ## Daily Standup Format
 
 Answer these three questions:
+
 1. **What did I accomplish yesterday?**
 2. **What will I work on today?**
 3. **Are there any blockers?**
@@ -477,6 +543,7 @@ Answer these three questions:
 ## Weekly Review Format
 
 Every Friday:
+
 1. **What did we ship this week?**
 2. **What went well?**
 3. **What could be improved?**
@@ -486,6 +553,7 @@ Every Friday:
 ## Communication Plan
 
 ### For Claude Code
+
 - All work tracked in GitHub Issues
 - Feature requirements in issue descriptions
 - Technical details in comments
@@ -493,6 +561,7 @@ Every Friday:
 - Questions asked in issue comments
 
 ### For Stakeholders
+
 - Weekly progress email
 - Demo every Friday
 - Feedback incorporated into backlog
@@ -501,52 +570,60 @@ Every Friday:
 ## Risk Management
 
 ### Technical Risks
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Supabase downtime | Low | High | Cache data locally, show cached results |
-| Google Maps API limits exceeded | Medium | Medium | Monitor usage, implement rate limiting |
-| OpenAI API costs too high | Medium | Low | Use GPT-4o-mini, limit agent runs |
-| Performance issues with many resources | Medium | Medium | Implement pagination, optimize queries |
-| Auth SMS delivery failures | Medium | High | Clear error messages, backup auth method |
+
+| Risk                                   | Likelihood | Impact | Mitigation                               |
+| -------------------------------------- | ---------- | ------ | ---------------------------------------- |
+| Supabase downtime                      | Low        | High   | Cache data locally, show cached results  |
+| Google Maps API limits exceeded        | Medium     | Medium | Monitor usage, implement rate limiting   |
+| OpenAI API costs too high              | Medium     | Low    | Use GPT-4o-mini, limit agent runs        |
+| Performance issues with many resources | Medium     | Medium | Implement pagination, optimize queries   |
+| Auth SMS delivery failures             | Medium     | High   | Clear error messages, backup auth method |
 
 ### Content Risks
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Insufficient initial resources | Low | High | Manual research and data entry |
-| Inaccurate resource information | Medium | High | Verification process, user reports |
-| Spam reviews | Low | Medium | Moderation queue, flag system |
-| No user adoption | Medium | High | Partner with reentry orgs, direct outreach |
+
+| Risk                            | Likelihood | Impact | Mitigation                                 |
+| ------------------------------- | ---------- | ------ | ------------------------------------------ |
+| Insufficient initial resources  | Low        | High   | Manual research and data entry             |
+| Inaccurate resource information | Medium     | High   | Verification process, user reports         |
+| Spam reviews                    | Low        | Medium | Moderation queue, flag system              |
+| No user adoption                | Medium     | High   | Partner with reentry orgs, direct outreach |
 
 ### Timeline Risks
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Feature takes longer than expected | High | Medium | Prioritize ruthlessly, cut scope if needed |
-| Unexpected bugs delay launch | Medium | Medium | Buffer time in Week 5, thorough testing |
-| External API issues | Low | High | Have backup plans, graceful degradation |
+
+| Risk                               | Likelihood | Impact | Mitigation                                 |
+| ---------------------------------- | ---------- | ------ | ------------------------------------------ |
+| Feature takes longer than expected | High       | Medium | Prioritize ruthlessly, cut scope if needed |
+| Unexpected bugs delay launch       | Medium     | Medium | Buffer time in Week 5, thorough testing    |
+| External API issues                | Low        | High   | Have backup plans, graceful degradation    |
 
 ## Success Metrics (Revisit Weekly)
 
 ### Week 1
+
 - [ ] All core infrastructure works
 - [ ] Resources display correctly
 - [ ] Search functions properly
 
 ### Week 2
+
 - [ ] Map view fully functional
 - [ ] Location features work
 - [ ] Performance acceptable
 
 ### Week 3
+
 - [ ] Authentication works
 - [ ] Users can save favorites
 - [ ] Rating system operational
 
 ### Week 4
+
 - [ ] Reviews working
 - [ ] AI agents functional
 - [ ] Admin dashboard complete
 
 ### Week 5
+
 - [ ] 50+ resources added
 - [ ] All bugs fixed
 - [ ] PWA installable
@@ -555,6 +632,7 @@ Every Friday:
 ## Resources & References
 
 ### Documentation
+
 - Next.js 16: https://nextjs.org/docs
 - Supabase: https://supabase.com/docs
 - Tailwind CSS: https://tailwindcss.com/docs
@@ -562,17 +640,20 @@ Every Friday:
 - Google Maps API: https://developers.google.com/maps/documentation
 
 ### Design Resources
+
 - Figma (if designing): https://figma.com
 - Lucide Icons: https://lucide.dev
 - Coolors (color palettes): https://coolors.co
 
 ### Testing Tools
+
 - Lighthouse: Built into Chrome DevTools
 - WAVE: https://wave.webaim.org
 - axe DevTools: Browser extension
 - PageSpeed Insights: https://pagespeed.web.dev
 
 ### AI/Development
+
 - OpenAI Playground: https://platform.openai.com/playground
 - Claude Code: For implementation assistance
 - GitHub Copilot: For code suggestions (optional)

@@ -39,6 +39,7 @@ cp .env.example .env.local
 ```
 
 Required environment variables:
+
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (secret)
@@ -52,6 +53,7 @@ Required environment variables:
 ### Core Tables
 
 **resources** - Primary resource directory table with:
+
 - Basic info (name, description, services)
 - Contact (phone, email, website)
 - Location (address, lat/lng with PostGIS indexing)
@@ -61,6 +63,7 @@ Required environment variables:
 - Community stats (rating_average, rating_count, review_count)
 
 **users** - Extended profile (integrates with auth.users)
+
 - References Supabase Auth
 - Contains is_admin flag
 
@@ -69,6 +72,7 @@ Required environment variables:
 **resource_ratings** - 1-5 star ratings (one per user per resource)
 
 **resource_reviews** - Detailed reviews with:
+
 - Rating, text, pros/cons, tips
 - Helpfulness voting
 - Moderation fields
@@ -80,6 +84,7 @@ Required environment variables:
 **ai_agent_logs** - Tracks all AI agent operations
 
 ### Key Features
+
 - PostGIS for efficient geospatial queries
 - Full-text search indexes on name/description
 - Row Level Security (RLS) enabled on all tables
@@ -141,13 +146,13 @@ export default async function ResourcesPage() {
 ### Client Components (When Needed)
 
 ```typescript
-'use client';
+'use client'
 
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client'
 
 export function ResourceList() {
-  const [resources, setResources] = useState([]);
-  const supabase = createClient();
+  const [resources, setResources] = useState([])
+  const supabase = createClient()
 
   // Component logic...
 }
@@ -157,23 +162,18 @@ export function ResourceList() {
 
 ```typescript
 // app/api/resources/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*');
+    const supabase = createClient()
+    const { data, error } = await supabase.from('resources').select('*')
 
-    if (error) throw error;
-    return NextResponse.json(data);
+    if (error) throw error
+    return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 ```
@@ -183,37 +183,39 @@ export async function GET(request: NextRequest) {
 Always handle Supabase errors explicitly:
 
 ```typescript
-const { data, error } = await supabase
-  .from('resources')
-  .select('*');
+const { data, error } = await supabase.from('resources').select('*')
 
 if (error) {
-  console.error('Error fetching resources:', error);
-  throw new Error('Failed to fetch resources');
+  console.error('Error fetching resources:', error)
+  throw new Error('Failed to fetch resources')
 }
 ```
 
 ## Key Implementation Guidelines
 
 ### TypeScript
+
 - Use explicit types for all functions and components
 - Create proper interfaces in `lib/types/`
 - Use const for immutable values
 - Prefer async/await over promises
 
 ### Components
+
 - Use function components with TypeScript
 - Server Components by default, 'use client' only when needed for interactivity
 - Props interfaces defined for all components
 - Implement loading.tsx and error.tsx for each route
 
 ### Styling
+
 - Mobile-first responsive design
 - Tailwind CSS utility classes
 - shadcn/ui components for consistency
 - Touch targets > 44x44px for accessibility
 
 ### Security
+
 - Never expose secrets in client components
 - API keys only in API routes or server components
 - Row Level Security policies on all Supabase tables
@@ -221,6 +223,7 @@ if (error) {
 - Rate limiting on API endpoints
 
 ### Performance
+
 - Server Components to reduce client JS
 - Image optimization with next/image
 - Debounced search inputs (300ms)
@@ -229,6 +232,7 @@ if (error) {
 - Marker clustering for map with 100+ resources
 
 ### Accessibility
+
 - WCAG 2.1 Level AA compliance
 - Keyboard navigation support
 - Screen reader compatibility
@@ -252,14 +256,23 @@ All agent actions logged to `ai_agent_logs` table with success/failure, cost tra
 # Development
 npm run dev                  # Start dev server
 
+# Testing
+npm test                     # Run Vitest unit tests (watch mode)
+npm run test:run             # Run tests once
+npm run test:ui              # Run Vitest with UI
+npm run test:coverage        # Generate coverage report
+npm run test:e2e             # Run Playwright E2E tests (headless)
+npm run test:e2e:ui          # Run E2E tests with Playwright UI
+npm run test:e2e:headed      # Run E2E tests in headed mode
+
 # Type checking
-npm run type-check          # Run TypeScript checks
+npm run type-check           # Run TypeScript checks
 
 # Linting
-npm run lint                # Run ESLint
+npm run lint                 # Run ESLint
 
 # Building
-npm run build               # Production build
+npm run build                # Production build
 
 # Database
 # Run migrations in Supabase SQL Editor in order:
@@ -269,9 +282,16 @@ npm run build               # Production build
 # 4. supabase/migrations/20250101000003_seed_data.sql
 ```
 
+**Testing Philosophy:**
+
+- **E2E tests run headless by default** - Use for troubleshooting and CI/CD
+- **Only show UI tests when demoing** - Avoid interrupting workflow
+- **Test before demo** - Verify everything works before showing to user
+
 ## Authentication Flow
 
 Phone-based OTP via Supabase Auth:
+
 1. User enters phone number (US format)
 2. SMS OTP sent (6-digit code, 10-minute expiry)
 3. User enters code
@@ -281,6 +301,7 @@ Phone-based OTP via Supabase Auth:
 ## Testing Requirements
 
 Before each commit:
+
 - Feature works on Chrome desktop and mobile
 - Loading and error states display correctly
 - No console errors
@@ -288,6 +309,7 @@ Before each commit:
 - Responsive design works (375px to 1920px)
 
 Performance targets:
+
 - Lighthouse Performance > 90
 - First Contentful Paint < 1.8s
 - Largest Contentful Paint < 2.5s
@@ -307,6 +329,7 @@ Performance targets:
 ## Important Documentation Files
 
 When working on this project, refer to:
+
 - `TECHNICAL_ARCHITECTURE.md` - Complete database schema, file structure, environment variables
 - `PRODUCT_REQUIREMENTS.md` - Feature requirements, acceptance criteria, user flows
 - `DEVELOPMENT_PLAN.md` - Week-by-week implementation plan
@@ -328,6 +351,7 @@ When working on this project, refer to:
 ## Category System
 
 Primary categories for resources:
+
 - Employment
 - Housing
 - Food

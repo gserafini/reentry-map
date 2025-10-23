@@ -1273,7 +1273,9 @@ video {
   animation-play-state: running;
 }
 
-html, body, #__next {
+html,
+body,
+#__next {
   height: 100%;
 }
 

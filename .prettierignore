@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Cache directories
+.cache/
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+
+# Environment files
+.env*
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+*.gen.*
+styles/tailwind.css
+
+# Public assets
+public/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Git
+.git/

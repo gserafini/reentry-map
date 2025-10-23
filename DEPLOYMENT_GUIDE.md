@@ -16,6 +16,7 @@ This guide covers deploying Reentry Map to production using Vercel and Supabase.
 ---
 
 ## Production Infrastructure
+
 ```
 ┌─────────────────────────────────────────┐
 │           Vercel (Hosting)              │
@@ -43,6 +44,7 @@ This guide covers deploying Reentry Map to production using Vercel and Supabase.
 ## Step 1: Prepare Repository
 
 ### 1.1 Create GitHub Repository
+
 ```bash
 # Initialize git (if not already done)
 git init
@@ -59,6 +61,7 @@ git push -u origin main
 ```
 
 ### 1.2 Create Branches
+
 ```bash
 # Create staging branch
 git checkout -b staging
@@ -69,6 +72,7 @@ git checkout main
 ```
 
 **Branch strategy**:
+
 - `main` → Production environment
 - `staging` → Staging environment
 - `feature/*` → Feature branches (merge to staging first)
@@ -133,6 +137,7 @@ git checkout main
 ### 3.2 Configure Environment Variables
 
 Add these in Vercel dashboard (Settings > Environment Variables):
+
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
@@ -177,6 +182,7 @@ NEXT_PUBLIC_VERCEL_ANALYTICS_ID=auto
 ### 4.2 Configure DNS
 
 Add these records to your domain registrar:
+
 ```
 Type: A
 Name: @
@@ -194,6 +200,7 @@ Value: cname.vercel-dns.com
 - Site will be accessible at `https://reentrymap.org`
 
 ### 4.4 Update Environment Variables
+
 ```bash
 NEXT_PUBLIC_APP_URL=https://reentrymap.org
 ```
@@ -205,31 +212,33 @@ NEXT_PUBLIC_APP_URL=https://reentrymap.org
 ### 5.1 Create Cron Configuration
 
 Already in `vercel.json`:
+
 ```json
 {
-  "crons": [{
-    "path": "/api/cron/agents",
-    "schedule": "0 2 * * 0"
-  }]
+  "crons": [
+    {
+      "path": "/api/cron/agents",
+      "schedule": "0 2 * * 0"
+    }
+  ]
 }
 ```
 
 This runs AI agents every Sunday at 2am.
 
 ### 5.2 Test Cron Endpoint
+
 ```bash
 curl -X GET https://reentry-map.vercel.app/api/cron/agents \
   -H "Authorization: Bearer your-cron-secret"
 ```
 
 Should return:
+
 ```json
 {
   "success": true,
-  "jobs_run": [
-    "discovery",
-    "verification"
-  ]
+  "jobs_run": ["discovery", "verification"]
 }
 ```
 
@@ -244,6 +253,7 @@ Already enabled if you added `NEXT_PUBLIC_VERCEL_ANALYTICS_ID=auto`.
 Access at: Project > Analytics
 
 Tracks:
+
 - Page views
 - User sessions
 - Core Web Vitals
@@ -256,6 +266,7 @@ Vercel automatically captures errors.
 Access at: Project > Logs
 
 Filter by:
+
 - Error level
 - Time range
 - Function/route
@@ -277,11 +288,13 @@ Filter by:
 Two options:
 
 **Option A: Manual Entry** (Recommended for first 50)
+
 1. Sign in as admin
 2. Go to Admin > Resources
 3. Add resources one by one
 
 **Option B: Bulk Import**
+
 ```bash
 # Prepare CSV: resources.csv
 # Run import script
@@ -289,6 +302,7 @@ npm run import-resources -- --file resources.csv --env production
 ```
 
 ### 7.2 Run AI Enrichment
+
 ```bash
 # From admin dashboard
 POST /api/agents/enrich
@@ -345,6 +359,7 @@ Or use admin UI: Admin > AI Agents > "Enrich All Resources"
 ### 9.1 Enable Caching
 
 Already configured in Next.js:
+
 - Static pages cached automatically
 - API routes can set Cache-Control headers
 - Images optimized with next/image
@@ -354,12 +369,13 @@ Already configured in Next.js:
 Vercel CDN enabled by default. No configuration needed.
 
 ### 9.3 Database Optimization
+
 ```sql
 -- Add indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_resources_category_rating 
+CREATE INDEX IF NOT EXISTS idx_resources_category_rating
 ON resources(primary_category, rating_average DESC);
 
-CREATE INDEX IF NOT EXISTS idx_resources_location_category 
+CREATE INDEX IF NOT EXISTS idx_resources_location_category
 ON resources USING GIST (ST_MakePoint(longitude, latitude)::geography)
 WHERE primary_category IS NOT NULL;
 
@@ -371,11 +387,13 @@ ANALYZE resource_reviews;
 ### 9.4 Monitor Performance
 
 Run Lighthouse audit:
+
 ```bash
 npm run lighthouse
 ```
 
 Target scores:
+
 - Performance: > 90
 - Accessibility: > 90
 - Best Practices: > 90
@@ -390,6 +408,7 @@ Target scores:
 Supabase Pro includes daily backups. On free tier:
 
 **Manual Backups**:
+
 ```bash
 # Weekly manual backup
 pg_dump "postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres" > backup-$(date +%Y%m%d).sql
@@ -400,6 +419,7 @@ Store backups securely (encrypted cloud storage).
 ### 10.2 Code Backups
 
 GitHub is your code backup. Ensure:
+
 - [ ] All code committed
 - [ ] Tags for releases
 - [ ] README up to date
@@ -407,6 +427,7 @@ GitHub is your code backup. Ensure:
 ### 10.3 Environment Variables Backup
 
 Keep secure copy of all environment variables:
+
 ```bash
 # Save to password manager
 # Or encrypted file
@@ -456,6 +477,7 @@ Keep secure copy of all environment variables:
 ### Deployment Fails
 
 **Error**: Build fails
+
 ```bash
 # Check build logs in Vercel
 # Common issues:
@@ -469,6 +491,7 @@ npm run build
 ```
 
 **Error**: Runtime errors after deployment
+
 ```bash
 # Check Vercel logs
 # Common issues:
@@ -482,6 +505,7 @@ npm run build
 ### Database Connection Issues
 
 **Error**: Supabase connection fails
+
 ```bash
 # Check:
 - NEXT_PUBLIC_SUPABASE_URL correct
@@ -496,6 +520,7 @@ curl https://your-project.supabase.co/rest/v1/resources \
 ### Performance Issues
 
 **Problem**: Slow page loads
+
 ```bash
 # Run Lighthouse
 npm run lighthouse
@@ -525,6 +550,7 @@ If critical bug in production:
 4. Takes effect immediately
 
 ### Option 2: Revert Code (Thorough)
+
 ```bash
 # Find last good commit
 git log
@@ -543,25 +569,30 @@ git push origin main
 ### When to Upgrade
 
 **Supabase**:
+
 - Free tier: 500MB database, 2GB bandwidth/month
 - Upgrade when: > 400MB used or > 1.5GB bandwidth
 
 **Vercel**:
+
 - Free tier: 100GB bandwidth/month, 100 function invocations/day
 - Upgrade when: Approaching limits
 
 ### Performance at Scale
 
 **1,000 users**:
+
 - Current setup handles easily
 - No changes needed
 
 **10,000 users**:
+
 - May need Supabase Pro ($25/month)
 - May need Vercel Pro ($20/month)
 - Add Redis caching
 
 **100,000 users**:
+
 - Definitely need paid tiers
 - Add CDN for assets
 - Implement advanced caching
@@ -572,22 +603,26 @@ git push origin main
 ## Maintenance Schedule
 
 ### Daily
+
 - Check error logs
 - Monitor user feedback
 - Respond to support requests
 
 ### Weekly
+
 - Review analytics
 - Check performance metrics
 - Update content as needed
 
 ### Monthly
+
 - Security updates (dependencies)
 - Database maintenance (vacuum, analyze)
 - Review and respond to user suggestions
 - Generate reports for stakeholders
 
 ### Quarterly
+
 - Comprehensive security audit
 - Performance optimization review
 - Feature prioritization planning
@@ -600,22 +635,26 @@ git push origin main
 ### Support Channels
 
 **User Support**:
+
 - Email: support@reentrymap.org
 - Response time: 24 hours
 
 **Technical Issues**:
+
 - Email: gserafini@gmail.com
 - GitHub Issues: github.com/gserafini/reentry-map/issues
 
 ### Escalation Path
 
 **Critical (Site Down)**:
+
 1. Check Vercel status
 2. Check Supabase status
 3. Review recent deployments
 4. Rollback if needed
 
 **High (Feature Broken)**:
+
 1. Reproduce issue
 2. Check error logs
 3. Create hotfix branch
@@ -623,6 +662,7 @@ git push origin main
 5. Verify resolution
 
 **Medium (Bug Report)**:
+
 1. Document issue
 2. Add to backlog
 3. Prioritize in next sprint
@@ -634,22 +674,26 @@ git push origin main
 Track these weekly:
 
 ### User Metrics
+
 - Active users (DAU/MAU)
 - New signups
 - Retention rate
 
 ### Engagement
+
 - Searches per user
 - Resources viewed
 - Favorites added
 - Reviews written
 
 ### Quality
+
 - Error rate < 0.1%
 - Performance score > 90
 - User satisfaction > 4/5
 
 ### Business
+
 - Resources in database
 - Data accuracy rate
 - Support ticket volume
@@ -661,6 +705,7 @@ Track these weekly:
 You're now live! 🎉
 
 Remember:
+
 - Monitor closely first week
 - Respond to feedback quickly
 - Iterate based on user needs
