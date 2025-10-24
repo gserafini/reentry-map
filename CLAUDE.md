@@ -28,7 +28,7 @@ A framework for structured, AI-optimized project management. Key docs:
 ## Tech Stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4.0
-- **UI Components**: shadcn/ui + Lucide React
+- **UI Components**: HeroUI 2.8.5 (primary) + Lucide React icons
 - **Backend**: Next.js API Routes, Supabase (PostgreSQL 16, Auth, Storage, Realtime)
 - **Maps**: Google Maps JavaScript API (@googlemaps/js-api-loader)
 - **AI**: OpenAI SDK (gpt-4o-mini for cost-effectiveness)
@@ -139,6 +139,73 @@ lib/
 ├── utils/                        # Utility functions (geocoding, distance, formatting)
 └── types/                        # TypeScript type definitions
 ```
+
+## HeroUI Component Library
+
+**HeroUI** (formerly NextUI) is our primary UI component library, chosen for its:
+
+- Built-in WCAG accessibility (critical for reentry population)
+- Zero runtime styles (Tailwind-based for performance)
+- Mobile-first design with proper touch targets
+- Comprehensive component set
+
+### Basic Usage
+
+```typescript
+'use client' // Most HeroUI components require client
+
+import { Button, Card, CardHeader, CardBody, Badge } from '@heroui/react'
+
+export function ResourceCard({ resource }) {
+  return (
+    <Card>
+      <CardHeader>
+        <h3>{resource.name}</h3>
+        <Badge color="primary">{resource.category}</Badge>
+      </CardHeader>
+      <CardBody>
+        <p>{resource.description}</p>
+        <Button color="primary" variant="flat">
+          View Details
+        </Button>
+      </CardBody>
+    </Card>
+  )
+}
+```
+
+### Common Components
+
+- **Button**: `<Button color="primary" variant="solid">Text</Button>`
+- **Card**: `<Card>`, `<CardHeader>`, `<CardBody>`, `<CardFooter>`
+- **Badge**: `<Badge color="success">Status</Badge>`
+- **Avatar**: `<Avatar src="/path" name="User" />`
+- **Input**: `<Input label="Name" placeholder="Enter name" />`
+- **Modal**: `<Modal>`, `<ModalContent>`, `<ModalHeader>`, etc.
+
+### Colors & Variants
+
+**Colors**: `default`, `primary`, `secondary`, `success`, `warning`, `danger`
+
+**Variants**: `solid`, `bordered`, `light`, `flat`, `faded`, `shadow`, `ghost`
+
+### Accessibility Features
+
+- Built-in ARIA labels and roles
+- Keyboard navigation (Tab, Enter, Arrow keys)
+- Screen reader compatible
+- Focus indicators
+- Proper contrast ratios
+
+### Theme Integration
+
+HeroUI works with `next-themes` for dark mode:
+
+- Components auto-adapt to theme
+- Use `className="dark:..."` for custom dark mode styles
+- Provider setup in `app/providers.tsx`
+
+**Example Test Page**: Visit `/heroui-test` to see components in action
 
 ## Development Patterns
 

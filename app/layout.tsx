@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
-import { ThemeProvider } from 'next-themes'
 import { env } from '@/lib/env'
+import { Providers } from './providers'
 import '../styles/tailwind.css'
 
 const defaultUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -26,14 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
