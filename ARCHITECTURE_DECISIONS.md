@@ -229,20 +229,26 @@ Use Tailwind CSS 4.0 as the primary styling framework.
 
 ---
 
-## ADR-005: HeroUI for Component Library
+## ADR-005: Component Library Selection (Revised)
 
-**Date**: 2025-10-23
-**Status**: ✅ Accepted (User confirmed 2025-10-23)
+**Date**: 2025-10-24 (Updated from 2025-10-23)
+**Status**: ✅ Accepted - Material UI v7 (Latest)
+**Previous Decision**: HeroUI (Superseded 2025-10-24)
 **Deciders**: Gabriel Serafini, Claude Code
 **Tags**: ui, components, accessibility
 
 ### Context
 
-Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly NextUI) for component library.
+Need to choose a component library that provides excellent accessibility, React 19 compatibility, and comprehensive components. Initially chose HeroUI, but discovered React 19 incompatibility issues (v2.8.5 built for React 18).
 
 ### Decision
 
-**Use HeroUI** as the primary component library for the application.
+**Use Material UI (MUI) v7** (latest version) as the primary component library for the application.
+
+### Revision History
+
+- **2025-10-23**: Initially chose HeroUI for accessibility and Tailwind integration
+- **2025-10-24**: Switched to Material UI due to React 19 compatibility and maturity
 
 ### Options
 
@@ -264,7 +270,7 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - Accessibility features need manual implementation
 - Less comprehensive out of the box
 
-#### Option B: Switch to HeroUI
+#### Option B: HeroUI (Initially Chosen, Then Superseded)
 
 **Pros**:
 
@@ -276,25 +282,49 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 - Keyboard navigation built-in
 - Multiple themes available
 - Specifically designed for Next.js App Router
-- Critical for reentry population accessibility needs
 
 **Cons**:
 
-- Need to remove current shadcn/ui components
-- Learning new component API
-- Slightly larger bundle size
-- May need to override some styles
+- **React 19 incompatibility** (v2.8.5 built for React 18) 🚫
+- Build errors with createContext
+- Alpha v3 not production-ready
+- Smaller community than MUI
+- Less comprehensive documentation
+
+#### Option C: Material UI (MUI) v7 ✅ CHOSEN
+
+**Pros**:
+
+- **Full React 19 support** (officially compatible)
+- Industry standard since 2014, battle-tested
+- 90+ comprehensive components
+- Excellent TypeScript support
+- WAI-ARIA accessibility built-in
+- Works with both Server and Client Components
+- Massive community and ecosystem
+- Extensive documentation and examples
+- Theming system with emotion/styled-components
+- Mobile-first responsive design
+- Can be styled with Tailwind via tss-react
+
+**Cons**:
+
+- Slightly larger bundle than HeroUI
+- Uses CSS-in-JS (emotion) not pure Tailwind
+- Need to configure theme provider
 
 ### Rationale
 
-**HeroUI was chosen** for the following reasons:
+**Material UI v6 was chosen** for the following reasons:
 
-1. **Accessibility First**: Reentry population has diverse needs; built-in ARIA compliance is critical
-2. **AI Development Speed**: MCP server integration will significantly accelerate development
-3. **4th Grade Reading Level**: Better defaults for clear, simple interfaces
-4. **Mobile-First**: Better touch targets and mobile patterns
-5. **Zero Runtime**: Performance is critical for users on slow connections
-6. **Time Savings**: Full component library vs building each piece
+1. **React 19 Compatibility**: Official support, no build errors
+2. **Production Ready**: Mature, stable, used by thousands of companies
+3. **Accessibility First**: WAI-ARIA compliance critical for reentry population
+4. **Comprehensive**: 90+ components vs HeroUI's ~50
+5. **TypeScript**: Built TypeScript-first for type safety
+6. **Server Components**: Works seamlessly with Next.js 15+ SSR
+7. **Community**: Massive ecosystem, instant solutions to problems
+8. **Longevity**: Proven track record, not going anywhere
 
 ### Migration Path
 
@@ -308,34 +338,39 @@ Need to choose between shadcn/ui (partially implemented) and HeroUI (formerly Ne
 
 **Positive**:
 
-- Faster development with complete component library
-- Built-in accessibility (WAI-ARIA compliant) - critical for target users
-- AI assistance via MCP server significantly accelerates development
-- Better default aesthetics and mobile patterns
-- Zero runtime styles for optimal performance
-- Strong support for 4th grade reading level interfaces
+- React 19 compatibility eliminates build errors
+- Production-ready, battle-tested component library
+- Comprehensive 90+ components accelerate development
+- Built-in accessibility (WAI-ARIA compliant) - critical for reentry population
+- Excellent TypeScript support and type safety
+- Works with both Server and Client Components
+- Massive community support and ecosystem
+- Dark mode support out of the box
 
 **Negative**:
 
-- Need to remove/replace current shadcn/ui components
-- Learning new component API
-- Slightly larger bundle size than shadcn/ui
+- Slightly larger bundle than HeroUI (~80KB gzipped)
+- CSS-in-JS approach (emotion) vs pure Tailwind
+- Need to configure theme provider
+- Learning MUI component API
 
 ### Alternatives Considered
 
-- **Material UI (MUI)**: Too heavy, poor Tailwind integration
+- **HeroUI**: Good accessibility but React 19 incompatibility (v2.8.5 for React 18)
+- **shadcn/ui**: Too manual, slow development
 - **Chakra UI**: Good but runtime styles are a performance concern
 - **Headless UI**: Too low-level, need to build everything
 - **Ant Design**: Not Tailwind-based, heavier bundle
 
 ### Implementation Plan
 
-1. Install HeroUI and configure Tailwind integration
-2. Set up HeroUI MCP server for AI-assisted development
-3. Audit and document current shadcn/ui components in use
-4. Migrate components one-by-one to HeroUI equivalents
-5. Test accessibility with screen readers
-6. Update all documentation with HeroUI patterns
+1. Uninstall HeroUI and clean up configuration
+2. Install Material UI v7 with required dependencies (@mui/material, @emotion/react, @emotion/styled)
+3. Configure MUI theme with dark mode support
+4. Set up ThemeProvider in app layout
+5. Migrate auth components to Material UI
+6. Test accessibility with screen readers
+7. Update all documentation with MUI patterns
 
 ---
 

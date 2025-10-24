@@ -1,12 +1,8 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import Link from 'next/link'
+import { Box, Button, Card, CardContent, TextField, Typography, Alert } from '@mui/material'
+import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -48,64 +44,63 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
   }
 
   return (
-    <div className={cn('flex flex-col gap-6', className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Sign up</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
-        </CardHeader>
+    <Box className={className} {...props}>
+      <Card sx={{ maxWidth: 448, width: '100%', p: 2 }}>
         <CardContent>
-          <form onSubmit={handleSignUp}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="repeat-password">Repeat Password</Label>
-                </div>
-                <Input
-                  id="repeat-password"
-                  type="password"
-                  required
-                  value={repeatPassword}
-                  onChange={(e) => setRepeatPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Creating an account...' : 'Sign up'}
-              </Button>
-            </div>
-            <div className="mt-4 text-center text-sm">
+          <Typography variant="h4" component="h1" gutterBottom>
+            Sign up
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Create a new account
+          </Typography>
+          <Box
+            component="form"
+            onSubmit={handleSignUp}
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+          >
+            <TextField
+              label="Email"
+              type="email"
+              placeholder="m@example.com"
+              required
+              fullWidth
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              variant="outlined"
+            />
+            <TextField
+              label="Password"
+              type="password"
+              placeholder="Enter your password"
+              required
+              fullWidth
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              variant="outlined"
+            />
+            <TextField
+              label="Repeat Password"
+              type="password"
+              placeholder="Confirm your password"
+              required
+              fullWidth
+              value={repeatPassword}
+              onChange={(e) => setRepeatPassword(e.target.value)}
+              variant="outlined"
+            />
+            {error && <Alert severity="error">{error}</Alert>}
+            <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
+              {isLoading ? 'Creating an account...' : 'Sign up'}
+            </Button>
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
               Already have an account?{' '}
-              <Link href="/auth/login" className="underline underline-offset-4">
+              <NextLink href="/auth/login" style={{ textDecoration: 'underline' }}>
                 Login
-              </Link>
-            </div>
-          </form>
+              </NextLink>
+            </Typography>
+          </Box>
         </CardContent>
       </Card>
-    </div>
+    </Box>
   )
 }

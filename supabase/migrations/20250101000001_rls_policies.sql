@@ -96,7 +96,7 @@ CREATE POLICY "Users can delete their own ratings"
 -- =============================================================================
 CREATE POLICY "Approved reviews are viewable by everyone"
   ON resource_reviews FOR SELECT
-  USING (is_approved = true OR auth.uid() = user_id);
+  USING (approved = true OR auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own reviews"
   ON resource_reviews FOR INSERT
@@ -140,7 +140,7 @@ CREATE POLICY "Users can delete their own helpfulness votes"
 -- =============================================================================
 CREATE POLICY "Users can view their own suggestions"
   ON resource_suggestions FOR SELECT
-  USING (auth.uid() = submitted_by);
+  USING (auth.uid() = suggested_by);
 
 CREATE POLICY "Admins can view all suggestions"
   ON resource_suggestions FOR SELECT
@@ -150,7 +150,7 @@ CREATE POLICY "Admins can view all suggestions"
 
 CREATE POLICY "Users can insert suggestions"
   ON resource_suggestions FOR INSERT
-  WITH CHECK (auth.uid() = submitted_by);
+  WITH CHECK (auth.uid() = suggested_by);
 
 CREATE POLICY "Admins can update suggestions"
   ON resource_suggestions FOR UPDATE

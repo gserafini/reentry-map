@@ -52,6 +52,35 @@ npm run quality:full # Full: Above + E2E tests
 
 ---
 
+## Visual Design Review (Screenshots)
+
+**When doing frontend design work, use screenshots to review responsive design:**
+
+```bash
+npm run screenshots              # Capture all viewports
+/screenshots                     # Slash command (same as above)
+```
+
+**What it captures:**
+
+- Mobile: 375x667 (iPhone SE) + 414x896 (iPhone Pro Max)
+- Tablet: 768x1024 (iPad)
+- Desktop: 1280x800 + 1920x1080
+- Both viewport and full-page screenshots
+
+**Output:** `/tmp/reentry-map-screenshots/` with timestamps
+
+**When to use:**
+
+- After implementing new UI components
+- Before committing frontend changes
+- During design reviews and PR demos
+- When testing responsive layouts
+
+**Best Practice:** Run screenshots before showing work to user to catch visual issues early.
+
+---
+
 ## Project Context
 
 **Reentry Map** is a mobile-first web application helping individuals navigating reentry find resources in their community. The app uses Next.js 16, Supabase, and AI agents to maintain an accurate, up-to-date directory of services.
@@ -64,7 +93,7 @@ npm run quality:full # Full: Above + E2E tests
 ## Tech Stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4.0
-- **UI Components**: HeroUI 2.8.5 (primary) + Lucide React icons
+- **UI Components**: Material UI v7 (@mui/material, @mui/icons-material) + Lucide React icons
 - **Backend**: Next.js API Routes, Supabase (PostgreSQL 16, Auth, Storage, Realtime)
 - **Maps**: Google Maps JavaScript API (@googlemaps/js-api-loader)
 - **AI**: OpenAI SDK (gpt-4o-mini for cost-effectiveness)

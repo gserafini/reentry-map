@@ -1,15 +1,33 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
+import { Box } from '@mui/material'
 import { env } from '@/lib/env'
 import { Providers } from './providers'
+import { AppBar } from '@/components/layout/AppBar'
+import { BottomNav } from '@/components/layout/BottomNav'
+import { AuthButton } from '@/components/auth-button'
 import '../styles/tailwind.css'
 
 const defaultUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3003'
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: 'Next.js and Supabase Starter Kit',
-  description: 'The fastest way to build apps with Next.js and Supabase',
+  title: 'Reentry Map - Find Resources for Reentry',
+  description:
+    'Find employment, housing, food, healthcare, and support services in your community. Mobile-first resource directory for individuals navigating reentry.',
+  keywords: [
+    'reentry',
+    'resources',
+    'employment',
+    'housing',
+    'support services',
+    'Oakland',
+    'community resources',
+  ],
+  icons: {
+    icon: '/ReentryMap_favicon.png',
+    apple: '/ReentryMap_favicon.png',
+  },
 }
 
 const geistSans = Geist({
@@ -26,7 +44,27 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '100vh',
+            }}
+          >
+            <AppBar authButton={<AuthButton />} />
+            <Box
+              component="main"
+              sx={{
+                flexGrow: 1,
+                pb: { xs: 7, md: 0 }, // padding-bottom for mobile bottom nav
+              }}
+            >
+              {children}
+            </Box>
+            <BottomNav />
+          </Box>
+        </Providers>
       </body>
     </html>
   )

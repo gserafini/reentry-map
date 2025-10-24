@@ -1,26 +1,252 @@
 # Reentry Map - Development Progress
 
-**Last Updated**: 2025-10-23
-**Current Phase**: Phase 1 - UI Library Decision & Setup
-**Overall Progress**: 9% (Phase 0: 100%, Phase 0.5: 100% complete)
+**Last Updated**: 2025-10-24
+**Current Phase**: Phase 3 Started - Homepage & Layout Complete
+**Overall Progress**: 35% (Phase 0: 100%, Phase 1: 100%, Phase 2: 100%, Phase 3: 15%)
 
 ---
 
 ## Quick Status
 
-| Phase                      | Status         | Progress | ETA                         |
-| -------------------------- | -------------- | -------- | --------------------------- |
-| Phase 0: Foundation        | ✅ Complete    | 100%     | Completed Session 1         |
-| Phase 0.5: Enterprise      | ✅ Complete    | 100%     | Completed Session 1         |
-| Phase 1: UI Library        | ✅ Decided     | 25%      | HeroUI - Ready to implement |
-| Phase 2: Database          | ❌ Not Started | 0%       | Next Session                |
-| Phase 3: Core Resources    | ❌ Not Started | 0%       | Week 1                      |
-| Phase 4: Location Features | ❌ Not Started | 0%       | Week 2                      |
-| Phase 5-14                 | ❌ Not Started | 0%       | Weeks 3-5                   |
+| Phase                      | Status      | Progress | ETA                               |
+| -------------------------- | ----------- | -------- | --------------------------------- |
+| Phase 0: Foundation        | ✅ Complete | 100%     | Completed Session 1               |
+| Phase 0.5: Enterprise      | ✅ Complete | 100%     | Completed Session 1               |
+| Phase 1: UI Library        | ✅ Complete | 100%     | Material UI v7 migrated Session 3 |
+| Phase 2: Database          | ✅ Complete | 100%     | Completed Session 2               |
+| Phase 3: Core Resources    | 🚧 Started  | 15%      | Week 1 - Layout & Homepage Done   |
+| Phase 4: Location Features | ❌ Pending  | 0%       | Week 2                            |
+| Phase 5-14                 | ❌ Pending  | 0%       | Weeks 3-5                         |
 
 ---
 
-## Current Session Progress (2025-10-23)
+## Current Session Progress (2025-10-24 - Session 4)
+
+### ✅ App Layout & Homepage COMPLETE
+
+**Successfully created professional Material UI homepage with navigation!**
+
+1. **Navigation Components** ✅
+   - ✅ Created [components/layout/AppBar.tsx](components/layout/AppBar.tsx) - Desktop/tablet top navigation
+     - Logo placeholder ("RM") ready for actual logo
+     - Desktop nav links (Resources, Favorites, Suggest)
+     - Mobile search icon
+     - Theme switcher integration
+     - Auth button (Sign in/Sign up or user menu)
+   - ✅ Created [components/layout/BottomNav.tsx](components/layout/BottomNav.tsx) - Mobile bottom navigation
+     - 4 tabs: Home, Search, Favorites, Account
+     - Auto-updates based on current route
+     - Fixed positioning with proper z-index
+     - Hidden on desktop (md+)
+   - ✅ Updated [app/layout.tsx](app/layout.tsx) - Integrated both navigation components
+     - Proper spacing for mobile bottom nav
+     - SEO metadata enhanced
+
+2. **Homepage Implementation** ✅
+   - ✅ Completely rebuilt [app/page.tsx](app/page.tsx) with Material UI v7
+     - **Hero Section**: Blue gradient with search bar and resource count
+     - **Categories Section**: 8 category cards with icons (Employment, Housing, Food, Healthcare, Clothing, Legal Aid, Transportation, Education)
+     - **Featured Resources**: Top 6 rated resources with cards
+     - **Call-to-Action**: Suggest a Resource section
+     - Server-side data fetching for performance
+     - Responsive design (mobile-first)
+
+3. **Material UI Grid v7 Migration** ✅
+   - ✅ Updated Grid API from v5 to v7
+     - Changed `<Grid item xs={6}>` → `<Grid size={{ xs: 6 }}>`
+     - Removed deprecated `item` prop
+     - Used responsive `size` object syntax
+   - ✅ All TypeScript errors resolved
+
+4. **Server/Client Component Architecture** ✅
+   - ✅ Fixed server component importing issues
+     - AppBar: Client component (uses Next.js Link with MUI)
+     - AuthButton: Server component (uses Supabase cookies)
+     - Layout: Server component (passes AuthButton as prop to AppBar)
+   - ✅ Proper component boundaries maintained
+
+5. **Quality Checks** ✅
+   - ✅ ESLint: 0 errors (1 warning on commitlint.config.js - expected)
+   - ✅ TypeScript: 0 errors
+   - ✅ Tests: 6/6 passing
+   - ✅ Build: Successful (routes correctly marked as dynamic)
+
+**Files Created/Modified**:
+
+- [components/layout/AppBar.tsx](components/layout/AppBar.tsx:1-108) - New file
+- [components/layout/BottomNav.tsx](components/layout/BottomNav.tsx:1-70) - New file
+- [app/layout.tsx](app/layout.tsx:1-67) - Enhanced with navigation
+- [app/page.tsx](app/page.tsx:1-251) - Complete rewrite
+- [lib/api/resources.ts](lib/api/resources.ts:1-189) - Fixed TypeScript types
+- [components/auth-button.tsx](components/auth-button.tsx:14-33) - Fixed Link usage
+
+### ✅ Screenshot System for Responsive Design Review
+
+**Created reusable screenshot system for visual design verification!**
+
+1. **Screenshot Script** ✅
+   - ✅ Created [scripts/screenshot.sh](scripts/screenshot.sh) - Automated multi-viewport capture
+   - ✅ Captures 5 viewport sizes: mobile (2), tablet, desktop (2)
+   - ✅ Both viewport and full-page screenshots
+   - ✅ Timestamped output to `/tmp/reentry-map-screenshots/`
+
+2. **npm Script** ✅
+   - ✅ Added `npm run screenshots` command
+   - ✅ Can pass custom URL: `npm run screenshots http://localhost:3003/route`
+
+3. **Slash Command** ✅
+   - ✅ Created [.claude/commands/screenshots.md](.claude/commands/screenshots.md)
+   - ✅ Claude can now invoke `/screenshots` for visual review
+
+4. **Documentation** ✅
+   - ✅ Updated [CLAUDE.md](CLAUDE.md:55-81) with screenshots section
+   - ✅ Updated [.gitignore](.gitignore:31-33) to exclude screenshot directories
+   - ✅ Fixed Material UI v7 reference in Tech Stack
+
+**Usage**:
+
+```bash
+npm run screenshots              # Capture homepage
+/screenshots                     # Slash command
+```
+
+**Verified on Homepage**: All responsive breakpoints working perfectly - zero issues found!
+
+**Next Steps**:
+
+- Replace "RM" logo placeholder with actual logo (user mentioned having one)
+- Continue with Phase 3.2: Resource List Page components
+
+---
+
+## Previous Session Progress (2025-10-24 - Session 3)
+
+### ✅ Phase 1 COMPLETE - Material UI v7 Migration
+
+**Successfully migrated from HeroUI to Material UI v7!**
+
+1. **Decision to Switch UI Libraries** 🔄
+   - ✅ Discovered HeroUI v2.8.5 incompatible with React 19
+   - ✅ HeroUI v3 is alpha only (not production ready)
+   - ✅ User decided to switch to Material UI v7
+   - ✅ Updated ADR-005 with complete rationale
+
+2. **Material UI v7 Installation** ✅
+   - ✅ Uninstalled HeroUI (@heroui/react, framer-motion)
+   - ✅ Installed Material UI v7 (@mui/material, @emotion/react, @emotion/styled, @mui/icons-material)
+   - ✅ Cleaned up Tailwind config (removed HeroUI plugin)
+   - ✅ Created MUI theme with light/dark mode support
+   - ✅ Integrated with next-themes for theme switching
+
+3. **Complete Component Migration** ✅
+   - ✅ login-form.tsx: TextField, Button, Card, Alert
+   - ✅ sign-up-form.tsx: TextField, Button, Card, Alert
+   - ✅ auth-button.tsx: Box, Button, Typography (Server Component compatible!)
+   - ✅ logout-button.tsx: Button with onClick
+   - ✅ ResourceCard.tsx: Card, Rating, Chip, Button, Link
+   - ✅ SearchBar.tsx: TextField, Button, Box
+   - ✅ Removed HeroUI test files (HeroUIExample.tsx, heroui-test page)
+
+4. **Key Advantages of Material UI** 📝
+   - Works in both Client AND Server Components
+   - React 19 fully compatible
+   - Built-in Rating component for star ratings
+   - Standard HTML props (onChange, onClick)
+   - Comprehensive component library (90+ components)
+   - Production-ready with massive community support
+   - Full TypeScript support with autocomplete
+   - WAI-ARIA accessibility built-in
+
+5. **Quality Checks** ✅
+   - ✅ ESLint: 0 errors, 1 pre-existing warning
+   - ✅ TypeScript: Compiled successfully
+   - ✅ Tests: 6/6 passing
+   - ✅ Build: Production build successful
+   - ✅ All files formatted with Prettier
+
+**Next Steps**: Start Phase 3 (Core Resources - Resource Display & Search)
+
+---
+
+## Earlier Session 3 Work (2025-10-24 - Session 3 Initial)
+
+### 🔄 Phase 1 - Initial HeroUI Migration Attempt
+
+**Attempted HeroUI migration, discovered React 19 incompatibility**
+
+1. **HeroUI Documentation Setup** ✅
+   - ✅ Downloaded complete HeroUI v2 docs locally (74 pages, 31MB via wget)
+   - ✅ Saved to www.heroui.com/ (added to .gitignore, .prettierignore, eslint ignore)
+   - ✅ Configured HeroUI MCP server in Claude Desktop
+   - ✅ Local docs provide accurate v2 reference (MCP has v3 alpha)
+
+2. **Initial Component Migration** ✅
+   - ✅ Migrated login-form.tsx to HeroUI (Button, Input, Card, Link)
+   - ✅ Migrated sign-up-form.tsx to HeroUI (Button, Input, Card, Link)
+   - ✅ Migrated logout-button.tsx to HeroUI (Button)
+   - ✅ Kept auth-button.tsx using shadcn (Server Component limitation)
+
+3. **Issue Discovered** ⚠️
+   - ❌ HeroUI v2.8.5 incompatible with React 19 (build error: `createContext is not a function`)
+   - ❌ HeroUI v3 is alpha only, not production ready
+   - ✅ User correctly identified issue was pre-existing
+
+4. **Decision** 🎯
+   - User decided to switch to Material UI v7 instead
+   - Proceeded with Material UI migration (see current session above)
+
+**Key Learnings**: Always verify UI library compatibility with framework versions before migration
+
+---
+
+## Previous Session (2025-10-24 - Session 2)
+
+### ✅ Phase 2 COMPLETE - Database Setup
+
+**All database infrastructure completed and verified!**
+
+1. **Database Schema** ✅
+   - ✅ Created 9 tables (users, resources, favorites, ratings, reviews, etc.)
+   - ✅ Enabled PostGIS extension for geospatial queries
+   - ✅ Created spatial indexes for location-based search
+   - ✅ Created full-text search indexes
+   - ✅ Created category and tag indexes
+
+2. **Row Level Security** ✅
+   - ✅ RLS enabled on all tables
+   - ✅ 40+ security policies implemented
+   - ✅ Admin-only access for sensitive operations
+   - ✅ User-scoped access for personal data
+
+3. **Database Functions & Triggers** ✅
+   - ✅ Auto-update timestamps on all tables
+   - ✅ Auto-calculate resource rating averages
+   - ✅ Auto-update review counts
+   - ✅ Auto-create user profiles on signup
+   - ✅ Haversine distance calculation function
+   - ✅ Get resources within radius function
+
+4. **Seed Data** ✅
+   - ✅ 10 Oakland-area resources loaded
+   - ✅ Categories: Employment, Housing, Food, Healthcare, Legal, Education, etc.
+   - ✅ All with real addresses and coordinates
+
+5. **TypeScript Types** ✅
+   - ✅ Generated types from database schema
+   - ✅ Saved to [lib/types/database.ts](lib/types/database.ts)
+   - ✅ Full type safety for all queries
+
+6. **Security & Performance Audits** ✅
+   - ✅ Ran Supabase security advisors
+   - ✅ Ran performance advisors
+   - ✅ All critical issues resolved
+   - ✅ Minor warnings documented for future optimization
+
+**Next Steps**: Ready to start Phase 3 (Core Resource Features)
+
+---
+
+## Previous Session (2025-10-23)
 
 ### ✅ Phase 0 COMPLETE
 

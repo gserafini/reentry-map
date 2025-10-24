@@ -37,3 +37,6 @@ test-results/
 
 # Git
 .git/
+
+# Downloaded documentation
+www.heroui.com/

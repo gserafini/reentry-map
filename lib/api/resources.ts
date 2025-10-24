@@ -1,24 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Resource } from '@/lib/types/database'
+import type {
+  Resource,
+  ResourceFilters,
+  ResourceWithDistance,
+  PaginationParams,
+  ResourceSort,
+  ResourceCategory,
+} from '@/lib/types/database'
 
 /**
  * Resource API - Server-side data fetching functions
  * These functions use the server Supabase client for optimal performance
  */
 
-export interface ResourceFilters {
-  category?: string
-  search?: string
-  status?: 'active' | 'inactive' | 'draft' | 'flagged'
-}
-
-export interface GetResourcesOptions extends ResourceFilters {
-  limit?: number
-  offset?: number
+export interface GetResourcesOptions extends Partial<ResourceFilters>, PaginationParams {
+  sort?: ResourceSort
 }
 
 /**
- * Get all active resources
+ * Get all resources with filtering, pagination, and sorting
  * @param options - Filtering and pagination options
  * @returns Array of resources
  */
@@ -27,23 +27,59 @@ export async function getResources(
 ): Promise<{ data: Resource[] | null; error: Error | null }> {
   try {
     const supabase = await createClient()
-    const { category, search, status = 'active', limit = 50, offset = 0 } = options
+    const {
+      search,
+      categories,
+      min_rating,
+      verified_only,
+      accepts_records,
+      appointment_required,
+      limit = 50,
+      offset = 0,
+      sort = { field: 'name', direction: 'asc' },
+    } = options
 
-    let query = supabase
-      .from('resources')
-      .select('*')
-      .eq('status', status)
-      .order('name', { ascending: true })
-      .range(offset, offset + limit - 1)
+    let query = supabase.from('resources').select('*')
 
-    // Apply category filter if provided
-    if (category) {
-      query = query.eq('primary_category', category)
+    // Always filter to active resources by default
+    query = query.eq('status', 'active')
+
+    // Apply category filter if provided (matches any category in array)
+    if (categories && categories.length > 0) {
+      query = query.contains('categories', categories)
     }
 
     // Apply search filter if provided (searches name and description)
     if (search && search.trim()) {
       query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+    }
+
+    // Apply minimum rating filter
+    if (min_rating !== undefined) {
+      query = query.gte('rating_average', min_rating)
+    }
+
+    // Apply verified filter
+    if (verified_only) {
+      query = query.eq('verified', true)
+    }
+
+    // Apply accepts_records filter
+    if (accepts_records !== undefined) {
+      query = query.eq('accepts_records', accepts_records)
+    }
+
+    // Apply appointment_required filter
+    if (appointment_required !== undefined) {
+      query = query.eq('appointment_required', appointment_required)
+    }
+
+    // Apply sorting
+    query = query.order(sort.field, { ascending: sort.direction === 'asc' })
+
+    // Apply pagination
+    if (limit) {
+      query = query.range(offset || 0, (offset || 0) + limit - 1)
     }
 
     const { data, error } = await query
@@ -92,16 +128,52 @@ export async function getResourceById(
 }
 
 /**
+ * Get resources near a location using PostGIS
+ * @param latitude - User's latitude
+ * @param longitude - User's longitude
+ * @param radiusMiles - Search radius in miles (default: 10)
+ * @returns Array of resources with distance
+ */
+export async function getResourcesNear(
+  latitude: number,
+  longitude: number,
+  radiusMiles = 10
+): Promise<{ data: ResourceWithDistance[] | null; error: Error | null }> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('get_resources_near', {
+      user_lat: latitude,
+      user_lng: longitude,
+      radius_miles: radiusMiles,
+    })
+
+    if (error) {
+      console.error('Error fetching nearby resources:', error)
+      return { data: null, error: new Error('Failed to fetch nearby resources') }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error in getResourcesNear:', error)
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error('Unknown error'),
+    }
+  }
+}
+
+/**
  * Get resources by category
- * @param category - Primary category to filter by
+ * @param category - Category to filter by
  * @param limit - Maximum number of results
  * @returns Array of resources in the specified category
  */
 export async function getResourcesByCategory(
-  category: string,
+  category: ResourceCategory,
   limit = 50
 ): Promise<{ data: Resource[] | null; error: Error | null }> {
-  return getResources({ category, limit })
+  return getResources({ categories: [category], limit })
 }
 
 /**

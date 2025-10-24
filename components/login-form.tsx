@@ -1,12 +1,8 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import Link from 'next/link'
+import { Box, Button, Card, CardContent, TextField, Typography, Alert } from '@mui/material'
+import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -39,58 +35,70 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
   }
 
   return (
-    <div className={cn('flex flex-col gap-6', className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your email below to login to your account</CardDescription>
-        </CardHeader>
+    <Box className={className} {...props}>
+      <Card sx={{ maxWidth: 448, width: '100%', p: 2 }}>
         <CardContent>
-          <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Logging in...' : 'Login'}
-              </Button>
-            </div>
-            <div className="mt-4 text-center text-sm">
+          <Typography variant="h4" component="h1" gutterBottom>
+            Login
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Enter your email below to login to your account
+          </Typography>
+          <Box
+            component="form"
+            onSubmit={handleLogin}
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+          >
+            <TextField
+              label="Email"
+              type="email"
+              placeholder="m@example.com"
+              required
+              fullWidth
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              variant="outlined"
+            />
+            <Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 1,
+                }}
+              >
+                <Typography variant="body2">Password</Typography>
+                <NextLink
+                  href="/auth/forgot-password"
+                  style={{ fontSize: '0.875rem', textDecoration: 'underline' }}
+                >
+                  Forgot password?
+                </NextLink>
+              </Box>
+              <TextField
+                type="password"
+                placeholder="Enter your password"
+                required
+                fullWidth
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                variant="outlined"
+              />
+            </Box>
+            {error && <Alert severity="error">{error}</Alert>}
+            <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
+              {isLoading ? 'Logging in...' : 'Login'}
+            </Button>
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
               Don&apos;t have an account?{' '}
-              <Link href="/auth/sign-up" className="underline underline-offset-4">
+              <NextLink href="/auth/sign-up" style={{ textDecoration: 'underline' }}>
                 Sign up
-              </Link>
-            </div>
-          </form>
+              </NextLink>
+            </Typography>
+          </Box>
         </CardContent>
       </Card>
-    </div>
+    </Box>
   )
 }

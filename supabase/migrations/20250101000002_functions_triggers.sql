@@ -80,7 +80,7 @@ BEGIN
     SELECT COUNT(*)
     FROM resource_reviews
     WHERE resource_id = COALESCE(NEW.resource_id, OLD.resource_id)
-      AND is_approved = true
+      AND approved = true
   )
   WHERE id = COALESCE(NEW.resource_id, OLD.resource_id);
 
@@ -115,13 +115,13 @@ BEGIN
       SELECT COUNT(*)
       FROM review_helpfulness
       WHERE review_id = COALESCE(NEW.review_id, OLD.review_id)
-        AND is_helpful = true
+        AND helpful = true
     ),
     not_helpful_count = (
       SELECT COUNT(*)
       FROM review_helpfulness
       WHERE review_id = COALESCE(NEW.review_id, OLD.review_id)
-        AND is_helpful = false
+        AND helpful = false
     )
   WHERE id = COALESCE(NEW.review_id, OLD.review_id);
 

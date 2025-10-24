@@ -1,19 +1,53 @@
 'use client'
 
-import { HeroUIProvider } from '@heroui/react'
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline } from '@mui/material'
+import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
+
+// Create MUI theme with dark mode support
+const lightTheme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+})
+
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+  },
+})
+
+function MuiThemeWrapper({ children }: { children: React.ReactNode }) {
+  const { theme, systemTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    // Prevent hydration mismatch by rendering light theme on server
+    return <MuiThemeProvider theme={lightTheme}>{children}</MuiThemeProvider>
+  }
+
+  const currentTheme = theme === 'system' ? systemTheme : theme
+  const muiTheme = currentTheme === 'dark' ? darkTheme : lightTheme
+
+  return <MuiThemeProvider theme={muiTheme}>{children}</MuiThemeProvider>
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <HeroUIProvider>
-      <NextThemesProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <MuiThemeWrapper>
+        <CssBaseline />
         {children}
-      </NextThemesProvider>
-    </HeroUIProvider>
+      </MuiThemeWrapper>
+    </NextThemesProvider>
   )
 }

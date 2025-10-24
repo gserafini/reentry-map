@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Input, Button } from '@heroui/react'
+import { TextField, Button, Box } from '@mui/material'
 
 interface SearchBarProps {
   value?: string
@@ -22,19 +22,22 @@ export function SearchBar({
   }, [query, onChange])
 
   return (
-    <div className="flex items-center gap-2" role="search">
-      <Input
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }} role="search">
+      <TextField
         aria-label="Search resources"
         placeholder={placeholder}
         value={query}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+        fullWidth
+        size="small"
+        variant="outlined"
       />
       {query && (
-        <Button size="sm" variant="flat" onClick={() => setQuery('')} aria-label="Clear search">
+        <Button size="small" variant="text" onClick={() => setQuery('')} aria-label="Clear search">
           Clear
         </Button>
       )}
-    </div>
+    </Box>
   )
 }
 

@@ -1,7 +1,17 @@
 'use client'
 
 import React from 'react'
-import { Card, CardHeader, CardBody, CardFooter, Badge, Button } from '@heroui/react'
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Button,
+  Typography,
+  Box,
+  Link,
+  Rating,
+} from '@mui/material'
 import type { Resource } from '@/lib/types/database'
 
 export type ResourceCardResource = {
@@ -44,61 +54,80 @@ export function ResourceCard({ resource, onFavorite, userLocation }: ResourceCar
 
   return (
     <Card data-testid="resource-card">
-      <CardHeader>
-        <div className="flex w-full items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">{resource.name}</h3>
+      <CardContent>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}
+        >
+          <Box>
+            <Typography variant="h6" component="h2">
+              {resource.name}
+            </Typography>
             {resource.primary_category && (
-              <Badge data-testid="category-badge" className="mt-1">
-                {resource.primary_category}
-              </Badge>
+              <Chip
+                label={resource.primary_category}
+                size="small"
+                data-testid="category-badge"
+                sx={{ mt: 1 }}
+              />
             )}
-          </div>
+          </Box>
 
-          <div className="text-right">
-            <div className="text-sm text-gray-600">
-              {resource.rating_average != null ? resource.rating_average.toFixed(1) : '-'}
-              {resource.rating_count ? ` (${resource.rating_count})` : ''}
-            </div>
-          </div>
-        </div>
-      </CardHeader>
+          <Box sx={{ textAlign: 'right' }}>
+            {resource.rating_average != null ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Rating value={resource.rating_average} precision={0.1} size="small" readOnly />
+                <Typography variant="body2" color="text.secondary">
+                  ({resource.rating_count || 0})
+                </Typography>
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No ratings
+              </Typography>
+            )}
+          </Box>
+        </Box>
 
-      <CardBody>
-        <p className="text-sm text-gray-700" data-testid="resource-address">
+        <Typography variant="body2" color="text.secondary" data-testid="resource-address">
           {resource.address ?? 'No address'}
-        </p>
+        </Typography>
         {distance !== null && (
-          <p className="mt-2 text-sm text-gray-500" data-testid="resource-distance">
-            {distance.toFixed(1)} mi
-          </p>
-        )}
-      </CardBody>
-
-      <CardFooter>
-        <div className="flex w-full items-center justify-between">
-          <Button
-            aria-label={`Save ${resource.name}`}
-            onClick={() => onFavorite?.(resource.id)}
-            size="sm"
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            data-testid="resource-distance"
+            sx={{ mt: 1 }}
           >
-            Save
-          </Button>
-          {resource.website ? (
-            <a
-              href={resource.website}
-              className="text-sm text-primary-600"
-              aria-label={`Visit ${resource.name} website`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Website
-            </a>
-          ) : (
-            <span className="text-sm text-gray-400">No website</span>
-          )}
-        </div>
-      </CardFooter>
+            {distance.toFixed(1)} mi
+          </Typography>
+        )}
+      </CardContent>
+
+      <CardActions>
+        <Button
+          size="small"
+          aria-label={`Save ${resource.name}`}
+          onClick={() => onFavorite?.(resource.id)}
+          variant="outlined"
+        >
+          Save
+        </Button>
+        {resource.website ? (
+          <Link
+            href={resource.website}
+            aria-label={`Visit ${resource.name} website`}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="body2"
+          >
+            Website
+          </Link>
+        ) : (
+          <Typography variant="body2" sx={{ color: '#616161' }}>
+            No website
+          </Typography>
+        )}
+      </CardActions>
     </Card>
   )
 }

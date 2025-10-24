@@ -28,6 +28,10 @@ pnpm-lock.yaml
 /playwright-report
 /test-results
 
+# screenshots
+/tmp
+/screenshots
+
 # next.js
 /.next/
 /out/
@@ -79,4 +83,7 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local documentation
+www.heroui.com/
 
