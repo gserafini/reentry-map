@@ -14,6 +14,42 @@ A framework for structured, AI-optimized project management. Key docs:
 
 **At session start**: Read PROGRESS.md to understand current state.
 
+**Before any frontend commit/demo**: Run quality checks to ensure zero errors.
+
+---
+
+## Quality Gates (CRITICAL)
+
+**Before presenting any frontend work to the user:**
+
+```bash
+npm run quality      # Quick: Lint + TypeCheck + Tests + Build
+npm run quality:full # Full: Above + E2E tests
+```
+
+**Or use slash command:** `/quality-check`
+
+**Why:** User should rarely see frontend errors. Catch them before commit:
+
+- ✅ 0 ESLint errors
+- ✅ 0 TypeScript errors
+- ✅ All unit tests pass
+- ✅ Build succeeds
+- ✅ E2E tests pass (optional, slower)
+
+**Workflow:**
+
+1. Make changes
+2. Run `npm run quality`
+3. Fix any errors
+4. Only then commit/demo
+
+**Port Management:**
+
+- **Port 3003**: User's dev server (`npm run dev`)
+- **Playwright**: Auto-manages test server (no conflicts)
+- Don't interfere with user's dev server
+
 ---
 
 ## Project Context
