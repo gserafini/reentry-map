@@ -138,7 +138,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see the app.
+Visit [http://localhost:3003](http://localhost:3003) to see the app.
 
 For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 

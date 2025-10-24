@@ -4,7 +4,7 @@ import { env } from '@/lib/env'
 import { Providers } from './providers'
 import '../styles/tailwind.css'
 
-const defaultUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const defaultUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3003'
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),

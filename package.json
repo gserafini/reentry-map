@@ -3,7 +3,7 @@
   "scripts": {
     "tailwind:build": "node node_modules/tailwindcss/lib/cli.js -i ./styles/tailwind-input.css -o ./styles/tailwind.css --minify",
     "tailwind:watch": "node node_modules/tailwindcss/lib/cli.js -i ./styles/tailwind-input.css -o ./styles/tailwind.css --watch",
-    "dev": "concurrently \"npm:tailwind:watch\" \"node node_modules/next/dist/bin/next dev --turbopack\"",
+    "dev": "concurrently \"npm:tailwind:watch\" \"node node_modules/next/dist/bin/next dev --turbopack --port 3003\"",
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",

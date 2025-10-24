@@ -783,7 +783,7 @@ ABSTRACT_API_KEY=xxx...
 CRON_SECRET=xxx...
 
 # App URL
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3003
 ```
 
 ## Security Considerations

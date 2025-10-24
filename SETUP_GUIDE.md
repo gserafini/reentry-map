@@ -63,7 +63,7 @@ Before you begin, ensure you have:
    - Under "API restrictions", select "Restrict key"
    - Check: Maps JavaScript API, Geocoding API, Places API
    - Under "Application restrictions", select "HTTP referrers"
-   - Add: `localhost:3000/*` and your production domain
+   - Add: `localhost:3003/*` and your production domain
    - Save
 
 ## Step 4: Configure OpenAI API
@@ -118,8 +118,8 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJhbGc...your-anon-key
 # OpenAI (needed for Phase 10: AI Agents)
 # OPENAI_API_KEY=sk-...your-openai-key
 
-# App URL (auto-detects localhost:3000 in development)
-# NEXT_PUBLIC_APP_URL=http://localhost:3000
+# App URL (auto-detects localhost:3003 in development)
+# NEXT_PUBLIC_APP_URL=http://localhost:3003
 ```
 
 ### Environment Variable Validation
@@ -162,7 +162,7 @@ const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe, validated
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3003](http://localhost:3003) in your browser.
 
 You should see the Reentry Map home page with the map and search interface.
 

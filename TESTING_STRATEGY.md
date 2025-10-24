@@ -158,7 +158,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3003',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -178,7 +178,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:3003',
     reuseExistingServer: !process.env.CI,
   },
 })
@@ -394,7 +394,7 @@ describe('/api/resources', () => {
 
   describe('GET', () => {
     it('returns all active resources', async () => {
-      const request = new NextRequest('http://localhost:3000/api/resources')
+      const request = new NextRequest('http://localhost:3003/api/resources')
 
       const response = await GET(request)
       const data = await response.json()
@@ -405,7 +405,7 @@ describe('/api/resources', () => {
     })
 
     it('filters by category', async () => {
-      const request = new NextRequest('http://localhost:3000/api/resources?category=employment')
+      const request = new NextRequest('http://localhost:3003/api/resources?category=employment')
 
       const response = await GET(request)
       const data = await response.json()
@@ -415,7 +415,7 @@ describe('/api/resources', () => {
     })
 
     it('handles search query', async () => {
-      const request = new NextRequest('http://localhost:3000/api/resources?search=food')
+      const request = new NextRequest('http://localhost:3003/api/resources?search=food')
 
       const response = await GET(request)
       const data = await response.json()
@@ -435,7 +435,7 @@ describe('/api/resources', () => {
         primary_category: 'employment',
       }
 
-      const request = new NextRequest('http://localhost:3000/api/resources', {
+      const request = new NextRequest('http://localhost:3003/api/resources', {
         method: 'POST',
         body: JSON.stringify(resourceData),
       })
@@ -449,7 +449,7 @@ describe('/api/resources', () => {
     })
 
     it('requires authentication', async () => {
-      const request = new NextRequest('http://localhost:3000/api/resources', {
+      const request = new NextRequest('http://localhost:3003/api/resources', {
         method: 'POST',
         body: JSON.stringify({}),
       })
@@ -460,7 +460,7 @@ describe('/api/resources', () => {
     })
 
     it('validates required fields', async () => {
-      const request = new NextRequest('http://localhost:3000/api/resources', {
+      const request = new NextRequest('http://localhost:3003/api/resources', {
         method: 'POST',
         body: JSON.stringify({ name: 'Test' }), // Missing required fields
       })
@@ -795,9 +795,9 @@ test.describe('Resource Detail Page', () => {
     "collect": {
       "startServerCommand": "npm run build && npm run start",
       "url": [
-        "http://localhost:3000",
-        "http://localhost:3000/resources",
-        "http://localhost:3000/resources/test-id"
+        "http://localhost:3003",
+        "http://localhost:3003/resources",
+        "http://localhost:3003/resources/test-id"
       ],
       "numberOfRuns": 3
     },
