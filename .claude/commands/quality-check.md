@@ -43,6 +43,7 @@ You are about to run quality checks on the Reentry Map application.
    - Report any build errors
 
 5. **E2E Tests** (optional, slower)
+
    ```bash
    npm run test:e2e
    ```

@@ -419,6 +419,24 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write component tests
 - [ ] **DEMO**: Show resource list with sample data
 
+#### 3.2.4 Integration Verification & Quality Check
+
+**CRITICAL**: Verify all components work together before proceeding
+
+- [ ] Run `npm run type-check` or `npx tsc --noEmit` - MUST pass with 0 errors
+- [ ] Run `npm run lint` - MUST pass with 0 errors
+- [ ] Run `npm run test:run` - All tests MUST pass
+- [ ] Run `npm run build` - Build MUST succeed
+- [ ] Verify all imports resolve correctly
+- [ ] Check for any unused imports or variables
+- [ ] Test actual page rendering in dev mode (`npm run dev`)
+- [ ] Verify data flows correctly: Server Component → Client Component → Display
+- [ ] Check console for runtime errors or warnings
+- [ ] Test mobile responsiveness (375px, 768px, 1024px)
+- [ ] **VERIFY**: Components integrate properly with no TS/runtime errors
+
+**If ANY check fails**: Stop and fix before proceeding to next phase
+
 ### 3.3 Resource Detail Page
 
 #### 3.3.1 Server Component
