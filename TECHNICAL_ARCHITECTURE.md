@@ -98,6 +98,243 @@
   - Pre-commit hooks run ESLint + Prettier on staged files
   - TypeScript strict mode with enhanced type safety (ts-reset)
   - Environment variable validation at build time
+- **Build Analysis**: @next/bundle-analyzer
+  - Interactive bundle size visualization
+  - Dependency analysis
+- **Commit Standards**: Commitlint
+  - Conventional Commits enforced
+  - Automated via git hooks
+
+## Testing Strategy
+
+### Unit Testing Approach
+
+**Framework**: Vitest + React Testing Library
+
+**What We Test**:
+
+- Client Components (interactive UI elements)
+- Utility functions (formatting, validation, calculations)
+- Custom React hooks
+- API route handlers (mocked external dependencies)
+
+**What We Don't Test**:
+
+- Server Components (tested via E2E instead)
+- Third-party library internals
+- Next.js framework behavior
+
+**Test File Structure**:
+
+```
+__tests__/
+├── components/
+│   ├── ThemeSwitcher.test.tsx
+│   ├── ResourceCard.test.tsx
+│   └── SearchBar.test.tsx
+├── lib/
+│   ├── utils/formatting.test.ts
+│   └── utils/validation.test.ts
+└── hooks/
+    └── useAuth.test.ts
+```
+
+**Coverage Targets**:
+
+- Lines: 70%+
+- Functions: 70%+
+- Branches: 70%+
+- Statements: 70%+
+
+**Best Practices**:
+
+- Mock external dependencies (Supabase, APIs)
+- Test user behavior, not implementation
+- Use semantic queries (getByRole, getByLabelText)
+- Test accessibility (keyboard nav, screen readers)
+
+### E2E Testing Approach
+
+**Framework**: Playwright
+
+**Browser Coverage**:
+
+- Desktop: Chromium, Firefox, WebKit
+- Mobile: Chrome (Pixel 5), Safari (iPhone 12)
+
+**What We Test**:
+
+- Critical user flows (auth, search, favorites, reviews)
+- Cross-browser compatibility
+- Mobile responsiveness
+- Server Component rendering
+- API integration (with real Supabase test DB)
+
+**Test File Structure**:
+
+```
+e2e/
+├── homepage.spec.ts          # Landing page smoke tests
+├── auth.spec.ts              # Phone auth flow
+├── search.spec.ts            # Resource search
+├── resource-detail.spec.ts   # View resource details
+├── favorites.spec.ts         # Favorite/unfavorite
+└── reviews.spec.ts           # Add/view reviews
+```
+
+**Execution Modes**:
+
+- `npm run test:e2e` - Headless (CI/CD, fast feedback)
+- `npm run test:e2e:ui` - Playwright UI (debugging, demos)
+- `npm run test:e2e:headed` - Headed mode (browser visible)
+
+**Best Practices**:
+
+- Use data-testid for stable selectors
+- Test against staging environment in CI
+- Mock external APIs (Google Maps, OpenAI)
+- Clean up test data after runs
+
+### Quality Gates
+
+**Pre-Commit** (automated via husky):
+
+- ESLint on staged files
+- Prettier on staged files
+- TypeScript type check
+- Affected unit tests
+
+**Pre-Push** (manual or CI):
+
+- All unit tests pass
+- E2E smoke tests pass
+- Build succeeds
+- No TypeScript errors
+
+**Pre-Deploy** (CI/CD):
+
+- Full test suite passes
+- Coverage meets 70% threshold
+- Bundle size within limits
+- Lighthouse score > 90
+
+**Quality Commands**:
+
+```bash
+npm run quality        # Quick: Lint + Type + Test + Build
+npm run quality:full   # Full: Above + E2E tests
+```
+
+## Code Quality Workflow
+
+### Development Workflow
+
+1. **Start Work**
+
+   ```bash
+   git checkout -b feature/my-feature
+   npm run dev
+   ```
+
+2. **Make Changes**
+   - Write code
+   - Write tests (TDD recommended)
+   - Run `npm test` (watch mode)
+
+3. **Before Commit**
+   - Pre-commit hooks auto-run:
+     - ESLint fixes staged files
+     - Prettier formats staged files
+     - Type check passes
+   - Manual: `npm run quality`
+
+4. **Commit**
+
+   ```bash
+   git add .
+   git commit -m "feat: add resource search"
+   # Commitlint validates message format
+   ```
+
+5. **Before Demo/PR**
+   - Run `npm run quality:full`
+   - Fix any failures
+   - Verify app works in browser
+
+### Git Commit Standards
+
+**Format**: `type(scope): subject`
+
+**Types**:
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation only
+- `style:` - Formatting (no logic changes)
+- `refactor:` - Code restructuring
+- `test:` - Add/update tests
+- `chore:` - Tooling, deps, config
+
+**Examples**:
+
+```bash
+feat: add phone auth with OTP
+fix: resolve map marker clustering bug
+docs: update SETUP_GUIDE with database steps
+test: add unit tests for ResourceCard
+chore: upgrade Next.js to 16.0.1
+```
+
+### Continuous Integration
+
+**GitHub Actions** (`.github/workflows/ci.yml`):
+
+**On Push/PR**:
+
+1. Install dependencies
+2. Run ESLint
+3. Run TypeScript check
+4. Run Prettier check
+5. Run unit tests with coverage
+6. Run E2E tests (headless)
+7. Build application
+8. Report results to PR
+
+**On Main Branch**:
+
+- Deploy to Vercel (auto)
+- Run full E2E suite against staging
+- Monitor bundle size
+- Update coverage reports
+
+### Environment Validation
+
+**T3 Env** (`lib/env.ts`):
+
+**Build-Time Checks**:
+
+- Required env vars must be present
+- Type-safe access to all variables
+- Client/server separation enforced
+- Invalid values cause build failure
+
+**Usage**:
+
+```typescript
+// ❌ NEVER use process.env directly
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+// ✅ ALWAYS use typed env import
+import { env } from '@/lib/env'
+const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe!
+```
+
+**Benefits**:
+
+- Catch missing env vars before deployment
+- TypeScript autocomplete for env vars
+- Prevent server secrets leaking to client
+- Clear validation errors with helpful messages
 
 ## Database Schema
 
