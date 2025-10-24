@@ -256,8 +256,37 @@ Automated quality checks run before every commit via husky + lint-staged:
 - **ESLint** - Lints modified files
 - **Prettier** - Formats modified files
 - **Type checking** - Validates TypeScript
+- **Commitlint** - Enforces conventional commit messages
 
 To bypass hooks (NOT recommended): `git commit --no-verify`
+
+### Conventional Commits
+
+All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+**Format:** `type(scope): subject`
+
+**Types:**
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code formatting (no logic changes)
+- `refactor:` - Code refactoring
+- `perf:` - Performance improvements
+- `test:` - Adding/updating tests
+- `build:` - Build system or dependencies
+- `ci:` - CI/CD configuration
+- `chore:` - Other changes
+
+**Examples:**
+
+```bash
+feat: add user authentication with Supabase
+fix: resolve map marker clustering issue
+docs: update SETUP_GUIDE with database instructions
+test: add unit tests for ResourceCard component
+```
 
 ### Enhanced TypeScript
 
@@ -298,6 +327,44 @@ Coverage thresholds enforced in `vitest.config.mts`:
 - Functions: 70%
 - Branches: 70%
 - Statements: 70%
+
+### Bundle Size Monitoring
+
+Monitor and analyze bundle size to maintain performance:
+
+```bash
+npm run build:analyze  # Build with bundle analyzer
+```
+
+Opens interactive visualization showing:
+
+- Bundle size by route
+- Largest dependencies
+- Code splitting effectiveness
+- Opportunities for optimization
+
+**Best Practices:**
+
+- Run before major PRs
+- Keep total bundle < 200KB (gzipped)
+- Use dynamic imports for large components
+- Check after adding new dependencies
+
+### CI/CD Pipeline
+
+**GitHub Actions** automatically runs on every push and PR:
+
+1. **Lint & Type Check** - ESLint, TypeScript, Prettier
+2. **Unit Tests** - Vitest with coverage reporting
+3. **E2E Tests** - Playwright across all browsers
+4. **Build** - Verifies production build succeeds
+
+All checks must pass before merging to main.
+
+**Required Secrets** (configure in GitHub repo settings):
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 ## Key Implementation Guidelines
 
@@ -448,6 +515,7 @@ npm run format:check         # Check if files need formatting
 
 # Building
 npm run build                # Production build
+npm run build:analyze        # Build with bundle size analysis
 
 # Database
 # Run migrations in Supabase SQL Editor in order:

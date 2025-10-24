@@ -232,7 +232,7 @@ Use Tailwind CSS 4.0 as the primary styling framework.
 ## ADR-005: HeroUI for Component Library
 
 **Date**: 2025-10-23
-**Status**: Accepted
+**Status**: ✅ Accepted (User confirmed 2025-10-23)
 **Deciders**: Gabriel Serafini, Claude Code
 **Tags**: ui, components, accessibility
 

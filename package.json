@@ -5,6 +5,7 @@
     "tailwind:watch": "node node_modules/tailwindcss/lib/cli.js -i ./styles/tailwind-input.css -o ./styles/tailwind.css --watch",
     "dev": "concurrently \"npm:tailwind:watch\" \"node node_modules/next/dist/bin/next dev --turbopack\"",
     "build": "next build",
+    "build:analyze": "ANALYZE=true next build",
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -40,7 +41,10 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@eslint/eslintrc": "^3",
+    "@next/bundle-analyzer": "^16.0.0",
     "@playwright/test": "^1.56.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
