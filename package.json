@@ -17,6 +17,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "quality": "npm run lint && npx tsc --noEmit && npm run test:run && npm run build",
+    "quality:full": "npm run quality && npm run test:e2e",
     "prepare": "husky"
   },
   "dependencies": {
