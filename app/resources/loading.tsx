@@ -1,24 +1,30 @@
+import { Container, Box, Skeleton, Grid, Card, CardContent } from '@mui/material'
+
 /**
  * Loading state for Resources page
  * Displayed while the server component is fetching data
  */
 export default function ResourcesLoading() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <div className="mb-2 h-8 w-64 animate-pulse rounded bg-gray-200"></div>
-        <div className="h-4 w-96 animate-pulse rounded bg-gray-200"></div>
-      </div>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Skeleton variant="text" width={300} height={48} sx={{ mb: 1 }} />
+        <Skeleton variant="text" width={500} height={24} />
+      </Box>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Grid container spacing={3}>
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="animate-pulse rounded-lg border border-gray-200 p-6">
-            <div className="mb-2 h-6 w-3/4 rounded bg-gray-200"></div>
-            <div className="mb-4 h-4 w-1/2 rounded bg-gray-200"></div>
-            <div className="h-4 w-full rounded bg-gray-200"></div>
-          </div>
+          <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
+            <Card>
+              <CardContent>
+                <Skeleton variant="text" width="75%" height={32} sx={{ mb: 1 }} />
+                <Skeleton variant="text" width="50%" height={24} sx={{ mb: 2 }} />
+                <Skeleton variant="text" width="100%" height={20} />
+              </CardContent>
+            </Card>
+          </Grid>
         ))}
-      </div>
-    </div>
+      </Grid>
+    </Container>
   )
 }

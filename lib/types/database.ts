@@ -352,6 +352,7 @@ export type Database = {
           appointment_required: boolean | null
           categories: string[] | null
           city: string | null
+          county: string | null
           created_at: string | null
           data_completeness_score: number | null
           description: string | null
@@ -372,6 +373,7 @@ export type Database = {
           rating_count: number | null
           review_count: number | null
           services_offered: string[] | null
+          slug: string | null
           state: string | null
           status: string | null
           status_reason: string | null
@@ -395,6 +397,7 @@ export type Database = {
           appointment_required?: boolean | null
           categories?: string[] | null
           city?: string | null
+          county?: string | null
           created_at?: string | null
           data_completeness_score?: number | null
           description?: string | null
@@ -415,6 +418,7 @@ export type Database = {
           rating_count?: number | null
           review_count?: number | null
           services_offered?: string[] | null
+          slug?: string | null
           state?: string | null
           status?: string | null
           status_reason?: string | null
@@ -438,6 +442,7 @@ export type Database = {
           appointment_required?: boolean | null
           categories?: string[] | null
           city?: string | null
+          county?: string | null
           created_at?: string | null
           data_completeness_score?: number | null
           description?: string | null
@@ -458,6 +463,7 @@ export type Database = {
           rating_count?: number | null
           review_count?: number | null
           services_offered?: string[] | null
+          slug?: string | null
           state?: string | null
           status?: string | null
           status_reason?: string | null

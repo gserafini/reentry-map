@@ -24,6 +24,9 @@ export type ResourceCardResource = {
   latitude?: number | null
   longitude?: number | null
   website?: string | null
+  slug?: string | null
+  state?: string | null
+  county?: string | null
 }
 
 interface ResourceCardProps {
@@ -51,6 +54,12 @@ export function ResourceCard({ resource, onFavorite, userLocation }: ResourceCar
     resource.latitude != null && resource.longitude != null && userLocation
       ? haversineDistance({ lat: resource.latitude, lng: resource.longitude }, userLocation)
       : null
+
+  // Generate SEO-friendly URL if slug/state/county available, otherwise use UUID
+  const resourceUrl =
+    resource.slug && resource.state && resource.county
+      ? `/resources/${resource.state}/${resource.county}/${resource.slug}`
+      : `/resources/${resource.id}`
 
   return (
     <Card data-testid="resource-card">
@@ -103,30 +112,44 @@ export function ResourceCard({ resource, onFavorite, userLocation }: ResourceCar
         )}
       </CardContent>
 
-      <CardActions>
+      <CardActions sx={{ justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            size="small"
+            aria-label={`Save ${resource.name}`}
+            onClick={() => onFavorite?.(resource.id)}
+            variant="outlined"
+          >
+            Save
+          </Button>
+          {resource.website ? (
+            <Link
+              href={resource.website}
+              aria-label={`Visit ${resource.name} website`}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="body2"
+              sx={{ display: 'flex', alignItems: 'center' }}
+            >
+              Website
+            </Link>
+          ) : (
+            <Typography
+              variant="body2"
+              sx={{ color: '#616161', display: 'flex', alignItems: 'center' }}
+            >
+              No website
+            </Typography>
+          )}
+        </Box>
         <Button
           size="small"
-          aria-label={`Save ${resource.name}`}
-          onClick={() => onFavorite?.(resource.id)}
-          variant="outlined"
+          href={resourceUrl}
+          variant="contained"
+          aria-label={`View details for ${resource.name}`}
         >
-          Save
+          Details
         </Button>
-        {resource.website ? (
-          <Link
-            href={resource.website}
-            aria-label={`Visit ${resource.name} website`}
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="body2"
-          >
-            Website
-          </Link>
-        ) : (
-          <Typography variant="body2" sx={{ color: '#616161' }}>
-            No website
-          </Typography>
-        )}
       </CardActions>
     </Card>
   )

@@ -1,3 +1,4 @@
+import { Container, Typography, Box, Alert } from '@mui/material'
 import { getResources } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
 
@@ -10,33 +11,37 @@ export default async function ResourcesPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <h2 className="mb-2 text-xl font-semibold text-red-800">Error Loading Resources</h2>
-          <p className="text-red-700">
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Error Loading Resources
+          </Typography>
+          <Typography>
             We encountered an issue loading resources. Please try again later.
-          </p>
-        </div>
-      </div>
+          </Typography>
+        </Alert>
+      </Container>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Community Resources</h1>
-        <p className="mt-2 text-gray-600">
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Community Resources
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
           Browse resources in your area to help with employment, housing, food, and more.
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {resources && resources.length > 0 && (
-        <div className="mb-4 text-sm text-gray-500">
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-        </div>
+        </Typography>
       )}
 
       <ResourceList resources={resources || []} />
-    </div>
+    </Container>
   )
 }

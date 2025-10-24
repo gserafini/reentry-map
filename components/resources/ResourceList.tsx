@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { Grid, Typography, Box } from '@mui/material'
 import ResourceCard, { type ResourceCardResource } from '@/components/resources/ResourceCard'
 
 interface ResourceListProps {
@@ -13,17 +14,14 @@ interface ResourceListProps {
 export function ResourceList({ resources, onFavorite, userLocation }: ResourceListProps) {
   if (!resources || resources.length === 0) {
     return (
-      <div role="status" aria-live="polite" className="p-6 text-center text-gray-600">
-        No resources found
-      </div>
+      <Box role="status" aria-live="polite" sx={{ py: 6, textAlign: 'center' }}>
+        <Typography color="text.secondary">No resources found</Typography>
+      </Box>
     )
   }
 
   return (
-    <div
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-      data-testid="resource-list"
-    >
+    <Grid container spacing={3} data-testid="resource-list">
       {resources.map((r) => {
         // ensure name exists for key and props
         const key = r.id ?? r.name ?? Math.random().toString(36).slice(2, 9)
@@ -38,18 +36,22 @@ export function ResourceList({ resources, onFavorite, userLocation }: ResourceLi
           rating_average: r.rating_average ?? null,
           rating_count: r.rating_count ?? null,
           website: r.website ?? null,
+          slug: r.slug ?? null,
+          state: r.state ?? null,
+          county: r.county ?? null,
         }
 
         return (
-          <ResourceCard
-            key={String(key)}
-            resource={resourceObj}
-            onFavorite={onFavorite}
-            userLocation={userLocation}
-          />
+          <Grid key={String(key)} size={{ xs: 12, sm: 6, md: 4 }}>
+            <ResourceCard
+              resource={resourceObj}
+              onFavorite={onFavorite}
+              userLocation={userLocation}
+            />
+          </Grid>
         )
       })}
-    </div>
+    </Grid>
   )
 }
 
