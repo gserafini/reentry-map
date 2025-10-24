@@ -35,6 +35,9 @@ A framework for structured, AI-optimized project management. Key docs:
 - **PWA**: @ducanh2912/next-pwa
 - **Forms**: react-hook-form + zod
 - **Hosting**: Vercel with Supabase Cloud
+- **Testing**: Vitest (unit), Playwright (E2E), @vitest/coverage-v8
+- **Code Quality**: Prettier, ESLint, husky, lint-staged, @total-typescript/ts-reset
+- **Environment**: @t3-oss/env-nextjs (type-safe env vars)
 
 ## Initial Setup
 
@@ -241,6 +244,60 @@ const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe, validated
 2. Add to runtimeEnv mapping
 3. Add to `.env.example` with documentation
 4. Update `SETUP_GUIDE.md` if it's required
+
+## Code Quality Infrastructure
+
+This project has enterprise-grade quality tools configured in Phase 0:
+
+### Pre-commit Hooks
+
+Automated quality checks run before every commit via husky + lint-staged:
+
+- **ESLint** - Lints modified files
+- **Prettier** - Formats modified files
+- **Type checking** - Validates TypeScript
+
+To bypass hooks (NOT recommended): `git commit --no-verify`
+
+### Enhanced TypeScript
+
+We use [@total-typescript/ts-reset](https://github.com/total-typescript/ts-reset) for improved type safety:
+
+- Better `.json()` inference
+- Improved array methods (`.filter(Boolean)`, `.includes()`)
+- Fixed `fetch` response types
+- Better `Promise.all()` typing
+
+Import automatically included in all TypeScript files via `reset.d.ts`.
+
+### Code Formatting
+
+**Prettier** enforces consistent formatting:
+
+```bash
+npm run format        # Format all files
+npm run format:check  # Check if files need formatting
+```
+
+Configuration in `.prettierrc` includes:
+
+- Tailwind CSS class sorting via `prettier-plugin-tailwindcss`
+- Semi-colons, single quotes, 2-space indentation
+
+### Test Coverage
+
+Target **70%+ coverage** for all production code:
+
+```bash
+npm run test:coverage  # Generate coverage report
+```
+
+Coverage thresholds enforced in `vitest.config.mts`:
+
+- Lines: 70%
+- Functions: 70%
+- Branches: 70%
+- Statements: 70%
 
 ## Key Implementation Guidelines
 
