@@ -1,0 +1,19 @@
+{
+  "default": true,
+  "MD013": false,
+  "MD019": false,
+  "MD022": false,
+  "MD024": false,
+  "MD031": false,
+  "MD032": false,
+  "MD036": false,
+  "line-length": false,
+  "no-multiple-space-atx": false,
+  "blanks-around-headings": false,
+  "no-duplicate-heading": {
+    "siblings_only": true
+  },
+  "blanks-around-fences": false,
+  "blanks-around-lists": false,
+  "no-emphasis-as-heading": false
+}
