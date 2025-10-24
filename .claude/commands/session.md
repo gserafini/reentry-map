@@ -1,10 +1,10 @@
 ---
-description: Show current session status including time and token usage
+description: Show current session metrics (time, tokens, progress)
 ---
 
 Please provide a concise session status update:
 
-**Session Information:**
+**Session Metrics:**
 
 - Current date/time
 - Estimated session duration so far (based on context)
