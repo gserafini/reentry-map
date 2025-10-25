@@ -26,7 +26,15 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
       sx={{ bgcolor: theme.colors.brand, color: theme.colors.brandText }}
     >
       {/* First row: Logo, Navigation, Auth */}
-      <Container maxWidth="lg">
+      <Container
+        maxWidth="lg"
+        sx={{
+          borderBottom: {
+            xs: showSearch ? 'none' : '1px solid rgba(0,0,0,0.12)',
+            md: '1px solid rgba(0,0,0,0.12)',
+          },
+        }}
+      >
         <Toolbar
           disableGutters
           sx={{
@@ -118,7 +126,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
           sx={{
             display: { xs: 'block', md: 'none' },
             bgcolor: '#f5f5f5', // Light grey background
-            borderTop: '1px solid rgba(0,0,0,0.08)',
+            borderBottom: '1px solid rgba(0,0,0,0.06)', // Fainter bottom border
           }}
         >
           <Container maxWidth="lg" sx={{ py: 2 }}>
