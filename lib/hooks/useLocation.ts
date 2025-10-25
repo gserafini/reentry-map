@@ -8,14 +8,19 @@ export interface UseLocationResult {
   error: GeolocationError | null
   loading: boolean
   requestLocation: () => void
+  setManualLocation: (coords: Coordinates, displayName: string) => void
   clearLocation: () => void
   isSupported: boolean
   lastUpdated: number | null // Unix timestamp of last location update
+  displayName: string | null // "Current Location", "Oakland, CA", "94601", etc.
+  source: 'geolocation' | 'manual' | null // How we got the location
 }
 
 interface CachedLocation {
   coordinates: Coordinates
   timestamp: number
+  displayName: string
+  source: 'geolocation' | 'manual'
 }
 
 const LOCATION_CACHE_KEY = 'userLocation'
@@ -58,13 +63,19 @@ function loadFromCache(): CachedLocation | null {
 /**
  * Save location to localStorage cache
  */
-function saveToCache(coordinates: Coordinates): void {
+function saveToCache(
+  coordinates: Coordinates,
+  displayName: string,
+  source: 'geolocation' | 'manual'
+): void {
   if (typeof window === 'undefined') return
 
   try {
     const cached: CachedLocation = {
       coordinates,
       timestamp: Date.now(),
+      displayName,
+      source,
     }
     localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cached))
   } catch {
@@ -102,6 +113,8 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
   const [error, setError] = useState<GeolocationError | null>(null)
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+  const [source, setSource] = useState<'geolocation' | 'manual' | null>(null)
 
   // Check if geolocation is supported by the browser
   const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator
@@ -115,12 +128,14 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
       longitude: position.coords.longitude,
     }
     setCoordinates(coords)
+    setDisplayName('Current Location')
+    setSource('geolocation')
     setError(null)
     setLoading(false)
     setLastUpdated(Date.now())
 
     // Cache the location
-    saveToCache(coords)
+    saveToCache(coords, 'Current Location', 'geolocation')
   }, [])
 
   /**
@@ -166,10 +181,27 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
   }, [isSupported, handleSuccess, handleError])
 
   /**
+   * Set manual location (from address/zip lookup)
+   */
+  const setManualLocation = useCallback((coords: Coordinates, name: string) => {
+    setCoordinates(coords)
+    setDisplayName(name)
+    setSource('manual')
+    setError(null)
+    setLoading(false)
+    setLastUpdated(Date.now())
+
+    // Cache the manual location
+    saveToCache(coords, name, 'manual')
+  }, [])
+
+  /**
    * Clear current location and error state
    */
   const clearLocation = useCallback(() => {
     setCoordinates(null)
+    setDisplayName(null)
+    setSource(null)
     setError(null)
     setLoading(false)
     setLastUpdated(null)
@@ -187,6 +219,8 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     const cached = loadFromCache()
     if (cached) {
       setCoordinates(cached.coordinates)
+      setDisplayName(cached.displayName)
+      setSource(cached.source)
       setLastUpdated(cached.timestamp)
     }
   }, [])
@@ -229,9 +263,12 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     error,
     loading,
     requestLocation,
+    setManualLocation,
     clearLocation,
     isSupported,
     lastUpdated,
+    displayName,
+    source,
   }
 }
 

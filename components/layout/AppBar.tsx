@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { theme } from '@/lib/theme'
 import { SearchBar } from '@/components/search/SearchBar'
+import { LocationInput } from '@/components/search/LocationInput'
 
 interface AppBarProps {
   authButton?: React.ReactNode
@@ -71,17 +72,38 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </Link>
           </Box>
 
-          {/* Search bar (desktop) */}
+          {/* Dual search (desktop) - Yelp style: What + Where */}
           {showSearch && (
-            <Box sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1, maxWidth: 400, mx: 2 }}>
-              <SearchBar
-                onSubmit={handleSearch}
-                inputSx={{
-                  bgcolor: 'rgba(255, 255, 255, 0.15)',
-                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
-                  '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
-                }}
-              />
+            <Box
+              sx={{
+                display: { xs: 'none', md: 'flex' },
+                flexGrow: 1,
+                maxWidth: 600,
+                mx: 2,
+                gap: 1,
+              }}
+            >
+              <Box sx={{ flex: '1 1 60%' }}>
+                <SearchBar
+                  onSubmit={handleSearch}
+                  placeholder="What are you looking for?"
+                  inputSx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
+                    '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
+                  }}
+                />
+              </Box>
+              <Box sx={{ flex: '1 1 40%' }}>
+                <LocationInput
+                  onLocationChange={() => {
+                    // Re-trigger search when location changes
+                    // This will update distance sorting if user is on search page
+                  }}
+                  size="small"
+                  fullWidth
+                />
+              </Box>
             </Box>
           )}
 
@@ -100,22 +122,32 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
           </Box>
         </Toolbar>
 
-        {/* Mobile search bar (second row on mobile) */}
+        {/* Mobile dual search (second row on mobile) */}
         {showSearch && (
           <Box
             sx={{
-              display: { xs: 'block', md: 'none' },
+              display: { xs: 'flex', md: 'none' },
+              flexDirection: 'column',
+              gap: 1,
               pb: 1.5,
               pt: 0.5,
             }}
           >
             <SearchBar
               onSubmit={handleSearch}
+              placeholder="What are you looking for?"
               inputSx={{
                 bgcolor: 'rgba(255, 255, 255, 0.15)',
                 '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
                 '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
               }}
+            />
+            <LocationInput
+              onLocationChange={() => {
+                // Re-trigger search when location changes
+              }}
+              size="small"
+              fullWidth
             />
           </Box>
         )}
