@@ -38,5 +38,8 @@ test-results/
 # Git
 .git/
 
+# Git submodules
+.agent-success-pack/
+
 # Downloaded documentation
 www.heroui.com/
