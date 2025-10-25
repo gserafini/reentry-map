@@ -24,9 +24,7 @@ export function LocationInput({
 }: LocationInputProps) {
   const { displayName, requestLocation, setManualLocation, loading } = useUserLocation()
   const [inputValue, setInputValue] = useState('')
-  const [autocompleteService, setAutocompleteService] =
-    useState<google.maps.places.AutocompleteService | null>(null)
-  const [placesService, setPlacesService] = useState<google.maps.places.PlacesService | null>(null)
+  const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -40,10 +38,7 @@ export function LocationInput({
     }
 
     // Check if already loaded
-    if (window.google?.maps?.places) {
-      setAutocompleteService(new google.maps.places.AutocompleteService())
-      const dummyDiv = document.createElement('div')
-      setPlacesService(new google.maps.places.PlacesService(dummyDiv))
+    if (placesLibrary) {
       return
     }
 
@@ -51,13 +46,8 @@ export function LocationInput({
     setOptions({ key: apiKey, v: 'weekly' })
 
     importLibrary('places')
-      .then(() => {
-        if (window.google?.maps?.places) {
-          setAutocompleteService(new google.maps.places.AutocompleteService())
-          // Create a dummy div for PlacesService (it needs a map or div)
-          const dummyDiv = document.createElement('div')
-          setPlacesService(new google.maps.places.PlacesService(dummyDiv))
-        }
+      .then((lib) => {
+        setPlacesLibrary(lib as google.maps.PlacesLibrary)
       })
       .catch((err: Error) => {
         console.error('Error loading Google Maps:', err)
@@ -72,7 +62,7 @@ export function LocationInput({
   }, [displayName])
 
   // Handle input change and fetch predictions
-  const handleInputChange = (value: string) => {
+  const handleInputChange = async (value: string) => {
     setInputValue(value)
 
     if (!value.trim()) {
@@ -83,21 +73,22 @@ export function LocationInput({
 
     setShowDropdown(true)
 
-    if (autocompleteService) {
-      autocompleteService.getPlacePredictions(
-        {
+    if (placesLibrary) {
+      try {
+        const { AutocompleteService } = placesLibrary
+        const service = new AutocompleteService()
+
+        const request = {
           input: value,
-          types: ['geocode'], // Cities, addresses, postal codes
           componentRestrictions: { country: 'us' }, // US only for now
-        },
-        (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-            setPredictions(results)
-          } else {
-            setPredictions([])
-          }
         }
-      )
+
+        const response = await service.getPlacePredictions(request)
+        setPredictions(response.predictions || [])
+      } catch (err) {
+        console.error('Autocomplete error:', err)
+        setPredictions([])
+      }
     }
   }
 
@@ -109,30 +100,31 @@ export function LocationInput({
   }
 
   // Handle place selection from autocomplete
-  const handlePlaceSelect = (placeId: string, description: string) => {
-    if (!placesService) return
+  const handlePlaceSelect = async (placeId: string, description: string) => {
+    if (!placesLibrary) return
 
-    placesService.getDetails(
-      {
-        placeId,
-        fields: ['geometry', 'name', 'formatted_address'],
-      },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          const coords = {
-            latitude: place.geometry.location.lat(),
-            longitude: place.geometry.location.lng(),
-          }
+    try {
+      const { Place } = placesLibrary
 
-          // Use description as display name (e.g., "Oakland, CA" or "94601")
-          setManualLocation(coords, description)
-          setInputValue(description)
-          setShowDropdown(false)
-          setPredictions([])
-          onLocationChange?.()
+      const place = new Place({ id: placeId })
+      await place.fetchFields({ fields: ['location'] })
+
+      if (place.location) {
+        const coords = {
+          latitude: place.location.lat(),
+          longitude: place.location.lng(),
         }
+
+        // Use description as display name (e.g., "Oakland, CA" or "94601")
+        setManualLocation(coords, description)
+        setInputValue(description)
+        setShowDropdown(false)
+        setPredictions([])
+        onLocationChange?.()
       }
-    )
+    } catch (err) {
+      console.error('Error fetching place details:', err)
+    }
   }
 
   return (
