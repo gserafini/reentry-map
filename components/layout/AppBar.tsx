@@ -72,7 +72,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </Link>
           </Box>
 
-          {/* Dual search (desktop) - Yelp style: What + Where */}
+          {/* Dual search (desktop): What + Where */}
           {showSearch && (
             <Box
               sx={{
@@ -80,17 +80,25 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
                 flexGrow: 1,
                 maxWidth: 600,
                 mx: 2,
-                gap: 1,
+                bgcolor: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '24px',
+                overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                },
               }}
             >
-              <Box sx={{ flex: '1 1 60%' }}>
+              <Box sx={{ flex: '1 1 60%', borderRight: '1px solid rgba(0,0,0,0.1)' }}>
                 <SearchBar
                   onSubmit={handleSearch}
                   placeholder="What are you looking for?"
+                  size="small"
                   inputSx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.15)',
-                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
-                    '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
+                    bgcolor: 'transparent',
+                    '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
                   }}
                 />
               </Box>

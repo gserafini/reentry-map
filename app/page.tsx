@@ -86,7 +86,7 @@ export default async function HomePage() {
       {/* Categories Section */}
       <Container maxWidth="lg" sx={{ py: 6 }}>
         <Typography variant="h4" component="h2" gutterBottom sx={{ mb: 4, fontWeight: 600 }}>
-          Browse by Category
+          I&apos;m looking for...
         </Typography>
         <Grid container spacing={3}>
           {categories.map((category) => {

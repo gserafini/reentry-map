@@ -4,10 +4,11 @@ import { useState, FormEvent } from 'react'
 import { TextField, Button, Box } from '@mui/material'
 import { Search as SearchIcon } from '@mui/icons-material'
 import { useRouter } from 'next/navigation'
+import { LocationInput } from './LocationInput'
 
 /**
  * Hero section search component
- * Allows users to search for resources from the homepage
+ * Dual search: What + Where
  */
 export function HeroSearch() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -30,38 +31,53 @@ export function HeroSearch() {
 
   return (
     <Box
+      id="hero-search"
       component="form"
       onSubmit={handleSubmit}
       sx={{
         display: 'flex',
         gap: 0.5,
-        maxWidth: 600,
+        maxWidth: 700,
         mx: 'auto',
         bgcolor: 'background.paper',
         p: '6px',
-        borderRadius: 2,
-        boxShadow: 1,
+        borderRadius: '24px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        '&:hover': {
+          boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
+        },
       }}
     >
-      <TextField
-        fullWidth
-        placeholder="Search for resources..."
-        variant="outlined"
-        size="small"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            bgcolor: 'background.paper',
-            '& fieldset': {
-              border: 'none',
+      {/* What search */}
+      <Box sx={{ flex: '1 1 50%', borderRight: '1px solid rgba(0,0,0,0.1)' }}>
+        <TextField
+          fullWidth
+          placeholder="What are you looking for?"
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              bgcolor: 'transparent',
+              '& fieldset': {
+                border: 'none',
+              },
+              '& input': {
+                py: 1.25,
+                px: 2,
+              },
             },
-            '& input': {
-              py: 1.25,
-            },
-          },
-        }}
-      />
+          }}
+        />
+      </Box>
+
+      {/* Where search */}
+      <Box sx={{ flex: '1 1 30%' }}>
+        <LocationInput size="small" fullWidth />
+      </Box>
+
+      {/* Search button */}
       <Button
         type="submit"
         variant="contained"
@@ -75,6 +91,7 @@ export function HeroSearch() {
           textTransform: 'uppercase',
           fontWeight: 600,
           fontSize: '0.875rem',
+          borderRadius: '18px',
         }}
       >
         Search

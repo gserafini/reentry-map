@@ -15,7 +15,7 @@ interface LocationInputProps {
 
 /**
  * LocationInput with "Current Location" option and Google Places Autocomplete
- * Yelp-style location picker for header search
+ * Dropdown location picker for header search
  */
 export function LocationInput({
   onLocationChange,
@@ -142,9 +142,8 @@ export function LocationInput({
         value={inputValue}
         onChange={(e) => handleInputChange(e.target.value)}
         onFocus={() => {
-          if (predictions.length > 0 || inputValue.trim()) {
-            setShowDropdown(true)
-          }
+          // Always show dropdown on focus (with Current Location option)
+          setShowDropdown(true)
         }}
         onBlur={() => {
           // Delay hiding dropdown to allow clicking on items
@@ -158,7 +157,16 @@ export function LocationInput({
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
-            backgroundColor: 'background.paper',
+            backgroundColor: 'transparent',
+          },
+          '& .MuiOutlinedInput-notchedOutline': {
+            border: 'none',
+          },
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            border: 'none',
+          },
+          '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
+            border: 'none',
           },
         }}
       />
