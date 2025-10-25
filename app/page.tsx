@@ -1,14 +1,4 @@
-import {
-  Container,
-  Box,
-  Typography,
-  Button,
-  Card,
-  CardContent,
-  CardActions,
-  Chip,
-  Grid,
-} from '@mui/material'
+import { Container, Box, Typography, Button, Card, CardContent, Chip, Grid } from '@mui/material'
 import {
   Work as WorkIcon,
   Home as HomeIcon,
@@ -22,6 +12,7 @@ import {
 import Link from 'next/link'
 import { getResources, getResourceCount } from '@/lib/api/resources'
 import { HeroSearch } from '@/components/search/HeroSearch'
+import { FeaturedResourcesList } from '@/components/resources/FeaturedResourcesList'
 
 // Force dynamic rendering since we fetch data with Supabase server client
 export const dynamic = 'force-dynamic'
@@ -162,43 +153,7 @@ export default async function HomePage() {
                 <Button variant="outlined">View All</Button>
               </Link>
             </Box>
-            <Grid container spacing={3}>
-              {featuredResources.map((resource) => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={resource.id}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6" component="div" gutterBottom>
-                        {resource.name}
-                      </Typography>
-                      {resource.primary_category && (
-                        <Chip label={resource.primary_category} size="small" sx={{ mb: 1 }} />
-                      )}
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        {resource.address}
-                      </Typography>
-                      {resource.description && (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {resource.description}
-                        </Typography>
-                      )}
-                    </CardContent>
-                    <CardActions>
-                      <Link href={`/resources/${resource.id}`} style={{ textDecoration: 'none' }}>
-                        <Button size="small">Learn More</Button>
-                      </Link>
-                    </CardActions>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
+            <FeaturedResourcesList resources={featuredResources} />
           </Container>
         </Box>
       )}
