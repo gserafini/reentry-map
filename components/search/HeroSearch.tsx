@@ -85,7 +85,7 @@ export function HeroSearch() {
         size="small"
         startIcon={<SearchIcon />}
         sx={{
-          px: 2.5,
+          px: { xs: 1.5, md: 2.5 },
           py: 1.25,
           minWidth: 'auto',
           whiteSpace: 'nowrap',
@@ -93,9 +93,16 @@ export function HeroSearch() {
           fontWeight: 600,
           fontSize: '0.875rem',
           borderRadius: '18px',
+          // Hide text on mobile, show icon only
+          '& .MuiButton-startIcon': {
+            marginRight: { xs: 0, md: 1 },
+            marginLeft: { xs: 0, md: -0.25 },
+          },
         }}
       >
-        Search
+        <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
+          Search
+        </Box>
       </Button>
     </Box>
   )
