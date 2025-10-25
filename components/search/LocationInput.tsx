@@ -22,6 +22,9 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   const [inputValue, setInputValue] = useState('')
   const [hoverText, setHoverText] = useState('')
   const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
+  const [geocodingLibrary, setGeocodingLibrary] = useState<google.maps.GeocodingLibrary | null>(
+    null
+  )
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false)
@@ -36,16 +39,18 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     }
 
     // Check if already loaded
-    if (placesLibrary) {
+    if (placesLibrary && geocodingLibrary) {
       return
     }
 
     // Use new functional API - must set options before importing library
     setOptions({ key: apiKey, v: 'weekly' })
 
-    importLibrary('places')
-      .then((lib) => {
-        setPlacesLibrary(lib as google.maps.PlacesLibrary)
+    // Load both places and geocoding libraries
+    Promise.all([importLibrary('places'), importLibrary('geocoding')])
+      .then(([placesLib, geocodingLib]) => {
+        setPlacesLibrary(placesLib as google.maps.PlacesLibrary)
+        setGeocodingLibrary(geocodingLib as google.maps.GeocodingLibrary)
       })
       .catch((err: Error) => {
         console.error('Error loading Google Maps:', err)
@@ -62,7 +67,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
   // Reverse geocode when we get geolocation coordinates
   useEffect(() => {
-    if (!coordinates || source !== 'geolocation' || !placesLibrary || isReverseGeocoding) {
+    if (!coordinates || source !== 'geolocation' || !geocodingLibrary || isReverseGeocoding) {
       return
     }
 
@@ -71,7 +76,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
       setInputValue('Getting location...')
 
       try {
-        const { Geocoder } = placesLibrary
+        const { Geocoder } = geocodingLibrary
         const geocoder = new Geocoder()
 
         const result = await geocoder.geocode({
@@ -117,7 +122,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     }
 
     reverseGeocode()
-  }, [coordinates, source, placesLibrary, isReverseGeocoding, setManualLocation])
+  }, [coordinates, source, geocodingLibrary, isReverseGeocoding, setManualLocation])
 
   // Handle input change and fetch predictions
   const handleInputChange = async (value: string) => {
