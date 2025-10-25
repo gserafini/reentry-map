@@ -152,7 +152,7 @@ export default async function HomePage() {
             return (
               <Grid size={{ xs: 6, sm: 4, md: 3 }} key={category.slug}>
                 <Link
-                  href={`/resources/category/${category.slug}`}
+                  href={`/resources?categories=${category.slug}`}
                   style={{ textDecoration: 'none', height: '100%', display: 'block' }}
                 >
                   <Card
