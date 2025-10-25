@@ -6,6 +6,7 @@ import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/re
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { Pagination } from '@/components/search/Pagination'
+import { SortDropdown, parseSortParam } from '@/components/search/SortDropdown'
 import { getCategoryLabel, getAllCategories } from '@/lib/utils/categories'
 import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import type { ResourceCategory } from '@/lib/types/database'
@@ -17,6 +18,7 @@ interface CategoryPageProps {
   searchParams: Promise<{
     search?: string
     page?: string
+    sort?: string
   }>
 }
 
@@ -28,9 +30,10 @@ const PAGE_SIZE = 20
  */
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { category } = await params
-  const { search, page } = await searchParams
+  const { search, page, sort: sortParam } = await searchParams
   const currentPage = Number(page) || 1
   const offset = (currentPage - 1) * PAGE_SIZE
+  const sort = parseSortParam(sortParam)
 
   // Validate category
   const validCategories = getAllCategories()
@@ -46,6 +49,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     categories: [typedCategory],
     limit: PAGE_SIZE,
     offset,
+    sort,
   })
 
   // Get total count for pagination
@@ -103,6 +107,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
+          {/* Sort dropdown */}
+          {hasResults && (
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+              <SortDropdown />
+            </Box>
+          )}
+
           {/* No results state */}
           {!hasResults && (
             <Alert

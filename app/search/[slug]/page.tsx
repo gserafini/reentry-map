@@ -5,6 +5,7 @@ import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/re
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { Pagination } from '@/components/search/Pagination'
+import { SortDropdown, parseSortParam } from '@/components/search/SortDropdown'
 import { parseSeoUrl, getCategoryPhrase, generateSeoIntro } from '@/lib/utils/seo-routes'
 import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import type { Metadata } from 'next'
@@ -15,6 +16,7 @@ interface HyperlocalSearchPageProps {
   }>
   searchParams: Promise<{
     page?: string
+    sort?: string
   }>
 }
 
@@ -36,6 +38,7 @@ export default async function HyperlocalSearchPage({
   const searchParamsData = await searchParams
   const currentPage = Number(searchParamsData.page) || 1
   const offset = (currentPage - 1) * PAGE_SIZE
+  const sort = parseSortParam(searchParamsData.sort)
 
   // Parse the SEO-friendly URL
   const parsed = parseSeoUrl(slug)
@@ -50,6 +53,7 @@ export default async function HyperlocalSearchPage({
     categories: [category],
     limit: PAGE_SIZE,
     offset,
+    sort,
     // TODO: Add location filtering when we implement geospatial search
     // For now, we'll show all resources in the category
   })
@@ -116,6 +120,13 @@ export default async function HyperlocalSearchPage({
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
+          {/* Sort dropdown */}
+          {hasResults && (
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+              <SortDropdown />
+            </Box>
+          )}
+
           {/* No results state */}
           {!hasResults && (
             <Alert severity="info" icon={<SearchOffIcon />} sx={{ mb: 3 }}>

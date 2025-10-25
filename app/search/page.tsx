@@ -4,11 +4,13 @@ import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/re
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { Pagination } from '@/components/search/Pagination'
+import { SortDropdown, parseSortParam } from '@/components/search/SortDropdown'
 import type { Metadata } from 'next'
 
 interface SearchPageProps {
   searchParams: Promise<{
     page?: string
+    sort?: string
   }>
 }
 
@@ -23,10 +25,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * PAGE_SIZE
+  const sort = parseSortParam(params.sort)
 
   const { data: resources, error } = await getResources({
     limit: PAGE_SIZE,
     offset,
+    sort,
   })
 
   const { data: totalCount } = await getResourcesCount()
@@ -71,6 +75,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
+          {/* Sort dropdown */}
+          {hasResults && (
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+              <SortDropdown />
+            </Box>
+          )}
+
           {!hasResults && (
             <Alert severity="info" icon={<SearchOffIcon />} sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom>
