@@ -653,19 +653,20 @@ Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 
 ## Decision Status Summary
 
-| ADR | Title                            | Status      | Priority |
-| --- | -------------------------------- | ----------- | -------- |
-| 001 | Next.js 16 with App Router       | ✅ Accepted | Critical |
-| 002 | Supabase for Backend             | ✅ Accepted | Critical |
-| 003 | TypeScript Strict Mode           | ✅ Accepted | High     |
-| 004 | Tailwind CSS                     | ✅ Accepted | High     |
-| 005 | Material UI v7 Component Library | ✅ Accepted | Critical |
-| 006 | Vitest + Playwright Testing      | ✅ Accepted | High     |
-| 007 | T3 Env Validation                | ✅ Accepted | Medium   |
-| 008 | ESLint + Prettier                | ✅ Accepted | Medium   |
-| 009 | OpenAI GPT-4o-mini               | ✅ Accepted | Medium   |
-| 010 | Google Maps                      | ✅ Accepted | High     |
-| 011 | Avatar Strategy (Gravatar + S3)  | ✅ Accepted | Low      |
+| ADR | Title                                    | Status      | Priority |
+| --- | ---------------------------------------- | ----------- | -------- |
+| 001 | Next.js 16 with App Router               | ✅ Accepted | Critical |
+| 002 | Supabase for Backend                     | ✅ Accepted | Critical |
+| 003 | TypeScript Strict Mode                   | ✅ Accepted | High     |
+| 004 | Tailwind CSS                             | ✅ Accepted | High     |
+| 005 | Material UI v7 Component Library         | ✅ Accepted | Critical |
+| 006 | Vitest + Playwright Testing              | ✅ Accepted | High     |
+| 007 | T3 Env Validation                        | ✅ Accepted | Medium   |
+| 008 | ESLint + Prettier                        | ✅ Accepted | Medium   |
+| 009 | OpenAI GPT-4o-mini                       | ✅ Accepted | Medium   |
+| 010 | Google Maps                              | ✅ Accepted | High     |
+| 011 | Avatar Strategy (Gravatar + S3)          | ✅ Accepted | Low      |
+| 012 | Recently Viewed Resources (localStorage) | 📋 Proposed | Low      |
 
 ---
 
@@ -873,13 +874,280 @@ import { Avatar } from '@mui/material'
 
 ---
 
+## ADR-012: Recently Viewed Resources Implementation
+
+**Date**: 2025-10-24
+**Status**: Proposed
+**Deciders**: Gabriel Serafini, Claude Code
+**Tags**: user-experience, storage, features, post-mvp
+
+### Context
+
+Users need a way to easily revisit resources they've previously viewed, similar to a browser history. This is a common UX pattern that helps users quickly return to resources they found helpful without having to search again. The feature should work for both authenticated and anonymous users.
+
+### Decision
+
+**Hybrid Approach (Recommended)**:
+
+Start with **localStorage** (Option B) for MVP, migrate to **database-backed** (Option A) post-launch if needed based on user feedback.
+
+### Rationale
+
+**Why Start with localStorage**:
+
+- Zero database changes required
+- Instant implementation (1 session)
+- No cost impact
+- Works offline (PWA benefit)
+- Privacy-friendly (data stays on device)
+- Good enough for MVP validation
+
+**Why Consider Database Later**:
+
+- Syncs across devices for authenticated users
+- More persistent (survives cache clearing)
+- Better analytics on user behavior
+- Can implement privacy controls server-side
+- Enables features like "Continue where you left off"
+
+### Implementation Details
+
+#### Option A: Database-Backed Solution
+
+**Database Schema**:
+
+```sql
+CREATE TABLE recently_viewed (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  session_id TEXT,  -- For anonymous users (browser fingerprint)
+  resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, resource_id)  -- Only track latest view per resource
+);
+
+CREATE INDEX idx_recently_viewed_user ON recently_viewed(user_id, viewed_at DESC);
+CREATE INDEX idx_recently_viewed_session ON recently_viewed(session_id, viewed_at DESC);
+CREATE INDEX idx_recently_viewed_resource ON recently_viewed(resource_id);
+
+-- RLS Policies
+ALTER TABLE recently_viewed ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own history"
+  ON recently_viewed FOR SELECT
+  USING (auth.uid() = user_id OR session_id = current_setting('app.session_id', true));
+
+CREATE POLICY "Users can add to own history"
+  ON recently_viewed FOR INSERT
+  WITH CHECK (auth.uid() = user_id OR session_id IS NOT NULL);
+
+CREATE POLICY "Users can delete own history"
+  ON recently_viewed FOR DELETE
+  USING (auth.uid() = user_id OR session_id = current_setting('app.session_id', true));
+```
+
+**API Functions** (`lib/api/history.ts`):
+
+```typescript
+// Track a view (upsert to update timestamp)
+async function trackResourceView(
+  resourceId: string,
+  userId?: string,
+  sessionId?: string
+): Promise<void>
+
+// Get recent views (limit 50)
+async function getRecentlyViewed(
+  userId?: string,
+  sessionId?: string,
+  limit: number = 50
+): Promise<ResourceWithTimestamp[]>
+
+// Clear history
+async function clearHistory(userId?: string, sessionId?: string): Promise<void>
+
+// Auto-cleanup (run via cron)
+async function cleanupOldViews(olderThanDays: number = 90): Promise<void>
+```
+
+**Pros**:
+
+- Syncs across devices
+- Works for authenticated and anonymous users
+- Persistent (not cleared with browser cache)
+- Better privacy controls
+- Can analyze user behavior patterns
+
+**Cons**:
+
+- Database schema changes required
+- Additional queries on every page view
+- Storage costs (negligible: 1000 users × 50 views = 50k rows)
+- More complex implementation
+
+#### Option B: localStorage Solution (Recommended for MVP)
+
+**Utility Functions** (`lib/utils/viewHistory.ts`):
+
+```typescript
+interface ViewedResource {
+  id: string
+  name: string
+  category: string
+  viewedAt: string // ISO timestamp
+}
+
+const MAX_HISTORY_ITEMS = 50
+const STORAGE_KEY = 'reentry-map-history'
+
+// Add to history (max 50 items, FIFO)
+export function addToHistory(resource: ViewedResource): void {
+  try {
+    const history = getHistory()
+    // Remove if already exists
+    const filtered = history.filter((r) => r.id !== resource.id)
+    // Add to front
+    const updated = [resource, ...filtered].slice(0, MAX_HISTORY_ITEMS)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+  } catch (error) {
+    // Handle localStorage full or unavailable
+    console.warn('Unable to save to history:', error)
+  }
+}
+
+// Get history
+export function getHistory(): ViewedResource[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? JSON.parse(stored) : []
+  } catch (error) {
+    return []
+  }
+}
+
+// Clear history
+export function clearHistory(): void {
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+// Group by date
+export function groupHistoryByDate(history: ViewedResource[]) {
+  // Returns { today: [], yesterday: [], thisWeek: [], older: [] }
+}
+```
+
+**Usage in Resource Detail Page**:
+
+```typescript
+// app/resources/[id]/page.tsx
+'use client'
+import { useEffect } from 'react'
+import { addToHistory } from '@/lib/utils/viewHistory'
+
+export default function ResourceDetailPage({ resource }) {
+  useEffect(() => {
+    addToHistory({
+      id: resource.id,
+      name: resource.name,
+      category: resource.primary_category,
+      viewedAt: new Date().toISOString(),
+    })
+  }, [resource.id])
+
+  return <ResourceDetail resource={resource} />
+}
+```
+
+**Pros**:
+
+- Zero database changes
+- Instant implementation
+- Works offline
+- No cost impact
+- Privacy-friendly (data on device)
+
+**Cons**:
+
+- Doesn't sync across devices
+- Cleared with browser data
+- Anonymous only (doesn't persist after sign-in)
+- Can't analyze user behavior server-side
+
+### Consequences
+
+**Positive**:
+
+- Quick win for user experience
+- Helps users find previously viewed resources
+- Common UX pattern users expect
+- Low implementation cost
+- Privacy-friendly approach
+
+**Negative**:
+
+- localStorage version doesn't sync across devices
+- Needs migration path if moving to database later
+- Additional page load tracking overhead (minimal)
+
+### Alternatives Considered
+
+**Option C: Session Storage Only**
+
+- Pro: More temporary (clears on browser close)
+- Con: Too short-lived to be useful
+
+**Option D: Cookies**
+
+- Pro: Sent with every request
+- Con: Limited size (4KB), not ideal for this use case
+
+**Option E: IndexedDB**
+
+- Pro: More storage than localStorage
+- Con: Overkill for this feature, more complex API
+
+### Migration Path
+
+If we later need database-backed history:
+
+1. Implement database schema and APIs
+2. Add feature flag for database vs localStorage
+3. For authenticated users, migrate localStorage history to database on sign-in
+4. Keep localStorage as fallback for anonymous users
+5. Gradually sunset localStorage version
+
+### Implementation Timeline
+
+**Phase 6.4** (Post-MVP Enhancement):
+
+- Start with localStorage (Option B) - 1 session
+- Evaluate user feedback and usage
+- Migrate to database (Option A) only if needed
+
+### Display Locations
+
+"Recently Viewed" accessible from:
+
+1. User menu / navigation (for authenticated users)
+2. Bottom of resource detail page (optional)
+3. Empty search results page ("Or try recently viewed")
+
+### Privacy Considerations
+
+- Clear history button prominent
+- Respect "Do Not Track" browser setting (optional)
+- Privacy mode option to disable tracking (future)
+- Incognito/private browsing: tracking disabled
+
+---
+
 ## Next Decisions Needed
 
-1. **ADR-012**: State Management approach (when needed)
-2. **ADR-013**: Form handling library (react-hook-form vs alternatives)
-3. **ADR-014**: Image optimization strategy
-4. **ADR-015**: Monitoring and observability tools
-5. **ADR-016**: CI/CD pipeline configuration
+1. **ADR-013**: State Management approach (when needed)
+2. **ADR-014**: Form handling library (react-hook-form vs alternatives)
+3. **ADR-015**: Image optimization strategy
+4. **ADR-016**: Monitoring and observability tools
+5. **ADR-017**: CI/CD pipeline configuration
 
 ---
 

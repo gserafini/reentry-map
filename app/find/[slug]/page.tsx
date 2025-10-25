@@ -15,11 +15,11 @@ interface SeoLandingPageProps {
 
 /**
  * SEO-friendly localized landing pages
- * URL pattern: /find-{category}-in-{city}-{state}/
+ * URL pattern: /find/{category}-in-{city}-{state}/
  * Examples:
- * - /find-a-job-in-oakland-ca/
- * - /find-housing-in-san-francisco-ca/
- * - /find-food-assistance-in-berkeley-ca/
+ * - /find/employment-in-oakland-ca/
+ * - /find/housing-in-san-francisco-ca/
+ * - /find/food-assistance-in-berkeley-ca/
  */
 export default async function SeoLandingPage({ params }: SeoLandingPageProps) {
   const { slug } = await params

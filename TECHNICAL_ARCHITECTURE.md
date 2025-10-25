@@ -730,6 +730,42 @@ CREATE INDEX idx_agent_logs_type ON ai_agent_logs(agent_type, created_at DESC);
 CREATE INDEX idx_agent_logs_resource ON ai_agent_logs(resource_id);
 ```
 
+#### recently_viewed (Post-MVP - See ADR-012)
+
+Track recently viewed resources for each user (browser history feature).
+
+**Note**: Initial implementation uses localStorage (client-side). Database implementation optional for post-MVP if cross-device sync is needed.
+
+```sql
+CREATE TABLE recently_viewed (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  session_id TEXT,  -- For anonymous users (browser fingerprint)
+  resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, resource_id)  -- Only track latest view per resource
+);
+
+CREATE INDEX idx_recently_viewed_user ON recently_viewed(user_id, viewed_at DESC);
+CREATE INDEX idx_recently_viewed_session ON recently_viewed(session_id, viewed_at DESC);
+CREATE INDEX idx_recently_viewed_resource ON recently_viewed(resource_id);
+
+-- RLS Policies
+ALTER TABLE recently_viewed ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own history"
+  ON recently_viewed FOR SELECT
+  USING (auth.uid() = user_id OR session_id = current_setting('app.session_id', true));
+
+CREATE POLICY "Users can add to own history"
+  ON recently_viewed FOR INSERT
+  WITH CHECK (auth.uid() = user_id OR session_id IS NOT NULL);
+
+CREATE POLICY "Users can delete own history"
+  ON recently_viewed FOR DELETE
+  USING (auth.uid() = user_id OR session_id = current_setting('app.session_id', true));
+```
+
 ## Database Functions & Triggers
 
 ### Auto-update resource rating average
@@ -887,6 +923,8 @@ reentry-map/
 │   │       └── page.tsx              # Resource detail page
 │   ├── favorites/
 │   │   └── page.tsx                  # User's saved resources
+│   ├── history/
+│   │   └── page.tsx                  # Recently viewed resources (Post-MVP)
 │   ├── suggest-resource/
 │   │   └── page.tsx                  # Suggest new resource form
 │   ├── my-reviews/
@@ -921,6 +959,8 @@ reentry-map/
 │   │   ├── ReviewForm.tsx            # Write review form
 │   │   ├── ReviewsList.tsx           # Display reviews
 │   │   └── UserProfile.tsx           # User profile display
+│   ├── history/
+│   │   └── HistoryList.tsx           # Recently viewed list (Post-MVP)
 │   ├── auth/
 │   │   ├── AuthModal.tsx             # Sign in/up modal
 │   │   ├── PhoneAuth.tsx             # Phone OTP authentication
@@ -954,7 +994,8 @@ reentry-map/
 │   │   ├── resources.ts              # Resource API calls
 │   │   ├── favorites.ts              # Favorites API calls
 │   │   ├── reviews.ts                # Reviews API calls
-│   │   └── suggestions.ts            # Suggestions API calls
+│   │   ├── suggestions.ts            # Suggestions API calls
+│   │   └── history.ts                # History API calls (Post-MVP, if using database)
 │   ├── hooks/
 │   │   ├── useResources.ts           # Fetch resources
 │   │   ├── useResource.ts            # Fetch single resource
@@ -967,7 +1008,9 @@ reentry-map/
 │   │   ├── distance.ts               # Distance calculations
 │   │   ├── formatting.ts             # Date/phone formatting
 │   │   ├── validation.ts             # Input validation
-│   │   └── constants.ts              # App constants
+│   │   ├── constants.ts              # App constants
+│   │   ├── viewHistory.ts            # localStorage history (Post-MVP)
+│   │   └── timeAgo.ts                # Relative time formatting (Post-MVP)
 │   └── types/
 │       ├── database.ts               # Database types
 │       ├── api.ts                    # API types

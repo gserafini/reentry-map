@@ -883,6 +883,115 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ---
 
+## Phase 6.4: Recently Viewed Resources (Browse History)
+
+**Goal**: Allow users to browse and revisit previously viewed resources
+
+**Estimated Time**: 1 session
+**Dependencies**: Phase 3.3 (Resource Detail Pages)
+**Priority**: Low (Post-MVP enhancement)
+
+**Reference**: See ADR-012 for implementation approach decision
+
+### 6.4.1 Implementation Approach Decision
+
+- [ ] Review ADR-012 (localStorage vs database approach)
+- [ ] Choose implementation based on requirements
+- [ ] Document decision rationale
+
+### 6.4.2 Option A: Database-Backed (Full Solution)
+
+**Advantages**: Syncs across devices, persistent, supports authenticated and anonymous users
+
+**Database Schema**:
+
+- [ ] Create `recently_viewed` table in Supabase
+  ```sql
+  CREATE TABLE recently_viewed (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT,  -- For anonymous users
+    resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
+    viewed_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, resource_id)  -- Track unique views per user
+  );
+  ```
+- [ ] Create indexes (user_id, resource_id, viewed_at)
+- [ ] Add RLS policies (users can only see own history)
+
+**Implementation**:
+
+- [ ] Track resource views in `app/resources/[...segments]/page.tsx`
+- [ ] Create `lib/api/history.ts` with query functions
+  - [ ] `trackResourceView(resourceId, userId?, sessionId?)`
+  - [ ] `getRecentlyViewed(userId?, sessionId?, limit = 50)`
+  - [ ] `clearHistory(userId?, sessionId?)`
+- [ ] Auto-cleanup old entries (keep last 50 per user)
+- [ ] Create `app/history/page.tsx` with chronological list
+- [ ] Write tests for tracking and retrieval
+
+### 6.4.3 Option B: localStorage (Quick Win)
+
+**Advantages**: No database changes, faster to implement, zero cost
+
+**Implementation**:
+
+- [ ] Create `lib/utils/viewHistory.ts`
+  - [ ] `addToHistory(resource)` - Add to localStorage
+  - [ ] `getHistory()` - Retrieve from localStorage
+  - [ ] `clearHistory()` - Clear localStorage
+  - [ ] Max 50 items (FIFO)
+- [ ] Track views on resource detail page
+- [ ] Create `app/history/page.tsx`
+- [ ] Handle localStorage unavailable (private browsing)
+- [ ] Write tests for localStorage utilities
+
+**Limitations**: Doesn't sync across devices, cleared with browser data
+
+### 6.4.4 UI Components
+
+- [ ] Create `components/history/HistoryList.tsx`
+  - [ ] Display resources in chronological order
+  - [ ] Show timestamp ("Viewed 2 hours ago", "Yesterday", etc.)
+  - [ ] Optional grouping by date (Today, Yesterday, This Week, Older)
+  - [ ] Show resource card preview
+  - [ ] Click to go to resource detail
+- [ ] Add "Recently Viewed" link to navigation/user menu
+- [ ] Add "Clear History" button with confirmation
+- [ ] Empty state ("No recently viewed resources")
+- [ ] Loading state while fetching
+
+### 6.4.5 Timestamp Formatting
+
+- [ ] Create `lib/utils/timeAgo.ts`
+  - [ ] Relative time formatting ("2 hours ago", "Yesterday")
+  - [ ] Smart grouping (Today, Yesterday, This Week, etc.)
+- [ ] Write tests for time formatting
+
+### 6.4.6 Integration & Polish
+
+- [ ] Add to main navigation or user dropdown
+- [ ] Add to AppBar for authenticated users
+- [ ] Mobile-friendly layout
+- [ ] Test with many (50+) items
+- [ ] Test with no items (empty state)
+- [ ] Accessibility (keyboard nav, screen readers)
+- [ ] Write E2E tests (`e2e/history.spec.ts`)
+
+### 6.4.7 Optional Enhancements (Future)
+
+- [ ] Pin favorite history items
+- [ ] Search within history
+- [ ] Filter history by category
+- [ ] Export history as list
+- [ ] Privacy mode (disable tracking)
+
+**Deliverable**: Users can easily revisit previously viewed resources
+**Review Point**: Demo history list with multiple entries
+**Cost Impact**: Database approach: negligible (1000 users × 50 views = 50k rows)
+
+---
+
 ## Phase 7: Reviews (Week 4 Plan)
 
 **Goal**: Users can write and read detailed reviews.

@@ -852,6 +852,40 @@ Target distribution for initial launch:
 
 ### 9.1 Phase 2 Features
 
+#### 9.1.1 Recently Viewed Resources (Browse History)
+
+**User Story**: As a user, I want to see resources I've recently viewed so I can easily return to them.
+
+**Requirements**:
+
+- Track resource views automatically
+- Display chronological list of recently viewed resources
+- Show relative timestamps ("2 hours ago", "Yesterday")
+- Optional date grouping (Today, Yesterday, This Week, Older)
+- Limit to last 50 viewed resources (FIFO)
+- "Clear History" button with confirmation
+- Access from navigation or user menu
+- Empty state when no history exists
+
+**Implementation Options**:
+
+- **Option A (MVP)**: localStorage-based (client-side, no sync)
+- **Option B (Future)**: Database-backed (syncs across devices)
+
+**Acceptance Criteria**:
+
+- [ ] Views tracked on resource detail page
+- [ ] History list displays with timestamps
+- [ ] Click resource to view detail page
+- [ ] Clear history removes all entries
+- [ ] Mobile-friendly layout
+- [ ] Works for anonymous users
+- [ ] Privacy-friendly (clear message about tracking)
+
+**Reference**: See ADR-012 and Phase 6.4 in Implementation Checklist
+
+#### 9.1.2 Other Phase 2 Features
+
 - Document scanning (release papers)
 - Calendar reminders for appointments
 - Transportation routing (multi-stop)

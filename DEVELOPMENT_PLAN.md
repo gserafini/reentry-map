@@ -450,6 +450,65 @@ This document provides a week-by-week plan for building the Phase 1 MVP.
 - [ ] Prioritize improvements
 - [ ] Plan Phase 2 features
 
+## Post-MVP Enhancement Ideas
+
+### Quick Wins (1-2 sessions each)
+
+- **Recently Viewed Resources** (Phase 6.4)
+  - localStorage-based history (no database changes)
+  - Helps users return to resources they've viewed
+  - Common UX pattern users expect
+  - See ADR-012 for implementation details
+
+- **Resource Sharing**
+  - Share resource link via SMS/Email/Social
+  - Copy link to clipboard
+  - Generate shareable short URL
+
+- **Accessibility Improvements**
+  - High contrast mode
+  - Text size controls
+  - Better screen reader support
+  - Keyboard shortcuts
+
+### Medium Enhancements (3-5 sessions each)
+
+- **Advanced Filtering**
+  - Hours filter (open now, open weekends)
+  - Service-specific filters
+  - Accepts walk-ins filter
+  - No appointment required filter
+
+- **Resource Comparison**
+  - Compare 2-3 resources side-by-side
+  - Highlight differences
+  - Help users choose best option
+
+- **User Notifications**
+  - Email digest of new resources in categories
+  - Update notifications for favorited resources
+  - Review response notifications
+
+### Major Features (Week+ each)
+
+- **Spanish Language Support**
+  - Full i18n implementation
+  - Translate all UI text
+  - Multilingual resource descriptions
+  - Language toggle in header
+
+- **Document Scanning**
+  - Upload release papers
+  - Extract information with OCR
+  - Auto-suggest resources based on document
+  - Store securely in Supabase Storage
+
+- **Calendar Integration**
+  - Save appointment times
+  - Reminders for appointments
+  - Add to Google Calendar / Apple Calendar
+  - SMS reminders
+
 ## Development Best Practices
 
 ### Git Workflow
