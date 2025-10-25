@@ -91,6 +91,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
   // Handle "Current Location" selection
   const handleCurrentLocation = () => {
+    setHoverText('') // Clear hover text immediately to prevent flash
     requestLocation()
     setInputValue('Current Location')
     setShowDropdown(false)
@@ -100,6 +101,11 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   // Handle place selection from autocomplete
   const handlePlaceSelect = async (placeId: string, description: string) => {
     if (!placesLibrary) return
+
+    // Clear hover text immediately to prevent flash
+    setHoverText('')
+    // Set input value immediately so text stays visible
+    setInputValue(description)
 
     try {
       const { Place } = placesLibrary
@@ -115,7 +121,6 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
         // Use description as display name (e.g., "Oakland, CA" or "94601")
         setManualLocation(coords, description)
-        setInputValue(description)
         setShowDropdown(false)
         setPredictions([])
         // Don't call onLocationChange - let user press Enter to submit
