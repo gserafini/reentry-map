@@ -4,7 +4,8 @@ import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/re
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { Pagination } from '@/components/search/Pagination'
-import { SortDropdown, parseSortParam } from '@/components/search/SortDropdown'
+import { SortDropdown } from '@/components/search/SortDropdown'
+import { parseSortParam } from '@/lib/utils/sort'
 import type { Metadata } from 'next'
 
 interface SearchPageProps {

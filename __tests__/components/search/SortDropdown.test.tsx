@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { SortDropdown, parseSortParam } from '@/components/search/SortDropdown'
+import { SortDropdown } from '@/components/search/SortDropdown'
+import { parseSortParam } from '@/lib/utils/sort'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
 // Mock Next.js navigation hooks
