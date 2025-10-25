@@ -16,6 +16,13 @@ interface SortDropdownProps {
    * Defaults to 'name-asc'
    */
   defaultSort?: string
+
+  /**
+   * Display variant
+   * - 'standard': FormControl with label (default)
+   * - 'inline': Minimal inline style like "Sort: Recommended"
+   */
+  variant?: 'standard' | 'inline'
 }
 
 /**
@@ -36,6 +43,7 @@ interface SortDropdownProps {
 export function SortDropdown({
   showDistanceSort = false,
   defaultSort = 'name-asc',
+  variant = 'standard',
 }: SortDropdownProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -77,6 +85,65 @@ export function SortDropdown({
     ? SORT_OPTIONS
     : SORT_OPTIONS.filter((option) => option.field !== 'distance')
 
+  // Inline variant - Yelp style
+  if (variant === 'inline') {
+    return (
+      <FormControl
+        size="small"
+        sx={{
+          minWidth: 150,
+          '& .MuiOutlinedInput-notchedOutline': {
+            border: 'none',
+          },
+          '& .MuiSelect-select': {
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            color: 'text.primary',
+            py: 0.5,
+            px: 1,
+          },
+          '& .MuiSelect-icon': {
+            color: 'text.secondary',
+          },
+        }}
+      >
+        <Select
+          id="sort-select-inline"
+          value={currentSort}
+          onChange={handleSortChange}
+          renderValue={(value) => {
+            const label =
+              availableSortOptions.find((opt) => opt.value === value)?.label || 'Name (A-Z)'
+            return `Sort: ${label}`
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                mt: 0.5,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+              },
+            },
+          }}
+        >
+          {availableSortOptions.map((option) => (
+            <MenuItem
+              key={option.value}
+              value={option.value}
+              sx={{
+                fontSize: '0.875rem',
+                py: 1.5,
+                px: 2,
+              }}
+            >
+              {option.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    )
+  }
+
+  // Standard variant - FormControl with label
   return (
     <FormControl size="small" sx={{ minWidth: 200 }}>
       <InputLabel id="sort-select-label">Sort By</InputLabel>
