@@ -75,7 +75,10 @@ export async function getResources(
     }
 
     // Apply sorting
-    query = query.order(sort.field, { ascending: sort.direction === 'asc' })
+    // Note: distance sorting requires user coordinates and is handled client-side for now
+    // TODO: Implement server-side distance sorting with PostGIS or URL params
+    const sortField = sort.field === 'distance' ? 'name' : sort.field
+    query = query.order(sortField, { ascending: sort.direction === 'asc' })
 
     // Apply pagination
     if (limit) {
