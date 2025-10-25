@@ -18,7 +18,10 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
 
   const handleSearch = (query: string) => {
     if (query.trim()) {
-      router.push(`/resources?search=${encodeURIComponent(query.trim())}`)
+      router.push(`/search?search=${encodeURIComponent(query.trim())}`)
+    } else {
+      // If empty search, go to search page
+      router.push('/search')
     }
   }
   return (
