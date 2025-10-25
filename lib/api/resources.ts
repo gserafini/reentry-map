@@ -221,6 +221,74 @@ export async function getResourceCount(): Promise<{
 }
 
 /**
+ * Get count of resources matching filters
+ * @param options - Filter options (same as getResources but without pagination)
+ * @returns Total count of matching resources
+ */
+export async function getResourcesCount(
+  options: Omit<GetResourcesOptions, 'limit' | 'offset' | 'page'> = {}
+): Promise<{
+  data: number | null
+  error: Error | null
+}> {
+  try {
+    const supabase = await createClient()
+    const { search, categories, min_rating, verified_only, accepts_records, appointment_required } =
+      options
+
+    let query = supabase.from('resources').select('*', { count: 'exact', head: true })
+
+    // Always filter to active resources by default
+    query = query.eq('status', 'active')
+
+    // Apply category filter if provided (matches any category in array)
+    if (categories && categories.length > 0) {
+      query = query.contains('categories', categories)
+    }
+
+    // Apply search filter if provided (searches name and description)
+    if (search && search.trim()) {
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+    }
+
+    // Apply minimum rating filter
+    if (min_rating !== undefined) {
+      query = query.gte('rating_average', min_rating)
+    }
+
+    // Apply verified filter
+    if (verified_only) {
+      query = query.eq('verified', true)
+    }
+
+    // Apply accepts_records filter
+    if (accepts_records !== undefined) {
+      query = query.eq('accepts_records', accepts_records)
+    }
+
+    // Apply appointment_required filter
+    if (appointment_required !== undefined) {
+      query = query.eq('appointment_required', appointment_required)
+    }
+
+    const { count, error } = await query
+
+    if (error) {
+      console.error('Error counting resources:', error)
+      return { data: null, error: new Error('Failed to count resources') }
+    }
+
+    return { data: count, error: null }
+  } catch (error) {
+    console.error('Unexpected error in getResourcesCount:', error)
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error('Unknown error'),
+    }
+  }
+}
+
+/**
  * Get count of resources per category
  * @returns Map of category to resource count
  */

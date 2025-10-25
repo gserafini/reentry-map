@@ -1,9 +1,10 @@
 import { Container, Typography, Box, Alert, Grid } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
 import { notFound } from 'next/navigation'
-import { getResources, getCategoryCounts } from '@/lib/api/resources'
+import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { Pagination } from '@/components/search/Pagination'
 import { parseSeoUrl, getCategoryPhrase, generateSeoIntro } from '@/lib/utils/seo-routes'
 import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import type { Metadata } from 'next'
@@ -12,7 +13,12 @@ interface HyperlocalSearchPageProps {
   params: Promise<{
     slug: string
   }>
+  searchParams: Promise<{
+    page?: string
+  }>
 }
+
+const PAGE_SIZE = 20
 
 /**
  * Hyperlocal SEO landing pages
@@ -22,8 +28,14 @@ interface HyperlocalSearchPageProps {
  * - /search/housing-in-san-francisco-ca/
  * - /search/food-assistance-in-berkeley-ca/
  */
-export default async function HyperlocalSearchPage({ params }: HyperlocalSearchPageProps) {
+export default async function HyperlocalSearchPage({
+  params,
+  searchParams,
+}: HyperlocalSearchPageProps) {
   const { slug } = await params
+  const searchParamsData = await searchParams
+  const currentPage = Number(searchParamsData.page) || 1
+  const offset = (currentPage - 1) * PAGE_SIZE
 
   // Parse the SEO-friendly URL
   const parsed = parseSeoUrl(slug)
@@ -36,10 +48,17 @@ export default async function HyperlocalSearchPage({ params }: HyperlocalSearchP
   // Fetch resources filtered by category and location
   const { data: resources, error } = await getResources({
     categories: [category],
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset,
     // TODO: Add location filtering when we implement geospatial search
     // For now, we'll show all resources in the category
   })
+
+  // Get total count for pagination
+  const { data: totalCount } = await getResourcesCount({
+    categories: [category],
+  })
+  const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE)
 
   // Fetch category counts for filter display
   const { data: categoryCounts } = await getCategoryCounts()
@@ -97,13 +116,6 @@ export default async function HyperlocalSearchPage({ params }: HyperlocalSearchP
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
-          {/* Results count */}
-          {hasResults && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-            </Typography>
-          )}
-
           {/* No results state */}
           {!hasResults && (
             <Alert severity="info" icon={<SearchOffIcon />} sx={{ mb: 3 }}>
@@ -118,6 +130,16 @@ export default async function HyperlocalSearchPage({ params }: HyperlocalSearchP
           )}
 
           <ResourceList resources={resources || []} />
+
+          {/* Pagination */}
+          {hasResults && totalCount && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+            />
+          )}
         </Grid>
       </Grid>
     </Container>

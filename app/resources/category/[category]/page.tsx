@@ -2,9 +2,10 @@ import { Container, Typography, Box, Alert, Button, Grid } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getResources, getCategoryCounts } from '@/lib/api/resources'
+import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { Pagination } from '@/components/search/Pagination'
 import { getCategoryLabel, getAllCategories } from '@/lib/utils/categories'
 import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import type { ResourceCategory } from '@/lib/types/database'
@@ -15,8 +16,11 @@ interface CategoryPageProps {
   }>
   searchParams: Promise<{
     search?: string
+    page?: string
   }>
 }
+
+const PAGE_SIZE = 20
 
 /**
  * Category-specific Resources Page
@@ -24,7 +28,9 @@ interface CategoryPageProps {
  */
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { category } = await params
-  const { search } = await searchParams
+  const { search, page } = await searchParams
+  const currentPage = Number(page) || 1
+  const offset = (currentPage - 1) * PAGE_SIZE
 
   // Validate category
   const validCategories = getAllCategories()
@@ -38,8 +44,16 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const { data: resources, error } = await getResources({
     search,
     categories: [typedCategory],
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset,
   })
+
+  // Get total count for pagination
+  const { data: totalCount } = await getResourcesCount({
+    search,
+    categories: [typedCategory],
+  })
+  const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE)
 
   // Fetch category counts for filter display
   const { data: categoryCounts } = await getCategoryCounts()
@@ -89,13 +103,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
-          {/* Results count */}
-          {hasResults && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-            </Typography>
-          )}
-
           {/* No results state */}
           {!hasResults && (
             <Alert
@@ -122,6 +129,16 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           )}
 
           <ResourceList resources={resources || []} />
+
+          {/* Pagination */}
+          {hasResults && totalCount && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+            />
+          )}
         </Grid>
       </Grid>
     </Container>

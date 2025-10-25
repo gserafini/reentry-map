@@ -1,19 +1,36 @@
 import { Container, Typography, Box, Alert, Grid } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
-import { getResources, getCategoryCounts } from '@/lib/api/resources'
+import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { Pagination } from '@/components/search/Pagination'
 import type { Metadata } from 'next'
+
+interface SearchPageProps {
+  searchParams: Promise<{
+    page?: string
+  }>
+}
+
+const PAGE_SIZE = 20
 
 /**
  * Base search page
  * URL: /search/
  * Shows general search landing page with all resources
  */
-export default async function SearchPage() {
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const params = await searchParams
+  const currentPage = Number(params.page) || 1
+  const offset = (currentPage - 1) * PAGE_SIZE
+
   const { data: resources, error } = await getResources({
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset,
   })
+
+  const { data: totalCount } = await getResourcesCount()
+  const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE)
 
   const { data: categoryCounts } = await getCategoryCounts()
 
@@ -54,12 +71,6 @@ export default async function SearchPage() {
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
-          {hasResults && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-            </Typography>
-          )}
-
           {!hasResults && (
             <Alert severity="info" icon={<SearchOffIcon />} sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom>
@@ -72,6 +83,16 @@ export default async function SearchPage() {
           )}
 
           <ResourceList resources={resources || []} />
+
+          {/* Pagination */}
+          {hasResults && totalCount && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+            />
+          )}
         </Grid>
       </Grid>
     </Container>
