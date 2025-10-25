@@ -80,6 +80,7 @@ export function SearchBar({
         placeholder={placeholder}
         size={size}
         fullWidth
+        autoComplete="off"
         inputProps={{
           'aria-label': 'Search resources',
         }}

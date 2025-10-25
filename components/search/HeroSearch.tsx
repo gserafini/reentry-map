@@ -57,6 +57,7 @@ export function HeroSearch() {
           size="small"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          autoComplete="off"
           sx={{
             '& .MuiOutlinedInput-root': {
               bgcolor: 'transparent',

@@ -144,6 +144,7 @@ export function LocationInput({
         placeholder="Enter location or zip"
         size={size}
         fullWidth={fullWidth}
+        autoComplete="off"
         InputProps={{
           endAdornment: loading ? <CircularProgress size={20} /> : null,
         }}
@@ -169,14 +170,14 @@ export function LocationInput({
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
-            right: 0,
+            left: '-20px',
+            right: '-20px',
             zIndex: 1300,
-            marginTop: '4px',
+            marginTop: '8px',
             backgroundColor: 'white',
-            borderRadius: '4px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            maxHeight: '300px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            maxHeight: '350px',
             overflowY: 'auto',
           }}
         >
@@ -186,12 +187,22 @@ export function LocationInput({
             sx={{
               borderBottom: predictions.length > 0 ? '1px solid' : 'none',
               borderColor: 'divider',
+              py: 1.5,
+              px: 2,
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
             }}
           >
-            <ListItemIcon>
-              <MyLocationIcon color="primary" />
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <MyLocationIcon sx={{ color: '#1976d2', fontSize: 20 }} />
             </ListItemIcon>
-            <ListItemText primary="Current Location" secondary="Use my current location" />
+            <ListItemText
+              primary="Use my current location"
+              primaryTypographyProps={{
+                sx: { color: 'text.primary', fontSize: '0.95rem', fontWeight: 500 },
+              }}
+            />
           </MenuItem>
 
           {/* Autocomplete predictions */}
@@ -199,13 +210,26 @@ export function LocationInput({
             <MenuItem
               key={prediction.place_id}
               onClick={() => handlePlaceSelect(prediction.place_id, prediction.description)}
+              sx={{
+                py: 1.5,
+                px: 2,
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                },
+              }}
             >
-              <ListItemIcon>
-                <PlaceIcon />
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <PlaceIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
               </ListItemIcon>
               <ListItemText
                 primary={prediction.structured_formatting.main_text}
                 secondary={prediction.structured_formatting.secondary_text}
+                primaryTypographyProps={{
+                  sx: { color: 'text.primary', fontSize: '0.95rem', fontWeight: 500 },
+                }}
+                secondaryTypographyProps={{
+                  sx: { color: 'text.secondary', fontSize: '0.85rem' },
+                }}
               />
             </MenuItem>
           ))}
