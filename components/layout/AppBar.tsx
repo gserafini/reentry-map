@@ -4,7 +4,7 @@ import { AppBar as MuiAppBar, Toolbar, IconButton, Box, Container, Button } from
 import { Menu as MenuIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { theme } from '@/lib/theme'
 import { SearchBar } from '@/components/search/SearchBar'
 import { LocationInput } from '@/components/search/LocationInput'
@@ -16,6 +16,10 @@ interface AppBarProps {
 
 export function AppBar({ authButton, showSearch = false }: AppBarProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Read current search query from URL to populate search input
+  const currentSearch = searchParams.get('search') || ''
 
   const handleSearch = (query: string) => {
     if (query.trim()) {
@@ -91,6 +95,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             >
               <Box sx={{ flex: '1 1 60%', borderRight: '1px solid rgba(0,0,0,0.1)' }}>
                 <SearchBar
+                  value={currentSearch}
                   onSubmit={handleSearch}
                   placeholder="What are you looking for?"
                   size="small"
@@ -136,6 +141,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             }}
           >
             <SearchBar
+              value={currentSearch}
               onSubmit={handleSearch}
               placeholder="What are you looking for?"
               inputSx={{
