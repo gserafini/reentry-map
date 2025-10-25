@@ -10,10 +10,19 @@ interface ResourceDetailPageProps {
 }
 
 /**
- * Resource Detail Page with dual URL support
- * Handles both:
- * - UUID: /resources/{uuid}
- * - SEO: /resources/{state}/{city}/{slug}
+ * Resource catch-all route with extensible URL format support
+ *
+ * Current formats:
+ * - 1 segment:  /resources/{uuid} → Single resource by ID
+ * - 2 segments: /resources/category/{category} → Category listings (redirects to /resources?category={category})
+ * - 3 segments: /resources/{state}/{city}/{slug} → Single resource by SEO
+ *
+ * Future extensibility (easy to add):
+ * - 2 segments: /resources/{state}/{city} → City resource listings
+ * - 4 segments: /resources/{state}/{city}/{category}/{slug} → Category-specific resource
+ *
+ * The catch-all [...segments] pattern makes adding new URL formats trivial
+ * by adding new segment length conditions below.
  */
 export default async function ResourceDetailPage({ params }: ResourceDetailPageProps) {
   const { segments } = await params
@@ -36,6 +45,12 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
     if (error) {
       notFound()
     }
+  } else if (segments.length === 2 && segments[0] === 'category') {
+    // Category listing format: /resources/category/{category}
+    // This should redirect to the main resources page with category filter
+    const [, category] = segments
+    const { redirect } = await import('next/navigation')
+    redirect(`/resources?category=${category}`)
   } else if (segments.length === 3) {
     // SEO format: /resources/{state}/{city}/{slug}
     const [state, city, slug] = segments
