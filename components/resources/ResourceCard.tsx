@@ -12,7 +12,10 @@ import {
   Link,
   Rating,
 } from '@mui/material'
+import { Navigation as NavigationIcon } from '@mui/icons-material'
 import type { Resource } from '@/lib/types/database'
+import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
+import { useUserLocation } from '@/lib/context/LocationContext'
 
 export type ResourceCardResource = {
   id?: string
@@ -32,27 +35,38 @@ export type ResourceCardResource = {
 interface ResourceCardProps {
   resource: ResourceCardResource | Resource
   onFavorite?: (id?: string) => void
+  /**
+   * Optional user location. If not provided, will use location from LocationContext
+   */
   userLocation?: { lat: number; lng: number }
 }
 
-function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const toRad = (v: number) => (v * Math.PI) / 180
-  const R = 3958.8 // miles
-  const dLat = toRad(b.lat - a.lat)
-  const dLon = toRad(b.lng - a.lng)
-  const lat1 = toRad(a.lat)
+export function ResourceCard({
+  resource,
+  onFavorite,
+  userLocation: providedLocation,
+}: ResourceCardProps) {
+  // Get user location from context if not provided as prop
+  const { coordinates: contextCoordinates } = useUserLocation()
 
-  const sinDLat = Math.sin(dLat / 2)
-  const sinDLon = Math.sin(dLon / 2)
-  const aHarv = sinDLat * sinDLat + sinDLon * sinDLon * Math.cos(lat1) * Math.cos(toRad(b.lat))
-  const c = 2 * Math.atan2(Math.sqrt(aHarv), Math.sqrt(1 - aHarv))
-  return R * c
-}
+  // Use provided location or context location
+  const userLocation =
+    providedLocation ||
+    (contextCoordinates
+      ? {
+          lat: contextCoordinates.latitude,
+          lng: contextCoordinates.longitude,
+        }
+      : null)
 
-export function ResourceCard({ resource, onFavorite, userLocation }: ResourceCardProps) {
+  // Calculate distance if we have both resource and user coordinates
   const distance =
     resource.latitude != null && resource.longitude != null && userLocation
-      ? haversineDistance({ lat: resource.latitude, lng: resource.longitude }, userLocation)
+      ? calculateDistance(
+          { latitude: resource.latitude, longitude: resource.longitude },
+          { latitude: userLocation.lat, longitude: userLocation.lng },
+          'miles'
+        )
       : null
 
   // Generate SEO-friendly URL if slug/state/city available, otherwise use UUID
@@ -101,14 +115,20 @@ export function ResourceCard({ resource, onFavorite, userLocation }: ResourceCar
           {resource.address ?? 'No address'}
         </Typography>
         {distance !== null && (
-          <Typography
-            variant="body2"
-            color="text.secondary"
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              mt: 1,
+            }}
             data-testid="resource-distance"
-            sx={{ mt: 1 }}
           >
-            {distance.toFixed(1)} mi
-          </Typography>
+            <NavigationIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+            <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
+              {formatDistanceSmart(distance, 'miles')} away
+            </Typography>
+          </Box>
         )}
       </CardContent>
 

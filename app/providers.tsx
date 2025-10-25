@@ -3,6 +3,7 @@
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline } from '@mui/material'
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
+import { LocationProvider } from '@/lib/context/LocationContext'
 
 // Create MUI theme with dark mode support
 const lightTheme = createTheme({
@@ -46,7 +47,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <MuiThemeWrapper>
         <CssBaseline />
-        {children}
+        <LocationProvider>{children}</LocationProvider>
       </MuiThemeWrapper>
     </NextThemesProvider>
   )
