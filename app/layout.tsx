@@ -3,7 +3,7 @@ import { Geist } from 'next/font/google'
 import { Box } from '@mui/material'
 import { env } from '@/lib/env'
 import { Providers } from './providers'
-import { AppBar } from '@/components/layout/AppBar'
+import { ClientAppBar } from '@/components/layout/ClientAppBar'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { AuthButton } from '@/components/auth-button'
 import '../styles/tailwind.css'
@@ -52,7 +52,7 @@ export default function RootLayout({
               minHeight: '100vh',
             }}
           >
-            <AppBar authButton={<AuthButton />} />
+            <ClientAppBar authButton={<AuthButton />} />
             <Box
               component="main"
               sx={{

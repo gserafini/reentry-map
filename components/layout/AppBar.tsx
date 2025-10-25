@@ -1,16 +1,37 @@
 'use client'
 
-import { AppBar as MuiAppBar, Toolbar, IconButton, Box, Container, Button } from '@mui/material'
+import { useState } from 'react'
+import {
+  AppBar as MuiAppBar,
+  Toolbar,
+  IconButton,
+  Box,
+  Container,
+  Button,
+  TextField,
+  InputAdornment,
+} from '@mui/material'
 import { Menu as MenuIcon, Search as SearchIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { theme } from '@/lib/theme'
 
 interface AppBarProps {
   authButton?: React.ReactNode
+  showSearch?: boolean
 }
 
-export function AppBar({ authButton }: AppBarProps) {
+export function AppBar({ authButton, showSearch = false }: AppBarProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const router = useRouter()
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/resources?search=${encodeURIComponent(searchQuery.trim())}`)
+    }
+  }
   return (
     <MuiAppBar
       position="sticky"
@@ -57,6 +78,35 @@ export function AppBar({ authButton }: AppBarProps) {
               <Button color="inherit">Suggest</Button>
             </Link>
           </Box>
+
+          {/* Search bar (desktop) */}
+          {showSearch && (
+            <Box
+              component="form"
+              onSubmit={handleSearch}
+              sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1, maxWidth: 400, mx: 2 }}
+            >
+              <TextField
+                size="small"
+                placeholder="Search resources..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
+                    '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
+                  },
+                }}
+              />
+            </Box>
+          )}
 
           {/* Right side actions */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

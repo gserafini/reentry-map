@@ -2,12 +2,19 @@ import { Container, Typography, Box, Alert } from '@mui/material'
 import { getResources } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
 
+interface ResourcesPageProps {
+  searchParams: Promise<{
+    search?: string
+  }>
+}
+
 /**
  * Resources List Page
  * Server Component that fetches and displays all active resources
  */
-export default async function ResourcesPage() {
-  const { data: resources, error } = await getResources({ limit: 100 })
+export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {
+  const { search } = await searchParams
+  const { data: resources, error } = await getResources({ search, limit: 100 })
 
   if (error) {
     return (
@@ -28,10 +35,12 @@ export default async function ResourcesPage() {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          Community Resources
+          {search ? `Search Results: "${search}"` : 'Community Resources'}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Browse resources in your area to help with employment, housing, food, and more.
+          {search
+            ? 'Results matching your search query'
+            : 'Browse resources in your area to help with employment, housing, food, and more.'}
         </Typography>
       </Box>
 
