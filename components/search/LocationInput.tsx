@@ -204,9 +204,14 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
               <MyLocationIcon sx={{ color: '#1976d2', fontSize: 20 }} />
             </ListItemIcon>
             <ListItemText
-              primary="Use my current location"
+              primary="Current Location"
               primaryTypographyProps={{
-                sx: { color: 'text.primary', fontSize: '0.95rem', fontWeight: 500 },
+                sx: {
+                  color: 'text.primary',
+                  fontSize: '0.95rem',
+                  fontWeight: 500,
+                  textAlign: 'left',
+                },
               }}
             />
           </MenuItem>
@@ -233,10 +238,19 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
                 primary={prediction.structured_formatting.main_text}
                 secondary={prediction.structured_formatting.secondary_text}
                 primaryTypographyProps={{
-                  sx: { color: 'text.primary', fontSize: '0.95rem', fontWeight: 500 },
+                  sx: {
+                    color: 'text.primary',
+                    fontSize: '0.95rem',
+                    fontWeight: 500,
+                    textAlign: 'left',
+                  },
                 }}
                 secondaryTypographyProps={{
-                  sx: { color: 'text.secondary', fontSize: '0.85rem' },
+                  sx: {
+                    color: 'text.secondary',
+                    fontSize: '0.85rem',
+                    textAlign: 'left',
+                  },
                 }}
               />
             </MenuItem>
@@ -245,7 +259,16 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           {/* No results */}
           {inputValue.trim() && predictions.length === 0 && !loading && (
             <MenuItem disabled>
-              <ListItemText primary="No locations found" secondary="Try a different search" />
+              <ListItemText
+                primary="No locations found"
+                secondary="Try a different search"
+                primaryTypographyProps={{
+                  sx: { textAlign: 'left' },
+                }}
+                secondaryTypographyProps={{
+                  sx: { textAlign: 'left' },
+                }}
+              />
             </MenuItem>
           )}
         </div>
