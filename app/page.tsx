@@ -66,7 +66,7 @@ export default async function HomePage() {
                 fontSize: { xs: '2rem', md: '3.5rem' },
               }}
             >
-              Find Resources for Your Journey
+              Find what you need to succeed
             </Typography>
             <Typography
               variant="h5"
