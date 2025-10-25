@@ -1,7 +1,8 @@
-import { Container, Typography, Box, Alert } from '@mui/material'
+import { Container } from '@mui/material'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
+import { ResourceDetail } from '@/components/resources/ResourceDetail'
 
 interface ResourceDetailPageProps {
   params: Promise<{
@@ -78,31 +79,7 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          {resource.name}
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Resource Detail Page (Coming Soon)
-        </Typography>
-      </Box>
-
-      <Alert severity="info">
-        This is a placeholder for the full resource detail page. Will be implemented in Phase 3.3.
-      </Alert>
-
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Resource Info:
-        </Typography>
-        <Typography>ID: {resource.id}</Typography>
-        <Typography>Name: {resource.name}</Typography>
-        {resource.slug && <Typography>Slug: {resource.slug}</Typography>}
-        {resource.state && <Typography>State: {resource.state}</Typography>}
-        {resource.city && <Typography>City: {resource.city}</Typography>}
-        <Typography>Address: {resource.address}</Typography>
-        <Typography>Category: {resource.primary_category}</Typography>
-      </Box>
+      <ResourceDetail resource={resource} />
     </Container>
   )
 }
