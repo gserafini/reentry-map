@@ -39,32 +39,20 @@ export function extractStateFromAddress(address: string | null): string | null {
 }
 
 /**
- * Extract county from address or resource name
+ * Extract city from address
  * @param address - Address string
- * @param name - Resource name
- * @returns County name as slug, or null if not found
+ * @returns City name as slug, or null if not found
  * @example
- * extractCountyFromAddress("123 Main St, Oakland, CA", "Alameda County Services") → "alameda"
+ * extractCityFromAddress("123 Main St, Oakland, CA 94601") → "oakland"
  */
-export function extractCountyFromAddress(
-  address: string | null,
-  name: string | null
-): string | null {
-  // Try to find "County" in the resource name first
-  if (name) {
-    const countyMatch = name.match(/([A-Za-z\s]+)\s+County/i)
-    if (countyMatch) {
-      return generateSlug(countyMatch[1])
-    }
-  }
+export function extractCityFromAddress(address: string | null): string | null {
+  if (!address) return null
 
-  // Try to extract city/county from address (between commas)
-  if (address) {
-    const parts = address.split(',').map((p) => p.trim())
-    if (parts.length >= 2) {
-      // Second part is usually city/county
-      return generateSlug(parts[1])
-    }
+  // Extract city from address (between first and second comma)
+  const parts = address.split(',').map((p) => p.trim())
+  if (parts.length >= 2) {
+    // Second part is usually the city
+    return generateSlug(parts[1])
   }
 
   return null
@@ -72,39 +60,40 @@ export function extractCountyFromAddress(
 
 /**
  * Generate full SEO-friendly URL path for a resource
- * @param name - Resource name
- * @param address - Resource address
- * @param fallbackId - UUID to use if slug generation fails
- * @returns URL path in format: /resources/[state]/[county]/[slug]
+ * Uses database fields (slug, state, city) when available, falls back to UUID
+ * @param slug - SEO slug from database
+ * @param state - State code from database
+ * @param city - City slug from database
+ * @param fallbackId - UUID to use if SEO fields are missing
+ * @returns URL path in format: /resources/[state]/[city]/[slug] or /resources/[id]
  * @example
- * generateResourcePath("Alameda County Health", "123 Main, Oakland, CA")
- * → "/resources/ca/alameda/alameda-county-health"
+ * generateResourcePath("alameda-county-health", "ca", "oakland", "uuid")
+ * → "/resources/ca/oakland/alameda-county-health"
+ * generateResourcePath(null, null, null, "7e1a2f1b-...") → "/resources/7e1a2f1b-..."
  */
 export function generateResourcePath(
-  name: string,
-  address: string | null,
-  fallbackId?: string
+  slug: string | null,
+  state: string | null,
+  city: string | null,
+  fallbackId: string
 ): string {
-  const state = extractStateFromAddress(address)
-  const county = extractCountyFromAddress(address, name)
-  const slug = generateSlug(name)
-
-  // If we can't generate proper location info, fall back to UUID
-  if (!state || !county) {
-    return fallbackId ? `/resources/${fallbackId}` : `/resources/${slug}`
+  // Use SEO-friendly URL if all fields are present
+  if (slug && state && city) {
+    return `/resources/${state}/${city}/${slug}`
   }
 
-  return `/resources/${state}/${county}/${slug}`
+  // Fall back to UUID
+  return `/resources/${fallbackId}`
 }
 
 /**
  * Parse a resource slug path into components
- * @param path - URL path (e.g., "/resources/ca/alameda/resource-name")
+ * @param path - URL path (e.g., "/resources/ca/oakland/resource-name")
  * @returns Parsed components or null if invalid
  */
 export function parseResourcePath(path: string): {
   state: string
-  county: string
+  city: string
   slug: string
 } | null {
   const match = path.match(/^\/resources\/([a-z]{2})\/([a-z0-9-]+)\/([a-z0-9-]+)$/)
@@ -113,7 +102,7 @@ export function parseResourcePath(path: string): {
 
   return {
     state: match[1],
-    county: match[2],
+    city: match[2],
     slug: match[3],
   }
 }
