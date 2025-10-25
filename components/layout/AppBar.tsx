@@ -4,10 +4,9 @@ import { AppBar as MuiAppBar, Toolbar, IconButton, Box, Container, Button } from
 import { Menu as MenuIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { theme } from '@/lib/theme'
-import { SearchBar } from '@/components/search/SearchBar'
-import { LocationInput } from '@/components/search/LocationInput'
+import { HeroSearch } from '@/components/search/HeroSearch'
 
 interface AppBarProps {
   authButton?: React.ReactNode
@@ -15,20 +14,11 @@ interface AppBarProps {
 }
 
 export function AppBar({ authButton, showSearch = false }: AppBarProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   // Read current search query from URL to populate search input
   const currentSearch = searchParams.get('search') || ''
 
-  const handleSearch = (query: string) => {
-    if (query.trim()) {
-      router.push(`/search?search=${encodeURIComponent(query.trim())}`)
-    } else {
-      // If empty search, go to search page
-      router.push('/search')
-    }
-  }
   return (
     <MuiAppBar
       position="sticky"
@@ -36,7 +26,15 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
       sx={{ bgcolor: theme.colors.brand, color: theme.colors.brandText }}
     >
       <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ gap: 2, color: theme.colors.brandText }}>
+        <Toolbar
+          disableGutters
+          sx={{
+            gap: 2,
+            color: theme.colors.brandText,
+            minHeight: { xs: 64, md: 80 }, // Taller toolbar to accommodate search
+            py: 1.5,
+          }}
+        >
           {/* Logo / Brand */}
           <Link href="/" style={{ textDecoration: 'none' }}>
             <Box
@@ -45,7 +43,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
                 alignItems: 'center',
                 position: 'relative',
                 height: 50,
-                flexGrow: { xs: 1, sm: 0 },
+                flexGrow: { xs: showSearch ? 0 : 1, sm: 0 },
               }}
             >
               <Image
@@ -64,7 +62,14 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
           </Link>
 
           {/* Desktop Navigation */}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, flexGrow: 1, ml: 4 }}>
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              gap: 1,
+              flexGrow: showSearch ? 0 : 1,
+              ml: 4,
+            }}
+          >
             <Link href="/resources" style={{ textDecoration: 'none' }}>
               <Button color="inherit">Resources</Button>
             </Link>
@@ -76,41 +81,16 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </Link>
           </Box>
 
-          {/* Dual search (desktop): What + Where */}
+          {/* HeroSearch - shown on both desktop and mobile when showSearch is true */}
           {showSearch && (
             <Box
               sx={{
-                display: { xs: 'none', md: 'flex' },
                 flexGrow: 1,
-                maxWidth: 600,
-                mx: 2,
-                bgcolor: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: '24px',
-                overflow: 'hidden',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                '&:hover': {
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-                },
+                maxWidth: 700,
+                mx: { xs: 1, md: 2 },
               }}
             >
-              <Box sx={{ flex: '1 1 60%', borderRight: '1px solid rgba(0,0,0,0.1)' }}>
-                <SearchBar
-                  value={currentSearch}
-                  onSubmit={handleSearch}
-                  placeholder="What are you looking for?"
-                  size="small"
-                  showCategoryDropdown
-                  inputSx={{
-                    bgcolor: 'transparent',
-                    '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                  }}
-                />
-              </Box>
-              <Box sx={{ flex: '1 1 40%' }}>
-                <LocationInput size="small" fullWidth />
-              </Box>
+              <HeroSearch initialValue={currentSearch} />
             </Box>
           )}
 
@@ -128,31 +108,6 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </IconButton>
           </Box>
         </Toolbar>
-
-        {/* Mobile dual search (second row on mobile) */}
-        {showSearch && (
-          <Box
-            sx={{
-              display: { xs: 'flex', md: 'none' },
-              flexDirection: 'column',
-              gap: 1,
-              pb: 1.5,
-              pt: 0.5,
-            }}
-          >
-            <SearchBar
-              value={currentSearch}
-              onSubmit={handleSearch}
-              placeholder="What are you looking for?"
-              inputSx={{
-                bgcolor: 'rgba(255, 255, 255, 0.15)',
-                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
-                '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
-              }}
-            />
-            <LocationInput size="small" fullWidth />
-          </Box>
-        )}
       </Container>
     </MuiAppBar>
   )

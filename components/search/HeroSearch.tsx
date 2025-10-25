@@ -1,18 +1,30 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { TextField, Button, Box } from '@mui/material'
 import { Search as SearchIcon } from '@mui/icons-material'
 import { useRouter } from 'next/navigation'
 import { LocationInput } from './LocationInput'
 
+interface HeroSearchProps {
+  /**
+   * Initial search query value (e.g., from URL params)
+   */
+  initialValue?: string
+}
+
 /**
  * Hero section search component
  * Dual search: What + Where
  */
-export function HeroSearch() {
-  const [searchQuery, setSearchQuery] = useState('')
+export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
+  const [searchQuery, setSearchQuery] = useState(initialValue)
   const router = useRouter()
+
+  // Update when initialValue changes (e.g., URL navigation)
+  useEffect(() => {
+    setSearchQuery(initialValue)
+  }, [initialValue])
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
