@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { useMediaQuery, useTheme } from '@mui/material'
 import { AppBar } from './AppBar'
 
 interface ClientAppBarProps {
@@ -10,11 +11,14 @@ interface ClientAppBarProps {
 
 /**
  * Client wrapper for AppBar that handles:
- * - Show search on all pages except homepage
- * - On homepage, show search when scrolled past hero (500px)
+ * - Mobile: Always show search bar as second row
+ * - Desktop: Show search on all pages except homepage
+ * - Desktop homepage: Show search when scrolled past hero (500px)
  */
 export function ClientAppBar({ authButton }: ClientAppBarProps) {
   const pathname = usePathname()
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const isHomepage = pathname === '/'
   const [isScrolled, setIsScrolled] = useState(false)
 
@@ -30,8 +34,9 @@ export function ClientAppBar({ authButton }: ClientAppBarProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [isHomepage])
 
-  // Show search if not homepage OR if homepage and scrolled
-  const showSearch = !isHomepage || isScrolled
+  // Mobile: always show search
+  // Desktop: show if not homepage OR if homepage and scrolled
+  const showSearch = isMobile || !isHomepage || isScrolled
 
   return <AppBar authButton={authButton} showSearch={showSearch} />
 }

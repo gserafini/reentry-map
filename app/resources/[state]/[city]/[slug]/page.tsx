@@ -5,27 +5,27 @@ import { createClient } from '@/lib/supabase/server'
 interface ResourceDetailPageProps {
   params: Promise<{
     state: string
-    county: string
+    city: string
     slug: string
   }>
 }
 
 /**
  * Resource Detail Page with SEO-friendly URLs
- * Route: /resources/[state]/[county]/[slug]
- * Example: /resources/ca/alameda/alameda-county-health-services
+ * Route: /resources/[state]/[city]/[slug]
+ * Example: /resources/ca/oakland/oakland-job-center
  */
 export default async function ResourceDetailPage({ params }: ResourceDetailPageProps) {
-  const { state, county, slug } = await params
+  const { state, city, slug } = await params
   const supabase = await createClient()
 
-  // Query by slug, state, and county for accuracy
+  // Query by slug, state, and city for accuracy
   const { data: resource, error } = await supabase
     .from('resources')
     .select('*')
     .eq('slug', slug)
     .eq('state', state)
-    .eq('county', county)
+    .eq('city', city)
     .eq('status', 'active')
     .single()
 
@@ -55,7 +55,7 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
         <Typography>ID: {resource.id}</Typography>
         <Typography>Slug: {resource.slug}</Typography>
         <Typography>State: {resource.state}</Typography>
-        <Typography>County: {resource.county}</Typography>
+        <Typography>City: {resource.city}</Typography>
         <Typography>Address: {resource.address}</Typography>
       </Box>
     </Container>

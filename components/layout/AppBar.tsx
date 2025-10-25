@@ -110,16 +110,6 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
 
           {/* Right side actions */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Link
-              href="/resources?search=true"
-              aria-label="Search resources"
-              style={{ textDecoration: 'none' }}
-            >
-              <IconButton color="inherit" sx={{ display: { xs: 'flex', sm: 'none' } }}>
-                <SearchIcon />
-              </IconButton>
-            </Link>
-
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{authButton}</Box>
 
             {/* Mobile menu button */}
@@ -132,6 +122,39 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </IconButton>
           </Box>
         </Toolbar>
+
+        {/* Mobile search bar (second row on mobile) */}
+        {showSearch && (
+          <Box
+            component="form"
+            onSubmit={handleSearch}
+            sx={{
+              display: { xs: 'block', md: 'none' },
+              pb: 1.5,
+              pt: 0.5,
+            }}
+          >
+            <TextField
+              size="small"
+              placeholder="Search resources..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              fullWidth
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                sx: {
+                  bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
+                  '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
+                },
+              }}
+            />
+          </Box>
+        )}
       </Container>
     </MuiAppBar>
   )

@@ -38,7 +38,7 @@ export function ResourceList({ resources, onFavorite, userLocation }: ResourceLi
           website: r.website ?? null,
           slug: r.slug ?? null,
           state: r.state ?? null,
-          county: r.county ?? null,
+          city: r.city ?? null,
         }
 
         return (

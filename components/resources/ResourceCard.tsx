@@ -26,7 +26,7 @@ export type ResourceCardResource = {
   website?: string | null
   slug?: string | null
   state?: string | null
-  county?: string | null
+  city?: string | null
 }
 
 interface ResourceCardProps {
@@ -55,10 +55,10 @@ export function ResourceCard({ resource, onFavorite, userLocation }: ResourceCar
       ? haversineDistance({ lat: resource.latitude, lng: resource.longitude }, userLocation)
       : null
 
-  // Generate SEO-friendly URL if slug/state/county available, otherwise use UUID
+  // Generate SEO-friendly URL if slug/state/city available, otherwise use UUID
   const resourceUrl =
-    resource.slug && resource.state && resource.county
-      ? `/resources/${resource.state}/${resource.county}/${resource.slug}`
+    resource.slug && resource.state && resource.city
+      ? `/resources/${resource.state}/${resource.city}/${resource.slug}`
       : `/resources/${resource.id}`
 
   return (
