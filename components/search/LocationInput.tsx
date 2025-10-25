@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { TextField, MenuItem, ListItemIcon, ListItemText, CircularProgress } from '@mui/material'
 import { MyLocation as MyLocationIcon, Place as PlaceIcon } from '@mui/icons-material'
-import { Loader } from '@googlemaps/js-api-loader'
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import { env } from '@/lib/env'
 
@@ -47,15 +47,10 @@ export function LocationInput({
       return
     }
 
-    const loader = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places'],
-    })
+    // Use new functional API - must set options before importing library
+    setOptions({ key: apiKey, v: 'weekly' })
 
-    // Use type assertion for loader API (type definitions may be outdated)
-    ;(loader as { load: () => Promise<void> })
-      .load()
+    importLibrary('places')
       .then(() => {
         if (window.google?.maps?.places) {
           setAutocompleteService(new google.maps.places.AutocompleteService())
