@@ -74,14 +74,15 @@ export function getCategoryPhrase(category: ResourceCategory): string {
 }
 
 /**
- * Parse SEO-friendly URL like "find-a-job-in-oakland-ca"
+ * Parse SEO-friendly URL slug like "employment-in-oakland-ca"
+ * (Note: the slug doesn't include "find-" prefix, that's in the route path)
  * Returns { category, city, state } or null if invalid
  */
 export function parseSeoUrl(
   slug: string
 ): { category: ResourceCategory; city: string; state: string } | null {
-  // Pattern: find-{category}-in-{city}-{state}
-  const match = slug.match(/^find-(.+)-in-(.+)-([a-z]{2})$/i)
+  // Pattern: {category}-in-{city}-{state}
+  const match = slug.match(/^(.+)-in-(.+)-([a-z]{2})$/i)
   if (!match) return null
 
   const [, categoryPhrase, city, state] = match
