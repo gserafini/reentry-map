@@ -7,21 +7,21 @@ import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { parseSeoUrl, getCategoryPhrase, generateSeoIntro } from '@/lib/utils/seo-routes'
 import type { Metadata } from 'next'
 
-interface SeoLandingPageProps {
+interface HyperlocalSearchPageProps {
   params: Promise<{
     slug: string
   }>
 }
 
 /**
- * SEO-friendly localized landing pages
- * URL pattern: /find/{category}-in-{city}-{state}/
+ * Hyperlocal SEO landing pages
+ * URL pattern: /search/{category}-in-{city}-{state}/
  * Examples:
- * - /find/employment-in-oakland-ca/
- * - /find/housing-in-san-francisco-ca/
- * - /find/food-assistance-in-berkeley-ca/
+ * - /search/employment-in-oakland-ca/
+ * - /search/housing-in-san-francisco-ca/
+ * - /search/food-assistance-in-berkeley-ca/
  */
-export default async function SeoLandingPage({ params }: SeoLandingPageProps) {
+export default async function HyperlocalSearchPage({ params }: HyperlocalSearchPageProps) {
   const { slug } = await params
 
   // Parse the SEO-friendly URL
@@ -119,7 +119,7 @@ export default async function SeoLandingPage({ params }: SeoLandingPageProps) {
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: SeoLandingPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: HyperlocalSearchPageProps): Promise<Metadata> {
   const { slug } = await params
 
   // Parse the SEO-friendly URL

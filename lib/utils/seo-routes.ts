@@ -107,7 +107,7 @@ export function generateSeoUrl(category: ResourceCategory, city: string, state: 
   const citySlug = city.toLowerCase().replace(/\s+/g, '-')
   const stateSlug = state.toLowerCase()
 
-  return `/find/${categoryPhrase}-in-${citySlug}-${stateSlug}`
+  return `/search/${categoryPhrase}-in-${citySlug}-${stateSlug}`
 }
 
 /**
