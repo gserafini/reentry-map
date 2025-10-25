@@ -104,14 +104,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
                 />
               </Box>
               <Box sx={{ flex: '1 1 40%' }}>
-                <LocationInput
-                  onLocationChange={() => {
-                    // Re-trigger search when location changes
-                    // This will update distance sorting if user is on search page
-                  }}
-                  size="small"
-                  fullWidth
-                />
+                <LocationInput size="small" fullWidth />
               </Box>
             </Box>
           )}
@@ -151,13 +144,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
                 '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
               }}
             />
-            <LocationInput
-              onLocationChange={() => {
-                // Re-trigger search when location changes
-              }}
-              size="small"
-              fullWidth
-            />
+            <LocationInput size="small" fullWidth />
           </Box>
         )}
       </Container>

@@ -8,7 +8,6 @@ import { useUserLocation } from '@/lib/context/LocationContext'
 import { env } from '@/lib/env'
 
 interface LocationInputProps {
-  onLocationChange?: () => void
   fullWidth?: boolean
   size?: 'small' | 'medium'
 }
@@ -17,11 +16,7 @@ interface LocationInputProps {
  * LocationInput with "Current Location" option and Google Places Autocomplete
  * Dropdown location picker for header search
  */
-export function LocationInput({
-  onLocationChange,
-  fullWidth = false,
-  size = 'medium',
-}: LocationInputProps) {
+export function LocationInput({ fullWidth = false, size = 'medium' }: LocationInputProps) {
   const { displayName, requestLocation, setManualLocation, loading } = useUserLocation()
   const [inputValue, setInputValue] = useState('')
   const [hoverText, setHoverText] = useState('')
@@ -97,8 +92,9 @@ export function LocationInput({
   // Handle "Current Location" selection
   const handleCurrentLocation = () => {
     requestLocation()
+    setInputValue('Current Location')
     setShowDropdown(false)
-    onLocationChange?.()
+    // Don't call onLocationChange - let user press Enter to submit
   }
 
   // Handle place selection from autocomplete
@@ -122,7 +118,7 @@ export function LocationInput({
         setInputValue(description)
         setShowDropdown(false)
         setPredictions([])
-        onLocationChange?.()
+        // Don't call onLocationChange - let user press Enter to submit
       }
     } catch (err) {
       console.error('Error fetching place details:', err)
