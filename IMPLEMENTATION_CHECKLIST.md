@@ -1433,6 +1433,53 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ---
 
+## Post-MVP Enhancements
+
+### Homepage Hero Background Image
+
+**Goal**: Add an engaging, trauma-informed background image to the hero section that feels peaceful, hopeful, and relevant to reentry resources.
+
+**Requirements**:
+
+- Pull from Unsplash API (or store URL in database for admin configurability)
+- Optimize for both desktop and mobile (responsive images)
+- Target Lighthouse 100 performance score
+- Admin-configurable without code deployment (store in Supabase settings table)
+- Use Next.js Image component with proper sizing and formats (WebP, AVIF)
+- Implement blur-up loading for smooth UX
+
+**Implementation Approach**:
+
+1. **Image Selection & Storage**:
+   - Create `site_settings` table in Supabase with `hero_image_url` field
+   - Admin can paste Unsplash URL or upload custom image
+   - Store multiple sizes/formats for responsive delivery
+
+2. **Performance Optimization**:
+   - Use Next.js `<Image>` component with priority loading
+   - Generate multiple srcset sizes (375w, 768w, 1024w, 1920w)
+   - Serve WebP/AVIF with JPEG fallback
+   - Implement blur placeholder from low-res version
+   - Lazy load below-the-fold content
+
+3. **Admin Interface** (Phase 9+):
+   - Add "Hero Image" settings in admin dashboard
+   - Preview before saving
+   - Validate image dimensions and file size
+   - Option to revert to default
+
+4. **Design Considerations**:
+   - Peaceful imagery: nature, sunrises/sunsets, open spaces, community
+   - Avoid: jail imagery, law enforcement, anything triggering
+   - Consider: hands helping, paths/roads (journey), light/hope themes
+   - Ensure text overlay remains readable (gradient overlay may be needed)
+
+**Estimated Time**: 1-2 sessions
+**Dependencies**: Phase 9 (Admin Dashboard), Phase 2 (Database)
+**Priority**: Medium (Nice-to-have for launch, not critical)
+
+---
+
 ## Ongoing Maintenance
 
 ### Daily Tasks (Post-Launch)
@@ -1453,9 +1500,9 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ## Current Status
 
-**Phase**: 1-2 (UI Library partially complete, Database 100% complete)
-**Progress**: Phase 0: 100%, Phase 1: ~50%, Phase 2: 100% ✅
-**Next Session Goal**: Complete Phase 1 (HeroUI migration) OR start Phase 3 (Resource List & Detail Pages)
+**Phase**: 3 (Core Resource Features)
+**Progress**: Phase 0: 100% ✅, Phase 1: 100% ✅, Phase 2: 100% ✅, Phase 3: ~85% (3.1-3.5 complete, working on 3.6 Pagination)
+**Next Session Goal**: Complete Phase 3.6 (Pagination) and 3.7 (Sorting)
 
 ---
 
