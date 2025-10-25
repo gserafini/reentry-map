@@ -1,21 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  AppBar as MuiAppBar,
-  Toolbar,
-  IconButton,
-  Box,
-  Container,
-  Button,
-  TextField,
-  InputAdornment,
-} from '@mui/material'
-import { Menu as MenuIcon, Search as SearchIcon } from '@mui/icons-material'
+import { AppBar as MuiAppBar, Toolbar, IconButton, Box, Container, Button } from '@mui/material'
+import { Menu as MenuIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { theme } from '@/lib/theme'
+import { SearchBar } from '@/components/search/SearchBar'
 
 interface AppBarProps {
   authButton?: React.ReactNode
@@ -23,13 +14,11 @@ interface AppBarProps {
 }
 
 export function AppBar({ authButton, showSearch = false }: AppBarProps) {
-  const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      router.push(`/resources?search=${encodeURIComponent(searchQuery.trim())}`)
+  const handleSearch = (query: string) => {
+    if (query.trim()) {
+      router.push(`/resources?search=${encodeURIComponent(query.trim())}`)
     }
   }
   return (
@@ -81,28 +70,13 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
 
           {/* Search bar (desktop) */}
           {showSearch && (
-            <Box
-              component="form"
-              onSubmit={handleSearch}
-              sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1, maxWidth: 400, mx: 2 }}
-            >
-              <TextField
-                size="small"
-                placeholder="Search resources..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    bgcolor: 'rgba(255, 255, 255, 0.15)',
-                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
-                    '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
-                  },
+            <Box sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1, maxWidth: 400, mx: 2 }}>
+              <SearchBar
+                onSubmit={handleSearch}
+                inputSx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
+                  '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
                 }}
               />
             </Box>
@@ -126,31 +100,18 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
         {/* Mobile search bar (second row on mobile) */}
         {showSearch && (
           <Box
-            component="form"
-            onSubmit={handleSearch}
             sx={{
               display: { xs: 'block', md: 'none' },
               pb: 1.5,
               pt: 0.5,
             }}
           >
-            <TextField
-              size="small"
-              placeholder="Search resources..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-                sx: {
-                  bgcolor: 'rgba(255, 255, 255, 0.15)',
-                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
-                  '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
-                },
+            <SearchBar
+              onSubmit={handleSearch}
+              inputSx={{
+                bgcolor: 'rgba(255, 255, 255, 0.15)',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' },
+                '&.Mui-focused': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
               }}
             />
           </Box>
