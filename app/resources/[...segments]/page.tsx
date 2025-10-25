@@ -15,8 +15,9 @@ interface ResourceDetailPageProps {
  *
  * Current formats:
  * - 1 segment:  /resources/{uuid} → Single resource by ID
- * - 2 segments: /resources/category/{category} → Category listings (redirects to /resources?category={category})
  * - 3 segments: /resources/{state}/{city}/{slug} → Single resource by SEO
+ *
+ * Note: Category listings now have dedicated route at /resources/category/[category]
  *
  * Future extensibility (easy to add):
  * - 2 segments: /resources/{state}/{city} → City resource listings
@@ -46,12 +47,6 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
     if (error) {
       notFound()
     }
-  } else if (segments.length === 2 && segments[0] === 'category') {
-    // Category listing format: /resources/category/{category}
-    // This should redirect to the main resources page with category filter
-    const [, category] = segments
-    const { redirect } = await import('next/navigation')
-    redirect(`/resources?categories=${category}`)
   } else if (segments.length === 3) {
     // SEO format: /resources/{state}/{city}/{slug}
     const [state, city, slug] = segments

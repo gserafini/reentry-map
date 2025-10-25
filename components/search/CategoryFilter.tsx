@@ -18,7 +18,7 @@ import {
   ExpandLess as ExpandLessIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import type { ResourceCategory } from '@/lib/types/database'
 import { getAllCategories, getCategoryLabel } from '@/lib/utils/categories'
 
@@ -34,20 +34,28 @@ interface CategoryFilterProps {
  * - Multi-select checkboxes for all categories
  * - Shows resource count per category
  * - Clear all filters button
- * - Updates URL params on filter change
+ * - Updates URL params on filter change (SEO-friendly for single category)
  * - Collapsible on mobile
  * - Fully accessible
  */
 export function CategoryFilter({ categoryCounts, defaultExpanded = true }: CategoryFilterProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [expanded, setExpanded] = React.useState(defaultExpanded)
 
-  // Get selected categories from URL params
+  // Get selected categories from URL (both query params and pathname)
   const selectedCategories = React.useMemo(() => {
+    // Check if we're on a category page (/resources/category/{category})
+    const categoryMatch = pathname.match(/\/resources\/category\/([^\/]+)/)
+    if (categoryMatch) {
+      return [categoryMatch[1]]
+    }
+
+    // Otherwise check query params
     const categories = searchParams.get('categories')
     return categories ? categories.split(',').filter(Boolean) : []
-  }, [searchParams])
+  }, [searchParams, pathname])
 
   const handleCategoryToggle = (category: ResourceCategory) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -61,19 +69,33 @@ export function CategoryFilter({ categoryCounts, defaultExpanded = true }: Categ
       newCategories = [...selectedCategories, category]
     }
 
-    if (newCategories.length > 0) {
+    // Use SEO-friendly URLs for single category, query params for multiple or none
+    if (newCategories.length === 1) {
+      // Single category: use SEO-friendly URL
+      const search = params.get('search')
+      if (search) {
+        router.push(`/resources/category/${newCategories[0]}?search=${encodeURIComponent(search)}`)
+      } else {
+        router.push(`/resources/category/${newCategories[0]}`)
+      }
+    } else if (newCategories.length > 1) {
+      // Multiple categories: use query params
       params.set('categories', newCategories.join(','))
+      router.push(`/resources?${params.toString()}`)
     } else {
+      // No categories: go to main resources page
       params.delete('categories')
+      router.push(`/resources?${params.toString()}`)
     }
-
-    router.push(`/resources?${params.toString()}`)
   }
 
   const handleClearAll = () => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('categories')
-    router.push(`/resources?${params.toString()}`)
+
+    // Navigate to main resources page (preserving search if present)
+    const queryString = params.toString()
+    router.push(queryString ? `/resources?${queryString}` : '/resources')
   }
 
   const categories = getAllCategories()
