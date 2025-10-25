@@ -414,56 +414,56 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - Filter types: `ResourceFilters`, `PaginationParams`, `ResourceSort`
 - Query result types: `ResourceListItem`, `ResourceWithDistance`, `ResourceWithInteractions`
 
-### 3.2 Resource List Page
+### 3.2 Resource List Page ✅
 
-#### 3.2.1 Server Component
+#### 3.2.1 Server Component ✅
 
-- [ ] Create `app/resources/page.tsx` (Server Component)
-- [ ] Fetch resources from Supabase
-- [ ] Handle empty state
-- [ ] Handle error state
-- [ ] Pass data to client components
-- [ ] Add loading.tsx
-- [ ] Add error.tsx
+- [x] Create `app/resources/page.tsx` (Server Component)
+- [x] Fetch resources from Supabase
+- [x] Handle empty state (via ResourceList component)
+- [x] Handle error state (Alert component with error message)
+- [x] Pass data to client components
+- [x] Add loading.tsx (with Skeleton components)
+- [x] Add error.tsx
 
-#### 3.2.2 ResourceCard Component
+#### 3.2.2 ResourceCard Component ✅
 
-- [ ] Create `components/resources/ResourceCard.tsx`
-- [ ] Display resource name, category, address
-- [ ] Show distance (if available)
-- [ ] Show rating
-- [ ] Add click to detail page
-- [ ] Style with UI library components
-- [ ] Write component tests
-- [ ] Test accessibility
+- [x] Create `components/resources/ResourceCard.tsx`
+- [x] Display resource name, category, address
+- [x] Show distance (if available) (haversine calculation)
+- [x] Show rating (Material UI Rating component)
+- [x] Add click to detail page (SEO-friendly URLs with UUID fallback)
+- [x] Style with UI library components (Material UI v7)
+- [x] Write component tests (`__tests__/ResourceCard.test.tsx`)
+- [x] Test accessibility (`e2e/accessibility.spec.ts`)
 
-#### 3.2.3 ResourceList Component
+#### 3.2.3 ResourceList Component ✅
 
-- [ ] Create `components/resources/ResourceList.tsx`
-- [ ] Render grid of ResourceCard components
-- [ ] Implement loading skeleton
-- [ ] Implement empty state
-- [ ] Make responsive (mobile-first)
-- [ ] Write component tests
-- [ ] **DEMO**: Show resource list with sample data
+- [x] Create `components/resources/ResourceList.tsx`
+- [x] Render grid of ResourceCard components (Material UI Grid v7)
+- [x] Implement loading skeleton (in app/resources/loading.tsx)
+- [x] Implement empty state ("No resources found" message)
+- [x] Make responsive (mobile-first with breakpoints: xs, sm, md)
+- [x] Write component tests (`__tests__/ResourceList.test.tsx`)
+- [x] **DEMO**: Show resource list with sample data (working at /resources)
 
-#### 3.2.4 Integration Verification & Quality Check
+#### 3.2.4 Integration Verification & Quality Check ✅
 
 **CRITICAL**: Verify all components work together before proceeding
 
-- [ ] Run `npm run type-check` or `npx tsc --noEmit` - MUST pass with 0 errors
-- [ ] Run `npm run lint` - MUST pass with 0 errors
-- [ ] Run `npm run test:run` - All tests MUST pass
-- [ ] Run `npm run build` - Build MUST succeed
-- [ ] Verify all imports resolve correctly
-- [ ] Check for any unused imports or variables
-- [ ] Test actual page rendering in dev mode (`npm run dev`)
-- [ ] Verify data flows correctly: Server Component → Client Component → Display
-- [ ] Check console for runtime errors or warnings
-- [ ] Test mobile responsiveness (375px, 768px, 1024px)
-- [ ] **VERIFY**: Components integrate properly with no TS/runtime errors
+- [x] Run `npm run type-check` or `npx tsc --noEmit` - MUST pass with 0 errors
+- [x] Run `npm run lint` - MUST pass with 0 errors
+- [x] Run `npm run test:run` - All tests MUST pass (6/6 passing)
+- [x] Run `npm run build` - Build MUST succeed
+- [x] Verify all imports resolve correctly
+- [x] Check for any unused imports or variables
+- [x] Test actual page rendering in dev mode (`npm run dev`)
+- [x] Verify data flows correctly: Server Component → Client Component → Display
+- [x] Check console for runtime errors or warnings
+- [x] Test mobile responsiveness (375px, 768px, 1024px)
+- [x] **VERIFY**: Components integrate properly with no TS/runtime errors
 
-**If ANY check fails**: Stop and fix before proceeding to next phase
+**✅ PHASE 3.2 COMPLETE**: All checks passed
 
 ### 3.3 Resource Detail Page
 
