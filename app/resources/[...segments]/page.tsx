@@ -51,7 +51,7 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
     // This should redirect to the main resources page with category filter
     const [, category] = segments
     const { redirect } = await import('next/navigation')
-    redirect(`/resources?category=${category}`)
+    redirect(`/resources?categories=${category}`)
   } else if (segments.length === 3) {
     // SEO format: /resources/{state}/{city}/{slug}
     const [state, city, slug] = segments
