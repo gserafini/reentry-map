@@ -25,8 +25,8 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
       elevation={1}
       sx={{ bgcolor: theme.colors.brand, color: theme.colors.brandText }}
     >
+      {/* First row: Logo, Navigation, Auth */}
       <Container maxWidth="lg">
-        {/* First row: Logo, Navigation, Auth */}
         <Toolbar
           disableGutters
           sx={{
@@ -110,22 +110,22 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </IconButton>
           </Box>
         </Toolbar>
-
-        {/* Second row: Mobile search (below toolbar) */}
-        {showSearch && (
-          <Box
-            sx={{
-              display: { xs: 'block', md: 'none' },
-              pb: 2,
-              pt: 2,
-              px: 2,
-              bgcolor: '#f5f5f5', // Light grey background
-            }}
-          >
-            <HeroSearch initialValue={currentSearch} />
-          </Box>
-        )}
       </Container>
+
+      {/* Second row: Mobile search (full-width grey bar below yellow header) */}
+      {showSearch && (
+        <Box
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            bgcolor: '#f5f5f5', // Light grey background
+            borderTop: '1px solid rgba(0,0,0,0.08)',
+          }}
+        >
+          <Container maxWidth="lg" sx={{ py: 2 }}>
+            <HeroSearch initialValue={currentSearch} />
+          </Container>
+        </Box>
+      )}
     </MuiAppBar>
   )
 }
