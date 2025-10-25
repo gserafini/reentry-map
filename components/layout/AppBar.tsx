@@ -117,7 +117,9 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             sx={{
               display: { xs: 'block', md: 'none' },
               pb: 2,
-              pt: 0,
+              pt: 2,
+              px: 2,
+              bgcolor: '#f5f5f5', // Light grey background
             }}
           >
             <HeroSearch initialValue={currentSearch} />
