@@ -5,7 +5,6 @@ import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
-import { NearMeButton } from '@/components/search/NearMeButton'
 import { parseSortParam } from '@/lib/utils/sort'
 import type { Metadata } from 'next'
 
@@ -78,6 +77,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
           {/* Sort and Near Me controls */}
+          {/* Sort dropdown - location input is now in header */}
           {hasResults && (
             <Box
               sx={{
@@ -88,7 +88,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 alignItems: 'center',
               }}
             >
-              <NearMeButton />
               <SortDropdown />
             </Box>
           )}
