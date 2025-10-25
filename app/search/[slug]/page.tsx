@@ -5,6 +5,7 @@ import { getResources, getCategoryCounts } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { parseSeoUrl, getCategoryPhrase, generateSeoIntro } from '@/lib/utils/seo-routes'
+import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import type { Metadata } from 'next'
 
 interface HyperlocalSearchPageProps {
@@ -61,6 +62,8 @@ export default async function HyperlocalSearchPage({ params }: HyperlocalSearchP
   const hasResults = resources && resources.length > 0
   const categoryPhrase = getCategoryPhrase(category)
   const seoIntro = generateSeoIntro(category, city, state)
+  const CategoryIcon = getCategoryIcon(category)
+  const categoryColor = getCategoryColor(category)
 
   // Capitalize city name
   const cityName = city
@@ -71,9 +74,12 @@ export default async function HyperlocalSearchPage({ params }: HyperlocalSearchP
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Find {categoryPhrase} in {cityName}, {state}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <CategoryIcon sx={{ fontSize: 48, color: categoryColor }} />
+          <Typography variant="h3" component="h1">
+            Find {categoryPhrase} in {cityName}, {state}
+          </Typography>
+        </Box>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
           {seoIntro}
         </Typography>
