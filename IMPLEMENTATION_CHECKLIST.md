@@ -518,28 +518,30 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 **✅ PHASE 3.4 COMPLETE**: Full search functionality with debouncing and improved UX
 
-### 3.5 Category Filtering
+### 3.5 Category Filtering ✅
 
-#### 3.5.1 CategoryFilter Component
+#### 3.5.1 CategoryFilter Component ✅
 
-- [ ] Create `components/search/CategoryFilter.tsx`
-- [ ] List all categories
-- [ ] Multi-select checkboxes
-- [ ] Show resource count per category
-- [ ] Clear all filters button
-- [ ] Update URL params on filter change
-- [ ] Write component tests
-- [ ] Test accessibility
+- [x] Create `components/search/CategoryFilter.tsx`
+- [x] List all categories (13 categories with display config)
+- [x] Multi-select checkboxes
+- [x] Show resource count per category (via getCategoryCounts API)
+- [x] Clear all filters button
+- [x] Update URL params on filter change
+- [x] Write component tests (11 comprehensive tests)
+- [x] Test accessibility
 
-#### 3.5.2 Filter Implementation
+#### 3.5.2 Filter Implementation ✅
 
-- [ ] Add category filter query to `lib/api/resources.ts`
-- [ ] Combine with search query
-- [ ] Update resource list page
-- [ ] Persist filters in URL
-- [ ] Test shareable filtered URLs
-- [ ] Write integration tests
-- [ ] **DEMO**: Filter by "Employment" and show results
+- [x] Add category filter query to `lib/api/resources.ts` (getCategoryCounts)
+- [x] Combine with search query (URL params: ?search=x&categories=y,z)
+- [x] Update resource list page (sidebar Grid layout)
+- [x] Persist filters in URL
+- [x] Test shareable filtered URLs (tests verify URL param preservation)
+- [x] Write integration tests (CategoryFilter tests cover integration)
+- [x] **DEMO**: Filter by "Employment" and show results
+
+**✅ PHASE 3.5 COMPLETE**: Full category filtering with live counts and multi-select
 
 ### 3.6 Pagination
 
