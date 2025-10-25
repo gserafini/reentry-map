@@ -271,6 +271,47 @@ export default async function HomePage() {
           </Button>
         </Link>
       </Container>
+
+      {/* SEO Landing Page Test Links (temporary for development) */}
+      <Box sx={{ bgcolor: 'background.default', py: 4, borderTop: 1, borderColor: 'divider' }}>
+        <Container maxWidth="lg">
+          <Typography variant="h6" gutterBottom>
+            Find Resources by Location (SEO Landing Pages)
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+            Test links for SEO-friendly localized pages
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <Link href="/find-employment-in-oakland-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Employment in Oakland, CA" clickable />
+            </Link>
+            <Link href="/find-housing-in-oakland-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Housing in Oakland, CA" clickable />
+            </Link>
+            <Link href="/find-food-assistance-in-oakland-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Food Assistance in Oakland, CA" clickable />
+            </Link>
+            <Link href="/find-employment-in-san-francisco-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Employment in San Francisco, CA" clickable />
+            </Link>
+            <Link href="/find-housing-in-berkeley-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Housing in Berkeley, CA" clickable />
+            </Link>
+            <Link href="/find-legal-aid-in-oakland-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Legal Aid in Oakland, CA" clickable />
+            </Link>
+            <Link
+              href="/find-mental-health-services-in-oakland-ca"
+              style={{ textDecoration: 'none' }}
+            >
+              <Chip label="Mental Health in Oakland, CA" clickable />
+            </Link>
+            <Link href="/find-transportation-in-oakland-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Transportation in Oakland, CA" clickable />
+            </Link>
+          </Box>
+        </Container>
+      </Box>
     </>
   )
 }
