@@ -10,7 +10,17 @@ export interface UseLocationResult {
   requestLocation: () => void
   clearLocation: () => void
   isSupported: boolean
+  lastUpdated: number | null // Unix timestamp of last location update
 }
+
+interface CachedLocation {
+  coordinates: Coordinates
+  timestamp: number
+}
+
+const LOCATION_CACHE_KEY = 'userLocation'
+const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes in milliseconds
+const REFRESH_INTERVAL = 2 * 60 * 1000 // Check every 2 minutes
 
 export type GeolocationError =
   | 'permission-denied'
@@ -20,15 +30,64 @@ export type GeolocationError =
   | 'unknown'
 
 /**
- * Custom hook for accessing browser geolocation
+ * Load cached location from localStorage
+ */
+function loadFromCache(): CachedLocation | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const cached = localStorage.getItem(LOCATION_CACHE_KEY)
+    if (!cached) return null
+
+    const parsed = JSON.parse(cached) as CachedLocation
+    const age = Date.now() - parsed.timestamp
+
+    // Return cached location if it's still fresh
+    if (age < CACHE_DURATION) {
+      return parsed
+    }
+
+    // Cache expired, remove it
+    localStorage.removeItem(LOCATION_CACHE_KEY)
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Save location to localStorage cache
+ */
+function saveToCache(coordinates: Coordinates): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    const cached: CachedLocation = {
+      coordinates,
+      timestamp: Date.now(),
+    }
+    localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cached))
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+/**
+ * Custom hook for accessing browser geolocation with caching and periodic refresh
  *
  * @param autoRequest - Whether to automatically request location on mount
  * @returns Location state and control functions
  *
+ * Features:
+ * - Caches location in localStorage for 2 minutes
+ * - Auto-loads cached location on mount
+ * - Periodic refresh every 2 minutes if location was previously granted
+ * - Provides lastUpdated timestamp
+ *
  * @example
  * ```tsx
  * function MyComponent() {
- *   const { coordinates, error, loading, requestLocation } = useLocation()
+ *   const { coordinates, error, loading, requestLocation, lastUpdated } = useLocation()
  *
  *   if (loading) return <p>Getting location...</p>
  *   if (error) return <p>Error: {error}</p>
@@ -42,6 +101,7 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null)
   const [error, setError] = useState<GeolocationError | null>(null)
   const [loading, setLoading] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
 
   // Check if geolocation is supported by the browser
   const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator
@@ -50,12 +110,17 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
    * Handle successful geolocation
    */
   const handleSuccess = useCallback((position: GeolocationPosition) => {
-    setCoordinates({
+    const coords = {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
-    })
+    }
+    setCoordinates(coords)
     setError(null)
     setLoading(false)
+    setLastUpdated(Date.now())
+
+    // Cache the location
+    saveToCache(coords)
   }, [])
 
   /**
@@ -107,6 +172,23 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     setCoordinates(null)
     setError(null)
     setLoading(false)
+    setLastUpdated(null)
+
+    // Clear cache
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(LOCATION_CACHE_KEY)
+    }
+  }, [])
+
+  /**
+   * Load cached location on mount
+   */
+  useEffect(() => {
+    const cached = loadFromCache()
+    if (cached) {
+      setCoordinates(cached.coordinates)
+      setLastUpdated(cached.timestamp)
+    }
   }, [])
 
   /**
@@ -118,6 +200,30 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     }
   }, [autoRequest, isSupported, requestLocation])
 
+  /**
+   * Set up periodic refresh if we have coordinates
+   */
+  useEffect(() => {
+    if (!coordinates || !isSupported) return
+
+    const intervalId = setInterval(() => {
+      // Silently refresh location in background
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        () => {
+          // Ignore errors on background refresh, keep using cached location
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 300000,
+        }
+      )
+    }, REFRESH_INTERVAL)
+
+    return () => clearInterval(intervalId)
+  }, [coordinates, isSupported, handleSuccess])
+
   return {
     coordinates,
     error,
@@ -125,6 +231,7 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     requestLocation,
     clearLocation,
     isSupported,
+    lastUpdated,
   }
 }
 
