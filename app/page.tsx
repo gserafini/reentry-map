@@ -2,7 +2,6 @@ import {
   Container,
   Box,
   Typography,
-  TextField,
   Button,
   Card,
   CardContent,
@@ -19,10 +18,10 @@ import {
   Gavel as LegalIcon,
   DirectionsBus as TransportIcon,
   School as EducationIcon,
-  Search as SearchIcon,
 } from '@mui/icons-material'
 import Link from 'next/link'
 import { getResources, getResourceCount } from '@/lib/api/resources'
+import { HeroSearch } from '@/components/search/HeroSearch'
 
 // Force dynamic rendering since we fetch data with Supabase server client
 export const dynamic = 'force-dynamic'
@@ -81,55 +80,7 @@ export default async function HomePage() {
             </Typography>
 
             {/* Search Bar */}
-            <Box
-              id="hero-search"
-              sx={{
-                display: 'flex',
-                gap: 0.5,
-                maxWidth: 600,
-                mx: 'auto',
-                bgcolor: 'background.paper',
-                p: '6px',
-                borderRadius: 2,
-                boxShadow: 1,
-              }}
-            >
-              <TextField
-                fullWidth
-                placeholder="Search for resources..."
-                variant="outlined"
-                size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: 'background.paper',
-                    '& fieldset': {
-                      border: 'none',
-                    },
-                    '& input': {
-                      py: 1.25,
-                    },
-                  },
-                }}
-              />
-              <Link href="/resources" style={{ textDecoration: 'none' }}>
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={<SearchIcon />}
-                  sx={{
-                    px: 2.5,
-                    py: 1.25,
-                    minWidth: 'auto',
-                    whiteSpace: 'nowrap',
-                    textTransform: 'uppercase',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  Search
-                </Button>
-              </Link>
-            </Box>
+            <HeroSearch />
 
             {/* Resource count */}
             {resourceCount !== null && (
