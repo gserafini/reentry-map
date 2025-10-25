@@ -713,6 +713,39 @@ When working on this project, refer to:
 - `DEPLOYMENT_GUIDE.md` - Deployment procedures
 - `API_DOCUMENTATION.md` - API endpoint specifications
 
+## User Profile & Avatars
+
+**Strategy**: Hybrid approach with Gravatar + Supabase Storage (see ADR-011)
+
+### Avatar Display
+
+```typescript
+import { Avatar } from '@mui/material'
+import { getAvatarUrl, getUserInitials } from '@/lib/utils/avatar'
+
+<Avatar src={getAvatarUrl(user) || undefined} alt={user.name || 'User'}>
+  {getUserInitials(user.name)}
+</Avatar>
+```
+
+**Priority**:
+
+1. Custom uploaded avatar (Supabase Storage) - if `user.avatar_url` exists
+2. Gravatar (free, zero setup) - based on email MD5 hash
+3. Initials fallback - generated from `user.name`
+
+**Where Avatars Appear**:
+
+- AppBar (user menu, top-right when signed in)
+- Review cards (next to reviewer name)
+- User profile page (large 200x200px version)
+
+**Avatar Uploads**: Post-MVP feature (Phase 6.3) - users can upload custom 2MB max JPG/PNG/WebP
+
+See [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md#user-profile-features) for complete implementation details.
+
+---
+
 ## Core Principles
 
 1. **Mobile-First**: Design for mobile, enhance for desktop
