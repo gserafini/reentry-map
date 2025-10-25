@@ -219,3 +219,47 @@ export async function getResourceCount(): Promise<{
     }
   }
 }
+
+/**
+ * Get count of resources per category
+ * @returns Map of category to resource count
+ */
+export async function getCategoryCounts(): Promise<{
+  data: Partial<Record<ResourceCategory, number>> | null
+  error: Error | null
+}> {
+  try {
+    const supabase = await createClient()
+
+    // Get all active resources with their categories
+    const { data: resources, error } = await supabase
+      .from('resources')
+      .select('categories')
+      .eq('status', 'active')
+
+    if (error) {
+      console.error('Error fetching resources for category counts:', error)
+      return { data: null, error: new Error('Failed to fetch category counts') }
+    }
+
+    // Count resources per category
+    const counts: Partial<Record<ResourceCategory, number>> = {}
+
+    resources?.forEach((resource) => {
+      if (resource.categories && Array.isArray(resource.categories)) {
+        resource.categories.forEach((category) => {
+          const cat = category as ResourceCategory
+          counts[cat] = (counts[cat] || 0) + 1
+        })
+      }
+    })
+
+    return { data: counts, error: null }
+  } catch (error) {
+    console.error('Unexpected error in getCategoryCounts:', error)
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error('Unknown error'),
+    }
+  }
+}

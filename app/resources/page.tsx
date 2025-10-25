@@ -1,12 +1,15 @@
-import { Container, Typography, Box, Alert, Button } from '@mui/material'
+import { Container, Typography, Box, Alert, Button, Grid } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
 import Link from 'next/link'
-import { getResources } from '@/lib/api/resources'
+import { getResources, getCategoryCounts } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
+import { CategoryFilter } from '@/components/search/CategoryFilter'
+import type { ResourceCategory } from '@/lib/types/database'
 
 interface ResourcesPageProps {
   searchParams: Promise<{
     search?: string
+    categories?: string
   }>
 }
 
@@ -15,8 +18,18 @@ interface ResourcesPageProps {
  * Server Component that fetches and displays all active resources
  */
 export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {
-  const { search } = await searchParams
-  const { data: resources, error } = await getResources({ search, limit: 100 })
+  const { search, categories: categoriesParam } = await searchParams
+
+  // Parse categories from URL param
+  const categories = categoriesParam
+    ? (categoriesParam.split(',').filter(Boolean) as ResourceCategory[])
+    : undefined
+
+  // Fetch resources with filters
+  const { data: resources, error } = await getResources({ search, categories, limit: 100 })
+
+  // Fetch category counts for filter display
+  const { data: categoryCounts } = await getCategoryCounts()
 
   if (error) {
     return (
@@ -35,6 +48,7 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
 
   const hasResults = resources && resources.length > 0
   const isSearching = Boolean(search && search.trim())
+  const isFiltering = Boolean(categories && categories.length > 0)
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -49,37 +63,50 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
         </Typography>
       </Box>
 
-      {/* Results count */}
-      {hasResults && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-        </Typography>
-      )}
+      <Grid container spacing={3}>
+        {/* Category Filter Sidebar */}
+        <Grid size={{ xs: 12, md: 3 }}>
+          <CategoryFilter categoryCounts={categoryCounts || undefined} />
+        </Grid>
 
-      {/* No results state for search */}
-      {isSearching && !hasResults && (
-        <Alert
-          severity="info"
-          icon={<SearchOffIcon />}
-          sx={{ mb: 3 }}
-          action={
-            <Link href="/resources" style={{ textDecoration: 'none' }}>
-              <Button color="inherit" size="small">
-                Clear Search
-              </Button>
-            </Link>
-          }
-        >
-          <Typography variant="subtitle2" gutterBottom>
-            No results found for &ldquo;{search}&rdquo;
-          </Typography>
-          <Typography variant="body2">
-            Try adjusting your search terms or browse all resources.
-          </Typography>
-        </Alert>
-      )}
+        {/* Results */}
+        <Grid size={{ xs: 12, md: 9 }}>
+          {/* Results count */}
+          {hasResults && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
+              {isFiltering && ` in selected categories`}
+            </Typography>
+          )}
 
-      <ResourceList resources={resources || []} />
+          {/* No results state */}
+          {!hasResults && (isSearching || isFiltering) && (
+            <Alert
+              severity="info"
+              icon={<SearchOffIcon />}
+              sx={{ mb: 3 }}
+              action={
+                <Link href="/resources" style={{ textDecoration: 'none' }}>
+                  <Button color="inherit" size="small">
+                    Clear Filters
+                  </Button>
+                </Link>
+              }
+            >
+              <Typography variant="subtitle2" gutterBottom>
+                No results found
+                {isSearching && ` for "${search}"`}
+                {isFiltering && ` in selected categories`}
+              </Typography>
+              <Typography variant="body2">
+                Try adjusting your filters or browse all resources.
+              </Typography>
+            </Alert>
+          )}
+
+          <ResourceList resources={resources || []} />
+        </Grid>
+      </Grid>
     </Container>
   )
 }
