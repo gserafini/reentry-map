@@ -17,12 +17,14 @@ interface LocationInputProps {
  * Dropdown location picker for header search
  */
 export function LocationInput({ fullWidth = false, size = 'medium' }: LocationInputProps) {
-  const { displayName, requestLocation, setManualLocation, loading } = useUserLocation()
+  const { displayName, requestLocation, setManualLocation, loading, coordinates, source } =
+    useUserLocation()
   const [inputValue, setInputValue] = useState('')
   const [hoverText, setHoverText] = useState('')
   const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Initialize Google Maps services
@@ -58,6 +60,65 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     }
   }, [displayName])
 
+  // Reverse geocode when we get geolocation coordinates
+  useEffect(() => {
+    if (!coordinates || source !== 'geolocation' || !placesLibrary || isReverseGeocoding) {
+      return
+    }
+
+    const reverseGeocode = async () => {
+      setIsReverseGeocoding(true)
+      setInputValue('Getting location...')
+
+      try {
+        const { Geocoder } = placesLibrary
+        const geocoder = new Geocoder()
+
+        const result = await geocoder.geocode({
+          location: {
+            lat: coordinates.latitude,
+            lng: coordinates.longitude,
+          },
+        })
+
+        if (result.results && result.results.length > 0) {
+          // Find the most appropriate result (locality level)
+          const cityResult =
+            result.results.find((r) => r.types.includes('locality')) || result.results[0]
+
+          // Extract city and state from address components
+          let city = ''
+          let state = ''
+
+          for (const component of cityResult.address_components) {
+            if (component.types.includes('locality')) {
+              city = component.long_name
+            }
+            if (component.types.includes('administrative_area_level_1')) {
+              state = component.short_name
+            }
+          }
+
+          // Format as "City, State"
+          const formattedLocation =
+            city && state ? `${city}, ${state}` : cityResult.formatted_address
+
+          // Update the location with the geocoded city/state
+          setManualLocation(coordinates, formattedLocation)
+          setInputValue(formattedLocation)
+        }
+      } catch (err) {
+        console.error('Reverse geocoding error:', err)
+        // Fall back to "Current Location"
+        setInputValue('Current Location')
+      } finally {
+        setIsReverseGeocoding(false)
+      }
+    }
+
+    reverseGeocode()
+  }, [coordinates, source, placesLibrary, isReverseGeocoding, setManualLocation])
+
   // Handle input change and fetch predictions
   const handleInputChange = async (value: string) => {
     setInputValue(value)
@@ -92,10 +153,9 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   // Handle "Current Location" selection
   const handleCurrentLocation = () => {
     setHoverText('') // Clear hover text immediately to prevent flash
-    requestLocation()
-    setInputValue('Current Location')
+    setInputValue('Getting location...') // Show loading state
     setShowDropdown(false)
-    // Don't call onLocationChange - let user press Enter to submit
+    requestLocation() // This will trigger the reverse geocoding useEffect
   }
 
   // Handle place selection from autocomplete
