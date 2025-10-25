@@ -26,12 +26,13 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
       sx={{ bgcolor: theme.colors.brand, color: theme.colors.brandText }}
     >
       <Container maxWidth="lg">
+        {/* First row: Logo, Navigation, Auth */}
         <Toolbar
           disableGutters
           sx={{
             gap: 2,
             color: theme.colors.brandText,
-            minHeight: { xs: 64, md: 80 }, // Taller toolbar to accommodate search
+            minHeight: { xs: 64, md: 80 },
             py: 1.5,
           }}
         >
@@ -43,7 +44,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
                 alignItems: 'center',
                 position: 'relative',
                 height: 50,
-                flexGrow: { xs: showSearch ? 0 : 1, sm: 0 },
+                flexGrow: { xs: 1, sm: 0 },
               }}
             >
               <Image
@@ -81,13 +82,14 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </Link>
           </Box>
 
-          {/* HeroSearch - shown on both desktop and mobile when showSearch is true */}
+          {/* HeroSearch - Desktop only (inline with toolbar) */}
           {showSearch && (
             <Box
               sx={{
+                display: { xs: 'none', md: 'flex' },
                 flexGrow: 1,
                 maxWidth: 700,
-                mx: { xs: 1, md: 2 },
+                mx: 2,
               }}
             >
               <HeroSearch initialValue={currentSearch} />
@@ -108,6 +110,19 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </IconButton>
           </Box>
         </Toolbar>
+
+        {/* Second row: Mobile search (below toolbar) */}
+        {showSearch && (
+          <Box
+            sx={{
+              display: { xs: 'block', md: 'none' },
+              pb: 2,
+              pt: 0,
+            }}
+          >
+            <HeroSearch initialValue={currentSearch} />
+          </Box>
+        )}
       </Container>
     </MuiAppBar>
   )
