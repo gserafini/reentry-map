@@ -2,10 +2,15 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import ResourceList from '@/components/resources/ResourceList'
+import { LocationProvider } from '@/lib/context/LocationContext'
 
 describe('ResourceList', () => {
   it('renders empty state', () => {
-    render(<ResourceList resources={[]} />)
+    render(
+      <LocationProvider>
+        <ResourceList resources={[]} />
+      </LocationProvider>
+    )
     expect(screen.getByRole('status')).toHaveTextContent('No resources found')
   })
 
@@ -15,7 +20,11 @@ describe('ResourceList', () => {
       { id: '2', name: 'B' },
     ]
 
-    render(<ResourceList resources={resources} />)
+    render(
+      <LocationProvider>
+        <ResourceList resources={resources} />
+      </LocationProvider>
+    )
     expect(screen.getByTestId('resource-list')).toBeInTheDocument()
   })
 })

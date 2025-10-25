@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import ResourceCard from '@/components/resources/ResourceCard'
+import { LocationProvider } from '@/lib/context/LocationContext'
 
 describe('ResourceCard', () => {
   const mockResource = {
@@ -18,7 +19,11 @@ describe('ResourceCard', () => {
   }
 
   it('renders resource information', () => {
-    render(<ResourceCard resource={mockResource} />)
+    render(
+      <LocationProvider>
+        <ResourceCard resource={mockResource} />
+      </LocationProvider>
+    )
 
     expect(screen.getByText('Test Resource')).toBeInTheDocument()
     expect(screen.getByTestId('category-badge')).toBeInTheDocument()
@@ -27,7 +32,11 @@ describe('ResourceCard', () => {
 
   it('calls onFavorite when save clicked', async () => {
     const onFavorite = vi.fn()
-    render(<ResourceCard resource={mockResource} onFavorite={onFavorite} />)
+    render(
+      <LocationProvider>
+        <ResourceCard resource={mockResource} onFavorite={onFavorite} />
+      </LocationProvider>
+    )
 
     const btn = screen.getByRole('button', { name: /save/i })
     fireEvent.click(btn)
