@@ -24,6 +24,7 @@ export function LocationInput({
 }: LocationInputProps) {
   const { displayName, requestLocation, setManualLocation, loading } = useUserLocation()
   const [inputValue, setInputValue] = useState('')
+  const [hoverText, setHoverText] = useState('')
   const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -52,6 +53,7 @@ export function LocationInput({
       .catch((err: Error) => {
         console.error('Error loading Google Maps:', err)
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update input value when displayName changes
@@ -131,15 +133,21 @@ export function LocationInput({
     <div style={{ position: 'relative', width: fullWidth ? '100%' : 'auto' }}>
       <TextField
         ref={inputRef}
-        value={inputValue}
-        onChange={(e) => handleInputChange(e.target.value)}
+        value={hoverText || inputValue}
+        onChange={(e) => {
+          handleInputChange(e.target.value)
+          setHoverText('')
+        }}
         onFocus={() => {
           // Always show dropdown on focus (with Current Location option)
           setShowDropdown(true)
         }}
         onBlur={() => {
           // Delay hiding dropdown to allow clicking on items
-          setTimeout(() => setShowDropdown(false), 200)
+          setTimeout(() => {
+            setShowDropdown(false)
+            setHoverText('')
+          }, 200)
         }}
         placeholder="Enter location or zip"
         size={size}
@@ -184,6 +192,8 @@ export function LocationInput({
           {/* Current Location option - always show first */}
           <MenuItem
             onClick={handleCurrentLocation}
+            onMouseEnter={() => setHoverText('Current Location')}
+            onMouseLeave={() => setHoverText('')}
             sx={{
               borderBottom: predictions.length > 0 ? '1px solid' : 'none',
               borderColor: 'divider',
@@ -210,6 +220,8 @@ export function LocationInput({
             <MenuItem
               key={prediction.place_id}
               onClick={() => handlePlaceSelect(prediction.place_id, prediction.description)}
+              onMouseEnter={() => setHoverText(prediction.description)}
+              onMouseLeave={() => setHoverText('')}
               sx={{
                 py: 1.5,
                 px: 2,

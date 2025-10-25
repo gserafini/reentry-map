@@ -94,6 +94,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
                   onSubmit={handleSearch}
                   placeholder="What are you looking for?"
                   size="small"
+                  showCategoryDropdown
                   inputSx={{
                     bgcolor: 'transparent',
                     '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
