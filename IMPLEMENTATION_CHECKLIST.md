@@ -465,32 +465,34 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 **✅ PHASE 3.2 COMPLETE**: All checks passed
 
-### 3.3 Resource Detail Page
+### 3.3 Resource Detail Page ✅
 
-#### 3.3.1 Server Component
+#### 3.3.1 Server Component ✅
 
-- [ ] Create `app/resources/[id]/page.tsx`
-- [ ] Fetch single resource by ID
-- [ ] Handle not found (404)
-- [ ] Pass data to detail component
-- [ ] Add loading.tsx
-- [ ] Add error.tsx
-- [ ] Implement metadata (SEO)
+- [x] Create `app/resources/[...segments]/page.tsx` (catch-all route for UUID + SEO URLs)
+- [x] Fetch single resource by ID or SEO path
+- [x] Handle not found (404) with `notFound()`
+- [x] Pass data to detail component
+- [x] Add loading.tsx (comprehensive skeleton loaders)
+- [x] Add error.tsx (with retry and back buttons)
+- [x] Implement metadata (SEO) for both URL formats
 
-#### 3.3.2 ResourceDetail Component
+#### 3.3.2 ResourceDetail Component ✅
 
-- [ ] Create `components/resources/ResourceDetail.tsx`
-- [ ] Display all resource information
-- [ ] Show full address
-- [ ] Display hours of operation
-- [ ] Show services offered
-- [ ] Display eligibility requirements
-- [ ] Add "Get Directions" button (opens Google Maps)
-- [ ] Add "Call" button (tel: link)
-- [ ] Add "Visit Website" button
-- [ ] Write component tests
-- [ ] Test accessibility
-- [ ] **DEMO**: Show resource detail page
+- [x] Create `components/resources/ResourceDetail.tsx`
+- [x] Display all resource information (comprehensive Material UI layout)
+- [x] Show full address (with zip code)
+- [x] Display hours of operation (formatted JSON display)
+- [x] Show services offered (list with checkmarks)
+- [x] Display eligibility requirements
+- [x] Add "Get Directions" button (opens Google Maps)
+- [x] Add "Call" button (tel: link)
+- [x] Add "Visit Website" button (opens in new tab)
+- [x] Write component tests (`__tests__/ResourceDetail.test.tsx` - 6 tests)
+- [x] Test accessibility (proper buttons, semantic HTML)
+- [x] **DEMO**: Show resource detail page (working with real data)
+
+**✅ PHASE 3.3 COMPLETE**: Full resource detail page with all features
 
 ### 3.4 Search Functionality
 
