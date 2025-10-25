@@ -47,12 +47,14 @@ npm run quality:full # Full: Above + E2E tests
 
 **Port Management:**
 
-- **Port 3003**: User's dev server (`npm run dev`)
-- **Port 3004**: Dev compilation check (`npm run dev:check`)
-- **Playwright**: Auto-manages test server (no conflicts)
-- Don't interfere with user's dev server
+- **Port 3003**: User's dev server (`npm run dev`) - NEVER kill this!
+- **Port 3004**: ALL testing and quality checks
+  - Dev compilation check (`npm run dev:check`)
+  - E2E tests (`npm run test:e2e`) via `dev:test`
+  - Playwright automated tests
+  - Screenshot generation
 
-**Dev Compilation Check**: The quality pipeline includes a dev server compilation check that catches client/server boundary issues that production builds might miss. This runs on port 3004 to avoid interfering with your dev server.
+**Important**: All automated testing uses port 3004 to preserve the user's dev server on port 3003. Never run commands that kill port 3003 during quality checks.
 
 ---
 
