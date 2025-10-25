@@ -82,6 +82,7 @@ export default async function HomePage() {
 
             {/* Search Bar */}
             <Box
+              id="hero-search"
               sx={{
                 display: 'flex',
                 gap: 0.5,

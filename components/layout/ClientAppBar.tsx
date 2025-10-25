@@ -10,29 +10,48 @@ interface ClientAppBarProps {
 
 /**
  * Client wrapper for AppBar that handles search bar visibility:
- * - Homepage (mobile + desktop): Show search only when scrolled past hero (500px)
- * - Non-homepage (mobile + desktop): Always show search
+ * - Homepage: Show header search only when hero search is scrolled out of view
+ * - Non-homepage: Always show header search
+ *
+ * Uses IntersectionObserver to detect when hero search (#hero-search) is visible
  */
 export function ClientAppBar({ authButton }: ClientAppBarProps) {
   const pathname = usePathname()
   const isHomepage = pathname === '/'
-  const [isScrolled, setIsScrolled] = useState(false)
+  const [heroSearchVisible, setHeroSearchVisible] = useState(true)
 
   useEffect(() => {
     if (!isHomepage) return
 
-    const handleScroll = () => {
-      // Show search bar when scrolled past hero section (approximately 500px)
-      setIsScrolled(window.scrollY > 500)
-    }
+    // Wait for hero search element to be available
+    const heroSearch = document.getElementById('hero-search')
+    if (!heroSearch) return
 
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    // Create intersection observer to watch hero search visibility
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // When hero search is visible, hide header search
+        // When hero search is hidden, show header search
+        setHeroSearchVisible(entry.isIntersecting)
+      },
+      {
+        // Trigger when any part of the hero search enters/leaves viewport
+        threshold: 0,
+        // Use viewport as root
+        root: null,
+        // Small margin to trigger slightly before element completely leaves
+        rootMargin: '-10px',
+      }
+    )
+
+    observer.observe(heroSearch)
+
+    return () => observer.disconnect()
   }, [isHomepage])
 
-  // Homepage: show search only when scrolled
-  // Non-homepage: always show search
-  const showSearch = !isHomepage || isScrolled
+  // Homepage: show header search only when hero search is not visible
+  // Non-homepage: always show header search
+  const showSearch = !isHomepage || !heroSearchVisible
 
   return <AppBar authButton={authButton} showSearch={showSearch} />
 }
