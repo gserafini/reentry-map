@@ -24,6 +24,9 @@ import {
 import Link from 'next/link'
 import { getResources, getResourceCount } from '@/lib/api/resources'
 
+// Force dynamic rendering since we fetch data with Supabase server client
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   // Fetch some featured resources and total count
   const [{ data: featuredResources }, { data: resourceCount }] = await Promise.all([

@@ -710,6 +710,23 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 - [ ] Write tests
 - [ ] **DEMO**: Show profile page
 
+#### 5.2.2 Avatar Display (Gravatar + Initials)
+
+**Quick Win**: Implement read-only avatar display with zero-cost Gravatar fallback (see ADR-011)
+
+- [ ] Create `lib/utils/avatar.ts` utility functions
+  - [ ] `getAvatarUrl()` - Returns Gravatar URL based on email hash
+  - [ ] `getUserInitials()` - Generates initials from name
+- [ ] Add Material UI Avatar component to AppBar (user menu)
+- [ ] Display avatars on review cards (with reviewer name)
+- [ ] Test Gravatar integration (uses crypto-js/md5 for hash)
+- [ ] Test initials fallback for users without Gravatar
+- [ ] Verify avatar accessibility (alt text, ARIA labels)
+- [ ] Write unit tests for avatar utilities
+- [ ] **DEMO**: Show avatars in AppBar and reviews
+
+**Note**: Custom avatar uploads will be implemented in Phase 6.3 (post-MVP)
+
 ### 5.3 Protected Routes
 
 - [ ] Create ProtectedRoute wrapper
@@ -785,6 +802,78 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 **Deliverable**: Favorites and ratings working
 **Review Point**: Demo favorites and rating flow
+
+---
+
+## Phase 6.3: Avatar Uploads (Post-MVP Enhancement)
+
+**Goal**: Allow users to upload custom profile pictures.
+
+**Estimated Time**: 1 session
+**Dependencies**: Phase 5.2.2 (Avatar display), Supabase Storage setup
+**Priority**: Low (Nice-to-have, not critical for MVP)
+
+**Reference**: See ADR-011 for full avatar strategy
+
+### 6.3.1 Supabase Storage Setup
+
+- [ ] Create `avatars` bucket in Supabase Storage (public)
+- [ ] Apply RLS policies for avatar uploads
+  ```sql
+  -- Users can upload their own avatar
+  CREATE POLICY "Users can upload own avatar"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+  ```
+- [ ] Configure bucket settings (2MB max, JPG/PNG/WebP only)
+- [ ] Test bucket creation and policies
+- [ ] **VERIFY**: Storage bucket accessible
+
+### 6.3.2 Avatar Upload Component
+
+- [ ] Create `components/profile/AvatarUpload.tsx`
+- [ ] File picker with drag-and-drop
+- [ ] Client-side validation (size, format)
+- [ ] Image preview before upload
+- [ ] Upload progress indicator
+- [ ] Error handling (size exceeded, invalid format)
+- [ ] Write component tests
+- [ ] Test accessibility (keyboard upload, screen reader)
+
+### 6.3.3 Upload Implementation
+
+- [ ] Create `lib/api/avatars.ts` with upload function
+- [ ] Resize image to 200x200px before upload (use canvas or library)
+- [ ] Upload to Supabase Storage with user_id path
+- [ ] Update `users.avatar_url` with storage URL
+- [ ] Optimistic UI update
+- [ ] Handle upload errors gracefully
+- [ ] Write integration tests
+- [ ] **DEMO**: Upload custom avatar
+
+### 6.3.4 Avatar Management
+
+- [ ] Add "Change Avatar" button to profile page
+- [ ] Option to remove custom avatar (revert to Gravatar)
+- [ ] Show current avatar with edit overlay
+- [ ] Crop/resize UI (optional, nice-to-have)
+- [ ] Write tests
+- [ ] **DEMO**: Full avatar upload flow
+
+### 6.3.5 Admin Moderation (Future)
+
+- [ ] Add `avatar_flagged` field to users table (future)
+- [ ] Admin can flag inappropriate avatars
+- [ ] Flagged avatars revert to Gravatar/initials
+- [ ] Notify user of flagged avatar
+- [ ] Document moderation process
+
+**Deliverable**: Users can upload custom avatars
+**Review Point**: Demo avatar upload and management
+**Cost Impact**: ~$0.001/month for 1000 users (negligible)
 
 ---
 

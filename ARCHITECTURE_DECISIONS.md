@@ -653,29 +653,233 @@ Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 
 ## Decision Status Summary
 
-| ADR | Title                        | Status      | Priority |
-| --- | ---------------------------- | ----------- | -------- |
-| 001 | Next.js 16 with App Router   | ✅ Accepted | Critical |
-| 002 | Supabase for Backend         | ✅ Accepted | Critical |
-| 003 | TypeScript Strict Mode       | ✅ Accepted | High     |
-| 004 | Tailwind CSS                 | ✅ Accepted | High     |
-| 005 | HeroUI for Component Library | ✅ Accepted | Critical |
-| 006 | Vitest + Playwright Testing  | 📝 Proposed | High     |
-| 007 | T3 Env Validation            | 📝 Proposed | Medium   |
-| 008 | ESLint + Prettier            | 📝 Proposed | Medium   |
-| 009 | OpenAI GPT-4o-mini           | ✅ Accepted | Medium   |
-| 010 | Google Maps                  | ✅ Accepted | High     |
+| ADR | Title                            | Status      | Priority |
+| --- | -------------------------------- | ----------- | -------- |
+| 001 | Next.js 16 with App Router       | ✅ Accepted | Critical |
+| 002 | Supabase for Backend             | ✅ Accepted | Critical |
+| 003 | TypeScript Strict Mode           | ✅ Accepted | High     |
+| 004 | Tailwind CSS                     | ✅ Accepted | High     |
+| 005 | Material UI v7 Component Library | ✅ Accepted | Critical |
+| 006 | Vitest + Playwright Testing      | ✅ Accepted | High     |
+| 007 | T3 Env Validation                | ✅ Accepted | Medium   |
+| 008 | ESLint + Prettier                | ✅ Accepted | Medium   |
+| 009 | OpenAI GPT-4o-mini               | ✅ Accepted | Medium   |
+| 010 | Google Maps                      | ✅ Accepted | High     |
+| 011 | Avatar Strategy (Gravatar + S3)  | ✅ Accepted | Low      |
+
+---
+
+## ADR-011: Avatar Strategy with Gravatar and Supabase Storage
+
+**Date**: 2025-10-24
+**Status**: Accepted
+**Deciders**: Gabriel Serafini, Claude Code
+**Tags**: user-profile, images, storage, ux
+
+### Context
+
+Users need a way to display profile pictures for personalization and identity in reviews and user interactions. The `users` table already has an `avatar_url` field. We need a strategy that balances user experience, implementation simplicity, and cost.
+
+### Decision
+
+Implement a **hybrid avatar strategy**:
+
+1. **Default to Gravatar**: Use Gravatar as the fallback based on user's email or phone hash
+2. **In-house uploads via Supabase Storage**: Allow users to upload custom avatars
+3. **Fallback hierarchy**: Custom upload → Gravatar → Initials-based placeholder
+
+### Rationale
+
+**Why Gravatar as Default:**
+
+- Zero implementation for basic functionality
+- No storage costs for users who don't upload
+- Many users already have Gravatar profiles
+- Automatic updates when users update their Gravatar
+- Reduces initial friction (no required upload)
+
+**Why In-house Storage:**
+
+- Not all users have or want Gravatar
+- Full control over image processing and storage
+- Better privacy (no external tracking)
+- Ability to moderate uploaded images
+- Offline-capable PWA support
+
+**Why Initials Fallback:**
+
+- Always shows something meaningful
+- Accessible and recognizable
+- No external dependencies required
+
+### Implementation Details
+
+#### Avatar Display Priority
+
+```typescript
+function getAvatarUrl(user: User): string {
+  // 1. Custom uploaded avatar (if exists)
+  if (user.avatar_url && user.avatar_url.startsWith('https://')) {
+    return user.avatar_url
+  }
+
+  // 2. Gravatar (using email or phone hash)
+  if (user.email) {
+    const hash = md5(user.email.toLowerCase().trim())
+    return `https://www.gravatar.com/avatar/${hash}?d=404&s=200`
+  }
+
+  // 3. Fallback to initials or default icon
+  return null // Component will show initials
+}
+```
+
+#### Storage Structure
+
+**Supabase Storage Bucket**: `avatars`
+
+- Path pattern: `{user_id}/avatar.{ext}`
+- Max file size: 2MB
+- Allowed formats: JPG, PNG, WebP
+- Image processing: Resize to 200x200px, optimize quality
+
+#### Upload Flow
+
+1. User selects image in profile settings
+2. Client-side validation (size, format)
+3. Upload to Supabase Storage with RLS policies
+4. Generate thumbnail (200x200px)
+5. Update `users.avatar_url` with storage URL
+6. Optimistic UI update
+
+### Consequences
+
+**Positive**:
+
+- Immediate solution with zero development (Gravatar)
+- Future-proof with upload capability
+- Cost-effective (Gravatar free, Supabase Storage cheap)
+- Better user experience (choice)
+- Privacy-friendly (optional external service)
+- Works offline (PWA caches uploaded avatars)
+
+**Negative**:
+
+- Need to implement upload UI
+- Image moderation may be needed
+- Storage costs for custom uploads
+- Need to handle image processing
+
+### Security Considerations
+
+**RLS Policies**:
+
+```sql
+-- Users can upload their own avatar
+CREATE POLICY "Users can upload own avatar"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'avatars'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- Anyone can view avatars (public)
+CREATE POLICY "Avatars are publicly accessible"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'avatars');
+
+-- Users can update their own avatar
+CREATE POLICY "Users can update own avatar"
+ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'avatars'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+```
+
+**Content Moderation**:
+
+- Consider automated content moderation (future)
+- Admin flag to disable inappropriate avatars
+- Fallback to Gravatar/initials if avatar flagged
+
+### Display Locations
+
+Avatars appear in:
+
+1. **AppBar** (top-right when signed in)
+2. **Review cards** (next to reviewer name)
+3. **User profile page** (large version)
+4. **Favorites list** (optional, in future)
+
+### Component Usage
+
+```typescript
+import { Avatar } from '@mui/material'
+
+<Avatar
+  src={getAvatarUrl(user)}
+  alt={user.name || 'User'}
+>
+  {/* Fallback to initials */}
+  {user.name?.[0]?.toUpperCase() || 'U'}
+</Avatar>
+```
+
+### Cost Estimate
+
+- Gravatar: **Free**
+- Supabase Storage: ~$0.021/GB/month
+- Estimated: 1000 users × 50KB avg = 50MB = **$0.001/month**
+- Negligible cost for MVP
+
+### Alternatives Considered
+
+**Option A: Gravatar Only**
+
+- Pro: Zero implementation, zero cost
+- Con: Many users won't have Gravatar, can't customize
+
+**Option B: Supabase Storage Only**
+
+- Pro: Full control, better privacy
+- Con: Forced upload friction, higher costs
+
+**Option C: Third-party Avatar Service (e.g., Cloudinary)**
+
+- Pro: Advanced image processing
+- Con: Additional vendor, higher cost, overkill for MVP
+
+### Implementation Timeline
+
+**Phase 5.2** (Authentication & User Profile - Week 3):
+
+- Display Gravatar avatars automatically ✅ Quick win
+- Add initials fallback to Material UI Avatar component
+
+**Phase 6.3** (Future Enhancement - After MVP):
+
+- Add avatar upload to profile page
+- Implement image processing
+- Add RLS policies for avatar storage
+- Add moderation tools for admins
+
+### Future Enhancements
+
+- **AI-generated avatars**: Offer generated avatars as an option
+- **Avatar frames/badges**: Reward active contributors
+- **Social login avatars**: Pull from Google/Facebook if OAuth added
+- **Avatar history**: Allow users to revert to previous avatars
 
 ---
 
 ## Next Decisions Needed
 
-1. **ADR-005**: UI Library choice (HeroUI vs shadcn/ui) - **USER INPUT REQUIRED**
-2. **ADR-011**: State Management approach (when needed)
-3. **ADR-012**: Form handling library (react-hook-form vs alternatives)
-4. **ADR-013**: Image optimization strategy
-5. **ADR-014**: Monitoring and observability tools
-6. **ADR-015**: CI/CD pipeline configuration
+1. **ADR-012**: State Management approach (when needed)
+2. **ADR-013**: Form handling library (react-hook-form vs alternatives)
+3. **ADR-014**: Image optimization strategy
+4. **ADR-015**: Monitoring and observability tools
+5. **ADR-016**: CI/CD pipeline configuration
 
 ---
 

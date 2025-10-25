@@ -1055,6 +1055,148 @@ NEXT_PUBLIC_APP_URL=http://localhost:3003
 - No PII in logs
 - GDPR-compliant data deletion
 
+## User Profile Features
+
+### Avatar Strategy
+
+**Implementation**: Hybrid approach with Gravatar fallback and Supabase Storage for custom uploads (see ADR-011)
+
+#### Avatar Display Priority
+
+1. **Custom uploaded avatar** (if user uploaded one to Supabase Storage)
+2. **Gravatar** (based on email hash, free service)
+3. **Initials fallback** (generated from user's name)
+
+#### Avatar Utility Function
+
+```typescript
+// lib/utils/avatar.ts
+import md5 from 'crypto-js/md5'
+
+export function getAvatarUrl(user: {
+  avatar_url?: string | null
+  email?: string | null
+  name?: string | null
+}): string | null {
+  // 1. Custom uploaded avatar (Supabase Storage)
+  if (user.avatar_url && user.avatar_url.startsWith('https://')) {
+    return user.avatar_url
+  }
+
+  // 2. Gravatar (free, no setup required)
+  if (user.email) {
+    const hash = md5(user.email.toLowerCase().trim()).toString()
+    return `https://www.gravatar.com/avatar/${hash}?d=404&s=200`
+  }
+
+  // 3. Null = Component will show initials
+  return null
+}
+
+export function getUserInitials(name: string | null): string {
+  if (!name) return 'U'
+  const parts = name.trim().split(' ')
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  }
+  return name[0].toUpperCase()
+}
+```
+
+#### Material UI Avatar Component
+
+```typescript
+import { Avatar } from '@mui/material'
+import { getAvatarUrl, getUserInitials } from '@/lib/utils/avatar'
+
+<Avatar
+  src={getAvatarUrl(user) || undefined}
+  alt={user.name || 'User'}
+  sx={{ width: 40, height: 40 }}
+>
+  {getUserInitials(user.name)}
+</Avatar>
+```
+
+#### Display Locations
+
+- **AppBar**: User menu (top-right when signed in)
+- **Review cards**: Next to reviewer name and rating
+- **User profile page**: Large version (200x200px)
+- **Suggestions/Reports**: Attribution for community contributions
+
+#### Supabase Storage Configuration
+
+**Bucket**: `avatars`
+
+- **Path pattern**: `{user_id}/avatar.{ext}`
+- **Max file size**: 2MB
+- **Allowed formats**: JPG, PNG, WebP
+- **Processing**: Auto-resize to 200x200px, optimize quality
+- **RLS policies**: Users can upload/update own avatar, anyone can view
+
+```sql
+-- Enable storage
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true);
+
+-- RLS: Users can upload their own avatar
+CREATE POLICY "Users can upload own avatar"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'avatars'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- RLS: Avatars are publicly accessible
+CREATE POLICY "Avatars are publicly accessible"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'avatars');
+
+-- RLS: Users can update their own avatar
+CREATE POLICY "Users can update own avatar"
+ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'avatars'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+```
+
+#### Upload Implementation (Future)
+
+```typescript
+// components/profile/AvatarUpload.tsx
+async function handleAvatarUpload(file: File, userId: string) {
+  // 1. Validate file
+  if (file.size > 2 * 1024 * 1024) throw new Error('File too large')
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Invalid format')
+  }
+
+  // 2. Upload to Supabase Storage
+  const fileName = `${userId}/avatar.${file.name.split('.').pop()}`
+  const { data, error } = await supabase.storage
+    .from('avatars')
+    .upload(fileName, file, { upsert: true })
+
+  if (error) throw error
+
+  // 3. Get public URL
+  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
+
+  // 4. Update user profile
+  await supabase.from('users').update({ avatar_url: urlData.publicUrl }).eq('id', userId)
+
+  return urlData.publicUrl
+}
+```
+
+#### Cost Estimate
+
+- **Gravatar**: Free
+- **Supabase Storage**: ~$0.021/GB/month
+- **Estimated**: 1000 users × 50KB avg = 50MB = **~$0.001/month** (negligible)
+
 ## Performance Optimizations
 
 ### Next.js 16 Features
