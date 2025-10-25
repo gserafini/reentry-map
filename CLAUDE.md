@@ -23,7 +23,7 @@ A framework for structured, AI-optimized project management. Key docs:
 **Before presenting any frontend work to the user:**
 
 ```bash
-npm run quality      # Quick: Lint + TypeCheck + Tests + Build
+npm run quality      # Quick: Lint + TypeCheck + Tests + Build + DevCheck
 npm run quality:full # Full: Above + E2E tests
 ```
 
@@ -35,6 +35,7 @@ npm run quality:full # Full: Above + E2E tests
 - ✅ 0 TypeScript errors
 - ✅ All unit tests pass
 - ✅ Build succeeds
+- ✅ Dev server compiles successfully
 - ✅ E2E tests pass (optional, slower)
 
 **Workflow:**
@@ -47,8 +48,11 @@ npm run quality:full # Full: Above + E2E tests
 **Port Management:**
 
 - **Port 3003**: User's dev server (`npm run dev`)
+- **Port 3004**: Dev compilation check (`npm run dev:check`)
 - **Playwright**: Auto-manages test server (no conflicts)
 - Don't interfere with user's dev server
+
+**Dev Compilation Check**: The quality pipeline includes a dev server compilation check that catches client/server boundary issues that production builds might miss. This runs on port 3004 to avoid interfering with your dev server.
 
 ---
 

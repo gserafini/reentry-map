@@ -373,11 +373,13 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ---
 
-## Phase 3: Core Resource Features (Week 1 Plan)
+## Phase 3: Core Resource Features (✅ 100% COMPLETE)
 
 **Goal**: Users can browse and search resources.
 
-**Estimated Time**: 2-3 sessions
+**Estimated Time**: 2-3 sessions (Completed in Session 4)
+
+**Status**: ✅ COMPLETE - All resource browsing, search, filtering, pagination, and sorting features implemented (2025-10-24)
 
 **Dependencies**: Phase 0 (testing), Phase 1 (UI), Phase 2 (database)
 
@@ -543,25 +545,39 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 **✅ PHASE 3.5 COMPLETE**: Full category filtering with live counts and multi-select
 
-### 3.6 Pagination
+### 3.6 Pagination ✅
 
-- [ ] Add pagination to resource query (20 per page)
-- [ ] Create Pagination component
-- [ ] Show page numbers
-- [ ] Previous/Next buttons
-- [ ] Update URL params
-- [ ] Scroll to top on page change
-- [ ] Write tests
-- [ ] **DEMO**: Navigate through pages
+- [x] Add pagination to resource query (20 per page) - in `lib/api/resources.ts`
+- [x] Create Pagination component - `components/search/Pagination.tsx`
+- [x] Show page numbers - Material UI Pagination component
+- [x] Previous/Next buttons - built into MUI Pagination
+- [x] Update URL params - `page` param
+- [x] Scroll to top on page change - implemented in component
+- [x] Write tests - `__tests__/components/search/Pagination.test.tsx` (8 tests)
+- [x] **DEMO**: Navigate through pages - working on all search pages
 
-### 3.7 Sorting
+### 3.7 Sorting ✅
 
-- [ ] Add sort options (name, rating, distance, date added)
-- [ ] Create Sort dropdown
-- [ ] Update URL params
-- [ ] Persist sort preference
-- [ ] Write tests
-- [ ] **DEMO**: Sort by rating descending
+- [x] Add sort options (name, rating, distance, date added) - 7 options in `lib/utils/sort.ts`
+- [x] Create Sort dropdown - `components/search/SortDropdown.tsx`
+- [x] Update URL params - `sort` param
+- [x] Persist sort preference - localStorage with 'preferredSort' key
+- [x] Write tests - `__tests__/components/search/SortDropdown.test.tsx` (11 tests)
+- [x] **DEMO**: Sort by rating descending - working on all search pages
+
+### 3.8 Quality Enhancement - Dev Compilation Check ✅
+
+**Added per user feedback: "maybe add an additional check to your quality checks for this"**
+
+- [x] Discovered client/server boundary issue - dev server failing while prod build passed
+- [x] Fixed root cause - moved `parseSortParam` to server-compatible `lib/utils/sort.ts`
+- [x] Created dev compilation check script - `scripts/check-dev-compile.sh`
+- [x] Runs on port 3004 (doesn't interfere with user's dev server on 3003)
+- [x] Detects compilation success/failure (looks for "✓ Ready" or errors)
+- [x] macOS compatible (no timeout command dependency)
+- [x] Integrated into quality pipeline - `npm run quality` now includes dev:check
+- [x] Updated documentation - CLAUDE.md Quality Gates section
+- [x] **VERIFY**: All quality checks passing (60/60 tests) ✅
 
 **Deliverable**: Functional resource browsing with search and filters
 **Review Point**: Full demo of search, filter, and detail pages
@@ -1500,9 +1516,9 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 ## Current Status
 
-**Phase**: 3 (Core Resource Features)
-**Progress**: Phase 0: 100% ✅, Phase 1: 100% ✅, Phase 2: 100% ✅, Phase 3: ~85% (3.1-3.5 complete, working on 3.6 Pagination)
-**Next Session Goal**: Complete Phase 3.6 (Pagination) and 3.7 (Sorting)
+**Phase**: 3 (Core Resource Features) ✅ COMPLETE
+**Progress**: Phase 0: 100% ✅, Phase 1: 100% ✅, Phase 2: 100% ✅, Phase 3: 100% ✅ (all 3.1-3.8 complete)
+**Next Session Goal**: Begin Phase 4 (Location Features - geolocation, maps)
 
 ---
 
