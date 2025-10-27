@@ -3,7 +3,7 @@
 import { Button, CircularProgress, Snackbar, Alert } from '@mui/material'
 import { MyLocation as MyLocationIcon } from '@mui/icons-material'
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import { getLocationErrorMessage } from '@/lib/hooks/useLocation'
 
@@ -13,6 +13,7 @@ import { getLocationErrorMessage } from '@/lib/hooks/useLocation'
 export function NearMeButton() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const { requestLocation, loading, error, coordinates } = useUserLocation()
   const [showError, setShowError] = useState(false)
   const [hasRequested, setHasRequested] = useState(false)
@@ -22,7 +23,7 @@ export function NearMeButton() {
     if (coordinates) {
       const params = new URLSearchParams(searchParams.toString())
       params.set('sort', 'distance-asc')
-      router.push(`/search?${params.toString()}`)
+      router.push(`${pathname}?${params.toString()}`)
       return
     }
 
@@ -42,10 +43,10 @@ export function NearMeButton() {
       // Location was just received, update URL to sort by distance
       const params = new URLSearchParams(searchParams.toString())
       params.set('sort', 'distance-asc')
-      router.push(`/search?${params.toString()}`)
+      router.push(`${pathname}?${params.toString()}`)
       setHasRequested(false)
     }
-  }, [coordinates, error, loading, hasRequested, searchParams, router])
+  }, [coordinates, error, loading, hasRequested, searchParams, router, pathname])
 
   const handleCloseError = () => {
     setShowError(false)

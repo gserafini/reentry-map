@@ -6,6 +6,7 @@ import { AppBar } from './AppBar'
 
 interface ClientAppBarProps {
   authButton?: React.ReactNode
+  isAuthenticated?: boolean
 }
 
 /**
@@ -15,43 +16,61 @@ interface ClientAppBarProps {
  *
  * Uses IntersectionObserver to detect when hero search (#hero-search) is visible
  */
-export function ClientAppBar({ authButton }: ClientAppBarProps) {
+export function ClientAppBar({ authButton, isAuthenticated = false }: ClientAppBarProps) {
   const pathname = usePathname()
   const isHomepage = pathname === '/'
-  const [heroSearchVisible, setHeroSearchVisible] = useState(true)
+  const [heroSearchVisible, setHeroSearchVisible] = useState(isHomepage)
 
   useEffect(() => {
-    if (!isHomepage) return
+    if (!isHomepage) {
+      setHeroSearchVisible(false)
+      return
+    }
 
-    // Wait for hero search element to be available
-    const heroSearch = document.getElementById('hero-search')
-    if (!heroSearch) return
+    let observer: IntersectionObserver | null = null
 
-    // Create intersection observer to watch hero search visibility
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // When hero search is visible, hide header search
-        // When hero search is hidden, show header search
-        setHeroSearchVisible(entry.isIntersecting)
-      },
-      {
-        // Trigger when any part of the hero search enters/leaves viewport
-        threshold: 0,
-        // Use viewport as root
-        root: null,
-        // Small margin to trigger slightly before element completely leaves
-        rootMargin: '-10px',
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      const heroSearch = document.getElementById('hero-search')
+      if (!heroSearch) {
+        console.warn('Hero search element #hero-search not found')
+        return
       }
-    )
 
-    observer.observe(heroSearch)
+      // Create intersection observer to watch hero search visibility
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          // When hero search is visible, hide header search
+          // When hero search is hidden, show header search
+          setHeroSearchVisible(entry.isIntersecting)
+        },
+        {
+          // Trigger when any part of the hero search enters/leaves viewport
+          threshold: 0,
+          // Use viewport as root
+          root: null,
+          // Small margin to trigger slightly before element completely leaves
+          rootMargin: '-10px',
+        }
+      )
 
-    return () => observer.disconnect()
+      observer.observe(heroSearch)
+    }, 100)
+
+    // Cleanup function
+    return () => {
+      clearTimeout(timer)
+      if (observer) {
+        observer.disconnect()
+      }
+    }
   }, [isHomepage])
 
   // Homepage: show header search only when hero search is not visible
   // Non-homepage: always show header search
   const showSearch = !isHomepage || !heroSearchVisible
 
-  return <AppBar authButton={authButton} showSearch={showSearch} />
+  return (
+    <AppBar authButton={authButton} showSearch={showSearch} isAuthenticated={isAuthenticated} />
+  )
 }

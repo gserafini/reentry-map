@@ -1,9 +1,6 @@
-import { Container, Typography, Box, Alert, Button, Grid } from '@mui/material'
-import { SearchOff as SearchOffIcon } from '@mui/icons-material'
-import Link from 'next/link'
+import { Container, Typography, Box, Alert } from '@mui/material'
 import { getResources, getCategoryCounts } from '@/lib/api/resources'
-import { ResourceList } from '@/components/resources/ResourceList'
-import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { ResourcesView } from './ResourcesView'
 import type { ResourceCategory } from '@/lib/types/database'
 
 interface ResourcesPageProps {
@@ -28,6 +25,13 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
   // Fetch resources with filters
   const { data: resources, error } = await getResources({ search, categories, limit: 100 })
 
+  // Server-side logging
+  console.log('[ResourcesPage] Fetched resources:', {
+    count: resources?.length || 0,
+    hasError: !!error,
+    error: error?.message,
+  })
+
   // Fetch category counts for filter display
   const { data: categoryCounts } = await getCategoryCounts()
 
@@ -46,7 +50,6 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
     )
   }
 
-  const hasResults = resources && resources.length > 0
   const isSearching = Boolean(search && search.trim())
   const isFiltering = Boolean(categories && categories.length > 0)
 
@@ -63,50 +66,13 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
         </Typography>
       </Box>
 
-      <Grid container spacing={3}>
-        {/* Category Filter Sidebar */}
-        <Grid size={{ xs: 12, md: 3 }}>
-          <CategoryFilter categoryCounts={categoryCounts || undefined} />
-        </Grid>
-
-        {/* Results */}
-        <Grid size={{ xs: 12, md: 9 }}>
-          {/* Results count */}
-          {hasResults && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-              {isFiltering && ` in selected categories`}
-            </Typography>
-          )}
-
-          {/* No results state */}
-          {!hasResults && (isSearching || isFiltering) && (
-            <Alert
-              severity="info"
-              icon={<SearchOffIcon />}
-              sx={{ mb: 3 }}
-              action={
-                <Link href="/resources" style={{ textDecoration: 'none' }}>
-                  <Button color="inherit" size="small">
-                    Clear Filters
-                  </Button>
-                </Link>
-              }
-            >
-              <Typography variant="subtitle2" gutterBottom>
-                No results found
-                {isSearching && ` for "${search}"`}
-                {isFiltering && ` in selected categories`}
-              </Typography>
-              <Typography variant="body2">
-                Try adjusting your filters or browse all resources.
-              </Typography>
-            </Alert>
-          )}
-
-          <ResourceList resources={resources || []} />
-        </Grid>
-      </Grid>
+      <ResourcesView
+        resources={resources || []}
+        categoryCounts={categoryCounts || undefined}
+        search={search}
+        isSearching={isSearching}
+        isFiltering={isFiltering}
+      />
     </Container>
   )
 }

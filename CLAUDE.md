@@ -87,6 +87,49 @@ npm run screenshots              # Capture all viewports
 
 ---
 
+## Browser Console Troubleshooting
+
+**CRITICAL: Always check browser console yourself before asking user to check.**
+
+When working on frontend features (especially maps, API integration, or client components):
+
+```bash
+# Check console for specific page
+node scripts/check-console.mjs /resources
+
+# Check homepage
+node scripts/check-console.mjs /
+
+# Check any path
+node scripts/check-console.mjs /path/to/page
+```
+
+**Troubleshooting Workflow:**
+
+1. **Make code changes**
+2. **Check console yourself first** (don't ask user)
+3. **Only show work to user after** console is clean
+4. **If issues found:**
+   - Fix errors and warnings
+   - Repeat console check
+   - Never present to user with console errors
+
+**Common Issues & Fixes:**
+
+- **`InvalidKeyMapError`**: Environment variable not loaded. Fix: `rm -rf .next && restart dev server`
+- **Hydration errors**: Client/server mismatch. Fix: Use `isMounted` state pattern
+- **`NEXT_PUBLIC_` vars wrong**: Delete `.next` directory before restarting server
+- **Google Maps warnings**: Usually API key or library loading order issues
+
+**When debugging fails:**
+
+1. Kill ALL node processes: `killall -9 node`
+2. Delete build cache: `rm -rf .next`
+3. Restart dev server fresh
+4. Re-check console logs
+
+---
+
 ## Project Context
 
 **Reentry Map** is a mobile-first web application helping individuals navigating reentry find resources in their community. The app uses Next.js 16, Supabase, and AI agents to maintain an accurate, up-to-date directory of services.

@@ -11,9 +11,10 @@ import { HeroSearch } from '@/components/search/HeroSearch'
 interface AppBarProps {
   authButton?: React.ReactNode
   showSearch?: boolean
+  isAuthenticated?: boolean
 }
 
-export function AppBar({ authButton, showSearch = false }: AppBarProps) {
+export function AppBar({ authButton, showSearch = false, isAuthenticated = false }: AppBarProps) {
   const searchParams = useSearchParams()
 
   // Read current search query from URL to populate search input
@@ -29,10 +30,7 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
       <Container
         maxWidth="lg"
         sx={{
-          borderBottom: {
-            xs: showSearch ? 'none' : '1px solid rgba(0,0,0,0.12)',
-            md: '1px solid rgba(0,0,0,0.12)',
-          },
+          borderBottom: '1px solid rgba(0,0,0,0.12)',
         }}
       >
         <Toolbar
@@ -70,39 +68,43 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
             </Box>
           </Link>
 
+          {/* HeroSearch - Desktop only (inline with toolbar) */}
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              flexGrow: 1,
+              mx: 2,
+              opacity: showSearch ? 1 : 0,
+              transform: showSearch ? 'translateY(0)' : 'translateY(-10px)',
+              transition: 'opacity 0.3s ease, transform 0.3s ease',
+              pointerEvents: showSearch ? 'auto' : 'none',
+            }}
+          >
+            <HeroSearch initialValue={currentSearch} />
+          </Box>
+
           {/* Desktop Navigation */}
           <Box
             sx={{
               display: { xs: 'none', md: 'flex' },
               gap: 1,
               flexGrow: showSearch ? 0 : 1,
-              ml: 4,
+              ml: showSearch ? 2 : 0,
+              justifyContent: showSearch ? 'flex-start' : 'flex-end',
             }}
           >
             <Link href="/resources" style={{ textDecoration: 'none' }}>
               <Button color="inherit">Resources</Button>
             </Link>
-            <Link href="/favorites" style={{ textDecoration: 'none' }}>
-              <Button color="inherit">Favorites</Button>
-            </Link>
+            {isAuthenticated && (
+              <Link href="/favorites" style={{ textDecoration: 'none' }}>
+                <Button color="inherit">Favorites</Button>
+              </Link>
+            )}
             <Link href="/suggest-resource" style={{ textDecoration: 'none' }}>
               <Button color="inherit">Suggest</Button>
             </Link>
           </Box>
-
-          {/* HeroSearch - Desktop only (inline with toolbar) */}
-          {showSearch && (
-            <Box
-              sx={{
-                display: { xs: 'none', md: 'flex' },
-                flexGrow: 1,
-                maxWidth: 700,
-                mx: 2,
-              }}
-            >
-              <HeroSearch initialValue={currentSearch} />
-            </Box>
-          )}
 
           {/* Right side actions */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -121,19 +123,22 @@ export function AppBar({ authButton, showSearch = false }: AppBarProps) {
       </Container>
 
       {/* Second row: Mobile search (full-width grey bar below yellow header) */}
-      {showSearch && (
-        <Box
-          sx={{
-            display: { xs: 'block', md: 'none' },
-            bgcolor: '#f5f5f5', // Light grey background
-            borderBottom: '1px solid rgba(0,0,0,0.06)', // Fainter bottom border
-          }}
-        >
-          <Container maxWidth="lg" sx={{ py: 2 }}>
-            <HeroSearch initialValue={currentSearch} />
-          </Container>
-        </Box>
-      )}
+      <Box
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          bgcolor: '#f5f5f5', // Light grey background
+          borderBottom: '1px solid rgba(0,0,0,0.06)', // Fainter bottom border
+          maxHeight: showSearch ? '200px' : '0',
+          opacity: showSearch ? 1 : 0,
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease, opacity 0.3s ease',
+          pointerEvents: showSearch ? 'auto' : 'none',
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 2 }}>
+          <HeroSearch initialValue={currentSearch} />
+        </Container>
+      </Box>
     </MuiAppBar>
   )
 }

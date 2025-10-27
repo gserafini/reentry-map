@@ -49,8 +49,7 @@ export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
       sx={{
         display: 'flex',
         gap: 0.5,
-        maxWidth: 700,
-        mx: 'auto',
+        width: '100%',
         bgcolor: 'background.paper',
         p: '6px',
         borderRadius: '24px',
@@ -90,31 +89,19 @@ export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
         <LocationInput size="small" fullWidth />
       </Box>
 
-      {/* Search button */}
+      {/* Search button - icon only */}
       <Button
         type="submit"
         variant="contained"
         size="small"
-        startIcon={<SearchIcon />}
         sx={{
-          px: { xs: 1.5, md: 2.5 },
+          px: 1.5,
           py: 1.25,
           minWidth: 'auto',
-          whiteSpace: 'nowrap',
-          textTransform: 'uppercase',
-          fontWeight: 600,
-          fontSize: '0.875rem',
           borderRadius: '18px',
-          // Hide text on mobile, show icon only
-          '& .MuiButton-startIcon': {
-            marginRight: { xs: 0, md: 1 },
-            marginLeft: { xs: 0, md: -0.25 },
-          },
         }}
       >
-        <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
-          Search
-        </Box>
+        <SearchIcon />
       </Button>
     </Box>
   )

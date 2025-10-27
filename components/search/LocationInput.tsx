@@ -3,9 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { TextField, MenuItem, ListItemIcon, ListItemText, CircularProgress } from '@mui/material'
 import { MyLocation as MyLocationIcon, Place as PlaceIcon } from '@mui/icons-material'
-import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
+import { initializeGoogleMaps } from '@/lib/google-maps'
 import { useUserLocation } from '@/lib/context/LocationContext'
-import { env } from '@/lib/env'
 
 interface LocationInputProps {
   fullWidth?: boolean
@@ -28,34 +27,19 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Initialize Google Maps services
+  // Initialize Google Maps services (singleton - safe to call from multiple instances)
   useEffect(() => {
-    const apiKey = env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
-    if (!apiKey) {
-      console.warn('Google Maps API key not configured')
-      return
-    }
-
-    // Check if already loaded
-    if (placesLibrary && geocodingLibrary) {
-      return
-    }
-
-    // Use new functional API - must set options before importing library
-    setOptions({ key: apiKey, v: 'weekly' })
-
-    // Load both places and geocoding libraries
-    Promise.all([importLibrary('places'), importLibrary('geocoding')])
-      .then(([placesLib, geocodingLib]) => {
-        setPlacesLibrary(placesLib as google.maps.PlacesLibrary)
-        setGeocodingLibrary(geocodingLib as google.maps.GeocodingLibrary)
+    initializeGoogleMaps()
+      .then(({ places, geocoding }) => {
+        setPlacesLibrary(places)
+        setGeocodingLibrary(geocoding)
       })
-      .catch((err: Error) => {
+      .catch((err) => {
         console.error('Error loading Google Maps:', err)
       })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update input value when displayName changes
@@ -124,6 +108,54 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     reverseGeocode()
   }, [coordinates, source, geocodingLibrary, isReverseGeocoding, setManualLocation])
 
+  // Reset selected index when predictions change
+  useEffect(() => {
+    setSelectedIndex(-1)
+  }, [predictions])
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!showDropdown) return
+
+    // Total items = 1 (Current Location) + predictions.length + (1 if user input shown)
+    const hasUserInput = inputValue.trim() && predictions.length === 0 && !loading
+    const totalItems = 1 + predictions.length + (hasUserInput ? 1 : 0)
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev < totalItems - 1 ? prev + 1 : prev))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedIndex === -1) return
+
+        // Index 0 = Current Location
+        if (selectedIndex === 0) {
+          handleCurrentLocation()
+        }
+        // Index 1 to predictions.length = predictions
+        else if (selectedIndex <= predictions.length) {
+          const prediction = predictions[selectedIndex - 1]
+          handlePlaceSelect(prediction.place_id, prediction.description)
+        }
+        // Last index = user's typed input (if shown)
+        else if (hasUserInput && selectedIndex === totalItems - 1) {
+          setShowDropdown(false)
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setShowDropdown(false)
+        setSelectedIndex(-1)
+        break
+    }
+  }
+
   // Handle input change and fetch predictions
   const handleInputChange = async (value: string) => {
     setInputValue(value)
@@ -147,7 +179,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         }
 
         const response = await service.getPlacePredictions(request)
-        setPredictions(response.predictions || [])
+        setPredictions(response?.predictions || [])
       } catch (err) {
         console.error('Autocomplete error:', err)
         setPredictions([])
@@ -204,6 +236,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           handleInputChange(e.target.value)
           setHoverText('')
         }}
+        onKeyDown={handleKeyDown}
         onFocus={() => {
           // Always show dropdown on focus (with Current Location option)
           setShowDropdown(true)
@@ -213,12 +246,22 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           setTimeout(() => {
             setShowDropdown(false)
             setHoverText('')
+            setSelectedIndex(-1)
           }, 200)
         }}
         placeholder="Enter location or zip"
         size={size}
         fullWidth={fullWidth}
         autoComplete="off"
+        inputProps={{
+          role: 'combobox',
+          'aria-label': 'Location search',
+          'aria-autocomplete': 'list',
+          'aria-controls': 'location-suggestions',
+          'aria-expanded': showDropdown,
+          'aria-activedescendant':
+            selectedIndex >= 0 ? `location-option-${selectedIndex}` : undefined,
+        }}
         InputProps={{
           endAdornment: loading ? <CircularProgress size={20} /> : null,
         }}
@@ -241,6 +284,9 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
       {/* Dropdown */}
       {showDropdown && (
         <div
+          id="location-suggestions"
+          role="listbox"
+          aria-label="Location suggestions"
           style={{
             position: 'absolute',
             top: '100%',
@@ -257,14 +303,21 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         >
           {/* Current Location option - always show first */}
           <MenuItem
+            id="location-option-0"
+            role="option"
+            aria-selected={selectedIndex === 0}
             onClick={handleCurrentLocation}
-            onMouseEnter={() => setHoverText('Current Location')}
+            onMouseEnter={() => {
+              setHoverText('Current Location')
+              setSelectedIndex(0)
+            }}
             onMouseLeave={() => setHoverText('')}
             sx={{
               borderBottom: predictions.length > 0 ? '1px solid' : 'none',
               borderColor: 'divider',
               py: 1.5,
               px: 2,
+              backgroundColor: selectedIndex === 0 ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
               '&:hover': {
                 backgroundColor: 'rgba(0, 0, 0, 0.04)',
               },
@@ -287,15 +340,23 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           </MenuItem>
 
           {/* Autocomplete predictions */}
-          {predictions.map((prediction) => (
+          {predictions.map((prediction, index) => (
             <MenuItem
               key={prediction.place_id}
+              id={`location-option-${index + 1}`}
+              role="option"
+              aria-selected={selectedIndex === index + 1}
               onClick={() => handlePlaceSelect(prediction.place_id, prediction.description)}
-              onMouseEnter={() => setHoverText(prediction.description)}
+              onMouseEnter={() => {
+                setHoverText(prediction.description)
+                setSelectedIndex(index + 1) // +1 because index 0 is Current Location
+              }}
               onMouseLeave={() => setHoverText('')}
               sx={{
                 py: 1.5,
                 px: 2,
+                backgroundColor:
+                  selectedIndex === index + 1 ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
                 '&:hover': {
                   backgroundColor: 'rgba(0, 0, 0, 0.04)',
                 },
@@ -326,17 +387,43 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
             </MenuItem>
           ))}
 
-          {/* No results */}
+          {/* User's typed input as fallback option */}
           {inputValue.trim() && predictions.length === 0 && !loading && (
-            <MenuItem disabled>
+            <MenuItem
+              id="location-option-1"
+              role="option"
+              aria-selected={selectedIndex === 1}
+              onClick={() => {
+                setHoverText('')
+                setShowDropdown(false)
+                // Keep the user's typed input - they can search with it as-is
+              }}
+              onMouseEnter={() => {
+                setHoverText(inputValue)
+                setSelectedIndex(1) // Index 1 since Current Location is 0
+              }}
+              onMouseLeave={() => setHoverText('')}
+              sx={{
+                py: 1.5,
+                px: 2,
+                backgroundColor: selectedIndex === 1 ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <PlaceIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+              </ListItemIcon>
               <ListItemText
-                primary="No locations found"
-                secondary="Try a different search"
+                primary={inputValue}
                 primaryTypographyProps={{
-                  sx: { textAlign: 'left' },
-                }}
-                secondaryTypographyProps={{
-                  sx: { textAlign: 'left' },
+                  sx: {
+                    color: 'text.primary',
+                    fontSize: '0.95rem',
+                    fontWeight: 500,
+                    textAlign: 'left',
+                  },
                 }}
               />
             </MenuItem>

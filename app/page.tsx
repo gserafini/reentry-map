@@ -71,7 +71,9 @@ export default async function HomePage() {
             </Typography>
 
             {/* Search Bar */}
-            <HeroSearch />
+            <Box sx={{ maxWidth: 700, mx: 'auto' }}>
+              <HeroSearch />
+            </Box>
 
             {/* Resource count */}
             {resourceCount !== null && (

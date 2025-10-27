@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import { Box } from '@mui/material'
 import { env } from '@/lib/env'
+import { createClient } from '@/lib/supabase/server'
 import { Providers } from './providers'
 import { ClientAppBar } from '@/components/layout/ClientAppBar'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -36,11 +37,16 @@ const geistSans = Geist({
   subsets: ['latin'],
 })
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getClaims()
+  const userEmail = data?.claims?.email
+  const isAuthenticated = !!userEmail
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
@@ -52,7 +58,10 @@ export default function RootLayout({
               minHeight: '100vh',
             }}
           >
-            <ClientAppBar authButton={<AuthButton />} />
+            <ClientAppBar
+              authButton={<AuthButton userEmail={userEmail} />}
+              isAuthenticated={isAuthenticated}
+            />
             <Box
               component="main"
               sx={{

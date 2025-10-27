@@ -1,21 +1,109 @@
-import { Box, Button, Typography } from '@mui/material'
+'use client'
+
+import { Box, Button, Avatar, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material'
+import {
+  Settings as SettingsIcon,
+  Logout as LogoutIcon,
+  Favorite as FavoriteIcon,
+} from '@mui/icons-material'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
-import { LogoutButton } from './logout-button'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
-export async function AuthButton() {
-  const supabase = await createClient()
+// Helper function to get initials from email
+function getInitials(email: string): string {
+  const name = email.split('@')[0]
+  const parts = name.split(/[._-]/)
 
-  // You can also use getUser() which will be slower.
-  const { data } = await supabase.auth.getClaims()
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
 
-  const user = data?.claims
+  return name.slice(0, 2).toUpperCase()
+}
 
-  return user ? (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      <Typography variant="body2">Hey, {user.email}!</Typography>
-      <LogoutButton />
-    </Box>
+interface AuthButtonProps {
+  userEmail?: string | null
+}
+
+export function AuthButton({ userEmail }: AuthButtonProps) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const router = useRouter()
+  const open = Boolean(anchorEl)
+
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleClose = () => {
+    setAnchorEl(null)
+  }
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    handleClose()
+    router.push('/auth/login')
+    router.refresh()
+  }
+
+  return userEmail ? (
+    <>
+      <Avatar
+        onClick={handleClick}
+        sx={{
+          width: 36,
+          height: 36,
+          bgcolor: '#000',
+          color: '#fff',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          cursor: 'pointer',
+          '&:hover': {
+            bgcolor: '#333',
+          },
+        }}
+      >
+        {getInitials(userEmail)}
+      </Avatar>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        onClick={handleClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1.5,
+              minWidth: 180,
+            },
+          },
+        }}
+      >
+        <MenuItem onClick={() => router.push('/favorites')}>
+          <ListItemIcon>
+            <FavoriteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Favorites</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => router.push('/account/settings')}>
+          <ListItemIcon>
+            <SettingsIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Account Settings</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon>
+            <LogoutIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Log Out</ListItemText>
+        </MenuItem>
+      </Menu>
+    </>
   ) : (
     <Box sx={{ display: 'flex', gap: 1 }}>
       <Link href="/auth/login" style={{ textDecoration: 'none' }}>
@@ -25,13 +113,16 @@ export async function AuthButton() {
           sx={{
             borderColor: '#000',
             color: '#000',
+            whiteSpace: 'nowrap',
+            minWidth: 'auto',
+            px: 2,
             '&:hover': {
               borderColor: '#000',
               bgcolor: 'rgba(0, 0, 0, 0.04)',
             },
           }}
         >
-          Sign in
+          Log In
         </Button>
       </Link>
       <Link href="/auth/sign-up" style={{ textDecoration: 'none' }}>
@@ -41,12 +132,15 @@ export async function AuthButton() {
           sx={{
             bgcolor: '#000',
             color: '#fff',
+            whiteSpace: 'nowrap',
+            minWidth: 'auto',
+            px: 2,
             '&:hover': {
               bgcolor: '#333',
             },
           }}
         >
-          Sign up
+          Sign Up
         </Button>
       </Link>
     </Box>
