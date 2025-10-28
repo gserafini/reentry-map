@@ -15,6 +15,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  Paper,
 } from '@mui/material'
 import {
   Phone as PhoneIcon,
@@ -24,8 +25,10 @@ import {
   Verified as VerifiedIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
+  LocationOn as LocationOnIcon,
 } from '@mui/icons-material'
 import type { Resource } from '@/lib/types/database'
+import { SingleResourceMap } from '@/components/map'
 
 interface ResourceDetailProps {
   resource: Resource
@@ -57,15 +60,45 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
 
   return (
     <Box>
+      {/* Map Section - Full width on mobile, contained on desktop */}
+      <Paper
+        elevation={2}
+        sx={{
+          mb: 4,
+          overflow: 'hidden',
+          borderRadius: { xs: 0, sm: 2 },
+          mx: { xs: -2, sm: 0 },
+        }}
+      >
+        <SingleResourceMap
+          resource={resource}
+          height={{ xs: '300px', sm: '350px', md: '400px' }}
+          showInfo={false}
+        />
+      </Paper>
+
       {/* Header Section */}
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <Typography variant="h3" component="h1" sx={{ flexGrow: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          <Typography
+            variant="h3"
+            component="h1"
+            sx={{ flexGrow: 1, fontSize: { xs: '2rem', md: '3rem' } }}
+          >
             {resource.name}
           </Typography>
           {resource.verified && (
             <Chip icon={<VerifiedIcon />} label="Verified" color="success" variant="outlined" />
           )}
+        </Box>
+
+        {/* Address with icon - visible on mobile */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
+          <LocationOnIcon color="action" sx={{ mt: 0.5 }} />
+          <Typography variant="body1" color="text.secondary">
+            {resource.address}
+            {resource.zip && ` ${resource.zip}`}
+          </Typography>
         </Box>
 
         {/* Categories */}
@@ -193,21 +226,14 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
 
             <Divider />
 
-            {/* Address */}
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Address
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 1 }}>
-                {resource.address}
-                {resource.zip && ` ${resource.zip}`}
-              </Typography>
+            {/* Quick Actions */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               <Button
                 variant="contained"
-                size="small"
                 startIcon={<DirectionsIcon />}
                 onClick={handleGetDirections}
                 fullWidth
+                sx={{ flex: { xs: '1 1 100%', sm: '1' } }}
               >
                 Get Directions
               </Button>
