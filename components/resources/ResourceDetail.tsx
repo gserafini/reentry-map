@@ -43,24 +43,6 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
   }
 
-  const handleCall = () => {
-    if (resource.phone) {
-      window.location.href = `tel:${resource.phone}`
-    }
-  }
-
-  const handleEmail = () => {
-    if (resource.email) {
-      window.location.href = `mailto:${resource.email}`
-    }
-  }
-
-  const handleWebsite = () => {
-    if (resource.website) {
-      window.open(resource.website, '_blank', 'noopener,noreferrer')
-    }
-  }
-
   return (
     <Box>
       {/* Map Section - Full width on mobile, contained on desktop */}
@@ -169,8 +151,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     href={`tel:${resource.phone}`}
                     underline="hover"
                     color="inherit"
+                    title={`Call ${resource.phone}`}
                     sx={{
-                      flexGrow: 1,
+                      flex: 1,
                       '&:hover': {
                         color: 'primary.main',
                       },
@@ -179,10 +162,13 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     <Typography variant="body1">{resource.phone}</Typography>
                   </MuiLink>
                   <Button
+                    component="a"
+                    href={`tel:${resource.phone}`}
                     variant="outlined"
                     size="small"
                     startIcon={<PhoneIcon />}
-                    onClick={handleCall}
+                    title={`Call ${resource.phone}`}
+                    sx={{ flexShrink: 0 }}
                   >
                     Call
                   </Button>
@@ -197,8 +183,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     href={`mailto:${resource.email}`}
                     underline="hover"
                     color="inherit"
+                    title={`Email ${resource.email}`}
                     sx={{
-                      flexGrow: 1,
+                      flex: 1,
                       '&:hover': {
                         color: 'primary.main',
                       },
@@ -207,10 +194,13 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     <Typography variant="body1">{resource.email}</Typography>
                   </MuiLink>
                   <Button
+                    component="a"
+                    href={`mailto:${resource.email}`}
                     variant="outlined"
                     size="small"
                     startIcon={<EmailIcon />}
-                    onClick={handleEmail}
+                    title={`Email ${resource.email}`}
+                    sx={{ flexShrink: 0 }}
                   >
                     Email
                   </Button>
@@ -227,8 +217,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     rel="noopener noreferrer"
                     underline="hover"
                     color="inherit"
+                    title={`Visit ${resource.website}`}
                     sx={{
-                      flexGrow: 1,
+                      flex: 1,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -249,10 +240,15 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     </Typography>
                   </MuiLink>
                   <Button
+                    component="a"
+                    href={resource.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     variant="outlined"
                     size="small"
                     startIcon={<WebsiteIcon />}
-                    onClick={handleWebsite}
+                    title={`Visit ${resource.website}`}
+                    sx={{ flexShrink: 0 }}
                   >
                     Visit
                   </Button>
