@@ -30,9 +30,18 @@ export function ResourcesView({
   isSearching,
   isFiltering,
 }: ResourcesViewProps) {
-  const { coordinates } = useUserLocation()
+  const { coordinates: gpsCoordinates } = useUserLocation()
   const searchParams = useSearchParams()
   const hasResults = resources && resources.length > 0
+
+  // Get location from URL params (manual search) or GPS
+  // URL params take priority so map re-centers when user searches for a location
+  const latParam = searchParams.get('lat')
+  const lngParam = searchParams.get('lng')
+  const coordinates =
+    latParam && lngParam
+      ? { latitude: parseFloat(latParam), longitude: parseFloat(lngParam) }
+      : gpsCoordinates
 
   // Get radius from URL params
   const distanceParam = searchParams.get('distance')

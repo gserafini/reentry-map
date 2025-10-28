@@ -69,6 +69,7 @@ export function ResourceMap({
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const clustererRef = useRef<MarkerClusterer | null>(null)
+  const userLocationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -327,6 +328,49 @@ export function ResourceMap({
       }
     }
   }, [resources, userLocation, selectedResourceId, isLoading, onResourceClick])
+
+  // Create user location marker (blue dot)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !userLocation) {
+      // Remove marker if no location
+      if (userLocationMarkerRef.current) {
+        userLocationMarkerRef.current.map = null
+        userLocationMarkerRef.current = null
+      }
+      return
+    }
+
+    const map = mapInstanceRef.current
+
+    // Create blue circle marker for user location
+    const userMarkerElement = document.createElement('div')
+    userMarkerElement.innerHTML = `
+      <div style="
+        width: 20px;
+        height: 20px;
+        background-color: #4285F4;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      "></div>
+    `
+
+    // Remove existing marker if any
+    if (userLocationMarkerRef.current) {
+      userLocationMarkerRef.current.map = null
+    }
+
+    // Create new marker
+    userLocationMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
+      map,
+      position: { lat: userLocation.latitude, lng: userLocation.longitude },
+      content: userMarkerElement,
+      title: 'Your Location',
+      zIndex: 1000, // Always on top of resource markers
+    })
+
+    console.log('[ResourceMap] User location marker created at:', userLocation)
+  }, [userLocation])
 
   // Open info window for selected resource
   useEffect(() => {
