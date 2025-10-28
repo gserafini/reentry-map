@@ -69,11 +69,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           mx: { xs: -2, sm: 0 },
         }}
       >
-        <SingleResourceMap
-          resource={resource}
-          height={{ xs: '300px', sm: '350px', md: '400px' }}
-          showInfo={false}
-        />
+        <SingleResourceMap resource={resource} height="400px" showInfo={false} />
       </Paper>
 
       {/* Header Section */}
