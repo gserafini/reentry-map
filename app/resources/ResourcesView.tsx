@@ -2,6 +2,7 @@
 
 import { Box, Typography, Alert, Button, Stack } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
@@ -30,7 +31,12 @@ export function ResourcesView({
   isFiltering,
 }: ResourcesViewProps) {
   const { coordinates } = useUserLocation()
+  const searchParams = useSearchParams()
   const hasResults = resources && resources.length > 0
+
+  // Get radius from URL params
+  const distanceParam = searchParams.get('distance')
+  const radiusMiles = distanceParam ? parseInt(distanceParam, 10) : undefined
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -53,6 +59,7 @@ export function ResourcesView({
                 }
               : null
           }
+          radiusMiles={radiusMiles}
           height="100%"
         />
       </Box>
@@ -99,7 +106,7 @@ export function ResourcesView({
             >
               <Typography variant="subtitle2" gutterBottom>
                 No results found
-                {isSearching && ` for "${search}"`}
+                {isSearching && ` for \u201C${search}"`}
                 {isFiltering && ` in selected categories`}
               </Typography>
               <Typography variant="body2">

@@ -20,17 +20,20 @@ export interface GetResourcesOptions extends Partial<ResourceFilters>, Paginatio
 /**
  * Get all resources with filtering, pagination, and sorting
  * @param options - Filtering and pagination options
- * @returns Array of resources
+ * @returns Array of resources (with distance if location provided)
  */
 export async function getResources(
   options: GetResourcesOptions = {}
-): Promise<{ data: Resource[] | null; error: Error | null }> {
+): Promise<{ data: (Resource & { distance?: number })[] | null; error: Error | null }> {
   try {
     const supabase = await createClient()
     const {
       search,
       categories,
       tags,
+      latitude,
+      longitude,
+      radius_miles,
       min_rating,
       verified_only,
       accepts_records,
@@ -40,6 +43,107 @@ export async function getResources(
       sort = { field: 'name', direction: 'asc' },
     } = options
 
+    // If location is provided, use RPC function for distance calculation and filtering
+    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
+      const { data: nearbyIds, error: rpcError } = await supabase.rpc('get_resources_near', {
+        user_lat: latitude,
+        user_lng: longitude,
+        radius_miles: radius_miles,
+      })
+
+      if (rpcError) {
+        console.error('Error fetching nearby resources:', rpcError)
+        return { data: null, error: new Error('Failed to fetch nearby resources') }
+      }
+
+      // If no nearby resources found, return empty array
+      if (!nearbyIds || nearbyIds.length === 0) {
+        return { data: [], error: null }
+      }
+
+      // Extract resource IDs and create a distance map
+      const distanceMap = new Map<string, number>()
+      const resourceIds = nearbyIds.map((item: { id: string; distance: number }) => {
+        distanceMap.set(item.id, item.distance)
+        return item.id
+      })
+
+      // Now fetch full resource data for these IDs with additional filters
+      let query = supabase.from('resources').select('*').in('id', resourceIds)
+
+      // Always filter to active resources
+      query = query.eq('status', 'active')
+
+      // Apply additional filters
+      if (categories && categories.length > 0) {
+        query = query.overlaps('categories', categories)
+      }
+
+      if (tags && tags.length > 0) {
+        query = query.contains('tags', tags)
+      }
+
+      if (search && search.trim()) {
+        // Search across name, description, primary_category, and tags
+        // For tags array, use cs (contains, case-sensitive) with lowercase search term
+        const searchLower = search.toLowerCase()
+        query = query.or(
+          `name.ilike.%${search}%,description.ilike.%${search}%,primary_category.ilike.%${search}%,tags.cs.{${searchLower}}`
+        )
+      }
+
+      if (min_rating !== undefined) {
+        query = query.gte('rating_average', min_rating)
+      }
+
+      if (verified_only) {
+        query = query.eq('verified', true)
+      }
+
+      if (accepts_records !== undefined) {
+        query = query.eq('accepts_records', accepts_records)
+      }
+
+      if (appointment_required !== undefined) {
+        query = query.eq('appointment_required', appointment_required)
+      }
+
+      const { data: resources, error } = await query
+
+      if (error) {
+        console.error('Error fetching filtered resources:', error)
+        return { data: null, error: new Error('Failed to fetch resources') }
+      }
+
+      // Attach distance to each resource
+      const resourcesWithDistance = (resources || []).map((resource) => ({
+        ...resource,
+        distance: distanceMap.get(resource.id) || 0,
+      }))
+
+      // Apply sorting (distance is already sorted from RPC, but handle other sorts)
+      if (sort.field === 'distance') {
+        resourcesWithDistance.sort((a, b) => {
+          const comparison = (a.distance || 0) - (b.distance || 0)
+          return sort.direction === 'asc' ? comparison : -comparison
+        })
+      } else {
+        resourcesWithDistance.sort((a, b) => {
+          const aVal = a[sort.field as keyof Resource]
+          const bVal = b[sort.field as keyof Resource]
+          if (aVal === undefined || bVal === undefined) return 0
+          const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+          return sort.direction === 'asc' ? comparison : -comparison
+        })
+      }
+
+      // Apply pagination
+      const paginatedResults = resourcesWithDistance.slice(offset || 0, (offset || 0) + limit)
+
+      return { data: paginatedResults, error: null }
+    }
+
+    // No location provided - use standard query
     let query = supabase.from('resources').select('*')
 
     // Always filter to active resources by default
@@ -81,8 +185,6 @@ export async function getResources(
     }
 
     // Apply sorting
-    // Note: distance sorting requires user coordinates and is handled client-side for now
-    // TODO: Implement server-side distance sorting with PostGIS or URL params
     const sortField = sort.field === 'distance' ? 'name' : sort.field
     query = query.order(sortField, { ascending: sort.direction === 'asc' })
 
@@ -246,12 +348,85 @@ export async function getResourcesCount(
       search,
       categories,
       tags,
+      latitude,
+      longitude,
+      radius_miles,
       min_rating,
       verified_only,
       accepts_records,
       appointment_required,
     } = options
 
+    // If location is provided, use RPC to get nearby IDs first
+    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
+      const { data: nearbyIds, error: rpcError } = await supabase.rpc('get_resources_near', {
+        user_lat: latitude,
+        user_lng: longitude,
+        radius_miles: radius_miles,
+      })
+
+      if (rpcError) {
+        console.error('Error fetching nearby resources for count:', rpcError)
+        return { data: null, error: new Error('Failed to count resources') }
+      }
+
+      if (!nearbyIds || nearbyIds.length === 0) {
+        return { data: 0, error: null }
+      }
+
+      const resourceIds = nearbyIds.map((item: { id: string }) => item.id)
+
+      // Count with additional filters applied
+      let query = supabase
+        .from('resources')
+        .select('*', { count: 'exact', head: true })
+        .in('id', resourceIds)
+        .eq('status', 'active')
+
+      if (categories && categories.length > 0) {
+        query = query.overlaps('categories', categories)
+      }
+
+      if (tags && tags.length > 0) {
+        query = query.contains('tags', tags)
+      }
+
+      if (search && search.trim()) {
+        // Search across name, description, primary_category, and tags
+        // For tags array, use cs (contains, case-sensitive) with lowercase search term
+        const searchLower = search.toLowerCase()
+        query = query.or(
+          `name.ilike.%${search}%,description.ilike.%${search}%,primary_category.ilike.%${search}%,tags.cs.{${searchLower}}`
+        )
+      }
+
+      if (min_rating !== undefined) {
+        query = query.gte('rating_average', min_rating)
+      }
+
+      if (verified_only) {
+        query = query.eq('verified', true)
+      }
+
+      if (accepts_records !== undefined) {
+        query = query.eq('accepts_records', accepts_records)
+      }
+
+      if (appointment_required !== undefined) {
+        query = query.eq('appointment_required', appointment_required)
+      }
+
+      const { count, error } = await query
+
+      if (error) {
+        console.error('Error counting filtered resources:', error)
+        return { data: null, error: new Error('Failed to count resources') }
+      }
+
+      return { data: count, error: null }
+    }
+
+    // No location - use standard query
     let query = supabase.from('resources').select('*', { count: 'exact', head: true })
 
     // Always filter to active resources by default
@@ -311,30 +486,94 @@ export async function getResourcesCount(
 
 /**
  * Get count of resources per category
+ * Supports filtering by search and location to show accurate counts
+ * @param options - Optional filters (search, location, etc.)
  * @returns Map of category to resource count
  */
-export async function getCategoryCounts(): Promise<{
+export async function getCategoryCounts(
+  options: {
+    search?: string
+    latitude?: number
+    longitude?: number
+    radius_miles?: number
+  } = {}
+): Promise<{
   data: Partial<Record<ResourceCategory, number>> | null
   error: Error | null
 }> {
   try {
     const supabase = await createClient()
+    const { search, latitude, longitude, radius_miles } = options
 
-    // Get all active resources with their categories
-    const { data: resources, error } = await supabase
-      .from('resources')
-      .select('categories')
-      .eq('status', 'active')
+    let resources: { categories: string[] }[] = []
 
-    if (error) {
-      console.error('Error fetching resources for category counts:', error)
-      return { data: null, error: new Error('Failed to fetch category counts') }
+    // If location filtering is provided, get nearby resources first
+    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
+      const { data: nearbyIds, error: rpcError } = await supabase.rpc('get_resources_near', {
+        user_lat: latitude,
+        user_lng: longitude,
+        radius_miles: radius_miles,
+      })
+
+      if (rpcError) {
+        console.error('Error fetching nearby resources for category counts:', rpcError)
+        return { data: null, error: new Error('Failed to fetch category counts') }
+      }
+
+      if (!nearbyIds || nearbyIds.length === 0) {
+        // No nearby resources, return empty counts
+        return { data: {}, error: null }
+      }
+
+      const resourceIds = nearbyIds.map((item: { id: string }) => item.id)
+
+      // Get categories for nearby resources
+      let query = supabase
+        .from('resources')
+        .select('categories')
+        .in('id', resourceIds)
+        .eq('status', 'active')
+
+      if (search && search.trim()) {
+        const searchLower = search.toLowerCase()
+        query = query.or(
+          `name.ilike.%${search}%,description.ilike.%${search}%,primary_category.ilike.%${search}%,tags.cs.{${searchLower}}`
+        )
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching filtered resources for category counts:', error)
+        return { data: null, error: new Error('Failed to fetch category counts') }
+      }
+
+      resources = data || []
+    } else {
+      // No location filtering - get all active resources
+      let query = supabase.from('resources').select('categories').eq('status', 'active')
+
+      if (search && search.trim()) {
+        const searchLower = search.toLowerCase()
+        query = query.or(
+          `name.ilike.%${search}%,description.ilike.%${search}%,primary_category.ilike.%${search}%,tags.cs.{${searchLower}}`
+        )
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching resources for category counts:', error)
+        return { data: null, error: new Error('Failed to fetch category counts') }
+      }
+
+      resources = data || []
     }
 
     // Count resources per category
     const counts: Partial<Record<ResourceCategory, number>> = {}
 
-    resources?.forEach((resource) => {
+    resources.forEach((resource) => {
       if (resource.categories && Array.isArray(resource.categories)) {
         resource.categories.forEach((category) => {
           const cat = category as ResourceCategory

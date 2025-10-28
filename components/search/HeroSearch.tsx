@@ -27,7 +27,7 @@ export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
     setSearchQuery(initialValue)
   }, [initialValue])
 
-  // Add keyboard shortcut listener for "/" key
+  // Add keyboard shortcut listener for \u201C/" key
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check if "/" was pressed

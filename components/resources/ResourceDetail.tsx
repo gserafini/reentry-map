@@ -17,6 +17,7 @@ import {
   ListItemText,
   Paper,
   Link as MuiLink,
+  Tooltip,
 } from '@mui/material'
 import {
   Phone as PhoneIcon,
@@ -43,8 +44,59 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
   }
 
+  // Generate Schema.org structured data for SEO
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': resource.primary_category === 'healthcare' ? 'MedicalBusiness' : 'LocalBusiness',
+    name: resource.name,
+    description: resource.description,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: resource.address,
+      addressLocality: resource.city || '',
+      addressRegion: resource.state || 'CA',
+      postalCode: resource.zip || '',
+      addressCountry: 'US',
+    },
+    ...(resource.latitude &&
+      resource.longitude && {
+        geo: {
+          '@type': 'GeoCoordinates',
+          latitude: resource.latitude,
+          longitude: resource.longitude,
+        },
+      }),
+    ...(resource.phone && { telephone: resource.phone }),
+    ...(resource.email && { email: resource.email }),
+    ...(resource.website && { url: resource.website }),
+    ...(resource.rating_average &&
+      resource.rating_count && {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: resource.rating_average,
+          ratingCount: resource.rating_count,
+          bestRating: 5,
+          worstRating: 1,
+        },
+      }),
+    ...(resource.hours && {
+      openingHours:
+        typeof resource.hours === 'string'
+          ? resource.hours
+          : Object.entries(resource.hours as Record<string, string>).map(
+              ([day, hours]) => `${day.substring(0, 2)} ${hours}`
+            ),
+    }),
+  }
+
   return (
-    <Box>
+    <Box component="article" itemScope itemType="https://schema.org/LocalBusiness">
+      {/* JSON-LD Structured Data for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+
       {/* Map Section - Full width on mobile, contained on desktop */}
       <Paper
         elevation={2}
@@ -59,11 +111,12 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
       </Paper>
 
       {/* Header Section */}
-      <Box sx={{ mb: 4 }}>
+      <Box component="header" sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
           <Typography
             variant="h3"
             component="h1"
+            itemProp="name"
             sx={{ flexGrow: 1, fontSize: { xs: '2rem', md: '3rem' } }}
           >
             {resource.name}
@@ -74,7 +127,20 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </Box>
 
         {/* Address with Get Directions button */}
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <Box
+          component="address"
+          itemProp="address"
+          itemScope
+          itemType="https://schema.org/PostalAddress"
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 2,
+            mb: 2,
+            flexWrap: 'wrap',
+            fontStyle: 'normal',
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
@@ -84,11 +150,27 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               minWidth: '200px',
             }}
           >
-            <LocationOnIcon color="action" sx={{ mt: 0.5 }} />
-            <Typography variant="body1" color="text.secondary">
-              {resource.address}
-              {resource.zip && ` ${resource.zip}`}
-            </Typography>
+            <LocationOnIcon color="action" sx={{ mt: 0.5 }} aria-label="Address" />
+            <Tooltip title="Click to open directions in Google Maps" arrow placement="top">
+              <MuiLink
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resource.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                underline="hover"
+                color="text.secondary"
+                sx={{
+                  cursor: 'pointer',
+                  '&:hover': {
+                    color: 'primary.main',
+                  },
+                }}
+              >
+                <Typography variant="body1" component="span" itemProp="streetAddress">
+                  {resource.address}
+                  {resource.zip && <span itemProp="postalCode"> {resource.zip}</span>}
+                </Typography>
+              </MuiLink>
+            </Tooltip>
           </Box>
           <Button
             variant="contained"
@@ -103,37 +185,155 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
 
         {/* Rating */}
         {resource.rating_average !== null && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Rating value={resource.rating_average} precision={0.5} readOnly />
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+            itemProp="aggregateRating"
+            itemScope
+            itemType="https://schema.org/AggregateRating"
+          >
+            <Rating
+              value={resource.rating_average}
+              precision={0.5}
+              readOnly
+              aria-label={`Rating: ${resource.rating_average.toFixed(1)} out of 5`}
+            />
             <Typography variant="body2" color="text.secondary">
-              {resource.rating_average.toFixed(1)} ({resource.rating_count} review
+              <span itemProp="ratingValue">{resource.rating_average.toFixed(1)}</span> (
+              <span itemProp="ratingCount">{resource.rating_count}</span> review
               {resource.rating_count !== 1 ? 's' : ''})
             </Typography>
+            <meta itemProp="bestRating" content="5" />
+            <meta itemProp="worstRating" content="1" />
           </Box>
         )}
       </Box>
 
-      {/* Description */}
-      {resource.description && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography
-              variant="h6"
-              component="p"
-              sx={{
-                fontWeight: 400,
-                lineHeight: 1.6,
-                fontSize: { xs: '1.125rem', md: '1.25rem' },
-                color: 'text.primary',
-              }}
-            >
-              {resource.description}
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
+      {/* Contact Information - Full width at top */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Contact Information
+          </Typography>
+          <Stack spacing={2}>
+            {/* Phone */}
+            {resource.phone && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PhoneIcon color="action" aria-label="Phone number" />
+                <MuiLink
+                  href={`tel:${resource.phone}`}
+                  underline="hover"
+                  color="inherit"
+                  title={`Call ${resource.phone}`}
+                  itemProp="telephone"
+                  sx={{
+                    flex: 1,
+                    '&:hover': {
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <Typography variant="body1">{resource.phone}</Typography>
+                </MuiLink>
+                <Button
+                  component="a"
+                  href={`tel:${resource.phone}`}
+                  variant="outlined"
+                  size="small"
+                  startIcon={<PhoneIcon />}
+                  title={`Call ${resource.phone}`}
+                  sx={{ flexShrink: 0 }}
+                >
+                  Call
+                </Button>
+              </Box>
+            )}
 
-      {/* Contact Information, Services & Details - 3 column layout on desktop, stacked on mobile */}
+            {/* Email */}
+            {resource.email && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <EmailIcon color="action" aria-label="Email address" />
+                <MuiLink
+                  href={`mailto:${resource.email}`}
+                  underline="hover"
+                  color="inherit"
+                  title={`Email ${resource.email}`}
+                  itemProp="email"
+                  sx={{
+                    flex: 1,
+                    '&:hover': {
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <Typography variant="body1">{resource.email}</Typography>
+                </MuiLink>
+                <Button
+                  component="a"
+                  href={`mailto:${resource.email}`}
+                  variant="outlined"
+                  size="small"
+                  startIcon={<EmailIcon />}
+                  title={`Email ${resource.email}`}
+                  sx={{ flexShrink: 0 }}
+                >
+                  Email
+                </Button>
+              </Box>
+            )}
+
+            {/* Website */}
+            {resource.website && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <WebsiteIcon color="action" aria-label="Website" />
+                <MuiLink
+                  href={resource.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  underline="hover"
+                  color="inherit"
+                  title={`Visit ${resource.website}`}
+                  itemProp="url"
+                  sx={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    '&:hover': {
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {resource.website}
+                  </Typography>
+                </MuiLink>
+                <Button
+                  component="a"
+                  href={resource.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  startIcon={<WebsiteIcon />}
+                  title={`Visit ${resource.website}`}
+                  sx={{ flexShrink: 0 }}
+                >
+                  Visit
+                </Button>
+              </Box>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {/* About, Services & Details - 3 column layout on desktop, stacked on mobile */}
       <Box
         sx={{
           display: 'grid',
@@ -142,127 +342,24 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           mb: 3,
         }}
       >
-        {/* Contact Information */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Contact Information
-            </Typography>
-            <Stack spacing={2}>
-              {/* Phone */}
-              {resource.phone && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PhoneIcon color="action" />
-                  <MuiLink
-                    href={`tel:${resource.phone}`}
-                    underline="hover"
-                    color="inherit"
-                    title={`Call ${resource.phone}`}
-                    sx={{
-                      flex: 1,
-                      '&:hover': {
-                        color: 'primary.main',
-                      },
-                    }}
-                  >
-                    <Typography variant="body1">{resource.phone}</Typography>
-                  </MuiLink>
-                  <Button
-                    component="a"
-                    href={`tel:${resource.phone}`}
-                    variant="outlined"
-                    size="small"
-                    startIcon={<PhoneIcon />}
-                    title={`Call ${resource.phone}`}
-                    sx={{ flexShrink: 0 }}
-                  >
-                    Call
-                  </Button>
-                </Box>
-              )}
-
-              {/* Email */}
-              {resource.email && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <EmailIcon color="action" />
-                  <MuiLink
-                    href={`mailto:${resource.email}`}
-                    underline="hover"
-                    color="inherit"
-                    title={`Email ${resource.email}`}
-                    sx={{
-                      flex: 1,
-                      '&:hover': {
-                        color: 'primary.main',
-                      },
-                    }}
-                  >
-                    <Typography variant="body1">{resource.email}</Typography>
-                  </MuiLink>
-                  <Button
-                    component="a"
-                    href={`mailto:${resource.email}`}
-                    variant="outlined"
-                    size="small"
-                    startIcon={<EmailIcon />}
-                    title={`Email ${resource.email}`}
-                    sx={{ flexShrink: 0 }}
-                  >
-                    Email
-                  </Button>
-                </Box>
-              )}
-
-              {/* Website */}
-              {resource.website && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <WebsiteIcon color="action" />
-                  <MuiLink
-                    href={resource.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    underline="hover"
-                    color="inherit"
-                    title={`Visit ${resource.website}`}
-                    sx={{
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      '&:hover': {
-                        color: 'primary.main',
-                      },
-                    }}
-                  >
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {resource.website}
-                    </Typography>
-                  </MuiLink>
-                  <Button
-                    component="a"
-                    href={resource.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="outlined"
-                    size="small"
-                    startIcon={<WebsiteIcon />}
-                    title={`Visit ${resource.website}`}
-                    sx={{ flexShrink: 0 }}
-                  >
-                    Visit
-                  </Button>
-                </Box>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
+        {/* About */}
+        {resource.description && (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                About
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ lineHeight: 1.6 }}
+                itemProp="description"
+              >
+                {resource.description}
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Services Offered */}
         {resource.services_offered && resource.services_offered.length > 0 && (
@@ -434,7 +531,11 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
             {resource.tags.map((tag) => (
-              <Link key={tag} href={`/resources/tag/${tag}`} style={{ textDecoration: 'none' }}>
+              <Link
+                key={tag}
+                href={`/resources/tag/${tag}?search=${encodeURIComponent(tag)}`}
+                style={{ textDecoration: 'none' }}
+              >
                 <Chip label={tag} size="small" variant="outlined" clickable />
               </Link>
             ))}

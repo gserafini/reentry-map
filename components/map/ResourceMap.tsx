@@ -25,6 +25,11 @@ interface ResourceMapProps {
   userLocation?: { latitude: number; longitude: number } | null
 
   /**
+   * Radius in miles for location-based filtering
+   */
+  radiusMiles?: number
+
+  /**
    * Selected resource ID (to highlight/open)
    */
   selectedResourceId?: string | null

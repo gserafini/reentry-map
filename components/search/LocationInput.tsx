@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { TextField, MenuItem, ListItemIcon, ListItemText, CircularProgress } from '@mui/material'
 import { MyLocation as MyLocationIcon, Place as PlaceIcon } from '@mui/icons-material'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { initializeGoogleMaps } from '@/lib/google-maps'
 import { useUserLocation } from '@/lib/context/LocationContext'
 
@@ -18,6 +19,8 @@ interface LocationInputProps {
 export function LocationInput({ fullWidth = false, size = 'medium' }: LocationInputProps) {
   const { displayName, requestLocation, setManualLocation, loading, coordinates, source } =
     useUserLocation()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [inputValue, setInputValue] = useState('')
   const [hoverText, setHoverText] = useState('')
   const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
@@ -29,6 +32,24 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Helper function to update URL with location parameters
+  const updateURLWithLocation = useCallback(
+    (lat: number, lng: number, locationName: string, distance?: number) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('lat', lat.toString())
+      params.set('lng', lng.toString())
+      params.set('locationName', locationName)
+      if (distance) {
+        params.set('distance', distance.toString())
+      } else if (!params.has('distance')) {
+        // Set default distance if not present
+        params.set('distance', '25')
+      }
+      router.push(`?${params.toString()}`, { scroll: false })
+    },
+    [router, searchParams]
+  )
 
   // Initialize Google Maps services (singleton - safe to call from multiple instances)
   useEffect(() => {
@@ -95,6 +116,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           // Update the location with the geocoded city/state
           setManualLocation(coordinates, formattedLocation)
           setInputValue(formattedLocation)
+          // Update URL with location params
+          updateURLWithLocation(coordinates.latitude, coordinates.longitude, formattedLocation)
         }
       } catch (err) {
         console.error('Reverse geocoding error:', err)
@@ -106,7 +129,14 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     }
 
     reverseGeocode()
-  }, [coordinates, source, geocodingLibrary, isReverseGeocoding, setManualLocation])
+  }, [
+    coordinates,
+    source,
+    geocodingLibrary,
+    isReverseGeocoding,
+    setManualLocation,
+    updateURLWithLocation,
+  ])
 
   // Reset selected index when predictions change
   useEffect(() => {
@@ -218,6 +248,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
         // Use description as display name (e.g., "Oakland, CA" or "94601")
         setManualLocation(coords, description)
+        // Update URL with location params
+        updateURLWithLocation(coords.latitude, coords.longitude, description)
         setShowDropdown(false)
         setPredictions([])
         // Don't call onLocationChange - let user press Enter to submit

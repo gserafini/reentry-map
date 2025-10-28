@@ -12,7 +12,6 @@ let scriptLoaded = false
  */
 function loadGoogleMapsScript(apiKey: string): Promise<void> {
   if (scriptLoaded) {
-    console.log('[google-maps] Script already loaded')
     return Promise.resolve()
   }
 
@@ -20,20 +19,17 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
     // Check if script is already in the DOM
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
     if (existingScript) {
-      console.log('[google-maps] Script tag already exists in DOM')
       scriptLoaded = true
       resolve()
       return
     }
 
-    console.log('[google-maps] Creating script tag with API key')
     const script = document.createElement('script')
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geocoding,marker&v=weekly`
     script.async = true
     script.defer = true
 
     script.onload = () => {
-      console.log('[google-maps] Script loaded successfully')
       scriptLoaded = true
       resolve()
     }
@@ -67,14 +63,8 @@ export async function initializeGoogleMaps(): Promise<{
     throw error
   }
 
-  console.log('[google-maps] Initializing...')
-  console.log('[google-maps] API key present:', !!apiKey)
-  console.log('[google-maps] API key length:', apiKey.length)
-  console.log('[google-maps] API key starts with:', apiKey.substring(0, 10))
-
   // If already initialized, return cached libraries
   if (placesLibrary && geocodingLibrary && mapsLibrary && markerLibrary) {
-    console.log('[google-maps] Returning cached libraries')
     return {
       places: placesLibrary,
       geocoding: geocodingLibrary,
@@ -85,7 +75,6 @@ export async function initializeGoogleMaps(): Promise<{
 
   // If initialization is in progress, wait for it
   if (initializationPromise) {
-    console.log('[google-maps] Waiting for existing initialization...')
     await initializationPromise
     return {
       places: placesLibrary!,
@@ -112,8 +101,6 @@ export async function initializeGoogleMaps(): Promise<{
         throw new Error('Google Maps failed to load after script injection')
       }
 
-      console.log('[google-maps] Google Maps API available, loading libraries...')
-
       // Now load individual libraries using google.maps.importLibrary
       const [placesLib, geocodingLib, mapsLib, markerLib] = await Promise.all([
         google.maps.importLibrary('places'),
@@ -126,8 +113,6 @@ export async function initializeGoogleMaps(): Promise<{
       geocodingLibrary = geocodingLib as google.maps.GeocodingLibrary
       mapsLibrary = mapsLib as google.maps.MapsLibrary
       markerLibrary = markerLib as google.maps.MarkerLibrary
-
-      console.log('[google-maps] All libraries loaded successfully')
     } catch (error) {
       console.error('[google-maps] Error loading Google Maps libraries:', error)
       initializationPromise = null // Allow retry

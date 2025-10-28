@@ -57,12 +57,10 @@ export function SingleResourceMap({
 
     async function initMap() {
       if (!mapRef.current) {
-        console.log('[SingleResourceMap] mapRef.current is null, skipping init')
         return
       }
 
       try {
-        console.log('[SingleResourceMap] Starting map initialization...')
         setIsLoading(true)
         setError(null)
 
@@ -70,7 +68,6 @@ export function SingleResourceMap({
         await initializeGoogleMaps()
 
         if (!isComponentMounted) {
-          console.log('[SingleResourceMap] Component unmounted during init, aborting')
           return
         }
 

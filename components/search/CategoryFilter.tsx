@@ -71,13 +71,10 @@ export function CategoryFilter({ categoryCounts, defaultExpanded = true }: Categ
 
     // Use SEO-friendly URLs for single category, query params for multiple or none
     if (newCategories.length === 1) {
-      // Single category: use SEO-friendly URL
-      const search = params.get('search')
-      if (search) {
-        router.push(`/resources/category/${newCategories[0]}?search=${encodeURIComponent(search)}`)
-      } else {
-        router.push(`/resources/category/${newCategories[0]}`)
-      }
+      // Single category: use SEO-friendly URL and populate search bar with category name
+      router.push(
+        `/resources/category/${newCategories[0]}?search=${encodeURIComponent(newCategories[0])}`
+      )
     } else if (newCategories.length > 1) {
       // Multiple categories: use query params
       params.set('categories', newCategories.join(','))

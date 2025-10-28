@@ -1,10 +1,12 @@
-import { Container, Typography, Box, Alert, Button, Grid, Chip, Paper } from '@mui/material'
+import { Container, Typography, Box, Alert, Button, Grid, Chip, Paper, Card } from '@mui/material'
 import { SearchOff as SearchOffIcon, LocalOffer as TagIcon } from '@mui/icons-material'
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
-import { ResourceMap } from '@/components/map/ResourceMap'
+import { ResourceMapWithLocation } from '@/components/map/ResourceMapWithLocation'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { LocationFilterSidebar } from '@/components/search/LocationFilterSidebar'
 import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
 import { parseSortParam } from '@/lib/utils/sort'
@@ -94,16 +96,22 @@ export default async function TagPage({ params, searchParams }: TagPageProps) {
           </Typography>
         </Box>
         <Typography variant="body1" color="text.secondary">
-          {isSearching
-            ? `Search results tagged with "${displayTag}"`
-            : `Browse all resources tagged with "${displayTag}"`}
+          {isSearching ? (
+            <>Search results tagged with &ldquo;{displayTag}&rdquo;</>
+          ) : (
+            <>Browse all resources tagged with &ldquo;{displayTag}&rdquo;</>
+          )}
         </Typography>
       </Box>
 
       <Grid container spacing={3}>
-        {/* Category Filter Sidebar */}
+        {/* Filter Sidebar - Location + Categories */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <CategoryFilter categoryCounts={categoryCounts || undefined} />
+          <LocationFilterSidebar>
+            <Card>
+              <CategoryFilter categoryCounts={categoryCounts || undefined} />
+            </Card>
+          </LocationFilterSidebar>
         </Grid>
 
         {/* Results */}
@@ -130,17 +138,20 @@ export default async function TagPage({ params, searchParams }: TagPageProps) {
               }
             >
               <Typography variant="subtitle2" gutterBottom>
-                No results found{isSearching && ` for "${search}"`}
+                No results found
+                {isSearching && <> for &ldquo;{search}&rdquo;</>}
               </Typography>
               <Typography variant="body2">
-                {isSearching
-                  ? 'Try adjusting your search terms.'
-                  : `There are currently no resources tagged with "${displayTag}".`}
+                {isSearching ? (
+                  'Try adjusting your search terms.'
+                ) : (
+                  <>There are currently no resources tagged with &ldquo;{displayTag}&rdquo;.</>
+                )}
               </Typography>
             </Alert>
           )}
 
-          {/* Map */}
+          {/* Map with location-based zoom */}
           {hasResults && (
             <Paper
               elevation={2}
@@ -150,7 +161,7 @@ export default async function TagPage({ params, searchParams }: TagPageProps) {
                 borderRadius: 2,
               }}
             >
-              <ResourceMap resources={resources || []} height="500px" />
+              <ResourceMapWithLocation resources={resources || []} height="500px" />
             </Paper>
           )}
 
@@ -172,7 +183,7 @@ export default async function TagPage({ params, searchParams }: TagPageProps) {
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: TagPageProps) {
+export async function generateMetadata({ params }: TagPageProps): Promise<Metadata> {
   const { tag } = await params
   const decodedTag = decodeURIComponent(tag)
 
@@ -182,8 +193,35 @@ export async function generateMetadata({ params }: TagPageProps) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 
+  const title = `${displayTag} Resources | Reentry Map`
+  const description = `Find resources tagged with "${displayTag}" in your community. Browse employment, housing, food assistance, healthcare, legal aid, and support services for individuals navigating reentry.`
+
+  const keywords = [
+    displayTag,
+    decodedTag,
+    'reentry resources',
+    'reentry services',
+    'community resources',
+    'criminal justice',
+    'second chances',
+    'support services',
+    'resource directory',
+  ]
+
   return {
-    title: `${displayTag} Resources | Reentry Map`,
-    description: `Find resources tagged with "${displayTag}" in your community. Browse employment, housing, food assistance, and more.`,
+    title,
+    description,
+    keywords: keywords.join(', '),
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      siteName: 'Reentry Map',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
   }
 }

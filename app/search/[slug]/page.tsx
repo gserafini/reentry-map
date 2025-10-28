@@ -1,10 +1,11 @@
-import { Container, Typography, Box, Alert, Grid, Paper } from '@mui/material'
+import { Container, Typography, Box, Alert, Grid, Paper, Card } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
 import { notFound } from 'next/navigation'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
-import { ResourceMap } from '@/components/map/ResourceMap'
+import { ResourceMapWithLocation } from '@/components/map/ResourceMapWithLocation'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { LocationFilterSidebar } from '@/components/search/LocationFilterSidebar'
 import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
 import { parseSortParam } from '@/lib/utils/sort'
@@ -115,9 +116,13 @@ export default async function HyperlocalSearchPage({
       </Box>
 
       <Grid container spacing={3}>
-        {/* Category Filter Sidebar */}
+        {/* Filter Sidebar - Location + Categories */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <CategoryFilter categoryCounts={categoryCounts || undefined} />
+          <LocationFilterSidebar>
+            <Card>
+              <CategoryFilter categoryCounts={categoryCounts || undefined} />
+            </Card>
+          </LocationFilterSidebar>
         </Grid>
 
         {/* Results */}
@@ -152,7 +157,7 @@ export default async function HyperlocalSearchPage({
                 borderRadius: 2,
               }}
             >
-              <ResourceMap resources={resources || []} height="500px" />
+              <ResourceMapWithLocation resources={resources || []} height="500px" />
             </Paper>
           )}
 

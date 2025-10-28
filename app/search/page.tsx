@@ -1,11 +1,13 @@
-import { Container, Typography, Box, Alert, Grid, Paper } from '@mui/material'
+import { Container, Typography, Box, Alert, Grid, Paper, Card } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
-import { ResourceMap } from '@/components/map/ResourceMap'
+import { ResourceMapWithLocation } from '@/components/map/ResourceMapWithLocation'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
+import { LocationFilterSidebar } from '@/components/search/LocationFilterSidebar'
 import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
+import { SearchPageHeader } from '@/components/search/SearchPageHeader'
 import { parseSortParam } from '@/lib/utils/sort'
 import type { Metadata } from 'next'
 
@@ -14,6 +16,10 @@ interface SearchPageProps {
     search?: string
     page?: string
     sort?: string
+    lat?: string
+    lng?: string
+    distance?: string
+    locationName?: string
   }>
 }
 
@@ -23,6 +29,7 @@ const PAGE_SIZE = 20
  * Base search page
  * URL: /search/
  * Shows general search landing page with all resources
+ * Supports location-based filtering via lat/lng/distance query params
  */
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams
@@ -31,17 +38,87 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const offset = (currentPage - 1) * PAGE_SIZE
   const sort = parseSortParam(params.sort)
 
-  const { data: resources, error } = await getResources({
+  // Parse location parameters
+  const lat = params.lat ? parseFloat(params.lat) : undefined
+  const lng = params.lng ? parseFloat(params.lng) : undefined
+  const distance = params.distance ? parseInt(params.distance, 10) : undefined
+  const locationName = params.locationName
+
+  // Determine if we have valid location for filtering
+  const hasLocation =
+    lat !== undefined && !isNaN(lat) && lng !== undefined && !isNaN(lng) && distance
+
+  // First, try to get resources within radius if location is provided
+  let resources = null
+  let withinRadiusCount = 0
+  let error = null
+
+  if (hasLocation) {
+    const nearbyResult = await getResources({
+      search,
+      latitude: lat,
+      longitude: lng,
+      radius_miles: distance,
+      limit: PAGE_SIZE,
+      offset,
+      sort,
+    })
+
+    if (nearbyResult.error) {
+      error = nearbyResult.error
+    } else {
+      withinRadiusCount = nearbyResult.data?.length || 0
+
+      if (withinRadiusCount > 0) {
+        // Found results within radius
+        resources = nearbyResult.data
+      } else {
+        // No results within radius - get ALL results sorted by distance
+        const allResult = await getResources({
+          search,
+          latitude: lat,
+          longitude: lng,
+          radius_miles: undefined, // No radius limit
+          limit: PAGE_SIZE,
+          offset,
+          sort: { field: 'distance', direction: 'asc' }, // Sort by distance
+        })
+
+        if (allResult.error) {
+          error = allResult.error
+        } else {
+          resources = allResult.data
+        }
+      }
+    }
+  } else {
+    // No location filtering - standard search
+    const result = await getResources({
+      search,
+      limit: PAGE_SIZE,
+      offset,
+      sort,
+    })
+
+    resources = result.data
+    error = result.error
+  }
+
+  // Get total count for pagination
+  const { data: totalCount } = await getResourcesCount({
     search,
-    limit: PAGE_SIZE,
-    offset,
-    sort,
+    ...(hasLocation && withinRadiusCount > 0
+      ? { latitude: lat, longitude: lng, radius_miles: distance }
+      : {}),
   })
 
-  const { data: totalCount } = await getResourcesCount({ search })
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE)
 
-  const { data: categoryCounts } = await getCategoryCounts()
+  // Get category counts with current filters applied
+  const { data: categoryCounts } = await getCategoryCounts({
+    search,
+    ...(hasLocation ? { latitude: lat, longitude: lng, radius_miles: distance } : {}),
+  })
 
   if (error) {
     return (
@@ -59,31 +136,25 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   const hasResults = resources && resources.length > 0
-  const isSearching = Boolean(search && search.trim())
+  const noResultsWithinRadius = hasLocation && withinRadiusCount === 0 && hasResults
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          {isSearching ? `Search Results: "${search}"` : 'Search Resources'}
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          {isSearching
-            ? `Showing results for "${search}"`
-            : 'Find employment, housing, food, healthcare, and support services in your community. Browse our directory of verified resources.'}
-        </Typography>
-      </Box>
+      <SearchPageHeader search={search} />
 
       <Grid container spacing={3}>
-        {/* Category Filter Sidebar */}
+        {/* Filter Sidebar - Location + Categories */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <CategoryFilter categoryCounts={categoryCounts || undefined} />
+          <LocationFilterSidebar>
+            <Card>
+              <CategoryFilter categoryCounts={categoryCounts || undefined} />
+            </Card>
+          </LocationFilterSidebar>
         </Grid>
 
         {/* Results */}
         <Grid size={{ xs: 12, md: 9 }}>
-          {/* Sort and Near Me controls */}
-          {/* Sort dropdown - location input is now in header */}
+          {/* Sort dropdown */}
           {hasResults && (
             <Box
               sx={{
@@ -98,10 +169,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             </Box>
           )}
 
+          {/* No results at all */}
           {!hasResults && (
             <Alert severity="info" icon={<SearchOffIcon />} sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom>
-                No resources found
+                {hasLocation
+                  ? `No results found within ${distance} miles of ${locationName || 'your location'}`
+                  : 'No resources found'}
               </Typography>
               <Typography variant="body2">
                 We&apos;re constantly adding new resources. Check back soon.
@@ -109,8 +183,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             </Alert>
           )}
 
-          {/* Map */}
-          {hasResults && (
+          {/* Map with location-based zoom - show if has results OR has location set */}
+          {(hasResults || hasLocation) && (
             <Paper
               elevation={2}
               sx={{
@@ -119,8 +193,28 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 borderRadius: 2,
               }}
             >
-              <ResourceMap resources={resources || []} height="500px" />
+              <ResourceMapWithLocation resources={resources || []} height="500px" />
             </Paper>
+          )}
+
+          {/* No results within radius - showing nearby results */}
+          {noResultsWithinRadius && (
+            <>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  No results found within {distance} miles of {locationName || 'your location'}
+                </Typography>
+              </Alert>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h5" component="h2" gutterBottom>
+                  Nearby Results
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Showing all available results sorted by distance
+                </Typography>
+              </Box>
+            </>
           )}
 
           <ResourceList resources={resources || []} />
@@ -141,16 +235,54 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 }
 
 // Generate metadata for SEO
-export function generateMetadata(): Metadata {
+export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
+  const params = await searchParams
+  const search = params.search
+  const locationName = params.locationName
+
+  // Build dynamic title and description
+  let title = 'Search Resources | Reentry Map'
+  let description =
+    'Find employment, housing, food, healthcare, and support services in your community. Browse our verified directory of reentry resources.'
+  let keywords = [
+    'reentry resources',
+    'employment assistance',
+    'housing support',
+    'food assistance',
+    'healthcare services',
+    'reentry programs',
+    'criminal justice',
+    'community resources',
+  ]
+
+  if (search && locationName) {
+    title = `${search} Resources near ${locationName} | Reentry Map`
+    description = `Find ${search} resources and services near ${locationName}. Connect with verified programs offering employment, housing, healthcare, and support for individuals navigating reentry.`
+    keywords = [search, locationName, 'reentry services', ...keywords]
+  } else if (search) {
+    title = `${search} Resources | Reentry Map`
+    description = `Search verified ${search} resources and programs. Find employment, housing, food, healthcare, and support services for individuals navigating reentry.`
+    keywords = [search, 'reentry resources', ...keywords]
+  } else if (locationName) {
+    title = `Resources near ${locationName} | Reentry Map`
+    description = `Browse verified reentry resources near ${locationName}. Find employment, housing, food, healthcare, and community support services in your area.`
+    keywords = [locationName, 'local resources', 'community services', ...keywords]
+  }
+
   return {
-    title: 'Search Resources | Reentry Map',
-    description:
-      'Find employment, housing, food, healthcare, and support services in your community. Browse our directory of verified resources for individuals navigating reentry.',
+    title,
+    description,
+    keywords: keywords.join(', '),
     openGraph: {
-      title: 'Search Resources | Reentry Map',
-      description:
-        'Find employment, housing, food, healthcare, and support services in your community.',
+      title,
+      description,
       type: 'website',
+      siteName: 'Reentry Map',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
     },
   }
 }

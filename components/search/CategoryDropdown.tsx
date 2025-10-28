@@ -13,7 +13,7 @@ interface CategoryDropdownProps {
 }
 
 /**
- * Category dropdown for "What" search box
+ * Category dropdown for \u201CWhat" search box
  * Shows main resource categories
  */
 export function CategoryDropdown({ onHover, onSelect, onClose }: CategoryDropdownProps) {

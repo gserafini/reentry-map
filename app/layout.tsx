@@ -24,10 +24,36 @@ export const metadata: Metadata = {
     'support services',
     'Oakland',
     'community resources',
+    'criminal justice',
+    'second chances',
+    'reentry services',
+    'resource directory',
+    'job assistance',
+    'housing assistance',
+    'food assistance',
+    'healthcare services',
+    'legal aid',
+    'mental health',
+    'substance abuse treatment',
   ],
   icons: {
     icon: '/ReentryMap_favicon.png',
     apple: '/ReentryMap_favicon.png',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: defaultUrl,
+    siteName: 'Reentry Map',
+    title: 'Reentry Map - Find Resources for Reentry',
+    description:
+      'Find employment, housing, food, healthcare, and support services in your community. Mobile-first resource directory for individuals navigating reentry.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Reentry Map - Find Resources for Reentry',
+    description:
+      'Find employment, housing, food, healthcare, and support services in your community. Mobile-first resource directory for individuals navigating reentry.',
   },
 }
 
