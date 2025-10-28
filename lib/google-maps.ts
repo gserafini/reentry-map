@@ -90,15 +90,21 @@ export async function initializeGoogleMaps(): Promise<{
       // Load the script first
       await loadGoogleMapsScript(apiKey)
 
-      // Wait for google.maps to be available
+      // Wait for google.maps and google.maps.importLibrary to be available
       let attempts = 0
-      while (!window.google?.maps && attempts < 50) {
+      while ((!window.google?.maps || !google.maps.importLibrary) && attempts < 50) {
         await new Promise((resolve) => setTimeout(resolve, 100))
         attempts++
       }
 
       if (!window.google?.maps) {
         throw new Error('Google Maps failed to load after script injection')
+      }
+
+      if (!google.maps.importLibrary) {
+        throw new Error(
+          'Google Maps importLibrary function not available. API may not be loaded with loading=async parameter.'
+        )
       }
 
       // Now load individual libraries using google.maps.importLibrary
