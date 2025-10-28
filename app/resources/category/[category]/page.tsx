@@ -1,9 +1,10 @@
-import { Container, Typography, Box, Alert, Button, Grid } from '@mui/material'
+import { Container, Typography, Box, Alert, Button, Grid, Paper } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResourceList } from '@/components/resources/ResourceList'
+import { ResourceMap } from '@/components/map/ResourceMap'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
@@ -138,6 +139,20 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                   : `There are currently no ${categoryLabel.toLowerCase()} resources available.`}
               </Typography>
             </Alert>
+          )}
+
+          {/* Map */}
+          {hasResults && (
+            <Paper
+              elevation={2}
+              sx={{
+                mb: 3,
+                overflow: 'hidden',
+                borderRadius: 2,
+              }}
+            >
+              <ResourceMap resources={resources || []} height="500px" />
+            </Paper>
           )}
 
           <ResourceList resources={resources || []} />
