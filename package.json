@@ -25,6 +25,7 @@
     "quality:full": "npm run quality && npm run test:e2e",
     "quality:a11y": "npm run lint && npx tsc --noEmit && npm run test:a11y",
     "screenshots": "bash scripts/screenshot.sh",
+    "geoip:update": "node node_modules/geoip-lite/scripts/updatedb.js",
     "prepare": "husky"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "geoip-lite": "^1.4.10",
     "lucide-react": "^0.511.0",
     "next": "latest",
     "next-themes": "^0.4.6",

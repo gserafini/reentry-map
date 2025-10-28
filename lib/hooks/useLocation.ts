@@ -13,14 +13,14 @@ export interface UseLocationResult {
   isSupported: boolean
   lastUpdated: number | null // Unix timestamp of last location update
   displayName: string | null // "Current Location", "Oakland, CA", "94601", etc.
-  source: 'geolocation' | 'manual' | null // How we got the location
+  source: 'geolocation' | 'manual' | 'geoip' | null // How we got the location
 }
 
 interface CachedLocation {
   coordinates: Coordinates
   timestamp: number
   displayName: string
-  source: 'geolocation' | 'manual'
+  source: 'geolocation' | 'manual' | 'geoip'
 }
 
 const LOCATION_CACHE_KEY = 'userLocation'
@@ -66,7 +66,7 @@ function loadFromCache(): CachedLocation | null {
 function saveToCache(
   coordinates: Coordinates,
   displayName: string,
-  source: 'geolocation' | 'manual'
+  source: 'geolocation' | 'manual' | 'geoip'
 ): void {
   if (typeof window === 'undefined') return
 
@@ -224,6 +224,57 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
       setLastUpdated(cached.timestamp)
     }
   }, [])
+
+  /**
+   * Fetch GeoIP-based location on mount if no cached location
+   * This runs after cache check, providing a default location without permission
+   */
+  useEffect(() => {
+    // Skip if we already have a location (from cache or manual input)
+    if (coordinates) return
+
+    // Skip if we're already loading geolocation
+    if (loading) return
+
+    const fetchGeoIPLocation = async () => {
+      try {
+        const response = await fetch('/api/location/ip')
+        const data = await response.json()
+
+        if (data.location && data.location.latitude && data.location.longitude) {
+          const { latitude, longitude, city, region } = data.location
+
+          // Format display name from GeoIP data
+          let displayName = ''
+          if (city && region) {
+            displayName = `${city}, ${region}`
+          } else if (city) {
+            displayName = city
+          } else if (region) {
+            displayName = region
+          } else {
+            displayName = 'Approximate Location'
+          }
+
+          const coords = { latitude, longitude }
+
+          // Set GeoIP location (lower priority than geolocation/manual)
+          setCoordinates(coords)
+          setDisplayName(displayName)
+          setSource('geoip')
+          setLastUpdated(Date.now())
+
+          // Cache the GeoIP location
+          saveToCache(coords, displayName, 'geoip')
+        }
+      } catch (error) {
+        // Silently fail - GeoIP is optional, user can still use manual location
+        console.debug('GeoIP location fetch failed:', error)
+      }
+    }
+
+    fetchGeoIPLocation()
+  }, [coordinates, loading])
 
   /**
    * Auto-request location on mount if autoRequest is true
