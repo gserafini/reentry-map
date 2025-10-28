@@ -7,6 +7,7 @@ import { MarkerClusterer } from '@googlemaps/markerclusterer'
 import type { Resource } from '@/lib/types/database'
 import { initializeGoogleMaps } from '@/lib/google-maps'
 import { getCategoryLabel } from '@/lib/utils/categories'
+import { getCategoryColor } from '@/lib/utils/category-icons'
 import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
 import type { ResourceCategory } from '@/lib/types/database'
@@ -214,6 +215,9 @@ export function ResourceMap({
         // Build info window content
         const categoryLabel = getCategoryLabel(
           resource.primary_category as Parameters<typeof getCategoryLabel>[0]
+        )
+        const categoryColor = getCategoryColor(
+          resource.primary_category as Parameters<typeof getCategoryColor>[0]
         )
         const distanceText =
           distance !== null ? `<strong>${formatDistanceSmart(distance)}</strong> away` : ''
