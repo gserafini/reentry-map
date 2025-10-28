@@ -11,6 +11,7 @@ import type { Metadata } from 'next'
 
 interface SearchPageProps {
   searchParams: Promise<{
+    search?: string
     page?: string
     sort?: string
   }>
@@ -25,17 +26,19 @@ const PAGE_SIZE = 20
  */
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams
+  const search = params.search
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * PAGE_SIZE
   const sort = parseSortParam(params.sort)
 
   const { data: resources, error } = await getResources({
+    search,
     limit: PAGE_SIZE,
     offset,
     sort,
   })
 
-  const { data: totalCount } = await getResourcesCount()
+  const { data: totalCount } = await getResourcesCount({ search })
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE)
 
   const { data: categoryCounts } = await getCategoryCounts()
@@ -56,16 +59,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   const hasResults = resources && resources.length > 0
+  const isSearching = Boolean(search && search.trim())
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          Search Resources
+          {isSearching ? `Search Results: "${search}"` : 'Search Resources'}
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          Find employment, housing, food, healthcare, and support services in your community. Browse
-          our directory of verified resources.
+          {isSearching
+            ? `Showing results for "${search}"`
+            : 'Find employment, housing, food, healthcare, and support services in your community. Browse our directory of verified resources.'}
         </Typography>
       </Box>
 
