@@ -8,9 +8,10 @@ import { useState } from 'react'
 
 export interface LoginFormProps extends React.ComponentPropsWithoutRef<'div'> {
   onSuccess?: () => void
+  minimal?: boolean // When true, removes Card wrapper for use in modals
 }
 
-export function LoginForm({ onSuccess, className, ...props }: LoginFormProps) {
+export function LoginForm({ onSuccess, minimal = false, className, ...props }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +47,77 @@ export function LoginForm({ onSuccess, className, ...props }: LoginFormProps) {
     }
   }
 
+  const formContent = (
+    <Box
+      component="form"
+      onSubmit={handleLogin}
+      sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+    >
+      <TextField
+        label="Email"
+        type="email"
+        placeholder="m@example.com"
+        required
+        fullWidth
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        variant="outlined"
+        size={minimal ? 'small' : 'medium'}
+      />
+      <Box>
+        {!minimal && (
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 1,
+            }}
+          >
+            <Typography variant="body2">Password</Typography>
+            <NextLink
+              href="/auth/forgot-password"
+              style={{ fontSize: '0.875rem', textDecoration: 'underline' }}
+            >
+              Forgot password?
+            </NextLink>
+          </Box>
+        )}
+        <TextField
+          label={minimal ? 'Password' : undefined}
+          type="password"
+          placeholder="Enter your password"
+          required
+          fullWidth
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          variant="outlined"
+          size={minimal ? 'small' : 'medium'}
+        />
+      </Box>
+      {error && <Alert severity="error">{error}</Alert>}
+      <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
+        {isLoading ? 'Logging in...' : 'Login'}
+      </Button>
+      {!minimal && (
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          Don&apos;t have an account?{' '}
+          <NextLink href="/auth/sign-up" style={{ textDecoration: 'underline' }}>
+            Sign up
+          </NextLink>
+        </Typography>
+      )}
+    </Box>
+  )
+
+  if (minimal) {
+    return (
+      <Box className={className} {...props}>
+        {formContent}
+      </Box>
+    )
+  }
+
   return (
     <Box className={className} {...props}>
       <Card sx={{ maxWidth: 448, width: '100%', p: 2 }}>
@@ -56,59 +128,7 @@ export function LoginForm({ onSuccess, className, ...props }: LoginFormProps) {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Enter your email below to login to your account
           </Typography>
-          <Box
-            component="form"
-            onSubmit={handleLogin}
-            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-          >
-            <TextField
-              label="Email"
-              type="email"
-              placeholder="m@example.com"
-              required
-              fullWidth
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              variant="outlined"
-            />
-            <Box>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  mb: 1,
-                }}
-              >
-                <Typography variant="body2">Password</Typography>
-                <NextLink
-                  href="/auth/forgot-password"
-                  style={{ fontSize: '0.875rem', textDecoration: 'underline' }}
-                >
-                  Forgot password?
-                </NextLink>
-              </Box>
-              <TextField
-                type="password"
-                placeholder="Enter your password"
-                required
-                fullWidth
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                variant="outlined"
-              />
-            </Box>
-            {error && <Alert severity="error">{error}</Alert>}
-            <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Button>
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-              Don&apos;t have an account?{' '}
-              <NextLink href="/auth/sign-up" style={{ textDecoration: 'underline' }}>
-                Sign up
-              </NextLink>
-            </Typography>
-          </Box>
+          {formContent}
         </CardContent>
       </Card>
     </Box>

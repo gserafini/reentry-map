@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogTitle, Box, IconButton, Divider } from '@mui/material'
 import { Close as CloseIcon } from '@mui/icons-material'
 import { LoginForm } from '@/components/login-form'
@@ -26,9 +26,14 @@ export interface AuthModalProps {
 export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode)
 
-  // Reset to initial state when modal closes
-  const handleClose = () => {
+  // Sync mode with initialMode when it changes (fixes bug where mode doesn't update)
+  useEffect(() => {
     setMode(initialMode)
+  }, [initialMode])
+
+  // Simply close the modal without resetting state
+  // State will be synced via useEffect when modal reopens
+  const handleClose = () => {
     onClose()
   }
 
@@ -40,7 +45,8 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
+          borderRadius: 3,
+          maxWidth: 480,
         },
       }}
     >
@@ -49,23 +55,39 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          pb: 2,
+          px: 3,
+          pt: 3,
+          pb: 1,
         }}
       >
-        {mode === 'login' ? 'Sign In' : 'Sign Up'}
+        <Box>
+          <Box component="h2" sx={{ fontSize: '1.5rem', fontWeight: 600, m: 0, mb: 0.5 }}>
+            {mode === 'login' ? 'Welcome back' : 'Create account'}
+          </Box>
+          <Box sx={{ fontSize: '0.875rem', color: 'text.secondary', fontWeight: 400 }}>
+            {mode === 'login'
+              ? 'Sign in to your account to continue'
+              : 'Sign up to save favorites and reviews'}
+          </Box>
+        </Box>
         <IconButton
           aria-label="close"
           onClick={handleClose}
           sx={{
-            color: (theme) => theme.palette.grey[500],
+            color: 'text.secondary',
+            '&:hover': {
+              bgcolor: 'action.hover',
+            },
           }}
         >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      <DialogContent sx={{ pt: 0 }}>
-        {/* Phone Auth */}
-        <PhoneAuth onSuccess={handleClose} />
+      <DialogContent sx={{ px: 3, pt: 2, pb: 3 }}>
+        {/* Phone Auth Section */}
+        <Box sx={{ mb: 3 }}>
+          <PhoneAuth onSuccess={handleClose} />
+        </Box>
 
         {/* OR Divider */}
         <Box sx={{ my: 3, position: 'relative' }}>
@@ -79,55 +101,41 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
               bgcolor: 'background.paper',
               px: 2,
               color: 'text.secondary',
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              letterSpacing: '0.5px',
             }}
           >
             OR
           </Box>
         </Box>
 
-        {/* Email Auth */}
-        {mode === 'login' ? (
-          <LoginForm onSuccess={handleClose} />
-        ) : (
-          <SignUpForm onSuccess={handleClose} />
-        )}
+        {/* Email Auth Section */}
+        <Box sx={{ mb: 2 }}>
+          {mode === 'login' ? (
+            <LoginForm onSuccess={handleClose} minimal />
+          ) : (
+            <SignUpForm onSuccess={handleClose} minimal />
+          )}
+        </Box>
 
         {/* Switch Mode Link */}
-        <Box sx={{ mt: 3, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}>
-          {mode === 'login' ? (
-            <>
-              Don&apos;t have an account?{' '}
-              <Box
-                component="span"
-                onClick={() => setMode('signup')}
-                sx={{
-                  color: 'primary.main',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-              >
-                Sign up
-              </Box>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <Box
-                component="span"
-                onClick={() => setMode('login')}
-                sx={{
-                  color: 'primary.main',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-              >
-                Sign in
-              </Box>
-            </>
-          )}
+        <Box sx={{ mt: 3, textAlign: 'center', fontSize: '0.875rem' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>
+            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          </Box>
+          <Box
+            component="span"
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            sx={{
+              color: 'primary.main',
+              cursor: 'pointer',
+              fontWeight: 600,
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            {mode === 'login' ? 'Sign up' : 'Sign in'}
+          </Box>
         </Box>
       </DialogContent>
     </Dialog>

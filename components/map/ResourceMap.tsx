@@ -183,8 +183,9 @@ export function ResourceMap({
     return () => {
       isComponentMounted = false
       // Call stored cleanup function for event listeners
-      if (mapInstanceRef.current && (mapInstanceRef.current as MapWithCleanup).__cleanup) {
-        ;(mapInstanceRef.current as MapWithCleanup).__cleanup()
+      const cleanup = (mapInstanceRef.current as MapWithCleanup)?.__cleanup
+      if (cleanup) {
+        cleanup()
       }
     }
   }, [isMounted]) // Only initialize once on mount
