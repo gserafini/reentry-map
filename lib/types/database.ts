@@ -569,27 +569,30 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
+          first_name: string | null
           id: string
           is_admin: boolean | null
-          name: string | null
+          last_name: string | null
           phone: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          first_name?: string | null
           id: string
           is_admin?: boolean | null
-          name?: string | null
+          last_name?: string | null
           phone?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          first_name?: string | null
           id?: string
           is_admin?: boolean | null
-          name?: string | null
+          last_name?: string | null
           phone?: string | null
           updated_at?: string | null
         }
@@ -776,15 +779,15 @@ export type ResourceListItem = Pick<
  * Useful for displaying reviews with author details
  */
 export type ReviewWithUser = ResourceReview & {
-  user: Pick<User, 'id' | 'name' | 'avatar_url'>
+  user: Pick<User, 'id' | 'first_name' | 'last_name' | 'avatar_url'>
 }
 
 /**
  * Resource suggestion with reviewer info
  */
 export type SuggestionWithReviewer = ResourceSuggestion & {
-  reviewer?: Pick<User, 'id' | 'name'> | null
-  suggester?: Pick<User, 'id' | 'name'> | null
+  reviewer?: Pick<User, 'id' | 'first_name' | 'last_name'> | null
+  suggester?: Pick<User, 'id' | 'first_name' | 'last_name'> | null
 }
 
 // ============================================================================

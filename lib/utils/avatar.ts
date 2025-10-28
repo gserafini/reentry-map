@@ -1,24 +1,40 @@
 import CryptoJS from 'crypto-js'
 
 /**
- * Get initials from email address
+ * Get initials from name or email address
  * Examples:
- * - john.doe@example.com → JD
- * - jane_smith@example.com → JS
- * - bob@example.com → BO
+ * - "John", "Doe" → JD
+ * - "Jane" (no last name) → JA
+ * - john.doe@example.com (email) → JD
+ * - jane_smith@example.com (email) → JS
  *
- * @param email - User's email address
+ * @param firstNameOrEmail - User's first name or email as fallback
+ * @param lastName - User's last name (optional)
  * @returns Two-character initials in uppercase
  */
-export function getInitials(email: string): string {
-  const name = email.split('@')[0]
-  const parts = name.split(/[._-]/)
-
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase()
+export function getInitials(firstNameOrEmail?: string | null, lastName?: string | null): string {
+  // If we have first name (and it's not an email), use it
+  if (firstNameOrEmail && !firstNameOrEmail.includes('@')) {
+    const firstInitial = firstNameOrEmail.charAt(0).toUpperCase()
+    const lastInitial = lastName
+      ? lastName.charAt(0).toUpperCase()
+      : firstNameOrEmail.charAt(1).toUpperCase()
+    return firstInitial + lastInitial
   }
 
-  return name.slice(0, 2).toUpperCase()
+  // Fall back to email parsing
+  if (firstNameOrEmail) {
+    const name = firstNameOrEmail.split('@')[0]
+    const parts = name.split(/[._-]/)
+
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase()
+    }
+
+    return name.slice(0, 2).toUpperCase()
+  }
+
+  return 'AU' // Anonymous User
 }
 
 /**
@@ -47,14 +63,27 @@ export function getGravatarUrl(
 }
 
 /**
- * Get user display name from email or phone
- * Priority: email username > phone (formatted) > fallback
+ * Get user display name from first/last name, email, or phone
+ * Priority: first_name + last_name > email username > phone (formatted) > fallback
  *
+ * @param firstName - User's first name (optional)
+ * @param lastName - User's last name (optional)
  * @param email - User's email address (optional)
  * @param phone - User's phone number (optional)
  * @returns Display name
  */
-export function getUserDisplayName(email?: string | null, phone?: string | null): string {
+export function getUserDisplayName(
+  firstName?: string | null,
+  lastName?: string | null,
+  email?: string | null,
+  phone?: string | null
+): string {
+  // Priority 1: Use first and last name if available
+  if (firstName || lastName) {
+    return [firstName, lastName].filter(Boolean).join(' ').trim()
+  }
+
+  // Priority 2: Use email username
   if (email) {
     const username = email.split('@')[0]
     // Convert dots/underscores/hyphens to spaces and capitalize
@@ -64,6 +93,7 @@ export function getUserDisplayName(email?: string | null, phone?: string | null)
       .join(' ')
   }
 
+  // Priority 3: Use formatted phone
   if (phone) {
     // Format phone for display (assumes E.164 format +1XXXXXXXXXX)
     const digits = phone.replace(/\D/g, '')
