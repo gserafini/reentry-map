@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogTitle, Tab, Tabs, Box, IconButton } from '@mui/material'
+import { Dialog, DialogContent, DialogTitle, Box, IconButton, Divider } from '@mui/material'
 import { Close as CloseIcon } from '@mui/icons-material'
 import { LoginForm } from '@/components/login-form'
 import { SignUpForm } from '@/components/sign-up-form'
@@ -14,23 +14,21 @@ export interface AuthModalProps {
 }
 
 /**
- * Authentication modal with login/signup tabs and email/phone options
+ * Simple authentication modal with phone and email options stacked
  *
  * Features:
- * - Login and Sign Up modes
- * - Email/password and Phone/SMS OTP authentication
- * - Material UI tabs for easy switching
+ * - Both phone and email auth visible (no tabs)
+ * - Clean vertical layout with OR divider
+ * - Switch between login/signup via bottom link
  * - Auto-closes on successful authentication
  * - Users stay on current page after auth
  */
 export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode)
-  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email')
 
-  // Reset to initial state when modal opens
+  // Reset to initial state when modal closes
   const handleClose = () => {
     setMode(initialMode)
-    setAuthMethod('email')
     onClose()
   }
 
@@ -46,7 +44,14 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
         },
       }}
     >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <DialogTitle
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          pb: 2,
+        }}
+      >
         {mode === 'login' ? 'Sign In' : 'Sign Up'}
         <IconButton
           aria-label="close"
@@ -58,38 +63,35 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      <DialogContent>
-        {/* Login / Sign Up Toggle */}
-        <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={mode} onChange={(_, value) => setMode(value)} variant="fullWidth">
-            <Tab label="Sign In" value="login" />
-            <Tab label="Sign Up" value="signup" />
-          </Tabs>
-        </Box>
+      <DialogContent sx={{ pt: 0 }}>
+        {/* Phone Auth */}
 
-        {/* Email / Phone Toggle */}
-        <Box sx={{ mb: 2 }}>
-          <Tabs
-            value={authMethod}
-            onChange={(_, value) => setAuthMethod(value)}
-            variant="fullWidth"
+        {/* OR Divider */}
+        <Box sx={{ my: 3, position: 'relative' }}>
+          <Divider sx={{ borderColor: 'divider' }} />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              bgcolor: 'background.paper',
+              px: 2,
+              color: 'text.secondary',
+              fontSize: '0.875rem',
+            }}
           >
-            <Tab label="Email" value="email" />
-            <Tab label="Phone" value="phone" />
-          </Tabs>
+            OR
+          </Box>
         </Box>
 
-        {/* Auth Forms */}
-        {authMethod === 'phone' ? (
-          <PhoneAuth onSuccess={handleClose} />
-        ) : mode === 'login' ? (
-          <LoginForm onSuccess={handleClose} />
+        {/* Email Auth */}
+        {mode === 'login' ? (
         ) : (
-          <SignUpForm onSuccess={handleClose} />
         )}
 
         {/* Switch Mode Link */}
-        <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}>
+        <Box sx={{ mt: 3, textAlign: 'center', color: 'text.secondary', fontSize: '0.875rem' }}>
           {mode === 'login' ? (
             <>
               Don&apos;t have an account?{' '}
@@ -99,6 +101,7 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
                 sx={{
                   color: 'primary.main',
                   cursor: 'pointer',
+                  fontWeight: 500,
                   '&:hover': { textDecoration: 'underline' },
                 }}
               >
@@ -114,6 +117,7 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
                 sx={{
                   color: 'primary.main',
                   cursor: 'pointer',
+                  fontWeight: 500,
                   '&:hover': { textDecoration: 'underline' },
                 }}
               >

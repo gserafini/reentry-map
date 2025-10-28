@@ -10,6 +10,7 @@ export interface SignUpFormProps extends React.ComponentPropsWithoutRef<'div'> {
   onSuccess?: () => void
 }
 
+export function SignUpForm({ onSuccess, className, ...props }: SignUpFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
