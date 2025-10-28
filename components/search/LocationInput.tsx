@@ -73,7 +73,12 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         const response = await fetch('/api/location/ip')
         if (!response.ok) throw new Error('GeoIP fetch failed')
 
-        const data = await response.json()
+        const data = (await response.json()) as {
+          city: string
+          region: string
+          latitude: number
+          longitude: number
+        }
 
         // Format as "City, ST"
         const locationText = `${data.city}, ${data.region}`

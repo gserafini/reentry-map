@@ -21,6 +21,7 @@ export interface PhoneAuthProps extends React.ComponentPropsWithoutRef<'div'> {
  * 4. Verify and create session
  * 5. Auto-create user profile on first sign-in (handled by database trigger)
  */
+export function PhoneAuth({ onSuccess, className, ...props }: PhoneAuthProps) {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [step, setStep] = useState<AuthStep>('phone')

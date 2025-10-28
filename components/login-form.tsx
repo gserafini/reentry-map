@@ -10,6 +10,7 @@ export interface LoginFormProps extends React.ComponentPropsWithoutRef<'div'> {
   onSuccess?: () => void
 }
 
+export function LoginForm({ onSuccess, className, ...props }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

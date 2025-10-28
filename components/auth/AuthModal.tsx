@@ -65,6 +65,7 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
       </DialogTitle>
       <DialogContent sx={{ pt: 0 }}>
         {/* Phone Auth */}
+        <PhoneAuth onSuccess={handleClose} />
 
         {/* OR Divider */}
         <Box sx={{ my: 3, position: 'relative' }}>
@@ -87,7 +88,9 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
 
         {/* Email Auth */}
         {mode === 'login' ? (
+          <LoginForm onSuccess={handleClose} />
         ) : (
+          <SignUpForm onSuccess={handleClose} />
         )}
 
         {/* Switch Mode Link */}

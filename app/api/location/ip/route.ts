@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 
+interface GeoIPResponse {
+  city?: string
+  region?: string
+  country_name?: string
+  latitude?: number
+  longitude?: number
+  ip?: string
+  error?: boolean
+  reason?: string
+}
+
 /**
  * GeoIP API endpoint - Returns location data based on client IP
  *
@@ -42,7 +53,7 @@ export async function GET() {
       throw new Error(`ipapi.co responded with ${response.status}`)
     }
 
-    const data = await response.json()
+    const data = (await response.json()) as GeoIPResponse
 
     // Check for rate limit error
     if (data.error) {
