@@ -150,7 +150,18 @@ export function ResourceMap({
     return () => {
       isComponentMounted = false
     }
-  }, [userLocation, isMounted])
+  }, [isMounted]) // Only initialize once on mount
+
+  // Re-center map when userLocation changes (separate effect for efficiency)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !userLocation) return
+
+    const newCenter = { lat: userLocation.latitude, lng: userLocation.longitude }
+    console.log('[ResourceMap] User location changed, re-centering map to:', newCenter)
+
+    // Smooth pan to new location with animation
+    mapInstanceRef.current.panTo(newCenter)
+  }, [userLocation])
 
   // Create markers when resources or map changes
   useEffect(() => {
