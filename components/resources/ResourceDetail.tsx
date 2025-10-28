@@ -16,6 +16,7 @@ import {
   ListItem,
   ListItemText,
   Paper,
+  Link as MuiLink,
 } from '@mui/material'
 import {
   Phone as PhoneIcon,
@@ -164,9 +165,19 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               {resource.phone && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <PhoneIcon color="action" />
-                  <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                    {resource.phone}
-                  </Typography>
+                  <MuiLink
+                    href={`tel:${resource.phone}`}
+                    underline="hover"
+                    color="inherit"
+                    sx={{
+                      flexGrow: 1,
+                      '&:hover': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  >
+                    <Typography variant="body1">{resource.phone}</Typography>
+                  </MuiLink>
                   <Button
                     variant="outlined"
                     size="small"
@@ -182,9 +193,19 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               {resource.email && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <EmailIcon color="action" />
-                  <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                    {resource.email}
-                  </Typography>
+                  <MuiLink
+                    href={`mailto:${resource.email}`}
+                    underline="hover"
+                    color="inherit"
+                    sx={{
+                      flexGrow: 1,
+                      '&:hover': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  >
+                    <Typography variant="body1">{resource.email}</Typography>
+                  </MuiLink>
                   <Button
                     variant="outlined"
                     size="small"
@@ -200,17 +221,33 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               {resource.website && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <WebsiteIcon color="action" />
-                  <Typography
-                    variant="body1"
+                  <MuiLink
+                    href={resource.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    underline="hover"
+                    color="inherit"
                     sx={{
                       flexGrow: 1,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
+                      '&:hover': {
+                        color: 'primary.main',
+                      },
                     }}
                   >
-                    {resource.website}
-                  </Typography>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {resource.website}
+                    </Typography>
+                  </MuiLink>
                   <Button
                     variant="outlined"
                     size="small"
