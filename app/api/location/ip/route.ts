@@ -38,9 +38,20 @@ export async function GET() {
     // Extract first IP if multiple (x-forwarded-for can be a list)
     const ip = forwardedFor?.split(',')[0]?.trim() || realIp || cfConnectingIp || '127.0.0.1'
 
-    // For localhost/development, use ipapi.co without IP to get server location
+    // Check if IP is private/local (can't be geolocated)
+    const isPrivateIP = (ipAddr: string): boolean => {
+      return (
+        ipAddr === '127.0.0.1' || // Localhost
+        ipAddr === '::1' || // IPv6 localhost
+        ipAddr.startsWith('10.') || // Class A private (10.0.0.0/8)
+        ipAddr.startsWith('192.168.') || // Class C private (192.168.0.0/16)
+        /^172\.(1[6-9]|2\d|3[01])\./.test(ipAddr) // Class B private (172.16.0.0/12)
+      )
+    }
+
+    // For localhost/development (private IPs), use ipapi.co without IP to get server location
     // In production, this will use the actual client IP
-    const apiUrl = ip === '127.0.0.1' ? 'https://ipapi.co/json/' : `https://ipapi.co/${ip}/json/`
+    const apiUrl = isPrivateIP(ip) ? 'https://ipapi.co/json/' : `https://ipapi.co/${ip}/json/`
 
     const response = await fetch(apiUrl, {
       headers: {
