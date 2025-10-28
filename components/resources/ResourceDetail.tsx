@@ -27,8 +27,10 @@ import {
   CheckCircle as CheckCircleIcon,
   LocationOn as LocationOnIcon,
 } from '@mui/icons-material'
-import type { Resource } from '@/lib/types/database'
+import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { SingleResourceMap } from '@/components/map'
+import { getCategoryIcon } from '@/lib/utils/category-icons'
+import { getCategoryLabel } from '@/lib/utils/categories'
 
 interface ResourceDetailProps {
   resource: Resource
@@ -305,20 +307,35 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             href={`/resources/category/${resource.primary_category}`}
             style={{ textDecoration: 'none' }}
           >
-            <Chip label={resource.primary_category} color="primary" clickable />
+            <Chip
+              icon={React.createElement(
+                getCategoryIcon(resource.primary_category as ResourceCategory)
+              )}
+              label={getCategoryLabel(resource.primary_category as ResourceCategory)}
+              color="primary"
+              clickable
+            />
           </Link>
           {resource.categories &&
             resource.categories
               .filter((cat) => cat !== resource.primary_category)
-              .map((category) => (
-                <Link
-                  key={category}
-                  href={`/resources/category/${category}`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Chip label={category} variant="outlined" clickable />
-                </Link>
-              ))}
+              .map((category) => {
+                const CategoryIcon = getCategoryIcon(category as ResourceCategory)
+                return (
+                  <Link
+                    key={category}
+                    href={`/resources/category/${category}`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Chip
+                      icon={<CategoryIcon />}
+                      label={getCategoryLabel(category as ResourceCategory)}
+                      variant="outlined"
+                      clickable
+                    />
+                  </Link>
+                )
+              })}
         </Box>
       </Box>
 

@@ -30,6 +30,7 @@ export async function getResources(
     const {
       search,
       categories,
+      tags,
       min_rating,
       verified_only,
       accepts_records,
@@ -47,6 +48,11 @@ export async function getResources(
     // Apply category filter if provided (matches any category in array)
     if (categories && categories.length > 0) {
       query = query.contains('categories', categories)
+    }
+
+    // Apply tags filter if provided (matches any tag in array)
+    if (tags && tags.length > 0) {
+      query = query.contains('tags', tags)
     }
 
     // Apply search filter if provided (searches name and description)
@@ -236,8 +242,15 @@ export async function getResourcesCount(
 }> {
   try {
     const supabase = await createClient()
-    const { search, categories, min_rating, verified_only, accepts_records, appointment_required } =
-      options
+    const {
+      search,
+      categories,
+      tags,
+      min_rating,
+      verified_only,
+      accepts_records,
+      appointment_required,
+    } = options
 
     let query = supabase.from('resources').select('*', { count: 'exact', head: true })
 
@@ -247,6 +260,11 @@ export async function getResourcesCount(
     // Apply category filter if provided (matches any category in array)
     if (categories && categories.length > 0) {
       query = query.contains('categories', categories)
+    }
+
+    // Apply tags filter if provided (matches any tag in array)
+    if (tags && tags.length > 0) {
+      query = query.contains('tags', tags)
     }
 
     // Apply search filter if provided (searches name and description)

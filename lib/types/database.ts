@@ -834,6 +834,7 @@ export type UpdateReportFormData = Omit<
 export type ResourceFilters = {
   search?: string
   categories?: ResourceCategory[]
+  tags?: string[]
   latitude?: number
   longitude?: number
   radius_miles?: number
