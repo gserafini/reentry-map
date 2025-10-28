@@ -95,7 +95,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
             const locationText = `${data.city}, ${data.region}`
             setInputValue(locationText)
             setManualLocation({ latitude: data.latitude, longitude: data.longitude }, locationText)
-            updateURLWithLocation(data.latitude, data.longitude, locationText)
+            // Don't update URL on automatic detection - only when user manually selects location
             return
           }
         }
@@ -124,7 +124,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         const locationText = `${data.city}, ${data.region}`
         setInputValue(locationText)
         setManualLocation({ latitude: data.latitude, longitude: data.longitude }, locationText)
-        updateURLWithLocation(data.latitude, data.longitude, locationText)
+        // Don't update URL on automatic detection - only when user manually selects location
       } catch (err) {
         console.debug('GeoIP pre-fill skipped:', err)
         // Silently fail - user can still enter location manually
