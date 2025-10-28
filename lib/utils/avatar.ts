@@ -44,7 +44,8 @@ export function getInitials(firstNameOrEmail?: string | null, lastName?: string 
  * @param email - User's email address
  * @param size - Avatar size in pixels (default: 200)
  * @param defaultType - Default avatar type if no Gravatar exists
- *   - 'mp' - mystery person (default)
+ *   - 'blank' - transparent image (recommended - use with onError handler)
+ *   - 'mp' - mystery person
  *   - 'identicon' - geometric pattern
  *   - 'monsterid' - generated monster
  *   - 'wavatar' - generated face
@@ -55,7 +56,7 @@ export function getInitials(firstNameOrEmail?: string | null, lastName?: string 
 export function getGravatarUrl(
   email: string,
   size: number = 200,
-  defaultType: string = 'mp'
+  defaultType: string = 'blank'
 ): string {
   const trimmedEmail = email.trim().toLowerCase()
   const hash = CryptoJS.MD5(trimmedEmail).toString()
@@ -111,25 +112,18 @@ export function getUserDisplayName(
 
 /**
  * Check if a Gravatar exists for an email address
- * Uses the d=404 parameter to return 404 if no Gravatar exists
  *
+ * NOTE: This function is deprecated and should not be used in client components.
+ * Instead, use getGravatarUrl() with d=blank and handle image load errors.
+ *
+ * @deprecated Use Avatar component with onError handler instead
  * @param email - User's email address
- * @returns Promise that resolves to true if Gravatar exists, false otherwise
+ * @returns Promise that always resolves to true (assumes Gravatar might exist)
  */
 export async function checkGravatarExists(email: string): Promise<boolean> {
-  if (!email) return false
-
-  try {
-    const trimmedEmail = email.trim().toLowerCase()
-    const hash = CryptoJS.MD5(trimmedEmail).toString()
-    // Use d=404 to return 404 if no Gravatar exists
-    const url = `https://www.gravatar.com/avatar/${hash}?d=404`
-
-    const response = await fetch(url, { method: 'HEAD' })
-    return response.ok // Returns true if status is 200-299
-  } catch {
-    return false
-  }
+  // Always return true to avoid console errors from 404 checks
+  // The Avatar component should handle image load failures gracefully
+  return !!email
 }
 
 /**
