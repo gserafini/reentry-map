@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { TextField, Button, Box } from '@mui/material'
 import { Search as SearchIcon } from '@mui/icons-material'
 import { useRouter } from 'next/navigation'
@@ -20,11 +20,47 @@ interface HeroSearchProps {
 export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
   const [searchQuery, setSearchQuery] = useState(initialValue)
   const router = useRouter()
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Update when initialValue changes (e.g., URL navigation)
   useEffect(() => {
     setSearchQuery(initialValue)
   }, [initialValue])
+
+  // Add keyboard shortcut listener for "/" key
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if "/" was pressed
+      if (event.key === '/') {
+        // Don't trigger if user is already typing in an input/textarea
+        const target = event.target as HTMLElement
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return
+        }
+
+        // Prevent default "/" character from being typed
+        event.preventDefault()
+
+        // Focus the search input and select all text
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+          searchInputRef.current.select()
+        }
+      }
+    }
+
+    // Add event listener
+    window.addEventListener('keydown', handleKeyDown)
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -69,6 +105,7 @@ export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           autoComplete="off"
+          inputRef={searchInputRef}
           sx={{
             '& .MuiOutlinedInput-root': {
               bgcolor: 'transparent',
