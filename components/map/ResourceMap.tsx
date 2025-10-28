@@ -7,7 +7,6 @@ import { MarkerClusterer } from '@googlemaps/markerclusterer'
 import type { Resource } from '@/lib/types/database'
 import { initializeGoogleMaps } from '@/lib/google-maps'
 import { getCategoryLabel } from '@/lib/utils/categories'
-import { getCategoryColor } from '@/lib/utils/category-icons'
 import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
 import { getResourceUrl } from '@/lib/utils/resource-url'
@@ -238,9 +237,6 @@ export function ResourceMap({
         const categoryLabel = getCategoryLabel(
           resource.primary_category as Parameters<typeof getCategoryLabel>[0]
         )
-        const categoryColor = getCategoryColor(
-          resource.primary_category as Parameters<typeof getCategoryColor>[0]
-        )
         const distanceText =
           distance !== null ? `<strong>${formatDistanceSmart(distance)}</strong> away` : ''
         const resourceUrl = getResourceUrl(resource)
@@ -250,8 +246,6 @@ export function ResourceMap({
             <a
               href="${resourceUrl}"
               style="text-decoration: none; color: inherit;"
-              onmouseover="this.style.color='${categoryColor}'"
-              onmouseout="this.style.color='inherit'"
             >
               <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: inherit;">
                 ${resource.name}
@@ -265,14 +259,14 @@ export function ResourceMap({
             </p>
             ${
               distanceText
-                ? `<p style="margin: 4px 0; color: ${categoryColor}; font-size: 14px;">
+                ? `<p style="margin: 4px 0; color: #666; font-size: 14px;">
                 ${distanceText}
               </p>`
                 : ''
             }
             <a
               href="${resourceUrl}"
-              style="display: inline-block; margin-top: 8px; color: ${categoryColor}; text-decoration: none; font-weight: 500;"
+              style="display: inline-block; margin-top: 8px; color: #1976d2; text-decoration: none; font-weight: 500;"
               onclick="event.stopPropagation();"
             >
               View Details →
