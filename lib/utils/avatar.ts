@@ -80,6 +80,29 @@ export function getUserDisplayName(email?: string | null, phone?: string | null)
 }
 
 /**
+ * Check if a Gravatar exists for an email address
+ * Uses the d=404 parameter to return 404 if no Gravatar exists
+ *
+ * @param email - User's email address
+ * @returns Promise that resolves to true if Gravatar exists, false otherwise
+ */
+export async function checkGravatarExists(email: string): Promise<boolean> {
+  if (!email) return false
+
+  try {
+    const trimmedEmail = email.trim().toLowerCase()
+    const hash = CryptoJS.MD5(trimmedEmail).toString()
+    // Use d=404 to return 404 if no Gravatar exists
+    const url = `https://www.gravatar.com/avatar/${hash}?d=404`
+
+    const response = await fetch(url, { method: 'HEAD' })
+    return response.ok // Returns true if status is 200-299
+  } catch {
+    return false
+  }
+}
+
+/**
  * Get avatar color based on email/phone hash
  * Provides consistent color for same email/phone
  *

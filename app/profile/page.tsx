@@ -13,11 +13,13 @@ import {
 import { Email as EmailIcon, Phone as PhoneIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getInitials, getAvatarColor, getUserDisplayName } from '@/lib/utils/avatar'
+import { useGravatar } from '@/lib/hooks/useGravatar'
 import { useRouter } from 'next/navigation'
 
 export default function ProfilePage() {
   const { user, isLoading, isAuthenticated, signOut } = useAuth()
   const router = useRouter()
+  const { gravatarUrl, hasGravatar } = useGravatar(user?.email, 160) // 2x size for retina
 
   // Redirect if not authenticated
   if (!isLoading && !isAuthenticated) {
@@ -47,6 +49,7 @@ export default function ProfilePage() {
           {/* Avatar and Name */}
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
             <Avatar
+              src={hasGravatar && gravatarUrl ? gravatarUrl : undefined}
               sx={{
                 width: 80,
                 height: 80,
@@ -56,7 +59,7 @@ export default function ProfilePage() {
                 mr: 3,
               }}
             >
-              {getInitials(identifier)}
+              {!hasGravatar && getInitials(identifier)}
             </Avatar>
             <Box>
               <Typography variant="h4" gutterBottom>

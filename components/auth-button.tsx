@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { getInitials, getAvatarColor } from '@/lib/utils/avatar'
+import { useGravatar } from '@/lib/hooks/useGravatar'
 
 interface AuthButtonProps {
   userEmail?: string | null
@@ -20,6 +21,7 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const router = useRouter()
   const open = Boolean(anchorEl)
+  const { gravatarUrl, hasGravatar } = useGravatar(userEmail, 72) // 2x size for retina
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)
@@ -41,6 +43,7 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
     <>
       <Avatar
         onClick={handleClick}
+        src={hasGravatar && gravatarUrl ? gravatarUrl : undefined}
         sx={{
           width: 36,
           height: 36,
@@ -54,7 +57,7 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
           },
         }}
       >
-        {getInitials(userEmail)}
+        {!hasGravatar && getInitials(userEmail)}
       </Avatar>
 
       <Menu
