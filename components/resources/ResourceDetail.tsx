@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
 import {
   Box,
   Typography,
@@ -113,15 +114,6 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           >
             Get Directions
           </Button>
-        </Box>
-
-        {/* Categories */}
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-          <Chip label={resource.primary_category} color="primary" />
-          {resource.categories &&
-            resource.categories
-              .filter((cat) => cat !== resource.primary_category)
-              .map((category) => <Chip key={category} label={category} variant="outlined" />)}
         </Box>
 
         {/* Rating */}
@@ -303,6 +295,33 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </CardContent>
       </Card>
 
+      {/* Categories */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          Categories
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Link
+            href={`/resources/category/${resource.primary_category}`}
+            style={{ textDecoration: 'none' }}
+          >
+            <Chip label={resource.primary_category} color="primary" clickable />
+          </Link>
+          {resource.categories &&
+            resource.categories
+              .filter((cat) => cat !== resource.primary_category)
+              .map((category) => (
+                <Link
+                  key={category}
+                  href={`/resources/category/${category}`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Chip label={category} variant="outlined" clickable />
+                </Link>
+              ))}
+        </Box>
+      </Box>
+
       {/* Tags */}
       {resource.tags && resource.tags.length > 0 && (
         <Box sx={{ mb: 3 }}>
@@ -311,7 +330,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             {resource.tags.map((tag) => (
-              <Chip key={tag} label={tag} size="small" variant="outlined" />
+              <Link key={tag} href={`/resources/tag/${tag}`} style={{ textDecoration: 'none' }}>
+                <Chip label={tag} size="small" variant="outlined" clickable />
+              </Link>
             ))}
           </Box>
         </Box>
