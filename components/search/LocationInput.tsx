@@ -12,6 +12,16 @@ interface LocationInputProps {
   size?: 'small' | 'medium'
 }
 
+interface CachedGeoIPData {
+  data: {
+    city: string
+    region: string
+    latitude: number
+    longitude: number
+  }
+  timestamp: number
+}
+
 /**
  * LocationInput with "Current Location" option and Google Places Autocomplete
  * Dropdown location picker for header search
@@ -62,6 +72,68 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         console.error('Error loading Google Maps:', err)
       })
   }, [])
+
+  // Smart GeoIP pre-fill with 24-hour localStorage cache
+  useEffect(() => {
+    // Only pre-fill if we don't have a location yet
+    if (coordinates || displayName) return
+
+    const GEOIP_CACHE_KEY = 'reentry-map-geoip-location'
+    const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+
+    const fetchGeoIPLocation = async () => {
+      try {
+        // Check cache first
+        const cached = localStorage.getItem(GEOIP_CACHE_KEY)
+        if (cached) {
+          const parsedCache = JSON.parse(cached) as CachedGeoIPData
+          const { data, timestamp } = parsedCache
+          const age = Date.now() - timestamp
+
+          // Use cache if less than 24 hours old
+          if (age < CACHE_DURATION) {
+            const locationText = `${data.city}, ${data.region}`
+            setInputValue(locationText)
+            setManualLocation({ latitude: data.latitude, longitude: data.longitude }, locationText)
+            updateURLWithLocation(data.latitude, data.longitude, locationText)
+            return
+          }
+        }
+
+        // Cache miss or expired - fetch from API
+        const response = await fetch('/api/location/ip')
+        if (!response.ok) throw new Error('GeoIP fetch failed')
+
+        const data = (await response.json()) as {
+          city: string
+          region: string
+          latitude: number
+          longitude: number
+        }
+
+        // Cache the result
+        localStorage.setItem(
+          GEOIP_CACHE_KEY,
+          JSON.stringify({
+            data,
+            timestamp: Date.now(),
+          })
+        )
+
+        // Apply location
+        const locationText = `${data.city}, ${data.region}`
+        setInputValue(locationText)
+        setManualLocation({ latitude: data.latitude, longitude: data.longitude }, locationText)
+        updateURLWithLocation(data.latitude, data.longitude, locationText)
+      } catch (err) {
+        console.debug('GeoIP pre-fill skipped:', err)
+        // Silently fail - user can still enter location manually
+      }
+    }
+
+    fetchGeoIPLocation()
+  }, []) // Only run on mount
+  // Intentionally excluding dependencies to only run once
 
   // Update input value when displayName changes
   useEffect(() => {
