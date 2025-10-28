@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { SingleResourceMap } from '@/components/map'
-import { getCategoryIcon } from '@/lib/utils/category-icons'
+import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import { getCategoryLabel } from '@/lib/utils/categories'
 
 interface ResourceDetailProps {
@@ -302,7 +302,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
           Categories
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           <Link
             href={`/resources/category/${resource.primary_category}`}
             style={{ textDecoration: 'none' }}
@@ -312,8 +312,21 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                 getCategoryIcon(resource.primary_category as ResourceCategory)
               )}
               label={getCategoryLabel(resource.primary_category as ResourceCategory)}
-              color="primary"
               clickable
+              sx={{
+                bgcolor: getCategoryColor(resource.primary_category as ResourceCategory),
+                color: 'white',
+                fontWeight: 600,
+                px: 0.5,
+                '& .MuiChip-icon': {
+                  color: 'white',
+                  fontSize: '1.1rem',
+                },
+                '&:hover': {
+                  bgcolor: getCategoryColor(resource.primary_category as ResourceCategory),
+                  opacity: 0.9,
+                },
+              }}
             />
           </Link>
           {resource.categories &&
@@ -321,6 +334,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               .filter((cat) => cat !== resource.primary_category)
               .map((category) => {
                 const CategoryIcon = getCategoryIcon(category as ResourceCategory)
+                const categoryColor = getCategoryColor(category as ResourceCategory)
                 return (
                   <Link
                     key={category}
@@ -330,8 +344,19 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     <Chip
                       icon={<CategoryIcon />}
                       label={getCategoryLabel(category as ResourceCategory)}
-                      variant="outlined"
                       clickable
+                      sx={{
+                        bgcolor: categoryColor,
+                        color: 'white',
+                        px: 0.5,
+                        '& .MuiChip-icon': {
+                          color: 'white',
+                          fontSize: '1.1rem',
+                        },
+                        '&:hover': {
+                          opacity: 0.9,
+                        },
+                      }}
                     />
                   </Link>
                 )
@@ -345,7 +370,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Tags
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
             {resource.tags.map((tag) => (
               <Link key={tag} href={`/resources/tag/${tag}`} style={{ textDecoration: 'none' }}>
                 <Chip label={tag} size="small" variant="outlined" clickable />
