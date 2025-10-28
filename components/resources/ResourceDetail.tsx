@@ -144,96 +144,106 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </Card>
       )}
 
-      {/* Contact Information */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Contact Information
-          </Typography>
-          <Stack spacing={2}>
-            {/* Phone */}
-            {resource.phone && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PhoneIcon color="action" />
-                <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                  {resource.phone}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<PhoneIcon />}
-                  onClick={handleCall}
-                >
-                  Call
-                </Button>
-              </Box>
-            )}
-
-            {/* Email */}
-            {resource.email && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <EmailIcon color="action" />
-                <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                  {resource.email}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<EmailIcon />}
-                  onClick={handleEmail}
-                >
-                  Email
-                </Button>
-              </Box>
-            )}
-
-            {/* Website */}
-            {resource.website && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <WebsiteIcon color="action" />
-                <Typography
-                  variant="body1"
-                  sx={{
-                    flexGrow: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {resource.website}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<WebsiteIcon />}
-                  onClick={handleWebsite}
-                >
-                  Visit
-                </Button>
-              </Box>
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
-
-      {/* Services Offered */}
-      {resource.services_offered && resource.services_offered.length > 0 && (
-        <Card sx={{ mb: 3 }}>
+      {/* Contact Information & Services - 2 column layout on desktop, stacked on mobile */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gap: 3,
+          mb: 3,
+        }}
+      >
+        {/* Contact Information */}
+        <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Services Offered
+              Contact Information
             </Typography>
-            <List dense>
-              {resource.services_offered.map((service, index) => (
-                <ListItem key={index}>
-                  <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: 20 }} />
-                  <ListItemText primary={service} />
-                </ListItem>
-              ))}
-            </List>
+            <Stack spacing={2}>
+              {/* Phone */}
+              {resource.phone && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PhoneIcon color="action" />
+                  <Typography variant="body1" sx={{ flexGrow: 1 }}>
+                    {resource.phone}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<PhoneIcon />}
+                    onClick={handleCall}
+                  >
+                    Call
+                  </Button>
+                </Box>
+              )}
+
+              {/* Email */}
+              {resource.email && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EmailIcon color="action" />
+                  <Typography variant="body1" sx={{ flexGrow: 1 }}>
+                    {resource.email}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<EmailIcon />}
+                    onClick={handleEmail}
+                  >
+                    Email
+                  </Button>
+                </Box>
+              )}
+
+              {/* Website */}
+              {resource.website && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <WebsiteIcon color="action" />
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      flexGrow: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {resource.website}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<WebsiteIcon />}
+                    onClick={handleWebsite}
+                  >
+                    Visit
+                  </Button>
+                </Box>
+              )}
+            </Stack>
           </CardContent>
         </Card>
-      )}
+
+        {/* Services Offered */}
+        {resource.services_offered && resource.services_offered.length > 0 && (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Services Offered
+              </Typography>
+              <List dense>
+                {resource.services_offered.map((service, index) => (
+                  <ListItem key={index}>
+                    <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: 20 }} />
+                    <ListItemText primary={service} />
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        )}
+      </Box>
 
       {/* Hours & Details */}
       <Card sx={{ mb: 3 }}>
