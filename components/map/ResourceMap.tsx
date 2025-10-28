@@ -226,9 +226,16 @@ export function ResourceMap({
 
         const content = `
           <div style="padding: 8px; min-width: 200px; max-width: 300px;">
-            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1a1a1a;">
-              ${resource.name}
-            </h3>
+            <a
+              href="${resourceUrl}"
+              style="text-decoration: none; color: inherit;"
+              onmouseover="this.style.color='${categoryColor}'"
+              onmouseout="this.style.color='inherit'"
+            >
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: inherit;">
+                ${resource.name}
+              </h3>
+            </a>
             <p style="margin: 0 0 4px 0; color: #666; font-size: 14px;">
               <strong>Category:</strong> ${categoryLabel}
             </p>

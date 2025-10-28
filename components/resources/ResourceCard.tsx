@@ -80,9 +80,20 @@ export function ResourceCard({
           sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}
         >
           <Box>
-            <Typography variant="h6" component="h2">
-              {resource.name}
-            </Typography>
+            <Link
+              href={resourceUrl}
+              underline="hover"
+              color="inherit"
+              sx={{
+                '&:hover': {
+                  color: 'primary.main',
+                },
+              }}
+            >
+              <Typography variant="h6" component="h2">
+                {resource.name}
+              </Typography>
+            </Link>
             {resource.primary_category && (
               <Chip
                 label={resource.primary_category}
