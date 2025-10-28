@@ -16,6 +16,7 @@ import { Navigation as NavigationIcon } from '@mui/icons-material'
 import type { Resource } from '@/lib/types/database'
 import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { useUserLocation } from '@/lib/context/LocationContext'
+import { getResourceUrl } from '@/lib/utils/resource-url'
 
 export type ResourceCardResource = {
   id?: string
@@ -69,11 +70,8 @@ export function ResourceCard({
         )
       : null
 
-  // Generate SEO-friendly URL if slug/state/city available, otherwise use UUID
-  const resourceUrl =
-    resource.slug && resource.state && resource.city
-      ? `/resources/${resource.state}/${resource.city}/${resource.slug}`
-      : `/resources/${resource.id}`
+  // Generate SEO-friendly URL
+  const resourceUrl = getResourceUrl(resource)
 
   return (
     <Card data-testid="resource-card">

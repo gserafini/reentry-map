@@ -10,6 +10,7 @@ import { getCategoryLabel } from '@/lib/utils/categories'
 import { getCategoryColor } from '@/lib/utils/category-icons'
 import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
+import { getResourceUrl } from '@/lib/utils/resource-url'
 import type { ResourceCategory } from '@/lib/types/database'
 
 interface ResourceMapProps {
@@ -221,6 +222,7 @@ export function ResourceMap({
         )
         const distanceText =
           distance !== null ? `<strong>${formatDistanceSmart(distance)}</strong> away` : ''
+        const resourceUrl = getResourceUrl(resource)
 
         const content = `
           <div style="padding: 8px; min-width: 200px; max-width: 300px;">
@@ -241,7 +243,7 @@ export function ResourceMap({
                 : ''
             }
             <a
-              href="/resources/${resource.id}"
+              href="${resourceUrl}"
               style="display: inline-block; margin-top: 8px; color: ${categoryColor}; text-decoration: none; font-weight: 500;"
               onclick="event.stopPropagation();"
             >
