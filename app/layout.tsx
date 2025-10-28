@@ -36,10 +36,6 @@ export const metadata: Metadata = {
     'mental health',
     'substance abuse treatment',
   ],
-  icons: {
-    icon: '/ReentryMap_favicon.png',
-    apple: '/ReentryMap_favicon.png',
-  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
