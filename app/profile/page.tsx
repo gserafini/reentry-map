@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import {
   Avatar,
   Box,
@@ -21,11 +22,12 @@ export default function ProfilePage() {
   const router = useRouter()
   const { gravatarUrl, hasGravatar } = useGravatar(user?.email, 160) // 2x size for retina
 
-  // Redirect if not authenticated
-  if (!isLoading && !isAuthenticated) {
-    router.push('/auth/login')
-    return null
-  }
+  // Redirect if not authenticated (in useEffect to avoid render-phase state updates)
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/auth/login')
+    }
+  }, [isLoading, isAuthenticated, router])
 
   if (isLoading) {
     return (
