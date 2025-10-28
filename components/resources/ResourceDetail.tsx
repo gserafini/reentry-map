@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   CardContent,
-  Divider,
   Stack,
   Rating,
   Alert,
@@ -92,13 +91,32 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           )}
         </Box>
 
-        {/* Address with icon - visible on mobile */}
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
-          <LocationOnIcon color="action" sx={{ mt: 0.5 }} />
-          <Typography variant="body1" color="text.secondary">
-            {resource.address}
-            {resource.zip && ` ${resource.zip}`}
-          </Typography>
+        {/* Address with Get Directions button */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 1,
+              flexGrow: 1,
+              minWidth: '200px',
+            }}
+          >
+            <LocationOnIcon color="action" sx={{ mt: 0.5 }} />
+            <Typography variant="body1" color="text.secondary">
+              {resource.address}
+              {resource.zip && ` ${resource.zip}`}
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<DirectionsIcon />}
+            onClick={handleGetDirections}
+            sx={{ flexShrink: 0 }}
+          >
+            Get Directions
+          </Button>
         </Box>
 
         {/* Categories */}
@@ -223,21 +241,6 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                 </Button>
               </Box>
             )}
-
-            <Divider />
-
-            {/* Quick Actions */}
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                startIcon={<DirectionsIcon />}
-                onClick={handleGetDirections}
-                fullWidth
-                sx={{ flex: { xs: '1 1 100%', sm: '1' } }}
-              >
-                Get Directions
-              </Button>
-            </Box>
           </Stack>
         </CardContent>
       </Card>
