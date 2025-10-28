@@ -2,7 +2,7 @@
 
 import { Box, Slider, Typography, IconButton, Stack } from '@mui/material'
 import { Clear as ClearIcon } from '@mui/icons-material'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useSearchParams, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useDebouncedCallback } from 'use-debounce'
 
@@ -42,7 +42,6 @@ const STORAGE_KEY = 'preferredDistance'
  * ```
  */
 export function DistanceFilter({ hasLocation, defaultDistance = 25 }: DistanceFilterProps) {
-  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -73,6 +72,7 @@ export function DistanceFilter({ hasLocation, defaultDistance = 25 }: DistanceFi
   const [isActive, setIsActive] = useState<boolean>(!!searchParams.get('distance'))
 
   // Update URL with debounce to avoid too many navigation calls
+  // Use window.history.replaceState to avoid page refresh
   const updateUrl = useDebouncedCallback((value: number) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('distance', value.toString())
@@ -81,7 +81,12 @@ export function DistanceFilter({ hasLocation, defaultDistance = 25 }: DistanceFi
     params.delete('page')
 
     const newUrl = `${pathname}?${params.toString()}`
-    router.push(newUrl)
+
+    // Use replaceState instead of router.push to avoid page refresh
+    window.history.replaceState({}, '', newUrl)
+
+    // Trigger a popstate event so Next.js updates searchParams
+    window.dispatchEvent(new PopStateEvent('popstate'))
   }, DEBOUNCE_MS)
 
   // Handle slider change
@@ -106,7 +111,10 @@ export function DistanceFilter({ hasLocation, defaultDistance = 25 }: DistanceFi
     params.delete('page')
 
     const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
-    router.push(newUrl)
+
+    // Use replaceState instead of router.push to avoid page refresh
+    window.history.replaceState({}, '', newUrl)
+    window.dispatchEvent(new PopStateEvent('popstate'))
 
     setDistance(defaultDistance)
     setIsActive(false)

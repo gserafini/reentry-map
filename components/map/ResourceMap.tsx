@@ -59,6 +59,7 @@ const DEFAULT_ZOOM = 12
 export function ResourceMap({
   resources,
   userLocation,
+  radiusMiles,
   selectedResourceId,
   onResourceClick,
   height = '500px',
@@ -69,6 +70,7 @@ export function ResourceMap({
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const clustererRef = useRef<MarkerClusterer | null>(null)
   const userLocationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
+  const radiusCircleRef = useRef<google.maps.Circle | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -370,6 +372,43 @@ export function ResourceMap({
     console.log('[ResourceMap] User location marker created at:', userLocation)
   }, [userLocation])
 
+  // Draw radius circle around user location
+  useEffect(() => {
+    if (!mapInstanceRef.current || !userLocation || !radiusMiles) {
+      // Remove circle if no location or radius
+      if (radiusCircleRef.current) {
+        radiusCircleRef.current.setMap(null)
+        radiusCircleRef.current = null
+      }
+      return
+    }
+
+    const map = mapInstanceRef.current
+
+    // Convert miles to meters (1 mile = 1609.34 meters)
+    const radiusMeters = radiusMiles * 1609.34
+
+    // Remove existing circle if any
+    if (radiusCircleRef.current) {
+      radiusCircleRef.current.setMap(null)
+    }
+
+    // Create new circle
+    radiusCircleRef.current = new google.maps.Circle({
+      map,
+      center: { lat: userLocation.latitude, lng: userLocation.longitude },
+      radius: radiusMeters,
+      strokeColor: '#1976d2',
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: '#1976d2',
+      fillOpacity: 0.15,
+      clickable: false,
+    })
+
+    console.log('[ResourceMap] Radius circle created:', radiusMiles, 'miles')
+  }, [userLocation, radiusMiles])
+
   // Open info window for selected resource
   useEffect(() => {
     if (!selectedResourceId || !mapInstanceRef.current || !infoWindowRef.current) return
@@ -399,6 +438,35 @@ export function ResourceMap({
     }
   }, [selectedResourceId, resources])
 
+  // Adjust zoom based on radius changes (smooth zoom)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !userLocation || !radiusMiles) return
+
+    const map = mapInstanceRef.current
+
+    // Calculate appropriate zoom level based on radius
+    // Zoom levels: 1 mile ≈ zoom 14, 5 miles ≈ zoom 12, 10 miles ≈ zoom 11, 25 miles ≈ zoom 10, 50 miles ≈ zoom 9
+    let targetZoom: number
+    if (radiusMiles <= 2) {
+      targetZoom = 14
+    } else if (radiusMiles <= 5) {
+      targetZoom = 12
+    } else if (radiusMiles <= 10) {
+      targetZoom = 11
+    } else if (radiusMiles <= 25) {
+      targetZoom = 10
+    } else {
+      targetZoom = 9
+    }
+
+    // Smoothly animate to the new zoom level
+    const currentZoom = map.getZoom() || DEFAULT_ZOOM
+    if (currentZoom !== targetZoom) {
+      map.setZoom(targetZoom)
+      console.log('[ResourceMap] Adjusted zoom to', targetZoom, 'for radius', radiusMiles, 'miles')
+    }
+  }, [radiusMiles, userLocation])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -415,6 +483,11 @@ export function ResourceMap({
       // Clean up info window
       if (infoWindowRef.current) {
         infoWindowRef.current.close()
+      }
+
+      // Clean up radius circle
+      if (radiusCircleRef.current) {
+        radiusCircleRef.current.setMap(null)
       }
     }
   }, [])
