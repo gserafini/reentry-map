@@ -23,7 +23,7 @@ A framework for structured, AI-optimized project management. Key docs:
 **Before presenting any frontend work to the user:**
 
 ```bash
-npm run quality      # Quick: Lint + TypeCheck + Tests + Build + DevCheck
+npm run quality      # Quick: Lint + TypeCheck + Tests + Build + DevCheck + ConsoleCheck
 npm run quality:full # Full: Above + E2E tests
 ```
 
@@ -36,7 +36,17 @@ npm run quality:full # Full: Above + E2E tests
 - ✅ All unit tests pass
 - ✅ Build succeeds
 - ✅ Dev server compiles successfully
+- ✅ **0 Browser console errors** (new! checks / and /resources)
 - ✅ E2E tests pass (optional, slower)
+
+**CRITICAL:** Browser console errors were NOT being caught before. Now `npm run quality` includes `console:check` which uses Playwright to capture runtime JavaScript errors. This catches issues like:
+
+- Google Maps API errors
+- React runtime errors
+- Network failures
+- API endpoint errors
+
+**DO NOT** run individual commands like `npx tsc` or `npm run lint`. ALWAYS run the full `npm run quality` suite.
 
 **Workflow:**
 
