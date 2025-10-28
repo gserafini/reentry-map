@@ -12,6 +12,7 @@ import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
 import { getResourceUrl } from '@/lib/utils/resource-url'
 import type { ResourceCategory } from '@/lib/types/database'
+import { env } from '@/lib/env'
 
 interface ResourceMapProps {
   /**
@@ -45,8 +46,11 @@ interface ResourceMapProps {
   height?: string
 }
 
-// Default map center (Oakland, CA)
-const DEFAULT_CENTER = { lat: 37.8044, lng: -122.2712 }
+// Default map center (from environment config)
+const DEFAULT_CENTER = {
+  lat: env.NEXT_PUBLIC_DEFAULT_LATITUDE,
+  lng: env.NEXT_PUBLIC_DEFAULT_LONGITUDE,
+}
 const DEFAULT_ZOOM = 12
 
 /**

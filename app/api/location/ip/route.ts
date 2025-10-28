@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
+import { env } from '@/lib/env'
 
 interface GeoIPResponse {
   city?: string
@@ -63,23 +64,23 @@ export async function GET() {
 
     // Return standardized location format
     return NextResponse.json({
-      city: data.city || 'Oakland',
-      region: data.region || 'CA',
+      city: data.city || env.NEXT_PUBLIC_DEFAULT_CITY,
+      region: data.region || env.NEXT_PUBLIC_DEFAULT_REGION,
       country: data.country_name || 'United States',
-      latitude: data.latitude || 37.8044,
-      longitude: data.longitude || -122.2712,
+      latitude: data.latitude || env.NEXT_PUBLIC_DEFAULT_LATITUDE,
+      longitude: data.longitude || env.NEXT_PUBLIC_DEFAULT_LONGITUDE,
       ip: data.ip,
     })
   } catch (error) {
     console.error('GeoIP lookup failed:', error)
 
-    // Return default Oakland location on error
+    // Return default location on error (from environment config)
     return NextResponse.json({
-      city: 'Oakland',
-      region: 'CA',
+      city: env.NEXT_PUBLIC_DEFAULT_CITY,
+      region: env.NEXT_PUBLIC_DEFAULT_REGION,
       country: 'United States',
-      latitude: 37.8044,
-      longitude: -122.2712,
+      latitude: env.NEXT_PUBLIC_DEFAULT_LATITUDE,
+      longitude: env.NEXT_PUBLIC_DEFAULT_LONGITUDE,
       ip: null,
       error: 'Failed to determine location, using default',
     })

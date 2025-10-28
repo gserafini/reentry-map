@@ -63,50 +63,6 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
       })
   }, [])
 
-  // Pre-fill location from GeoIP on mount (only if no location set yet)
-  useEffect(() => {
-    // Only pre-fill if we don't have a location yet
-    if (coordinates || displayName) return
-
-    const fetchGeoIPLocation = async () => {
-      try {
-        const response = await fetch('/api/location/ip')
-        if (!response.ok) throw new Error('GeoIP fetch failed')
-
-        const data = (await response.json()) as {
-          city: string
-          region: string
-          latitude: number
-          longitude: number
-        }
-
-        // Format as "City, ST"
-        const locationText = `${data.city}, ${data.region}`
-
-        // Pre-fill the input
-        setInputValue(locationText)
-
-        // Set the location in context
-        setManualLocation(
-          {
-            latitude: data.latitude,
-            longitude: data.longitude,
-          },
-          locationText
-        )
-
-        // Update URL with GeoIP location
-        updateURLWithLocation(data.latitude, data.longitude, locationText)
-      } catch (err) {
-        console.debug('GeoIP pre-fill skipped:', err)
-        // Silently fail - user can still enter location manually
-      }
-    }
-
-    fetchGeoIPLocation()
-  }, []) // Only run on mount
-  // Intentionally excluding dependencies to only run once
-
   // Update input value when displayName changes
   useEffect(() => {
     if (displayName) {

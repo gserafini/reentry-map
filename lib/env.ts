@@ -31,6 +31,12 @@ export const env = createEnv({
 
     // Google Maps client-side key
     NEXT_PUBLIC_GOOGLE_MAPS_KEY: z.string().min(1).optional(),
+
+    // Default location (for initial map center and fallback)
+    NEXT_PUBLIC_DEFAULT_CITY: z.string().default('Oakland'),
+    NEXT_PUBLIC_DEFAULT_REGION: z.string().default('CA'),
+    NEXT_PUBLIC_DEFAULT_LATITUDE: z.coerce.number().default(37.8044),
+    NEXT_PUBLIC_DEFAULT_LONGITUDE: z.coerce.number().default(-122.2712),
   },
 
   /**
@@ -48,6 +54,10 @@ export const env = createEnv({
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_GOOGLE_MAPS_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY,
+    NEXT_PUBLIC_DEFAULT_CITY: process.env.NEXT_PUBLIC_DEFAULT_CITY,
+    NEXT_PUBLIC_DEFAULT_REGION: process.env.NEXT_PUBLIC_DEFAULT_REGION,
+    NEXT_PUBLIC_DEFAULT_LATITUDE: process.env.NEXT_PUBLIC_DEFAULT_LATITUDE,
+    NEXT_PUBLIC_DEFAULT_LONGITUDE: process.env.NEXT_PUBLIC_DEFAULT_LONGITUDE,
   },
 
   /**
