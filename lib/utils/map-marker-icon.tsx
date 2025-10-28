@@ -3,7 +3,7 @@ import { getCategoryIcon, getCategoryColor } from './category-icons'
 import type { ResourceCategory } from '@/lib/types/database'
 
 /**
- * Create a custom HTML marker element with category icon
+ * Create a custom pin-shaped marker element with category icon
  * Returns an HTML element that can be used with AdvancedMarkerElement
  */
 export function createCategoryMarkerElement(
@@ -18,45 +18,66 @@ export function createCategoryMarkerElement(
   const Icon = getCategoryIcon(category)
   const color = getCategoryColor(category)
 
-  // Create container element
-  const markerDiv = document.createElement('div')
-  markerDiv.style.width = `${size}px`
-  markerDiv.style.height = `${size}px`
-  markerDiv.style.borderRadius = '50%'
-  markerDiv.style.backgroundColor = color
-  markerDiv.style.border = selected ? '3px solid white' : '2px solid white'
-  markerDiv.style.boxShadow = selected ? '0 4px 12px rgba(0,0,0,0.4)' : '0 2px 6px rgba(0,0,0,0.3)'
-  markerDiv.style.display = 'flex'
-  markerDiv.style.alignItems = 'center'
-  markerDiv.style.justifyContent = 'center'
-  markerDiv.style.cursor = 'pointer'
-  markerDiv.style.transition = 'transform 0.2s, box-shadow 0.2s'
+  // Create container element for the entire pin
+  const pinContainer = document.createElement('div')
+  pinContainer.style.position = 'relative'
+  pinContainer.style.width = `${size}px`
+  pinContainer.style.height = `${size * 1.5}px` // Pin is taller than wide
+  pinContainer.style.cursor = 'pointer'
+  pinContainer.style.transition = 'transform 0.2s, filter 0.2s'
+  pinContainer.style.transform = 'translate(-50%, -100%)' // Center horizontally, anchor at bottom
 
-  // Add hover effect
-  markerDiv.addEventListener('mouseenter', () => {
-    markerDiv.style.transform = 'scale(1.1)'
-    markerDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)'
-  })
-  markerDiv.addEventListener('mouseleave', () => {
-    markerDiv.style.transform = 'scale(1)'
-    markerDiv.style.boxShadow = selected
-      ? '0 4px 12px rgba(0,0,0,0.4)'
-      : '0 2px 6px rgba(0,0,0,0.3)'
-  })
+  // Create SVG pin shape
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 40 60')
+  svg.setAttribute('width', `${size}`)
+  svg.setAttribute('height', `${size * 1.5}`)
+  svg.style.filter = selected
+    ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))'
+    : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
 
-  // Render icon as SVG string
-  const iconSvg = renderToStaticMarkup(<Icon style={{ fontSize: size * 0.6, color: 'white' }} />)
+  // Create pin path (teardrop shape)
+  const pinPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  pinPath.setAttribute(
+    'd',
+    'M20 0 C8.954 0 0 8.954 0 20 C0 20 0 25 5 35 C10 45 15 55 20 60 C25 55 30 45 35 35 C40 25 40 20 40 20 C40 8.954 31.046 0 20 0 Z'
+  )
+  pinPath.setAttribute('fill', color)
+  pinPath.setAttribute('stroke', 'white')
+  pinPath.setAttribute('stroke-width', selected ? '2.5' : '2')
 
-  // Create a container for the SVG
+  svg.appendChild(pinPath)
+
+  // Render category icon as SVG string
+  const iconSvg = renderToStaticMarkup(<Icon style={{ fontSize: size * 0.5, color: 'white' }} />)
+
+  // Create icon container positioned in the circular part of the pin
   const iconContainer = document.createElement('div')
   iconContainer.innerHTML = iconSvg
+  iconContainer.style.position = 'absolute'
+  iconContainer.style.top = `${size * 0.25}px`
+  iconContainer.style.left = '50%'
+  iconContainer.style.transform = 'translate(-50%, -50%)'
   iconContainer.style.display = 'flex'
   iconContainer.style.alignItems = 'center'
   iconContainer.style.justifyContent = 'center'
-  iconContainer.style.width = '100%'
-  iconContainer.style.height = '100%'
+  iconContainer.style.pointerEvents = 'none'
 
-  markerDiv.appendChild(iconContainer)
+  // Add hover effects
+  pinContainer.addEventListener('mouseenter', () => {
+    pinContainer.style.transform = 'translate(-50%, -100%) scale(1.1)'
+    svg.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.5))'
+  })
+  pinContainer.addEventListener('mouseleave', () => {
+    pinContainer.style.transform = 'translate(-50%, -100%) scale(1)'
+    svg.style.filter = selected
+      ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))'
+      : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+  })
 
-  return markerDiv
+  // Assemble the pin
+  pinContainer.appendChild(svg)
+  pinContainer.appendChild(iconContainer)
+
+  return pinContainer
 }
