@@ -22,15 +22,53 @@ interface CachedGeoIPData {
   timestamp: number
 }
 
+interface UserSelectedLocation {
+  coords: {
+    latitude: number
+    longitude: number
+  }
+  locationName: string
+  timestamp: number
+}
+
 /**
  * LocationInput with "Current Location" option and Google Places Autocomplete
  * Dropdown location picker for header search
  */
 export function LocationInput({ fullWidth = false, size = 'medium' }: LocationInputProps) {
-  const { displayName, requestLocation, setManualLocation, loading, coordinates, source } =
-    useUserLocation()
+  const {
+    displayName,
+    requestLocation,
+    setManualLocation: setManualLocationBase,
+    loading,
+    coordinates,
+    source,
+  } = useUserLocation()
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  // localStorage keys for location persistence
+  const USER_SELECTED_LOCATION_KEY = 'reentry-map-user-selected-location'
+
+  // Wrapper that saves manual location selections to localStorage
+  const setManualLocation = useCallback(
+    (coords: { latitude: number; longitude: number }, locationName: string) => {
+      // Call the base function from useLocation hook
+      setManualLocationBase(coords, locationName)
+
+      // Save to localStorage for persistence across refreshes
+      localStorage.setItem(
+        USER_SELECTED_LOCATION_KEY,
+        JSON.stringify({
+          coords,
+          locationName,
+          timestamp: Date.now(),
+        })
+      )
+      console.log('[LocationInput] Saved user-selected location to localStorage:', locationName)
+    },
+    [setManualLocationBase]
+  )
   const [inputValue, setInputValue] = useState('')
   const [hoverText, setHoverText] = useState('')
   const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
@@ -73,7 +111,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
       })
   }, [])
 
-  // Smart GeoIP pre-fill with 24-hour localStorage cache
+  // Smart location pre-fill with localStorage persistence
+  // Priority: 1. User's last selection, 2. GeoIP auto-detect, 3. Default
   useEffect(() => {
     // Only pre-fill if we don't have a location yet
     if (coordinates || displayName) return
@@ -83,7 +122,28 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
     const fetchGeoIPLocation = async () => {
       try {
-        // Check cache first
+        // FIRST: Check if user has manually selected a location before
+        const userSelected = localStorage.getItem(USER_SELECTED_LOCATION_KEY)
+        if (userSelected) {
+          try {
+            const { coords, locationName } = JSON.parse(userSelected) as UserSelectedLocation
+            console.log(
+              '[LocationInput] Restoring user-selected location from localStorage:',
+              locationName
+            )
+            setInputValue(locationName)
+            setManualLocationBase(coords, locationName)
+            // Don't update URL on restore - only when user manually selects
+            return
+          } catch {
+            console.debug(
+              '[LocationInput] Failed to parse user-selected location, falling back to GeoIP'
+            )
+            localStorage.removeItem(USER_SELECTED_LOCATION_KEY)
+          }
+        }
+
+        // SECOND: Check GeoIP cache
         const cached = localStorage.getItem(GEOIP_CACHE_KEY)
         if (cached) {
           const parsedCache = JSON.parse(cached) as CachedGeoIPData
