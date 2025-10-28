@@ -1,7 +1,18 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { Box, Button, Card, CardContent, TextField, Typography, Alert } from '@mui/material'
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  TextField,
+  Typography,
+  Alert,
+  IconButton,
+  InputAdornment,
+} from '@mui/material'
+import { Visibility, VisibilityOff } from '@mui/icons-material'
 import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -14,7 +25,7 @@ export interface SignUpFormProps extends React.ComponentPropsWithoutRef<'div'> {
 export function SignUpForm({ onSuccess, minimal = false, className, ...props }: SignUpFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [repeatPassword, setRepeatPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -24,12 +35,6 @@ export function SignUpForm({ onSuccess, minimal = false, className, ...props }: 
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
-
-    if (password !== repeatPassword) {
-      setError('Passwords do not match')
-      setIsLoading(false)
-      return
-    }
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -76,7 +81,7 @@ export function SignUpForm({ onSuccess, minimal = false, className, ...props }: 
       />
       <TextField
         label="Password"
-        type="password"
+        type={showPassword ? 'text' : 'password'}
         placeholder="Enter your password"
         required
         fullWidth
@@ -84,17 +89,21 @@ export function SignUpForm({ onSuccess, minimal = false, className, ...props }: 
         onChange={(e) => setPassword(e.target.value)}
         variant="outlined"
         size={minimal ? 'small' : 'medium'}
-      />
-      <TextField
-        label="Confirm Password"
-        type="password"
-        placeholder="Confirm your password"
-        required
-        fullWidth
-        value={repeatPassword}
-        onChange={(e) => setRepeatPassword(e.target.value)}
-        variant="outlined"
-        size={minimal ? 'small' : 'medium'}
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                aria-label="toggle password visibility"
+                onClick={() => setShowPassword(!showPassword)}
+                onMouseDown={(e) => e.preventDefault()}
+                edge="end"
+                size="small"
+              >
+                {showPassword ? <VisibilityOff /> : <Visibility />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
       />
       {error && <Alert severity="error">{error}</Alert>}
       <Button type="submit" variant="contained" fullWidth disabled={isLoading}>

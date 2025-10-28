@@ -1,7 +1,18 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { Box, Button, Card, CardContent, TextField, Typography, Alert } from '@mui/material'
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  TextField,
+  Typography,
+  Alert,
+  IconButton,
+  InputAdornment,
+} from '@mui/material'
+import { Visibility, VisibilityOff } from '@mui/icons-material'
 import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -14,6 +25,7 @@ export interface LoginFormProps extends React.ComponentPropsWithoutRef<'div'> {
 export function LoginForm({ onSuccess, minimal = false, className, ...props }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -65,27 +77,29 @@ export function LoginForm({ onSuccess, minimal = false, className, ...props }: L
         size={minimal ? 'small' : 'medium'}
       />
       <Box>
-        {!minimal && (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mb: 1,
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 1,
+          }}
+        >
+          {!minimal && <Typography variant="body2">Password</Typography>}
+          <NextLink
+            href="/auth/forgot-password"
+            style={{
+              fontSize: '0.875rem',
+              textDecoration: 'underline',
+              marginLeft: minimal ? 'auto' : 0,
             }}
           >
-            <Typography variant="body2">Password</Typography>
-            <NextLink
-              href="/auth/forgot-password"
-              style={{ fontSize: '0.875rem', textDecoration: 'underline' }}
-            >
-              Forgot password?
-            </NextLink>
-          </Box>
-        )}
+            Forgot password?
+          </NextLink>
+        </Box>
         <TextField
           label={minimal ? 'Password' : undefined}
-          type="password"
+          type={showPassword ? 'text' : 'password'}
           placeholder="Enter your password"
           required
           fullWidth
@@ -93,6 +107,21 @@ export function LoginForm({ onSuccess, minimal = false, className, ...props }: L
           onChange={(e) => setPassword(e.target.value)}
           variant="outlined"
           size={minimal ? 'small' : 'medium'}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="toggle password visibility"
+                  onClick={() => setShowPassword(!showPassword)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  edge="end"
+                  size="small"
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
         />
       </Box>
       {error && <Alert severity="error">{error}</Alert>}
@@ -126,7 +155,7 @@ export function LoginForm({ onSuccess, minimal = false, className, ...props }: L
             Login
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter your email below to login to your account
+            Enter your email below to log in to your account
           </Typography>
           {formContent}
         </CardContent>

@@ -66,7 +66,7 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
           </Box>
           <Box sx={{ fontSize: '0.875rem', color: 'text.secondary', fontWeight: 400 }}>
             {mode === 'login'
-              ? 'Sign in to your account to continue'
+              ? 'Log in to your account to continue'
               : 'Sign up to save favorites and reviews'}
           </Box>
         </Box>
@@ -86,7 +86,7 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
       <DialogContent sx={{ px: 3, pt: 2, pb: 3 }}>
         {/* Phone Auth Section */}
         <Box sx={{ mb: 3 }}>
-          <PhoneAuth onSuccess={handleClose} />
+          <PhoneAuth onSuccess={handleClose} mode={mode} minimal />
         </Box>
 
         {/* OR Divider */}
@@ -134,7 +134,7 @@ export function AuthModal({ open, onClose, initialMode = 'login' }: AuthModalPro
               '&:hover': { textDecoration: 'underline' },
             }}
           >
-            {mode === 'login' ? 'Sign up' : 'Sign in'}
+            {mode === 'login' ? 'Sign up' : 'Log in'}
           </Box>
         </Box>
       </DialogContent>

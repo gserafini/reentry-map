@@ -9,6 +9,8 @@ type AuthStep = 'phone' | 'otp'
 
 export interface PhoneAuthProps extends React.ComponentPropsWithoutRef<'div'> {
   onSuccess?: () => void
+  mode?: 'login' | 'signup' // Determines button text
+  minimal?: boolean // When true, removes Card wrapper for use in modals
 }
 
 /**
@@ -21,7 +23,13 @@ export interface PhoneAuthProps extends React.ComponentPropsWithoutRef<'div'> {
  * 4. Verify and create session
  * 5. Auto-create user profile on first sign-in (handled by database trigger)
  */
-export function PhoneAuth({ onSuccess, className, ...props }: PhoneAuthProps) {
+export function PhoneAuth({
+  onSuccess,
+  mode = 'login',
+  minimal = false,
+  className,
+  ...props
+}: PhoneAuthProps) {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [step, setStep] = useState<AuthStep>('phone')
@@ -189,94 +197,115 @@ export function PhoneAuth({ onSuccess, className, ...props }: PhoneAuthProps) {
     setError(null)
   }
 
-  return (
-    <Box className={className} {...props}>
-      <Card sx={{ maxWidth: 448, width: '100%', p: 2 }}>
-        <CardContent>
-          {step === 'phone' ? (
+  const content = (
+    <>
+      {step === 'phone' ? (
+        <>
+          {!minimal && (
             <>
               <Typography variant="h4" component="h1" gutterBottom>
-                Sign In
+                {mode === 'login' ? 'Log In' : 'Sign Up'}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Enter your phone number to receive a verification code
               </Typography>
-              <Box
-                component="form"
-                onSubmit={handleSendOTP}
-                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-              >
-                <TextField
-                  label="Phone Number"
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  required
-                  fullWidth
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  variant="outlined"
-                  helperText="US phone numbers only"
-                  inputProps={{
-                    maxLength: 14, // (XXX) XXX-XXXX
-                  }}
-                />
-                {error && <Alert severity="error">{error}</Alert>}
-                <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
-                  {isLoading ? 'Sending code...' : 'Send verification code'}
-                </Button>
-              </Box>
-            </>
-          ) : (
-            <>
-              <Typography variant="h4" component="h1" gutterBottom>
-                Enter Verification Code
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                We sent a 6-digit code to {phone}
-              </Typography>
-              <Box
-                component="form"
-                onSubmit={handleVerifyOTP}
-                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-              >
-                <TextField
-                  label="Verification Code"
-                  type="text"
-                  placeholder="123456"
-                  required
-                  fullWidth
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  variant="outlined"
-                  helperText="Enter the 6-digit code from your text message"
-                  inputProps={{
-                    maxLength: 6,
-                    inputMode: 'numeric',
-                    pattern: '[0-9]*',
-                  }}
-                  autoComplete="one-time-code"
-                />
-                {error && <Alert severity="error">{error}</Alert>}
-                <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
-                  {isLoading ? 'Verifying...' : 'Verify and sign in'}
-                </Button>
-                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between' }}>
-                  <Button
-                    variant="text"
-                    onClick={handleResendOTP}
-                    disabled={resendCooldown > 0 || isLoading}
-                    size="small"
-                  >
-                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
-                  </Button>
-                  <Button variant="text" onClick={handleBackToPhone} size="small">
-                    Change phone number
-                  </Button>
-                </Box>
-              </Box>
             </>
           )}
-        </CardContent>
+          <Box
+            component="form"
+            onSubmit={handleSendOTP}
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+          >
+            <TextField
+              label={mode === 'login' ? 'Log in with my phone' : 'Sign up with my phone'}
+              type="tel"
+              placeholder="(555) 123-4567"
+              required
+              fullWidth
+              value={phone}
+              onChange={handlePhoneChange}
+              variant="outlined"
+              size={minimal ? 'small' : 'medium'}
+              helperText="US phone numbers only"
+              inputProps={{
+                maxLength: 14, // (XXX) XXX-XXXX
+                autoComplete: 'tel',
+              }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+              Carrier charges may apply
+            </Typography>
+            {error && <Alert severity="error">{error}</Alert>}
+            <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
+              {isLoading ? 'Sending code...' : 'Send verification code'}
+            </Button>
+          </Box>
+        </>
+      ) : (
+        <>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Enter Verification Code
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            We sent a 6-digit code to {phone}
+          </Typography>
+          <Box
+            component="form"
+            onSubmit={handleVerifyOTP}
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+          >
+            <TextField
+              label="Verification Code"
+              type="text"
+              placeholder="123456"
+              required
+              fullWidth
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              variant="outlined"
+              helperText="Enter the 6-digit code from your text message"
+              inputProps={{
+                maxLength: 6,
+                inputMode: 'numeric',
+                pattern: '[0-9]*',
+              }}
+              autoComplete="one-time-code"
+            />
+            {error && <Alert severity="error">{error}</Alert>}
+            <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
+              {isLoading ? 'Verifying...' : 'Verify and log in'}
+            </Button>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between' }}>
+              <Button
+                variant="text"
+                onClick={handleResendOTP}
+                disabled={resendCooldown > 0 || isLoading}
+                size="small"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+              </Button>
+              <Button variant="text" onClick={handleBackToPhone} size="small">
+                Change phone number
+              </Button>
+            </Box>
+          </Box>
+        </>
+      )}
+    </>
+  )
+
+  if (minimal) {
+    return (
+      <Box className={className} {...props}>
+        {content}
+      </Box>
+    )
+  }
+
+  return (
+    <Box className={className} {...props}>
+      <Card sx={{ maxWidth: 448, width: '100%', p: 2 }}>
+        <CardContent>{content}</CardContent>
       </Card>
     </Box>
   )
