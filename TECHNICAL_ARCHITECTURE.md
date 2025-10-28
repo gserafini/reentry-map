@@ -434,6 +434,8 @@ CREATE INDEX idx_resources_rating ON resources(rating_average DESC);
 
 Extended user profile (Supabase Auth integration).
 
+**Current (MVP - Minimal Profile)**:
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -456,6 +458,34 @@ CREATE POLICY "Users can update own profile"
   ON users FOR UPDATE
   USING (auth.uid() = id);
 ```
+
+**Phase 15+ Enhancement (Baseline Profile System)**:
+
+The users table will be expanded with comprehensive baseline fields to support role-based profiles and personalized experiences. See ADR-013 and IMPLEMENTATION_CHECKLIST.md Phase 15 for complete details.
+
+**Key additions**:
+- **Name fields**: `first_name`, `last_name` (separate from current `name` field)
+- **Contact**: `email` (optional if phone provided), `phone` (optional if email provided)
+  - **Important**: At least ONE contact method (email OR phone) must be provided and verified
+  - Both `email_verified` and `phone_verified` boolean flags track verification status
+- **User type**: `user_type` ENUM (returning-citizen | coach | volunteer | leader | general-public | admin)
+- **Secondary roles**: `secondary_roles` TEXT[] (for multi-role users in Phase 18)
+- **Location**: `city`, `state`, `zip_code` (optional but recommended for resource matching)
+- **Preferences**: `preferred_language`, `timezone`, `notification_preferences` (JSONB)
+- **Privacy**: `profile_visibility`, `show_on_leaderboard`, `data_sharing_consent`
+- **Onboarding**: `onboarding_completed`, `onboarding_step`, `profile_completeness` (0-100%)
+- **Tracking**: `last_active_at`
+
+**Contact Method Flexibility**:
+- Users can sign up with email+password OR phone+OTP (not both required)
+- At signup, require either:
+  - Email (must verify before full access)
+  - Phone (must verify OTP before full access)
+- Users can optionally add the other contact method later
+- Both contact methods can be verified for redundancy
+- Profile completeness rewards having both methods verified
+
+**See ADR-013 for complete schema migration SQL**
 
 #### user_favorites
 
@@ -915,7 +945,7 @@ app/api/
 reentry-map/
 ├── app/
 │   ├── layout.tsx                    # Root layout with providers
-│   ├── page.tsx                      # Home page (map + search)
+│   ├── page.tsx                      # Home page (role-based dashboard or map)
 │   ├── globals.css                   # Global styles
 │   ├── resources/
 │   │   ├── page.tsx                  # Resource list view
@@ -924,7 +954,19 @@ reentry-map/
 │   ├── favorites/
 │   │   └── page.tsx                  # User's saved resources
 │   ├── history/
-│   │   └── page.tsx                  # Recently viewed resources (Post-MVP)
+│   │   └── page.tsx                  # Recently viewed resources (Post-MVP Phase 6.4)
+│   ├── profile/
+│   │   └── page.tsx                  # User profile with tabs (Phase 15+)
+│   ├── onboarding/                   # Progressive onboarding wizard (Phase 16)
+│   │   ├── layout.tsx                # Wizard shell with progress bar
+│   │   ├── role-selection/
+│   │   │   └── page.tsx              # Step 3: Select user role
+│   │   ├── essential-profile/
+│   │   │   └── page.tsx              # Step 4: Location, needs, privacy
+│   │   ├── extended-profile/
+│   │   │   └── page.tsx              # Step 5: Role-specific fields
+│   │   └── complete/
+│   │       └── page.tsx              # Step 6: Completion & tour
 │   ├── suggest-resource/
 │   │   └── page.tsx                  # Suggest new resource form
 │   ├── my-reviews/
@@ -936,6 +978,20 @@ reentry-map/
 │   │   └── suggestions/
 │   │       └── page.tsx              # Review suggestions
 │   └── api/                          # API routes (see above)
+│       ├── profile/
+│       │   ├── route.ts              # GET/PATCH profile
+│       │   ├── export/route.ts       # Export user data (GDPR)
+│       │   └── delete/route.ts       # Delete account (GDPR)
+│       ├── role-profiles/            # Role-specific profile endpoints (Phase 16)
+│       │   ├── returning-citizen/route.ts
+│       │   ├── coach/route.ts
+│       │   ├── volunteer/route.ts
+│       │   ├── team-leader/route.ts
+│       │   └── general-public/route.ts
+│       └── dashboard/                # Dashboard data endpoints (Phase 17)
+│           ├── route.ts              # Get dashboard config
+│           ├── recommendations/route.ts
+│           └── nearby/route.ts
 ├── components/
 │   ├── ui/                           # shadcn/ui components
 │   │   ├── button.tsx
@@ -959,8 +1015,44 @@ reentry-map/
 │   │   ├── ReviewForm.tsx            # Write review form
 │   │   ├── ReviewsList.tsx           # Display reviews
 │   │   └── UserProfile.tsx           # User profile display
+│   ├── profile/                      # Profile management (Phase 15+)
+│   │   ├── ProfileHeader.tsx         # Avatar, name, completeness bar
+│   │   ├── ProfileTabs.tsx           # Tab navigation
+│   │   ├── BasicInfoTab.tsx          # Tab 1: Contact, location, preferences
+│   │   ├── RoleInfoTab.tsx           # Tab 2: Role-specific fields
+│   │   ├── PrivacyNotificationsTab.tsx # Tab 3: Privacy & notifications
+│   │   ├── ActivityStatsTab.tsx      # Tab 4: Activity & stats
+│   │   └── ProfileCompletenessBar.tsx # Progress indicator
+│   ├── onboarding/                   # Onboarding wizard (Phase 16)
+│   │   ├── WizardProgress.tsx        # Step progress indicator
+│   │   ├── RoleSelectionCards.tsx    # 5 role selection cards
+│   │   ├── EssentialProfileForm.tsx  # Essential profile questions
+│   │   ├── ExtendedProfileForm.tsx   # Role-specific questions
+│   │   ├── CompletionCelebration.tsx # Success message & animation
+│   │   └── DashboardTour.tsx         # Onboarding tour tooltips
+│   ├── dashboard/                    # Role-based dashboards (Phase 17)
+│   │   ├── DashboardWidget.tsx       # Base widget component
+│   │   ├── WidgetSkeleton.tsx        # Widget loading state
+│   │   ├── WidgetEmpty.tsx           # Widget empty state
+│   │   ├── ReturningCitizenDashboard.tsx  # Returning citizen layout
+│   │   ├── ReentryCoachDashboard.tsx      # Coach layout
+│   │   ├── VolunteerDashboard.tsx         # Volunteer layout
+│   │   ├── TeamLeaderDashboard.tsx        # Team leader layout
+│   │   ├── GeneralPublicDashboard.tsx     # General public layout
+│   │   └── widgets/                       # Individual widgets
+│   │       ├── RecommendedResourcesWidget.tsx
+│   │       ├── ResourcesNearYouWidget.tsx
+│   │       ├── NextStepsWidget.tsx
+│   │       ├── RecentActivityWidget.tsx
+│   │       ├── SupportContactsWidget.tsx
+│   │       ├── UpdatedResourcesWidget.tsx
+│   │       ├── CommunityActivityWidget.tsx
+│   │       ├── VolunteerOpportunitiesWidget.tsx
+│   │       ├── ImpactStatsWidget.tsx
+│   │       ├── SuccessStoriesWidget.tsx
+│   │       └── ...
 │   ├── history/
-│   │   └── HistoryList.tsx           # Recently viewed list (Post-MVP)
+│   │   └── HistoryList.tsx           # Recently viewed list (Post-MVP Phase 6.4)
 │   ├── auth/
 │   │   ├── AuthModal.tsx             # Sign in/up modal
 │   │   ├── PhoneAuth.tsx             # Phone OTP authentication
@@ -995,25 +1087,36 @@ reentry-map/
 │   │   ├── favorites.ts              # Favorites API calls
 │   │   ├── reviews.ts                # Reviews API calls
 │   │   ├── suggestions.ts            # Suggestions API calls
-│   │   └── history.ts                # History API calls (Post-MVP, if using database)
+│   │   ├── history.ts                # History API calls (Post-MVP Phase 6.4)
+│   │   ├── profile.ts                # Profile API calls (Phase 15+)
+│   │   ├── roleProfiles.ts           # Role-specific profile APIs (Phase 16)
+│   │   └── dashboard.ts              # Dashboard data APIs (Phase 17)
 │   ├── hooks/
 │   │   ├── useResources.ts           # Fetch resources
 │   │   ├── useResource.ts            # Fetch single resource
 │   │   ├── useFavorites.ts           # User favorites
 │   │   ├── useReviews.ts             # Resource reviews
 │   │   ├── useAuth.ts                # Authentication
-│   │   └── useLocation.ts            # User geolocation
+│   │   ├── useLocation.ts            # User geolocation
+│   │   ├── useProfile.ts             # User profile (Phase 15+)
+│   │   ├── useOnboarding.ts          # Onboarding wizard state (Phase 16)
+│   │   └── useUserDashboard.ts       # Dashboard config/data (Phase 17)
 │   ├── utils/
 │   │   ├── geocoding.ts              # Geocoding utilities
 │   │   ├── distance.ts               # Distance calculations
 │   │   ├── formatting.ts             # Date/phone formatting
 │   │   ├── validation.ts             # Input validation
 │   │   ├── constants.ts              # App constants
-│   │   ├── viewHistory.ts            # localStorage history (Post-MVP)
-│   │   └── timeAgo.ts                # Relative time formatting (Post-MVP)
+│   │   ├── viewHistory.ts            # localStorage history (Post-MVP Phase 6.4)
+│   │   ├── timeAgo.ts                # Relative time formatting (Post-MVP Phase 6.4)
+│   │   ├── profileCompleteness.ts    # Profile completeness calculation (Phase 15)
+│   │   ├── avatar.ts                 # Avatar URL generation (Gravatar)
+│   │   └── dashboard.ts              # Dashboard utilities (Phase 17)
 │   └── types/
-│       ├── database.ts               # Database types
+│       ├── database.ts               # Database types (all tables)
 │       ├── api.ts                    # API types
+│       ├── profile.ts                # Profile types (Phase 15+)
+│       ├── roles.ts                  # Role-specific types (Phase 16)
 │       └── index.ts                  # Exported types
 ├── public/
 │   ├── manifest.json                 # PWA manifest

@@ -1,37 +1,76 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getClientIP, getLocationFromIP } from '@/lib/utils/geoip'
+import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 
 /**
- * GET /api/location/ip
- * Returns geolocation based on client IP address
- * Returns null for localhost/private IPs
+ * GeoIP API endpoint - Returns location data based on client IP
+ *
+ * Uses ipapi.co free service (30k requests/month):
+ * - No API key required for basic usage
+ * - Returns city, region, country, lat/lng
+ * - Falls back to default Oakland location on error
+ *
+ * Free tier limits:
+ * - 30,000 requests per month
+ * - 1,000 requests per day
+ * - HTTPS supported
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const ip = getClientIP(request.headers)
+    const headersList = await headers()
 
-    if (!ip) {
-      return NextResponse.json(
-        { location: null, message: 'No public IP address detected' },
-        { status: 200 }
-      )
+    // Get client IP from various proxy headers
+    const forwardedFor = headersList.get('x-forwarded-for')
+    const realIp = headersList.get('x-real-ip')
+    const cfConnectingIp = headersList.get('cf-connecting-ip') // Cloudflare
+
+    // Extract first IP if multiple (x-forwarded-for can be a list)
+    const ip = forwardedFor?.split(',')[0]?.trim() || realIp || cfConnectingIp || '127.0.0.1'
+
+    // For localhost/development, use ipapi.co without IP to get server location
+    // In production, this will use the actual client IP
+    const apiUrl = ip === '127.0.0.1' ? 'https://ipapi.co/json/' : `https://ipapi.co/${ip}/json/`
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'Reentry Map App',
+      },
+      // Cache for 1 hour to reduce API calls
+      next: { revalidate: 3600 },
+    })
+
+    if (!response.ok) {
+      throw new Error(`ipapi.co responded with ${response.status}`)
     }
 
-    const location = getLocationFromIP(ip)
+    const data = await response.json()
 
-    if (!location) {
-      return NextResponse.json(
-        { location: null, message: 'Location not found for IP address' },
-        { status: 200 }
-      )
+    // Check for rate limit error
+    if (data.error) {
+      console.warn('ipapi.co error:', data.reason)
+      throw new Error(data.reason || 'GeoIP service error')
     }
 
-    return NextResponse.json({ location, ip }, { status: 200 })
+    // Return standardized location format
+    return NextResponse.json({
+      city: data.city || 'Oakland',
+      region: data.region || 'CA',
+      country: data.country_name || 'United States',
+      latitude: data.latitude || 37.8044,
+      longitude: data.longitude || -122.2712,
+      ip: data.ip,
+    })
   } catch (error) {
-    console.error('Error in /api/location/ip:', error)
-    return NextResponse.json(
-      { location: null, error: 'Failed to get location from IP' },
-      { status: 500 }
-    )
+    console.error('GeoIP lookup failed:', error)
+
+    // Return default Oakland location on error
+    return NextResponse.json({
+      city: 'Oakland',
+      region: 'CA',
+      country: 'United States',
+      latitude: 37.8044,
+      longitude: -122.2712,
+      ip: null,
+      error: 'Failed to determine location, using default',
+    })
   }
 }

@@ -1569,6 +1569,733 @@ Until configured, "Unsupported phone provider" error is expected. Email auth wor
 
 ---
 
+## Phase 15: Enhanced User Profile System - Baseline (Phase 2 Feature)
+
+**Goal**: Upgrade user profiles from minimal fields to comprehensive baseline that supports future role-based system.
+
+**Reference**: See ADR-013 and PRD Section 2.10
+
+**Estimated Time**: 3-4 sessions
+**Dependencies**: Phase 5 (Authentication)
+**Priority**: P0/P1 (High - Foundation for community features)
+
+### 15.1 Database Schema - Baseline Profile
+
+**Expand users table with baseline fields**:
+
+- [ ] Create migration to add baseline profile fields:
+  ```sql
+  ALTER TABLE users
+  ADD COLUMN first_name TEXT,
+  ADD COLUMN last_name TEXT,
+  ADD COLUMN email TEXT UNIQUE,
+  ADD COLUMN user_type TEXT DEFAULT 'general-public',
+  ADD COLUMN secondary_roles TEXT[],
+  ADD COLUMN preferred_language TEXT DEFAULT 'en',
+  ADD COLUMN timezone TEXT DEFAULT 'America/Los_Angeles',
+  ADD COLUMN notification_preferences JSONB,
+  ADD COLUMN profile_visibility TEXT DEFAULT 'private',
+  ADD COLUMN show_on_leaderboard BOOLEAN DEFAULT false,
+  ADD COLUMN data_sharing_consent BOOLEAN DEFAULT false,
+  ADD COLUMN email_verified BOOLEAN DEFAULT false,
+  ADD COLUMN phone_verified BOOLEAN DEFAULT false,
+  ADD COLUMN city TEXT,
+  ADD COLUMN state TEXT,
+  ADD COLUMN zip_code TEXT,
+  ADD COLUMN show_location_publicly BOOLEAN DEFAULT false,
+  ADD COLUMN onboarding_completed BOOLEAN DEFAULT false,
+  ADD COLUMN onboarding_step INTEGER DEFAULT 0,
+  ADD COLUMN profile_completeness INTEGER DEFAULT 0,
+  ADD COLUMN last_active_at TIMESTAMPTZ;
+  ```
+- [ ] Create indexes for performance:
+  - `idx_users_user_type ON users(user_type)`
+  - `idx_users_city ON users(city) WHERE city IS NOT NULL`
+  - `idx_users_onboarding ON users(onboarding_completed)`
+- [ ] Migrate existing data:
+  - Split `name` into `first_name` and `last_name`
+  - Set default `user_type` = 'general-public'
+  - Calculate initial `profile_completeness`
+- [ ] Update RLS policies for new fields
+- [ ] Test migration on staging
+
+### 15.2 Update Type Definitions
+
+- [ ] Update `lib/types/database.ts` with new user fields
+- [ ] Create `lib/types/profile.ts` for profile types
+- [ ] Add TypeScript enums:
+  - `UserType` enum (returning-citizen, coach, volunteer, leader, general-public, admin)
+  - `ProfileVisibility` enum (private, community, public)
+  - `NotificationPreferences` interface
+- [ ] Export all new types from `lib/types/index.ts`
+
+### 15.3 Profile Completeness Calculation
+
+- [ ] Create `lib/utils/profileCompleteness.ts`
+  - [ ] `calculateCompleteness(user)` function
+  - [ ] Weight baseline fields (required fields higher weight)
+  - [ ] Return percentage 0-100
+- [ ] Create database function `calculate_profile_completeness()`
+- [ ] Create trigger to auto-update on profile changes
+- [ ] Write tests for completeness calculation
+
+### 15.4 Update Signup Flow
+
+**Separate first/last name in signup**:
+
+- [ ] Update signup form to have separate first_name/last_name fields
+- [ ] Update validation schema (both required)
+- [ ] Update API endpoint `/api/auth/signup`
+- [ ] Update `lib/auth.ts` helper functions
+- [ ] Write tests for updated signup
+
+**Email verification requirement**:
+
+- [ ] Implement email verification on signup
+- [ ] Send verification email with link
+- [ ] Create verification endpoint `/api/auth/verify-email`
+- [ ] Redirect to dashboard after verification
+- [ ] Show "verify your email" banner if unverified
+- [ ] Resend verification link option
+- [ ] Write tests for email verification flow
+
+### 15.5 Enhanced Profile Page
+
+**Update existing profile page** (`app/profile/page.tsx`):
+
+- [ ] Split name field into first_name + last_name (inline editable)
+- [ ] Add email field (with verified badge/link)
+- [ ] Add phone field (with verified badge/link)
+- [ ] Add location section (city, state, zip)
+  - [ ] "Show publicly" toggle
+- [ ] Add language preference dropdown
+- [ ] Add timezone selector (auto-detect button)
+- [ ] Add profile completeness progress bar in header
+- [ ] Add "Complete your profile" CTA if < 100%
+
+**Create tabbed layout** (4 tabs):
+
+- [ ] Tab 1: Basic Information (contact, location, preferences, security)
+- [ ] Tab 2: Role Information (placeholder for future, hidden if no role)
+- [ ] Tab 3: Privacy & Notifications
+  - [ ] Profile visibility radio (private/community/public)
+  - [ ] Show on leaderboard toggle
+  - [ ] Data sharing consent toggle
+  - [ ] Email notification preferences
+  - [ ] SMS notification preferences (if phone verified)
+- [ ] Tab 4: Activity & Stats
+  - [ ] Favorites count (clickable)
+  - [ ] Reviews count (clickable)
+  - [ ] Resources suggested (clickable)
+  - [ ] Account created date
+
+**Design & UX**:
+
+- [ ] Mobile-first responsive design
+- [ ] Auto-save on field blur (with loading indicator)
+- [ ] Success toast notifications
+- [ ] Clear validation errors
+- [ ] Keyboard navigable
+- [ ] Screen reader friendly
+- [ ] Help tooltips for complex fields
+
+### 15.6 Privacy & Data Export
+
+**Implement GDPR features**:
+
+- [ ] Create `/api/profile/export` endpoint
+  - [ ] Export all user data as JSON
+  - [ ] Include favorites, reviews, ratings, suggestions
+- [ ] Create `/api/profile/delete` endpoint
+  - [ ] Delete all user data (cascade)
+  - [ ] Require password confirmation
+  - [ ] Send confirmation email
+  - [ ] Mark account for deletion (30-day grace period)
+- [ ] Add "Export my data" button to profile
+- [ ] Add "Delete my account" button with confirmation modal
+- [ ] Write tests for export and delete
+
+### 15.7 Update User API
+
+- [ ] Create/update `lib/api/profile.ts`:
+  - [ ] `getProfile(userId)` - Get full profile
+  - [ ] `updateProfile(userId, data)` - Update profile fields
+  - [ ] `calculateCompleteness(userId)` - Recalculate completeness
+  - [ ] `updateNotificationPreferences(userId, prefs)` - Update notifications
+- [ ] Add API routes:
+  - [ ] `GET /api/profile` - Get current user profile
+  - [ ] `PATCH /api/profile` - Update profile
+  - [ ] `POST /api/profile/export` - Export data
+  - [ ] `DELETE /api/profile` - Delete account
+- [ ] Add validation with Zod schemas
+- [ ] Write API tests
+
+### 15.8 Testing & Documentation
+
+- [ ] Write unit tests for profile utilities
+- [ ] Write integration tests for profile API
+- [ ] Write E2E tests (`e2e/profile.spec.ts`):
+  - [ ] Update profile information
+  - [ ] Change privacy settings
+  - [ ] Export data
+  - [ ] Profile completeness updates
+- [ ] Update user documentation (in-app help)
+- [ ] Add to admin guide if needed
+
+**Deliverable**: Enhanced baseline profile system ready for role-based expansion
+**Review Point**: Demo updated profile page, email verification, and data export
+
+---
+
+## Phase 16: Role-Based Profiles & Onboarding Wizard (Phase 2 Feature)
+
+**Goal**: Implement role selection and progressive onboarding wizard for personalized user experience.
+
+**Reference**: See ADR-013 and PRD Section 2.10
+
+**Estimated Time**: 5-6 sessions
+**Dependencies**: Phase 15 (Baseline Profile)
+**Priority**: P1 (High - Early Enhancement)
+
+### 16.1 Database Schema - Role-Specific Tables
+
+**Create extended profile tables for each role**:
+
+- [ ] Create migration for role-specific tables:
+  - [ ] `returning_citizen_profiles` table
+  - [ ] `reentry_coach_profiles` table
+  - [ ] `volunteer_profiles` table
+  - [ ] `team_leader_profiles` table
+  - [ ] `general_public_profiles` table
+- [ ] Add RLS policies for each table (users see only their own)
+- [ ] Create indexes for common queries
+- [ ] Add foreign key constraints to users table
+- [ ] Test migration on staging
+
+**See ADR-013 for complete schema definitions**
+
+### 16.2 Update Type Definitions
+
+- [ ] Create `lib/types/roles.ts`:
+  - [ ] `ReturningCitizenProfile` interface
+  - [ ] `ReentryCoachProfile` interface
+  - [ ] `VolunteerProfile` interface
+  - [ ] `TeamLeaderProfile` interface
+  - [ ] `GeneralPublicProfile` interface
+- [ ] Add role-specific enums (support_timeline, organization_type, etc.)
+- [ ] Export from `lib/types/index.ts`
+
+### 16.3 Onboarding Wizard - Step 3: Role Selection
+
+**Create role selection screen**:
+
+- [ ] Create `app/onboarding/role-selection/page.tsx`
+- [ ] Design 5 clear role cards with icons:
+  - [ ] Returning Citizen - "I'm navigating reentry..."
+  - [ ] Reentry Coach - "I'm a professional supporting..."
+  - [ ] Angel Team Volunteer - "I volunteer to help..."
+  - [ ] Angel Team Leader - "I coordinate volunteers..."
+  - [ ] General Public - "I'm here to learn, support..."
+- [ ] Each card has icon, title, 1-sentence description
+- [ ] Click card to select, proceed to next step
+- [ ] Save `user_type` to database
+- [ ] Track in onboarding progress (step 3 of 6)
+
+### 16.4 Onboarding Wizard - Step 4: Essential Profile
+
+**Create essential profile screen** (branches by role):
+
+- [ ] Create `app/onboarding/essential-profile/page.tsx`
+- [ ] **Location section** (all roles):
+  - [ ] City input (autocomplete)
+  - [ ] State dropdown
+  - [ ] Zip code input
+  - [ ] "Why we ask" explanation
+- [ ] **Primary needs/interests** (varies by role):
+  - [ ] Returning Citizens: "What are you looking for help with?" (checkboxes, max 5)
+  - [ ] Coaches: "What areas do you specialize in?" (checkboxes)
+  - [ ] Volunteers: "What are you interested in helping with?" (checkboxes)
+  - [ ] General Public: "What brought you here?" (checkboxes)
+- [ ] **Notification preferences**:
+  - [ ] Email notifications toggle
+  - [ ] SMS notifications toggle (if phone provided)
+- [ ] **Privacy settings**:
+  - [ ] Profile visibility radio (private recommended)
+- [ ] Progress indicator: "Step 4 of 6"
+- [ ] Save and continue
+
+### 16.5 Onboarding Wizard - Step 5: Extended Profile
+
+**Create extended profile screen** (role-specific deep-dive):
+
+- [ ] Create `app/onboarding/extended-profile/page.tsx`
+- [ ] Render different fields based on `user_type`
+
+**Returning Citizen fields**:
+
+- [ ] Support timeline (pre-release | first 90 days | established | long-term)
+- [ ] Do you have a case manager? (yes/no)
+  - [ ] If yes: name, email, phone fields
+- [ ] Do you have reliable transportation? (yes/no)
+  - [ ] If yes: method dropdown
+- [ ] Internet access type (home | mobile | library | limited)
+- [ ] Accessibility needs (checkboxes)
+- [ ] Emergency contact (optional): name, phone, relationship
+
+**Reentry Coach fields**:
+
+- [ ] Organization name (required)
+- [ ] Organization type dropdown
+- [ ] Job title
+- [ ] Years of experience
+- [ ] Credentials (tags input)
+- [ ] Currently accepting clients? (yes/no toggle)
+- [ ] Professional bio (textarea, 500 char)
+
+**Volunteer fields**:
+
+- [ ] Volunteer since date
+- [ ] Skills to share (tags input)
+- [ ] Hours per month available (number input)
+- [ ] Preferred volunteer activities (checkboxes)
+- [ ] Background check upload (file input)
+
+**General Public fields**:
+
+- [ ] How did you hear about us? (text input)
+- [ ] Want to volunteer? (yes/no)
+- [ ] Want to donate? (yes/no)
+- [ ] Want newsletter updates? (yes/no)
+- [ ] Relationship to reentry (dropdown)
+
+- [ ] All fields optional with clear "why we ask"
+- [ ] **Prominent "Skip for now" button**
+- [ ] Progress indicator: "Step 5 of 6"
+- [ ] Save and continue (or skip)
+
+### 16.6 Onboarding Wizard - Step 6: Completion
+
+**Create completion screen**:
+
+- [ ] Create `app/onboarding/complete/page.tsx`
+- [ ] Success message: "Welcome to Reentry Map, [First Name]! 🎉"
+- [ ] Celebration animation (confetti or badge)
+- [ ] Profile completeness badge
+- [ ] Quick dashboard tour (3-4 screens with tooltips)
+- [ ] Role-specific call-to-action:
+  - [ ] Returning Citizens: "Find resources near you →"
+  - [ ] Coaches: "Explore the resource directory →"
+  - [ ] Volunteers: "See volunteer opportunities →"
+- [ ] Mark `onboarding_completed = true`
+- [ ] Redirect to personalized dashboard
+
+### 16.7 Onboarding Wizard - Infrastructure
+
+**Build wizard framework**:
+
+- [ ] Create `app/onboarding/layout.tsx` (wizard shell)
+- [ ] Progress bar component (shows step X of 6)
+- [ ] Wizard navigation (back/next buttons)
+- [ ] Auto-save progress on each step
+- [ ] Resume capability (redirect to current step if incomplete)
+- [ ] Skip handling (mark step as skipped)
+- [ ] Mobile-responsive wizard UI
+- [ ] Keyboard navigation
+- [ ] Screen reader announcements
+
+**Step components** (create all):
+
+- [ ] Step 1: Minimal Signup (already exists, update)
+- [ ] Step 2: Verification (already exists, update)
+- [ ] Step 3: Role Selection (new)
+- [ ] Step 4: Essential Profile (new)
+- [ ] Step 5: Extended Profile (new)
+- [ ] Step 6: Completion (new)
+
+### 16.8 Role-Specific Profile API
+
+- [ ] Create `lib/api/roleProfiles.ts`:
+  - [ ] `getReturningCitizenProfile(userId)`
+  - [ ] `updateReturningCitizenProfile(userId, data)`
+  - [ ] `getReentryCoachProfile(userId)`
+  - [ ] `updateReentryCoachProfile(userId, data)`
+  - [ ] `getVolunteerProfile(userId)`
+  - [ ] `updateVolunteerProfile(userId, data)`
+  - [ ] `getTeamLeaderProfile(userId)`
+  - [ ] `updateTeamLeaderProfile(userId, data)`
+  - [ ] `getGeneralPublicProfile(userId)`
+  - [ ] `updateGeneralPublicProfile(userId, data)`
+- [ ] Add API routes for each profile type
+- [ ] Validation with Zod schemas
+- [ ] Write API tests
+
+### 16.9 Update Profile Page for Roles
+
+**Add Tab 2: Role Information**:
+
+- [ ] Show tab only if user has selected a role
+- [ ] Render role-specific fields in collapsible sections
+- [ ] Icons for each section
+- [ ] Help tooltips for complex fields
+- [ ] All fields editable
+- [ ] Save changes with feedback
+
+**Update completeness calculation**:
+
+- [ ] Include role-specific fields in completeness
+- [ ] Weight essential fields higher
+- [ ] Show what's missing in progress bar tooltip
+
+### 16.10 Testing & Documentation
+
+- [ ] Write unit tests for wizard logic
+- [ ] Write integration tests for role profile APIs
+- [ ] Write E2E tests (`e2e/onboarding.spec.ts`):
+  - [ ] Complete onboarding as returning citizen
+  - [ ] Complete onboarding as coach
+  - [ ] Complete onboarding as volunteer
+  - [ ] Skip optional steps
+  - [ ] Resume interrupted onboarding
+- [ ] Update documentation with onboarding flow
+- [ ] Create help content for each role
+
+**Deliverable**: Full onboarding wizard with role-based profiles
+**Review Point**: Demo complete onboarding flow for 2-3 roles, show profile pages
+
+---
+
+## Phase 17: Personalized Dashboards (Phase 2 Feature)
+
+**Goal**: Create role-specific dashboards that show relevant content and actions for each user type.
+
+**Reference**: See ADR-013 and PRD Section 2.10.9
+
+**Estimated Time**: 4-5 sessions
+**Dependencies**: Phase 16 (Role-Based Profiles)
+**Priority**: P2 (Post-Launch)
+
+### 17.1 Dashboard Framework
+
+**Create dashboard infrastructure**:
+
+- [ ] Update `app/page.tsx` to render role-specific dashboard
+- [ ] Create `components/dashboard/` directory
+- [ ] Create base dashboard layout:
+  - [ ] Hero section component
+  - [ ] Widget grid component
+  - [ ] Quick actions component
+- [ ] Create dashboard hook `useUserDashboard()`:
+  - [ ] Fetch user profile with role
+  - [ ] Return appropriate dashboard config
+- [ ] Mobile-responsive grid system
+
+### 17.2 Returning Citizen Dashboard
+
+- [ ] Create `components/dashboard/ReturningCitizenDashboard.tsx`
+
+**Hero Section**:
+
+- [ ] Greeting: "Welcome back, [First Name]!"
+- [ ] Profile completeness bar (if < 100%)
+- [ ] 3 Quick action buttons:
+  - [ ] Search Resources (prominent)
+  - [ ] My Favorites
+  - [ ] Get Help (help modal or contact)
+
+**Widgets**:
+
+- [ ] Create `RecommendedResourcesWidget.tsx`:
+  - [ ] Fetch resources matching `primary_needs`
+  - [ ] Show 3-5 resource cards
+  - [ ] "Why we're showing this" explanation
+  - [ ] "See more" link
+- [ ] Create `ResourcesNearYouWidget.tsx`:
+  - [ ] Embedded map with nearby resources
+  - [ ] List/map toggle
+  - [ ] Filter by category
+- [ ] Create `NextStepsWidget.tsx`:
+  - [ ] Parse `personal_goals` and `goal_categories`
+  - [ ] Generate actionable checklist
+  - [ ] Milestone tracking (future)
+- [ ] Create `RecentActivityWidget.tsx`:
+  - [ ] Recent favorites
+  - [ ] Recent reviews
+  - [ ] Recently viewed (if Phase 6.4 implemented)
+- [ ] Create `SupportContactsWidget.tsx`:
+  - [ ] Case manager quick access (if `has_case_manager`)
+  - [ ] Emergency contact
+  - [ ] Crisis helpline numbers
+
+### 17.3 Reentry Coach Dashboard
+
+- [ ] Create `components/dashboard/ReentryCoachDashboard.tsx`
+
+**Hero Section**:
+
+- [ ] Greeting: "Welcome, [First Name]!"
+- [ ] Quick stats: caseload, new reviews, pending suggestions
+- [ ] Quick actions:
+  - [ ] Find Resources
+  - [ ] Suggest Resource
+  - [ ] View Updates
+
+**Widgets**:
+
+- [ ] Create `UpdatedResourcesWidget.tsx`:
+  - [ ] Resources in coach's specializations
+  - [ ] What changed (diff display)
+  - [ ] "Review & verify" button
+- [ ] Create `ResourcesByCategoryWidget.tsx`:
+  - [ ] Categories coach supports
+  - [ ] Resource counts per category
+  - [ ] Completeness indicators
+- [ ] Create `CommunityActivityWidget.tsx`:
+  - [ ] New reviews on resources
+  - [ ] New suggestions pending review
+  - [ ] Real-time updates
+- [ ] Create `CoachContributionsWidget.tsx`:
+  - [ ] Resources suggested by coach
+  - [ ] Reviews written
+  - [ ] Impact metrics
+- [ ] Create `HelpfulResourcesWidget.tsx`:
+  - [ ] Top-rated resources in area
+  - [ ] Most viewed this week
+  - [ ] Trending resources
+
+### 17.4 Volunteer Dashboard
+
+- [ ] Create `components/dashboard/VolunteerDashboard.tsx`
+
+**Hero Section**:
+
+- [ ] Greeting: "Welcome, [First Name]!"
+- [ ] Impact summary: total hours, level, next badge
+- [ ] Quick actions:
+  - [ ] Log Hours (timesheet modal)
+  - [ ] View Opportunities
+  - [ ] Team Updates
+
+**Widgets**:
+
+- [ ] Create `VolunteerOpportunitiesWidget.tsx`:
+  - [ ] Open opportunities
+  - [ ] Match percentage based on interests
+  - [ ] Time commitment
+  - [ ] Apply/express interest button
+- [ ] Create `ImpactStatsWidget.tsx`:
+  - [ ] Total hours logged (lifetime)
+  - [ ] Current volunteer level badge
+  - [ ] Badges earned (grid)
+  - [ ] Hours this month (progress bar)
+- [ ] Create `TeamUpdatesWidget.tsx`:
+  - [ ] Announcements from team leader
+  - [ ] Upcoming team meetings
+  - [ ] Team stats (total hours, members)
+- [ ] Create `TrainingResourcesWidget.tsx`:
+  - [ ] Required training (uncompleted)
+  - [ ] Optional learning
+  - [ ] Certification progress
+- [ ] Create `UpcomingEventsWidget.tsx`:
+  - [ ] Volunteer events calendar
+  - [ ] Community events
+  - [ ] Add to calendar links
+
+### 17.5 General Public Dashboard
+
+- [ ] Create `components/dashboard/GeneralPublicDashboard.tsx`
+
+**Hero Section**:
+
+- [ ] Greeting: "Welcome, [First Name]!"
+- [ ] Prompt: "Complete your profile" or "Explore resources"
+- [ ] Quick actions:
+  - [ ] Explore Resources
+  - [ ] Learn More
+  - [ ] Get Involved
+
+**Widgets**:
+
+- [ ] Create `BrowseResourcesWidget.tsx`:
+  - [ ] Category overview grid
+  - [ ] Total resources count
+  - [ ] Search bar
+  - [ ] Featured resources
+- [ ] Create `HowToHelpWidget.tsx`:
+  - [ ] Become a volunteer (sign up flow)
+  - [ ] Donate (future payment integration)
+  - [ ] Advocate (share buttons)
+  - [ ] Refer others
+- [ ] Create `SuccessStoriesWidget.tsx`:
+  - [ ] Community impact numbers
+  - [ ] Testimonials (carousel)
+  - [ ] Statistics (resources, users, reviews)
+- [ ] Create `RecentUpdatesWidget.tsx`:
+  - [ ] New resources added this week
+  - [ ] Platform updates/announcements
+  - [ ] Blog posts (future)
+
+### 17.6 Widget System & Utilities
+
+**Create reusable widget components**:
+
+- [ ] `DashboardWidget.tsx` base component:
+  - [ ] Title
+  - [ ] Icon
+  - [ ] Loading state
+  - [ ] Empty state
+  - [ ] Error state
+  - [ ] "See more" link
+  - [ ] Refresh button
+- [ ] Widget loading skeleton
+- [ ] Widget error boundary
+- [ ] Widget empty states
+
+**Create dashboard utilities**:
+
+- [ ] `lib/utils/dashboard.ts`:
+  - [ ] `getDashboardConfig(userType)` - Returns widget config
+  - [ ] `fetchWidgetData(widget, userId)` - Fetch widget-specific data
+  - [ ] `isWidgetVisible(widget, user)` - Visibility rules
+
+### 17.7 Dashboard API
+
+- [ ] Create `lib/api/dashboard.ts`:
+  - [ ] `getDashboardData(userId)` - Fetch all dashboard data
+  - [ ] `getRecommendedResources(userId)` - Based on needs
+  - [ ] `getNearbyResources(userId)` - Based on location
+  - [ ] `getUserActivity(userId)` - Recent actions
+  - [ ] `getVolunteerOpportunities(userId)` - Match interests
+- [ ] Add API routes:
+  - [ ] `GET /api/dashboard` - Get dashboard config and data
+  - [ ] `GET /api/dashboard/recommendations` - Recommended resources
+  - [ ] `GET /api/dashboard/nearby` - Nearby resources
+- [ ] Write API tests
+
+### 17.8 Performance & Caching
+
+- [ ] Implement widget caching strategy:
+  - [ ] Cache dashboard data for 5 minutes
+  - [ ] Stale-while-revalidate pattern
+  - [ ] Refresh on user action
+- [ ] Optimize widget queries:
+  - [ ] Limit results per widget (e.g., 5 recommendations)
+  - [ ] Use database indexes
+  - [ ] Parallel widget data fetching
+- [ ] Add loading states for each widget
+- [ ] Implement widget refresh (manual)
+
+### 17.9 Testing & Documentation
+
+- [ ] Write unit tests for dashboard utilities
+- [ ] Write integration tests for dashboard APIs
+- [ ] Write E2E tests (`e2e/dashboards.spec.ts`):
+  - [ ] Returning citizen dashboard loads correctly
+  - [ ] Coach dashboard shows relevant resources
+  - [ ] Volunteer dashboard tracks hours
+  - [ ] General public dashboard allows exploration
+  - [ ] Widgets refresh correctly
+- [ ] Performance test dashboard load times (< 2 seconds)
+- [ ] Update user guide with dashboard features
+
+**Deliverable**: Personalized dashboards for all user roles
+**Review Point**: Demo all 5 dashboards, show widget refresh and personalization
+
+---
+
+## Phase 18: Multi-Role Support & Advanced Features (Future)
+
+**Goal**: Allow users to have multiple roles and add advanced community features.
+
+**Reference**: See ADR-013 Phase 4
+
+**Estimated Time**: 6-8 sessions
+**Dependencies**: Phase 17 (Personalized Dashboards)
+**Priority**: P3 (Future Enhancement)
+
+### 18.1 Multi-Role Support
+
+**Allow users to have multiple roles simultaneously**:
+
+- [ ] Update `users.secondary_roles` to support multiple roles
+- [ ] UI to add/remove secondary roles from profile
+- [ ] Dashboard switcher (dropdown to view different role dashboards)
+- [ ] Merged dashboard view (combines widgets from all roles)
+- [ ] Profile completeness accounts for all roles
+- [ ] Navigation adapts based on active roles
+
+### 18.2 Goal Tracking for Returning Citizens
+
+**Implement structured goal tracking**:
+
+- [ ] Create `goals` table (user_id, title, category, status, due_date)
+- [ ] Goal CRUD operations
+- [ ] Progress tracking (checklist items)
+- [ ] Milestone celebrations
+- [ ] Goal recommendations based on needs
+- [ ] Resource suggestions per goal
+- [ ] Share goals with case manager (optional)
+
+### 18.3 Coach-Client Connections
+
+**Enable coaches to connect with returning citizens**:
+
+- [ ] Create `coach_client_connections` table
+- [ ] Connection request system (with approval)
+- [ ] Coach directory (searchable, filterable)
+- [ ] Client can request coach
+- [ ] Coach can accept/decline
+- [ ] Messaging system (future Phase 19)
+- [ ] Shared resource lists
+- [ ] Progress visibility (opt-in)
+
+### 18.4 Volunteer Opportunity Matching
+
+**Advanced volunteer-opportunity matching**:
+
+- [ ] Create `volunteer_opportunities` table
+- [ ] Opportunity posting (by team leaders/admins)
+- [ ] Smart matching algorithm (skills, interests, location, availability)
+- [ ] Application system
+- [ ] Opportunity status tracking
+- [ ] Hour logging per opportunity
+- [ ] Volunteer leaderboard (opt-in)
+
+### 18.5 Team Leader Management Tools
+
+**Enhanced tools for team leaders**:
+
+- [ ] Team member management dashboard
+- [ ] Assign opportunities to volunteers
+- [ ] Track team hours and impact
+- [ ] Team announcements
+- [ ] Team calendar
+- [ ] Approve volunteer applications
+- [ ] Generate team reports
+
+### 18.6 Community Features
+
+**Build community engagement features**:
+
+- [ ] User badges and achievements system
+- [ ] Community leaderboard (opt-in)
+- [ ] Success story submissions
+- [ ] Testimonials (with approval workflow)
+- [ ] Resource of the month
+- [ ] Volunteer of the month
+- [ ] Impact analytics dashboard
+
+### 18.7 Testing & Documentation
+
+- [ ] Comprehensive testing of multi-role features
+- [ ] E2E tests for all advanced features
+- [ ] User guide updates
+- [ ] Admin guide for community management
+
+**Deliverable**: Advanced multi-role support and community features
+**Review Point**: Demo multi-role dashboard, goal tracking, coach connections
+
+---
+
 ## Post-MVP Enhancements
 
 ### Homepage Hero Background Image
