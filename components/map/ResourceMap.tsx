@@ -74,6 +74,11 @@ export function ResourceMap({
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Type for map instance with cleanup function
+  interface MapWithCleanup extends google.maps.Map {
+    __cleanup?: () => void
+  }
   const [isMounted, setIsMounted] = useState(false)
 
   // Wait for client-side hydration to complete
@@ -132,6 +137,32 @@ export function ResourceMap({
         // Create info window (reused for all markers)
         infoWindowRef.current = new google.maps.InfoWindow()
 
+        // Add ESC key listener to close info window
+        const handleEscKey = (e: KeyboardEvent) => {
+          if (e.key === 'Escape' && infoWindowRef.current) {
+            infoWindowRef.current.close()
+          }
+        }
+        document.addEventListener('keydown', handleEscKey)
+
+        // Add map click listener to close info window when clicking outside
+        const mapClickListener = map.addListener('click', () => {
+          if (infoWindowRef.current) {
+            infoWindowRef.current.close()
+          }
+        })
+
+        // Store cleanup functions
+        const cleanup = () => {
+          document.removeEventListener('keydown', handleEscKey)
+          if (mapClickListener) {
+            google.maps.event.removeListener(mapClickListener)
+          }
+        }
+
+        // Store cleanup for later
+        ;(mapInstanceRef.current as MapWithCleanup).__cleanup = cleanup
+
         console.log('[ResourceMap] Map initialization complete, setting isLoading=false')
         setIsLoading(false)
       } catch (err) {
@@ -151,6 +182,10 @@ export function ResourceMap({
 
     return () => {
       isComponentMounted = false
+      // Call stored cleanup function for event listeners
+      if (mapInstanceRef.current && (mapInstanceRef.current as MapWithCleanup).__cleanup) {
+        ;(mapInstanceRef.current as MapWithCleanup).__cleanup()
+      }
     }
   }, [isMounted]) // Only initialize once on mount
 

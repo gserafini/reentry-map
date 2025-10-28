@@ -37,7 +37,7 @@ interface GeoIPResponse {
 }
 
 const LOCATION_CACHE_KEY = 'userLocation'
-const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes in milliseconds
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
 const REFRESH_INTERVAL = 2 * 60 * 1000 // Check every 2 minutes
 
 export type GeolocationError =
@@ -103,7 +103,7 @@ function saveToCache(
  * @returns Location state and control functions
  *
  * Features:
- * - Caches location in localStorage for 2 minutes
+ * - Caches location in localStorage for 7 days
  * - Auto-loads cached location on mount
  * - Periodic refresh every 2 minutes if location was previously granted
  * - Provides lastUpdated timestamp
