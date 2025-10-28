@@ -144,25 +144,6 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </Card>
       )}
 
-      {/* Services Offered */}
-      {resource.services_offered && resource.services_offered.length > 0 && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Services Offered
-            </Typography>
-            <List dense>
-              {resource.services_offered.map((service, index) => (
-                <ListItem key={index}>
-                  <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: 20 }} />
-                  <ListItemText primary={service} />
-                </ListItem>
-              ))}
-            </List>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Contact Information */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -234,6 +215,25 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           </Stack>
         </CardContent>
       </Card>
+
+      {/* Services Offered */}
+      {resource.services_offered && resource.services_offered.length > 0 && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Services Offered
+            </Typography>
+            <List dense>
+              {resource.services_offered.map((service, index) => (
+                <ListItem key={index}>
+                  <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: 20 }} />
+                  <ListItemText primary={service} />
+                </ListItem>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hours & Details */}
       <Card sx={{ mb: 3 }}>
