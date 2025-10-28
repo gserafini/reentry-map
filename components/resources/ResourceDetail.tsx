@@ -144,11 +144,11 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </Card>
       )}
 
-      {/* Contact Information & Services - 2 column layout on desktop, stacked on mobile */}
+      {/* Contact Information, Services & Details - 3 column layout on desktop, stacked on mobile */}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
           gap: 3,
           mb: 3,
         }}
@@ -243,69 +243,71 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             </CardContent>
           </Card>
         )}
-      </Box>
 
-      {/* Hours & Details */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Details
-          </Typography>
-          <Stack spacing={2}>
-            {/* Hours */}
-            {resource.hours && (
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <ScheduleIcon color="action" fontSize="small" />
-                  <Typography variant="subtitle2">Hours of Operation</Typography>
+        {/* Hours & Details */}
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Details
+            </Typography>
+            <Stack spacing={2}>
+              {/* Hours */}
+              {resource.hours && (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <ScheduleIcon color="action" fontSize="small" />
+                    <Typography variant="subtitle2">Hours of Operation</Typography>
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    component="pre"
+                    sx={{ fontFamily: 'inherit', whiteSpace: 'pre-wrap' }}
+                  >
+                    {typeof resource.hours === 'string'
+                      ? resource.hours
+                      : JSON.stringify(resource.hours, null, 2)}
+                  </Typography>
                 </Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  component="pre"
-                  sx={{ fontFamily: 'inherit', whiteSpace: 'pre-wrap' }}
-                >
-                  {typeof resource.hours === 'string'
-                    ? resource.hours
-                    : JSON.stringify(resource.hours, null, 2)}
-                </Typography>
-              </Box>
-            )}
+              )}
 
-            {/* Appointment Required */}
-            {resource.appointment_required !== null && (
-              <Alert severity={resource.appointment_required ? 'info' : 'success'} icon={false}>
-                <Typography variant="body2">
-                  {resource.appointment_required ? '📅 Appointment required' : '✓ Walk-ins welcome'}
-                </Typography>
-              </Alert>
-            )}
+              {/* Appointment Required */}
+              {resource.appointment_required !== null && (
+                <Alert severity={resource.appointment_required ? 'info' : 'success'} icon={false}>
+                  <Typography variant="body2">
+                    {resource.appointment_required
+                      ? '📅 Appointment required'
+                      : '✓ Walk-ins welcome'}
+                  </Typography>
+                </Alert>
+              )}
 
-            {/* Accepts Records */}
-            {resource.accepts_records !== null && (
-              <Alert severity={resource.accepts_records ? 'success' : 'warning'} icon={false}>
-                <Typography variant="body2">
-                  {resource.accepts_records
-                    ? '✓ Accepts individuals with criminal records'
-                    : '⚠️ May have restrictions for individuals with criminal records'}
-                </Typography>
-              </Alert>
-            )}
+              {/* Accepts Records */}
+              {resource.accepts_records !== null && (
+                <Alert severity={resource.accepts_records ? 'success' : 'warning'} icon={false}>
+                  <Typography variant="body2">
+                    {resource.accepts_records
+                      ? '✓ Accepts individuals with criminal records'
+                      : '⚠️ May have restrictions for individuals with criminal records'}
+                  </Typography>
+                </Alert>
+              )}
 
-            {/* Eligibility Requirements */}
-            {resource.eligibility_requirements && (
-              <Box>
-                <Typography variant="subtitle2" gutterBottom>
-                  Eligibility Requirements
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {resource.eligibility_requirements}
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
+              {/* Eligibility Requirements */}
+              {resource.eligibility_requirements && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Eligibility Requirements
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {resource.eligibility_requirements}
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Categories */}
       <Box sx={{ mb: 3 }}>
