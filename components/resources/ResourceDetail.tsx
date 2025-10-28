@@ -117,10 +117,16 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
       {resource.description && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              About
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography
+              variant="h6"
+              component="p"
+              sx={{
+                fontWeight: 400,
+                lineHeight: 1.6,
+                fontSize: { xs: '1.125rem', md: '1.25rem' },
+                color: 'text.primary',
+              }}
+            >
               {resource.description}
             </Typography>
           </CardContent>
