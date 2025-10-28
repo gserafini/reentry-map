@@ -306,8 +306,10 @@ export function ResourceMap({
       })
     }
 
-    // Fit map bounds to show all markers
-    if (markers.length > 0) {
+    // Only auto-fit bounds when there's NO user location
+    // If user explicitly selected a location, respect that choice
+    if (markers.length > 0 && !userLocation) {
+      console.log('[ResourceMap] No user location, auto-fitting bounds to show all resources')
       map.fitBounds(bounds, {
         top: 50,
         right: 50,
@@ -326,6 +328,8 @@ export function ResourceMap({
       return () => {
         google.maps.event.removeListener(listener)
       }
+    } else if (userLocation) {
+      console.log('[ResourceMap] User location set, keeping map centered on user selection')
     }
   }, [resources, userLocation, selectedResourceId, isLoading, onResourceClick])
 
