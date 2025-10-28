@@ -23,6 +23,19 @@ interface CachedLocation {
   source: 'geolocation' | 'manual' | 'geoip'
 }
 
+interface GeoIPResponse {
+  location: {
+    latitude: number
+    longitude: number
+    city?: string
+    region?: string
+    country?: string
+    timezone?: string
+  } | null
+  message?: string
+  ip?: string
+}
+
 const LOCATION_CACHE_KEY = 'userLocation'
 const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes in milliseconds
 const REFRESH_INTERVAL = 2 * 60 * 1000 // Check every 2 minutes
@@ -114,7 +127,7 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
-  const [source, setSource] = useState<'geolocation' | 'manual' | null>(null)
+  const [source, setSource] = useState<'geolocation' | 'manual' | 'geoip' | null>(null)
 
   // Check if geolocation is supported by the browser
   const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator
@@ -239,7 +252,7 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     const fetchGeoIPLocation = async () => {
       try {
         const response = await fetch('/api/location/ip')
-        const data = await response.json()
+        const data = (await response.json()) as GeoIPResponse
 
         if (data.location && data.location.latitude && data.location.longitude) {
           const { latitude, longitude, city, region } = data.location
