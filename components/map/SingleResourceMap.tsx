@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Box, CircularProgress, Alert } from '@mui/material'
-import type { Resource } from '@/lib/types/database'
+import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { initializeGoogleMaps } from '@/lib/google-maps'
-import { getCategoryColor } from '@/lib/utils/category-icons'
+import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
 
 interface SingleResourceMapProps {
   /**
@@ -128,18 +128,14 @@ export function SingleResourceMap({
       markerRef.current.map = null
     }
 
-    // Get category color
-    const categoryColor = getCategoryColor(
-      resource.primary_category as Parameters<typeof getCategoryColor>[0]
+    // Create custom marker element with category icon
+    const markerElement = createCategoryMarkerElement(
+      resource.primary_category as ResourceCategory,
+      {
+        size: 48, // Slightly larger for detail page
+        selected: false,
+      }
     )
-
-    // Create custom pin element for Advanced Marker
-    const pinElement = new google.maps.marker.PinElement({
-      scale: 1.3,
-      background: categoryColor,
-      borderColor: '#ffffff',
-      glyphColor: '#ffffff',
-    })
 
     // Create Advanced Marker
     const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -149,7 +145,7 @@ export function SingleResourceMap({
         lng: resource.longitude,
       },
       title: resource.name,
-      content: pinElement.element,
+      content: markerElement,
     })
 
     markerRef.current = marker

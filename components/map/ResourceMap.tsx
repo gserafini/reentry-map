@@ -6,9 +6,10 @@ import { MapOutlined, ListAlt } from '@mui/icons-material'
 import { MarkerClusterer } from '@googlemaps/markerclusterer'
 import type { Resource } from '@/lib/types/database'
 import { initializeGoogleMaps } from '@/lib/google-maps'
-import { getCategoryColor } from '@/lib/utils/category-icons'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
+import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
+import type { ResourceCategory } from '@/lib/types/database'
 
 interface ResourceMapProps {
   /**
@@ -189,25 +190,21 @@ export function ResourceMap({
         )
       }
 
-      // Get category color
-      const categoryColor = getCategoryColor(
-        resource.primary_category as Parameters<typeof getCategoryColor>[0]
+      // Create custom marker element with category icon
+      const markerElement = createCategoryMarkerElement(
+        resource.primary_category as ResourceCategory,
+        {
+          size: 40,
+          selected: selectedResourceId === resource.id,
+        }
       )
-
-      // Create custom pin element for Advanced Marker
-      const pinElement = new google.maps.marker.PinElement({
-        scale: selectedResourceId === resource.id ? 1.2 : 1,
-        background: categoryColor,
-        borderColor: '#ffffff',
-        glyphColor: '#ffffff',
-      })
 
       // Create Advanced Marker
       const marker = new google.maps.marker.AdvancedMarkerElement({
         map,
         position,
         title: resource.name,
-        content: pinElement.element,
+        content: markerElement,
       })
 
       // Add click listener to show info window
