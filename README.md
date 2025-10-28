@@ -63,6 +63,7 @@ Our solution is a community-driven, AI-enhanced resource directory that:
 
 - Google Maps JavaScript API (maps, geocoding)
 - OpenAI API (GPT-4o-mini for AI agents)
+- ipapi.co (GeoIP location detection)
 
 **Infrastructure**
 
@@ -172,6 +173,30 @@ Three autonomous agents keep data fresh:
 - **Discovery Agent** - Finds new resources from 211 directories and government sites
 - **Enrichment Agent** - Fills in missing data via web scraping and APIs
 - **Verification Agent** - Quarterly checks on phone numbers and business status
+
+### External Service Dependencies
+
+**ipapi.co (GeoIP Location Detection)**
+
+- **Purpose**: Auto-detect user's location for map centering
+- **Tier**: Free (no API key required)
+- **Limits**: 1,000 requests/day, 30,000 requests/month
+- **Caching**: 24-hour localStorage cache to minimize API calls
+- **Fallback**: Falls back to Oakland, CA default location
+- **Monitoring**: Automated alerts to Vercel logs (max 1 alert/hour per service)
+- **Status**: https://ipapi.co/
+
+**Google Maps JavaScript API**
+
+- **Purpose**: Interactive maps, geocoding, places autocomplete
+- **Billing**: Pay-as-you-go (free tier: $200/month credit)
+- **Limits**: See Google Maps Platform pricing
+
+**OpenAI API**
+
+- **Purpose**: AI agents for resource discovery and enrichment
+- **Model**: GPT-4o-mini (cost-effective)
+- **Limits**: Per your OpenAI account tier
 
 ### Security & Privacy
 

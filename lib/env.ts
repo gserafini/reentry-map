@@ -15,6 +15,9 @@ export const env = createEnv({
 
     // Google Maps server-side key (for geocoding, etc.)
     GOOGLE_MAPS_KEY: z.string().min(1).optional(),
+
+    // Admin contact for system alerts and monitoring
+    ADMIN_EMAIL: z.string().email().optional(),
   },
 
   /**
@@ -48,6 +51,7 @@ export const env = createEnv({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GOOGLE_MAPS_KEY: process.env.GOOGLE_MAPS_KEY,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
 
     // Client-side
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,

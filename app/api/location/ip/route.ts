@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { env } from '@/lib/env'
+import { monitorGeoIPService } from '@/lib/monitoring/dependency-monitor'
 
 interface GeoIPResponse {
   city?: string
@@ -69,8 +70,17 @@ export async function GET() {
 
     // Check for rate limit error
     if (data.error) {
+      const error = new Error(data.reason || 'GeoIP service error')
       console.warn('ipapi.co error:', data.reason)
-      throw new Error(data.reason || 'GeoIP service error')
+
+      // Send monitoring alert (rate limited to 1 per hour)
+      await monitorGeoIPService(error, {
+        reason: data.reason,
+        ip,
+        response_status: response.status,
+      })
+
+      throw error
     }
 
     // Return standardized location format
