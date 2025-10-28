@@ -25,7 +25,7 @@ export function createCategoryMarkerElement(
   pinContainer.style.height = `${size * 1.5}px` // Pin is taller than wide
   pinContainer.style.cursor = 'pointer'
   pinContainer.style.transition = 'transform 0.2s, filter 0.2s'
-  pinContainer.style.transform = 'translate(-50%, -100%)' // Center horizontally, anchor at bottom
+  // No transform here - AdvancedMarkerElement handles positioning
 
   // Create SVG pin shape
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -52,24 +52,29 @@ export function createCategoryMarkerElement(
   const iconSvg = renderToStaticMarkup(<Icon style={{ fontSize: size * 0.5, color: 'white' }} />)
 
   // Create icon container positioned in the circular part of the pin
+  // The SVG viewBox is 0-40 (width) by 0-60 (height), with circle center at (20, 20)
+  // So the circle center is at 20/60 = 1/3 from the top
+  // With container height of size * 1.5, the icon should be at (size * 1.5) * (1/3) = size * 0.5
   const iconContainer = document.createElement('div')
   iconContainer.innerHTML = iconSvg
   iconContainer.style.position = 'absolute'
-  iconContainer.style.top = `${size * 0.25}px`
+  iconContainer.style.top = `${size * 0.5}px` // Center in the circular portion (at y=20 in viewBox)
   iconContainer.style.left = '50%'
   iconContainer.style.transform = 'translate(-50%, -50%)'
   iconContainer.style.display = 'flex'
   iconContainer.style.alignItems = 'center'
   iconContainer.style.justifyContent = 'center'
   iconContainer.style.pointerEvents = 'none'
+  iconContainer.style.width = `${size * 0.5}px`
+  iconContainer.style.height = `${size * 0.5}px`
 
   // Add hover effects
   pinContainer.addEventListener('mouseenter', () => {
-    pinContainer.style.transform = 'translate(-50%, -100%) scale(1.1)'
+    pinContainer.style.transform = 'scale(1.1)'
     svg.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.5))'
   })
   pinContainer.addEventListener('mouseleave', () => {
-    pinContainer.style.transform = 'translate(-50%, -100%) scale(1)'
+    pinContainer.style.transform = 'scale(1)'
     svg.style.filter = selected
       ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))'
       : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
