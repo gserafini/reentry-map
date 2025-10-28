@@ -45,8 +45,7 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
 
-  const [showGravatar, setShowGravatar] = useState(true)
-  const { gravatarUrl } = useGravatar(authUser?.email, 160)
+  const { gravatarUrl, hasGravatar } = useGravatar(authUser?.email, 160)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -171,10 +170,7 @@ export default function ProfilePage() {
           {/* Avatar and Name */}
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
             <Avatar
-              src={showGravatar && gravatarUrl ? gravatarUrl : undefined}
-              imgProps={{
-                onError: () => setShowGravatar(false),
-              }}
+              src={hasGravatar && gravatarUrl ? gravatarUrl : undefined}
               sx={{
                 width: 80,
                 height: 80,
@@ -184,7 +180,7 @@ export default function ProfilePage() {
                 mr: 3,
               }}
             >
-              {(!showGravatar || !gravatarUrl) && initials}
+              {!hasGravatar && initials}
             </Avatar>
             <Box sx={{ flex: 1 }}>
               <Typography variant="h4" gutterBottom>

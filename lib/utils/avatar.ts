@@ -44,8 +44,7 @@ export function getInitials(firstNameOrEmail?: string | null, lastName?: string 
  * @param email - User's email address
  * @param size - Avatar size in pixels (default: 200)
  * @param defaultType - Default avatar type if no Gravatar exists
- *   - 'blank' - transparent image (recommended - use with onError handler)
- *   - 'mp' - mystery person
+ *   - 'mp' - mystery person (default)
  *   - 'identicon' - geometric pattern
  *   - 'monsterid' - generated monster
  *   - 'wavatar' - generated face
@@ -56,7 +55,7 @@ export function getInitials(firstNameOrEmail?: string | null, lastName?: string 
 export function getGravatarUrl(
   email: string,
   size: number = 200,
-  defaultType: string = 'blank'
+  defaultType: string = 'mp'
 ): string {
   const trimmedEmail = email.trim().toLowerCase()
   const hash = CryptoJS.MD5(trimmedEmail).toString()
@@ -112,18 +111,28 @@ export function getUserDisplayName(
 
 /**
  * Check if a Gravatar exists for an email address
+ * Uses server-side API route to check Gravatar with d=404
+ * This prevents browser console errors from 404 responses
  *
- * NOTE: This function is deprecated and should not be used in client components.
- * Instead, use getGravatarUrl() with d=blank and handle image load errors.
- *
- * @deprecated Use Avatar component with onError handler instead
  * @param email - User's email address
- * @returns Promise that always resolves to true (assumes Gravatar might exist)
+ * @returns Promise that resolves to true if Gravatar exists, false otherwise
  */
 export async function checkGravatarExists(email: string): Promise<boolean> {
-  // Always return true to avoid console errors from 404 checks
-  // The Avatar component should handle image load failures gracefully
-  return !!email
+  if (!email) return false
+
+  try {
+    // Use server-side API route to avoid browser console errors
+    const response = await fetch(`/api/gravatar/check?email=${encodeURIComponent(email)}`)
+
+    if (!response.ok) {
+      return false
+    }
+
+    const data = await response.json()
+    return data.exists === true
+  } catch {
+    return false
+  }
 }
 
 /**
