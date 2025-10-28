@@ -120,16 +120,49 @@ export function ResourceCard({
           </Box>
         </Box>
 
-        <Typography variant="body2" color="text.secondary" data-testid="resource-address">
-          {resource.address ?? 'No address'}
-        </Typography>
-        {distance !== null && (
-          <Box
+        {resource.address ? (
+          <Link
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resource.address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="hover"
+            color="text.secondary"
+            title={`Get directions to ${resource.address}`}
+            sx={{
+              display: 'block',
+              '&:hover': {
+                color: 'primary.main',
+              },
+            }}
+            data-testid="resource-address"
+          >
+            <Typography variant="body2" component="span">
+              {resource.address}
+            </Typography>
+          </Link>
+        ) : (
+          <Typography variant="body2" color="text.secondary" data-testid="resource-address">
+            No address
+          </Typography>
+        )}
+        {distance !== null && resource.address && (
+          <Link
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resource.address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="hover"
+            title={`Get directions to ${resource.name}`}
             sx={{
               display: 'flex',
               alignItems: 'center',
               gap: 0.5,
               mt: 1,
+              textDecoration: 'none',
+              '&:hover': {
+                '& .MuiTypography-root': {
+                  textDecoration: 'underline',
+                },
+              },
             }}
             data-testid="resource-distance"
           >
@@ -137,7 +170,7 @@ export function ResourceCard({
             <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
               {formatDistanceSmart(distance, 'miles')} away
             </Typography>
-          </Box>
+          </Link>
         )}
       </CardContent>
 
