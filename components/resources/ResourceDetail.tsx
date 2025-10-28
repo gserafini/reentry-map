@@ -291,16 +291,27 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     <ScheduleIcon color="action" fontSize="small" />
                     <Typography variant="subtitle2">Hours of Operation</Typography>
                   </Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    component="pre"
-                    sx={{ fontFamily: 'inherit', whiteSpace: 'pre-wrap' }}
-                  >
-                    {typeof resource.hours === 'string'
-                      ? resource.hours
-                      : JSON.stringify(resource.hours, null, 2)}
-                  </Typography>
+                  {typeof resource.hours === 'string' ? (
+                    <Typography variant="body2" color="text.secondary">
+                      {resource.hours}
+                    </Typography>
+                  ) : (
+                    <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                      {Object.entries(resource.hours as Record<string, string>).map(
+                        ([day, hours]) => (
+                          <Typography
+                            key={day}
+                            component="li"
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mb: 0.5 }}
+                          >
+                            <strong style={{ textTransform: 'capitalize' }}>{day}:</strong> {hours}
+                          </Typography>
+                        )
+                      )}
+                    </Box>
+                  )}
                 </Box>
               )}
 
