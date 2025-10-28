@@ -6,7 +6,11 @@ import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+export interface LoginFormProps extends React.ComponentPropsWithoutRef<'div'> {
+  onSuccess?: () => void
+}
+
+export function LoginForm({ onSuccess, className, ...props }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -27,8 +31,14 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
       if (error) throw error
       // Refresh server components to update auth state in header
       router.refresh()
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push('/protected')
+
+      if (onSuccess) {
+        // Used in modal - stay on current page
+        onSuccess()
+      } else {
+        // Used on standalone page - redirect to home
+        router.push('/')
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {

@@ -6,12 +6,12 @@ import {
   Logout as LogoutIcon,
   Favorite as FavoriteIcon,
 } from '@mui/icons-material'
-import Link from 'next/link'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { getInitials, getAvatarColor } from '@/lib/utils/avatar'
 import { useGravatar } from '@/lib/hooks/useGravatar'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 interface AuthButtonProps {
   userEmail?: string | null
@@ -19,6 +19,8 @@ interface AuthButtonProps {
 
 export function AuthButton({ userEmail }: AuthButtonProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login')
   const router = useRouter()
   const open = Boolean(anchorEl)
   const { gravatarUrl, hasGravatar } = useGravatar(userEmail, 72) // 2x size for retina
@@ -35,8 +37,21 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
     const supabase = createClient()
     await supabase.auth.signOut()
     handleClose()
-    router.push('/auth/login')
     router.refresh()
+  }
+
+  const handleOpenLogin = () => {
+    setAuthModalMode('login')
+    setAuthModalOpen(true)
+  }
+
+  const handleOpenSignup = () => {
+    setAuthModalMode('signup')
+    setAuthModalOpen(true)
+  }
+
+  const handleCloseAuthModal = () => {
+    setAuthModalOpen(false)
   }
 
   return userEmail ? (
@@ -97,9 +112,10 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
       </Menu>
     </>
   ) : (
-    <Box sx={{ display: 'flex', gap: 1 }}>
-      <Link href="/auth/login" style={{ textDecoration: 'none' }}>
+    <>
+      <Box sx={{ display: 'flex', gap: 1 }}>
         <Button
+          onClick={handleOpenLogin}
           size="small"
           variant="outlined"
           sx={{
@@ -116,9 +132,8 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
         >
           Log In
         </Button>
-      </Link>
-      <Link href="/auth/sign-up" style={{ textDecoration: 'none' }}>
         <Button
+          onClick={handleOpenSignup}
           size="small"
           variant="contained"
           sx={{
@@ -134,7 +149,9 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
         >
           Sign Up
         </Button>
-      </Link>
-    </Box>
+      </Box>
+
+      <AuthModal open={authModalOpen} onClose={handleCloseAuthModal} initialMode={authModalMode} />
+    </>
   )
 }

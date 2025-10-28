@@ -6,7 +6,11 @@ import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+export interface SignUpFormProps extends React.ComponentPropsWithoutRef<'div'> {
+  onSuccess?: () => void
+}
+
+export function SignUpForm({ onSuccess, className, ...props }: SignUpFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
@@ -37,7 +41,14 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       if (error) throw error
       // Refresh server components to update auth state in header
       router.refresh()
-      router.push('/auth/sign-up-success')
+
+      if (onSuccess) {
+        // Used in modal - stay on current page
+        onSuccess()
+      } else {
+        // Used on standalone page - redirect to success page
+        router.push('/auth/sign-up-success')
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {

@@ -217,15 +217,15 @@ with AI-powered automation to maintain a comprehensive, reliable directory of se
 - [ ] Sign out clears session
 - [ ] Error messages clear and helpful
 
-#### 2.4.2 User Profile
+#### 2.4.2 User Profile (Basic - MVP)
 
 **User Story**: As a user, I want to manage my profile so I can personalize my experience.
 
-**Requirements**:
+**Requirements (MVP)**:
 
-- Optional display name
+- Display name (currently single field, will split to first/last)
 - Phone number (read-only)
-- Optional avatar (future)
+- Optional avatar (Gravatar/future upload)
 - View favorites count
 - View reviews count
 - Delete account option
@@ -236,6 +236,17 @@ with AI-powered automation to maintain a comprehensive, reliable directory of se
 - [ ] Name can be updated
 - [ ] Counts accurate
 - [ ] Changes save successfully
+
+#### 2.4.3 Enhanced User Profile System (Phase 2 - See Section 2.10)
+
+**User Story**: As a user, I want a profile that understands my role and needs so I get relevant content and features.
+
+**See Section 2.10 for comprehensive profile requirements including**:
+
+- Role-based profiles (Returning Citizen, Coach, Volunteer, Leader, General Public)
+- Progressive onboarding wizard
+- Personalized dashboards
+- Privacy controls
 
 ### 2.5 Favorites
 
@@ -580,6 +591,816 @@ with AI-powered automation to maintain a comprehensive, reliable directory of se
 - [ ] Apply updates resource correctly
 - [ ] Reject updates status
 - [ ] Bulk actions work efficiently
+
+### 2.10 Enhanced User Profile & Role System (Phase 2 Feature)
+
+**Reference**: See ADR-013 for complete technical specification
+
+This section documents the comprehensive user profile system planned for Phase 2, which will transform the platform from a simple resource directory into a community platform serving multiple user types.
+
+#### 2.10.1 Overview & User Roles
+
+**Vision**: Build profiles that understand who users are and personalize their experience accordingly.
+
+**User Roles**:
+
+1. **Returning Citizen** - Primary users navigating reentry
+2. **Reentry Coach** - Professionals supporting returning citizens
+3. **Angel Team Volunteer** - Community volunteers
+4. **Angel Team Leader** - Volunteer coordinators
+5. **General Public** - Family, advocates, interested community
+6. **Admin** - Platform administrators (existing)
+
+**Key Features**:
+
+- Role-based profile fields (show relevant fields only)
+- Progressive onboarding wizard (6 steps, < 10 minutes)
+- Personalized dashboards (different for each role)
+- Privacy controls (default private, user-controlled)
+- Profile completeness tracking
+
+#### 2.10.2 Baseline Profile Fields (All Users)
+
+**User Story**: As any user, I want basic profile fields that apply to everyone.
+
+**Requirements**:
+
+**Core Identity** (required):
+
+- First name (separate from last name)
+- Last name
+- Email (verified)
+- Phone (optional, verified if provided)
+- Avatar (Gravatar + optional upload)
+
+**Account Settings**:
+
+- User type/role (selected during onboarding)
+- Secondary roles (optional, e.g., "Returning Citizen" + "Volunteer")
+- Preferred language (English, Spanish future)
+- Timezone (auto-detect, editable)
+- Notification preferences (email, SMS, push)
+
+**Privacy**:
+
+- Profile visibility (public/community/private, default private)
+- Show on leaderboard (opt-in)
+- Data sharing consent for research (opt-in)
+- Email verified status
+- Phone verified status
+
+**Location** (optional but recommended):
+
+- City, State, Zip code
+- Show location publicly (opt-in, default no)
+
+**System Tracking** (automatic):
+
+- Onboarding completion status
+- Current onboarding step (resume capability)
+- Profile completeness percentage (0-100%)
+- Last active timestamp
+
+**Acceptance Criteria**:
+
+- [ ] First/last name stored separately
+- [ ] Email verification required before full access
+- [ ] Profile completeness auto-calculated
+- [ ] Location used for distance calculations
+- [ ] Privacy defaults to most restrictive
+
+#### 2.10.3 Returning Citizen Profile (Extended Fields)
+
+**User Story**: As a returning citizen, I want my profile to help me find relevant resources and track my reentry journey without feeling stigmatized.
+
+**Journey Context** (all optional, private by default):
+
+- Reentry date (privacy-sensitive, encrypted)
+- Support timeline (pre-release | first 90 days | established | long-term)
+- Primary needs (max 5: employment, housing, healthcare, etc.)
+- Immediate needs (urgent: ID, food, shelter)
+- Personal goals (free-text, 500 chars)
+- Goal categories (structured for tracking)
+
+**Support Network**:
+
+- Has case manager (yes/no)
+- Case manager: name, email, phone (if yes)
+- Emergency contact: name, phone, relationship
+
+**Practical Information**:
+
+- Has valid ID (yes/no), type if yes
+- Has reliable transportation (yes/no), method
+- Has smartphone (yes/no)
+- Internet access (home | mobile | public library | limited)
+- Accessibility needs (array: wheelchair, vision, hearing, etc.)
+- Special accommodations (free-text)
+
+**Privacy & Dignity**:
+
+- All fields optional
+- No required sensitive information
+- Clear "why we ask" for every field
+- No stigmatizing language
+- User controls what's shared
+
+**Acceptance Criteria**:
+
+- [ ] All fields optional
+- [ ] Reentry date encrypted in database
+- [ ] Primary needs limited to 5
+- [ ] Clear help text for every field
+- [ ] No jargon or complex language
+- [ ] Default visibility: private
+
+#### 2.10.4 Reentry Coach Profile (Extended Fields)
+
+**User Story**: As a reentry coach, I want a profile that helps returning citizens find me and understand how I can help them.
+
+**Professional Information** (required for public profile):
+
+- Organization name, type (government | nonprofit | private | faith-based)
+- Job title
+- Years of experience in reentry work
+- Credentials/certifications (array)
+- Specializations (employment, housing, etc.)
+
+**Availability & Capacity**:
+
+- Current caseload size
+- Accepting new clients (yes/no toggle)
+- Maximum caseload capacity
+- Weekly availability (JSONB schedule)
+- Preferred contact method (email | phone | text | in-person)
+- Response time expectation (text, e.g., "within 24 hours")
+
+**Service Areas**:
+
+- Service categories (required, multi-select)
+- Geographic area served (text)
+- Languages spoken (array)
+- Offers virtual services (yes/no)
+
+**Public Profile** (visible to returning citizens):
+
+- Professional bio (500 char max)
+- Success stories count (auto-tracked)
+- Verified coach badge (admin-approved)
+
+**Acceptance Criteria**:
+
+- [ ] Organization info required for activation
+- [ ] Bio visible on public coach directory
+- [ ] Availability clearly shown to returning citizens
+- [ ] Can toggle "accepting clients" easily
+- [ ] Admin verification process for badge
+- [ ] Service categories match resource taxonomy
+
+#### 2.10.5 Angel Team Volunteer Profile (Extended Fields)
+
+**User Story**: As a volunteer, I want to track my contributions, find opportunities matching my skills, and feel recognized for my work.
+
+**Volunteer Information**:
+
+- Volunteer since (date)
+- Volunteer status (active | inactive | on-hold)
+- Hours per month availability
+- Volunteer interests (multi-select)
+- Skills to share (professional/personal, array)
+
+**Verification & Onboarding**:
+
+- Background check status (pending | cleared | expired | failed)
+- Background check date
+- Onboarding completed date
+- Orientation attended (yes/no)
+- Agreements signed (JSONB: waivers, confidentiality)
+
+**Engagement Tracking**:
+
+- Volunteer activities (types of work done)
+- Total lifetime hours logged (auto-tracked)
+- Projects participated (array)
+- Preferred schedule (JSONB, weekly availability)
+
+**Recognition**:
+
+- Volunteer level (bronze | silver | gold | platinum, auto-assigned by hours)
+- Badges earned (array, achievement system)
+- Recognition notes (admin-visible only)
+
+**Acceptance Criteria**:
+
+- [ ] Background check required before "active" status
+- [ ] Hours logged automatically via timesheet
+- [ ] Volunteer level auto-upgrades (Bronze: 0-25h, Silver: 26-100h, Gold: 101-500h, Platinum: 500h+)
+- [ ] Badges awarded automatically for milestones
+- [ ] Volunteer opportunities matched to interests
+- [ ] Recognition visible on profile
+
+#### 2.10.6 Angel Team Leader Profile (Extended Fields)
+
+**User Story**: As a team leader, I need additional tools to manage volunteers and coordinate projects beyond my own volunteer work.
+
+**Inherits all Volunteer Profile fields, plus**:
+
+**Leadership Information**:
+
+- Team name (text)
+- Team size (number of volunteers managed)
+- Leadership since (date)
+- Leadership training completed (yes/no)
+
+**Responsibilities**:
+
+- Areas of responsibility (array: outreach, training, events, etc.)
+- Projects managed (array)
+- Budget responsibility (yes/no)
+- Can approve new volunteers (yes/no, permission)
+
+**Communication**:
+
+- Team meeting schedule (text, e.g., "First Monday 6pm")
+- Preferred communication tools (array: Slack, email, phone)
+- Office hours for team members (JSONB)
+
+**Acceptance Criteria**:
+
+- [ ] Can view all team members in dashboard
+- [ ] Can approve volunteer onboarding (if permission granted)
+- [ ] Team dashboard shows aggregate stats
+- [ ] Can assign projects to volunteers
+- [ ] Team communication preferences visible
+- [ ] Projects tracked with status
+
+#### 2.10.7 General Public Profile (Extended Fields)
+
+**User Story**: As a member of the general public, I want to explore resources and learn how I can help without needing an extensive profile.
+
+**Interest & Engagement**:
+
+- How did you hear about us (text, referral tracking)
+- Interest areas (multi-select)
+- Want to volunteer (yes/no)
+- Want to donate (yes/no)
+- Want newsletter updates (yes/no)
+- Profession (optional text)
+- Can provide resources/connections (yes/no)
+
+**Relationship to Reentry**:
+
+- Relationship type (family member | friend | advocate | researcher | curious | other)
+- Motivation (free-text: "why are you here?")
+
+**Acceptance Criteria**:
+
+- [ ] Minimal required fields
+- [ ] Can convert to volunteer profile later
+- [ ] Interest areas personalize dashboard
+- [ ] Newsletter subscription integrated with email system
+- [ ] Relationship type helps analytics
+
+#### 2.10.8 Progressive Onboarding Wizard
+
+**User Story**: As a new user, I want a simple signup process that doesn't overwhelm me but collects enough info to personalize my experience.
+
+**Design Principles**:
+
+- Fast initial signup (< 1 minute)
+- Progressive disclosure (collect more later)
+- Clear progress indication
+- Mobile-first, touch-friendly
+- Simple language (8th grade level)
+- Skip optional steps
+- Save progress (resume later)
+
+**Flow**:
+
+**Step 1: Minimal Signup** (< 1 minute)
+
+- First name (required)
+- Last name (required)
+- Email (required)
+- Password (required) OR Phone number for OTP
+- Terms of service acceptance (checkbox)
+- **Output**: Unverified account created
+- **Next**: Verification
+
+**Step 2: Verification** (< 2 minutes)
+
+- Email: verification link sent, user clicks
+- Phone: 6-digit OTP sent, user enters code
+- Resend option (60 second cooldown)
+- **Output**: Verified account
+- **Next**: Role selection
+
+**Step 3: Role Selection** (< 30 seconds)
+**Prompt**: "Welcome! To personalize your experience, let us know who you are:"
+
+- [ ] **Returning Citizen** - "I'm navigating reentry and looking for resources"
+- [ ] **Reentry Coach** - "I'm a professional supporting returning citizens"
+- [ ] **Angel Team Volunteer** - "I volunteer to help the reentry community"
+- [ ] **Angel Team Leader** - "I coordinate volunteers and projects"
+- [ ] **General Public** - "I'm here to learn, support, or find information"
+
+_Each option has a friendly icon and 1-sentence description_
+
+**Output**: User type set, wizard branches to role-specific questions
+**Next**: Essential profile
+
+**Step 4: Essential Profile** (< 3 minutes)
+_Questions vary by role, but always include_:
+
+- **Location**: "Where are you located?" (City, Zip)
+  - _Why we ask: "Help us show you nearby resources"_
+- **Primary needs/interests** (checkboxes, max 5)
+  - Returning Citizens: "What are you looking for help with?"
+  - Coaches: "What areas do you specialize in?"
+  - Volunteers: "What are you interested in helping with?"
+- **Notification preferences**: "How should we contact you?"
+  - Email notifications (yes/no)
+  - SMS updates (yes/no, requires phone)
+- **Privacy**: "Who can see your profile?"
+  - Private (recommended, default)
+  - Community (coaches/volunteers)
+  - Public (everyone)
+
+**Progress indicator**: "Step 3 of 5" with visual progress bar
+
+**Output**: Essential profile complete
+**Next**: Extended profile (optional)
+
+**Step 5: Extended Profile** (< 5 minutes, optional)
+_Role-specific deep-dive, all fields optional_
+
+**Returning Citizens**:
+
+- "Tell us more so we can help you better" (supportive tone)
+- Support timeline (when did you return?)
+- Do you have a case manager?
+- Transportation access?
+- Internet access?
+- Emergency contact?
+
+**Coaches**:
+
+- Organization details
+- Credentials & specializations
+- Current availability
+- Professional bio (for public profile)
+
+**Volunteers**:
+
+- Skills and interests
+- Hours available per month
+- Background check upload
+- Preferred volunteer activities
+
+**Prominent "Skip for now" button** - emphasize they can complete this later
+
+**Output**: Extended profile complete (or skipped)
+**Next**: Completion
+
+**Step 6: Completion & Dashboard** (< 1 minute)
+
+- **Success message**: "Welcome to Reentry Map, [First Name]! 🎉"
+- Profile completion badge/celebration animation
+- Quick dashboard tour (3-4 screens with highlights)
+- **Role-specific call-to-action**:
+  - Returning Citizens: "Find resources near you →"
+  - Coaches: "Explore the resource directory →"
+  - Volunteers: "See volunteer opportunities →"
+- **Output**: Redirect to personalized dashboard
+
+**Requirements**:
+
+- Total onboarding: 5-10 minutes maximum
+- Save progress at each step (can resume later)
+- Skip button on optional steps
+- Clear "why we ask" for sensitive questions
+- No required sensitive information
+- Mobile-responsive (works on any screen size)
+- Accessible (keyboard nav, screen readers, high contrast)
+- Fast loading (each step < 1 second)
+
+**Acceptance Criteria**:
+
+- [ ] Signup completes in < 1 minute
+- [ ] Email verification required before dashboard access
+- [ ] Role selection has 5 clear, distinct options
+- [ ] Questions branch correctly based on role
+- [ ] Progress bar accurate at each step
+- [ ] Can skip optional questions without penalty
+- [ ] Can resume onboarding later from any step
+- [ ] Mobile-responsive and touch-friendly
+- [ ] WCAG 2.1 AA accessible
+- [ ] Works on slow connections (3G)
+- [ ] No jargon or confusing language
+- [ ] "Why we ask" clear for every field
+
+#### 2.10.9 Personalized Dashboards
+
+**User Story**: As a user with a specific role, I want a dashboard that shows me relevant content, quick actions, and important information for my needs.
+
+**Design Principles**:
+
+- Role-specific (different for each user type)
+- Widget-based (modular, configurable future)
+- Real-time data
+- Quick actions prominent
+- Mobile-first responsive
+- Fast loading (< 2 seconds)
+
+##### Returning Citizen Dashboard
+
+**Hero Section**:
+
+- Greeting: "Welcome back, [First Name]!"
+- Profile completeness bar (if < 100%)
+- Quick actions (large buttons):
+  - Search Resources
+  - My Favorites
+  - Get Help
+
+**Main Widgets**:
+
+1. **Recommended Resources** (based on primary_needs)
+   - Shows 3-5 resources matching their needs
+   - "Why we're showing this" explanation
+   - Quick view: name, category, distance, rating
+
+2. **Resources Near You** (based on location)
+   - Map view with nearby resources
+   - List view toggle
+   - Filter by category
+
+3. **Your Next Steps** (based on goals)
+   - Actionable todo items
+   - Milestone tracking
+   - Encouraging messages
+
+4. **Recent Activity**
+   - Your recent favorites
+   - Your recent reviews
+   - Resources you viewed
+
+5. **Support Contacts** (if has_case_manager)
+   - Quick access to case manager
+   - Emergency contact
+   - Help line numbers
+
+**Acceptance Criteria**:
+
+- [ ] Recommendations based on profile needs
+- [ ] Near you uses actual location
+- [ ] Next steps personalized to goals
+- [ ] Recent activity accurate
+- [ ] Support contacts easily accessible
+- [ ] All widgets load < 2 seconds
+- [ ] Empty states for new users
+- [ ] Mobile-responsive
+
+##### Reentry Coach Dashboard
+
+**Hero Section**:
+
+- Greeting: "Welcome, [First Name]!"
+- Quick stats: caseload, new reviews, pending suggestions
+- Quick actions:
+  - Find Resources
+  - Suggest Resource
+  - View Updates
+
+**Main Widgets**:
+
+1. **Recently Updated Resources** (in specializations)
+   - Resources in coach's areas of expertise
+   - What changed (address, hours, etc.)
+   - Review and verify option
+
+2. **Resources by Category** (service areas)
+   - Browse by categories coach supports
+   - Completeness indicators
+   - Add/suggest button
+
+3. **Community Activity**
+   - New reviews on resources
+   - New suggestions pending
+   - User questions (future)
+
+4. **Your Contributions**
+   - Resources you suggested
+   - Reviews you wrote
+   - Impact metrics
+
+5. **Helpful Resources** (most reviewed)
+   - Top-rated resources in area
+   - Most viewed this week
+   - Trending up
+
+**Acceptance Criteria**:
+
+- [ ] Updates filtered by specializations
+- [ ] Categories match service areas
+- [ ] Activity real-time
+- [ ] Contributions tracked accurately
+- [ ] Helpful resources algorithm sound
+
+##### Volunteer Dashboard
+
+**Hero Section**:
+
+- Greeting: "Welcome, [First Name]!"
+- Impact summary: total hours, current level, next badge
+- Quick actions:
+  - Log Hours
+  - View Opportunities
+  - Team Updates
+
+**Main Widgets**:
+
+1. **Volunteer Opportunities** (matching interests)
+   - Open opportunities
+   - Match percentage
+   - Time commitment
+   - Apply/express interest
+
+2. **Your Impact Stats**
+   - Total hours logged
+   - Current volunteer level
+   - Badges earned
+   - Hours this month
+
+3. **Team Updates** (from team leader)
+   - Team announcements
+   - Upcoming team meetings
+   - Team stats
+
+4. **Training Resources**
+   - Required training
+   - Optional learning
+   - Certification tracking
+
+5. **Upcoming Events**
+   - Volunteer events
+   - Community events
+   - Calendar integration
+
+**Acceptance Criteria**:
+
+- [ ] Opportunities match volunteer interests
+- [ ] Impact stats accurate and real-time
+- [ ] Team updates from actual team leader
+- [ ] Training completion tracked
+- [ ] Events synced with calendar
+
+##### General Public Dashboard
+
+**Hero Section**:
+
+- Greeting: "Welcome, [First Name]!"
+- Prompt to complete profile or explore
+- Quick actions:
+  - Explore Resources
+  - Learn More
+  - Get Involved
+
+**Main Widgets**:
+
+1. **Browse Resources** (directory overview)
+   - Categories overview
+   - Total resources count
+   - Search bar
+   - Featured resources
+
+2. **How to Help**
+   - Become a volunteer
+   - Donate
+   - Advocate
+   - Share with others
+
+3. **Success Stories**
+   - Community impact
+   - Testimonials
+   - Statistics
+
+4. **Recent Updates**
+   - New resources added
+   - Platform updates
+   - Blog posts (future)
+
+**Acceptance Criteria**:
+
+- [ ] Directory browse functional
+- [ ] Volunteer signup clear
+- [ ] Success stories inspiring
+- [ ] Updates relevant and timely
+
+#### 2.10.10 Profile Page Design
+
+**User Story**: As a user, I want to view and edit my profile information in a clear, organized way that doesn't overwhelm me.
+
+**Layout Structure**:
+
+**Header Section**:
+
+- Avatar (large, 200x200px, click to edit)
+- First + Last name (editable inline)
+- User type badge(s) (e.g., "Returning Citizen" + "Volunteer")
+- Profile completeness progress bar (if < 100%, with "Complete your profile" link)
+- Primary "Edit Profile" button
+
+**Tabbed Layout**:
+
+**Tab 1: Basic Information** (all users)
+
+- **Contact**:
+  - Email (verified badge if verified, "Verify" link if not)
+  - Phone (optional, verified badge)
+  - Preferred contact method
+- **Location**:
+  - City, State, Zip
+  - Show publicly (toggle)
+- **Preferences**:
+  - Language
+  - Timezone (auto-detected, editable)
+- **Security**:
+  - Change password
+  - Two-factor authentication (future)
+
+**Tab 2: Role Information** (varies by role)
+
+- Role-specific fields organized into collapsible sections
+- Icons for each section (visual clarity)
+- Help text for complex fields
+- "Why we ask" tooltips (? icon)
+- Max 3-5 fields per section (progressive disclosure)
+
+**Tab 3: Privacy & Notifications**
+
+- **Privacy**:
+  - Profile visibility (radio: public/community/private)
+  - Show on leaderboard (toggle)
+  - Data sharing for research (toggle)
+- **Notifications**:
+  - Email notifications (checkboxes by type)
+  - SMS notifications (requires verified phone)
+  - Push notifications (browser permission)
+- **Data Rights**:
+  - Export my data
+  - Delete my account (confirmation required)
+
+**Tab 4: Activity & Stats** (optional)
+
+- Favorites count (clickable → favorites page)
+- Reviews written (clickable → my reviews)
+- Resources suggested (clickable → my suggestions)
+- Volunteer hours (if applicable)
+- Achievements/badges (grid display)
+
+**Design Principles**:
+
+**Simplicity**:
+
+- Max 3-5 fields per section
+- Plain language ("Where do you live?" not "Residential Address")
+- Icons for visual hierarchy
+- Inline help text (not modals)
+
+**Progressive Disclosure**:
+
+- Essential fields first
+- "Show more" for advanced options
+- Collapsible sections (closed by default)
+- "Why we ask" as tooltips, not blocking
+
+**Visual Hierarchy**:
+
+- Required fields: red asterisk
+- Optional fields: lighter gray text
+- Section headers: bold with icons
+- White space between groups
+
+**Accessibility**:
+
+- High contrast (4.5:1 minimum)
+- Touch targets 44px minimum
+- Keyboard navigation (tab order logical)
+- Screen reader labels
+- Error messages clear and actionable
+
+**Mobile-First**:
+
+- Single column layout
+- Thumb-friendly button placement
+- Minimal scrolling per section
+- Sticky save button (always visible)
+- Swipeable tabs
+
+**Requirements**:
+
+- Auto-save on field blur (with loading indicator)
+- Manual "Save" button for batch changes
+- Validation on submit
+- Success/error toast notifications
+- Unsaved changes warning
+- Fast rendering (< 1 second)
+
+**Acceptance Criteria**:
+
+- [ ] All profile fields editable
+- [ ] Changes save successfully with feedback
+- [ ] Validation clear and helpful
+- [ ] Tabs work on mobile (swipe + tap)
+- [ ] Profile completeness updates live
+- [ ] Help tooltips don't block UI
+- [ ] Keyboard navigable (no mouse required)
+- [ ] Screen reader announces changes
+- [ ] Works on slow connections
+- [ ] Graceful degradation without JS
+- [ ] No data loss on browser back button
+
+#### 2.10.11 Privacy, Security & Compliance
+
+**Requirements**:
+
+**Data Minimization**:
+
+- Most fields optional
+- Clear justification for every field ("why we ask")
+- Don't collect unnecessary data
+- Purge unused data regularly
+
+**Privacy Controls**:
+
+- **Profile visibility**:
+  - Private (default): only user sees full profile
+  - Community: coaches/volunteers see basic info
+  - Public: anyone can see (opt-in only)
+- **Granular field visibility** (future):
+  - Control visibility per field
+  - E.g., show location to coaches but hide from public
+- **Opt-out options**:
+  - Leaderboards (default opt-out)
+  - Analytics/research (default opt-out)
+  - Directory listings (coaches/volunteers can opt out)
+
+**Sensitive Data Handling**:
+
+- **Reentry dates**: encrypted at rest, never logged
+- **Case manager info**: private, never shared
+- **Emergency contacts**: private, never shared
+- **Background checks**: status only, file upload secure
+- **Health/accessibility**: private, optional, never required
+
+**Access Control**:
+
+- Row Level Security (RLS) on all profile tables
+- Users can only view/edit their own profiles
+- Admins require explicit permission for sensitive fields
+- Coaches cannot see returning citizen profiles without consent (future)
+- Audit logging for all profile changes
+
+**Data Rights (GDPR Compliance)**:
+
+- **Right to access**: Export all data (JSON format)
+- **Right to rectification**: Edit any field
+- **Right to erasure**: Delete account with full data purge
+- **Right to portability**: Download profile data
+- **Right to object**: Opt out of analytics/research
+
+**Security**:
+
+- All data encrypted at rest
+- All connections HTTPS only
+- Password requirements enforced
+- Session timeouts
+- No sensitive data in URLs or logs
+- Rate limiting on profile updates
+
+**Compliance**:
+
+- Privacy policy linked prominently
+- Terms of service acceptance required
+- Clear consent for data sharing
+- Age verification (18+ required)
+- Mandatory reporting exceptions documented
+
+**Acceptance Criteria**:
+
+- [ ] Privacy policy clear and accessible
+- [ ] Default settings most restrictive
+- [ ] Users can export all their data (JSON)
+- [ ] Delete account purges all personal data within 30 days
+- [ ] Reentry dates never appear in logs or error messages
+- [ ] RLS policies prevent unauthorized access
+- [ ] Audit trail for all profile changes
+- [ ] GDPR-compliant data handling
+- [ ] Age verification at signup
+- [ ] Clear consent flows
+
+---
 
 ## 3. Non-Functional Requirements
 

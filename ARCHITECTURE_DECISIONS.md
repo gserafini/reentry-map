@@ -667,6 +667,7 @@ Use Google Maps JavaScript API with @googlemaps/js-api-loader.
 | 010 | Google Maps                              | ✅ Accepted | High     |
 | 011 | Avatar Strategy (Gravatar + S3)          | ✅ Accepted | Low      |
 | 012 | Recently Viewed Resources (localStorage) | 📋 Proposed | Low      |
+| 013 | User Profile & Role-Based System         | 📋 Proposed | High     |
 
 ---
 
@@ -1141,13 +1142,766 @@ If we later need database-backed history:
 
 ---
 
+---
+
+## ADR-013: User Profile Strategy with Role-Based System
+
+**Date**: 2025-10-24
+**Status**: Proposed
+**Deciders**: Gabriel Serafini, Claude Code
+**Tags**: user-profile, onboarding, roles, user-experience
+
+### Context
+
+The current user profile is minimal (name, phone, avatar). To better serve the reentry community, we need a comprehensive profile system that:
+
+1. Supports multiple user types with different needs and workflows
+2. Collects relevant information without overwhelming users
+3. Respects privacy and dignity (especially for returning citizens)
+4. Enables personalized dashboards and resource matching
+5. Maintains simplicity for low-tech literacy users
+
+### Decision
+
+Implement a **role-based user profile system** with:
+
+1. **Universal baseline fields** for all users
+2. **Role selection** during onboarding ("Are you a...")
+3. **Role-specific extended fields** that show/hide based on user type
+4. **Progressive onboarding wizard** with completion tracking
+5. **Personalized dashboards** based on user role
+
+### User Roles
+
+#### Primary Roles
+
+1. **Returning Citizen** - Individuals navigating reentry (primary users)
+2. **Reentry Coach** - Professionals supporting returning citizens
+3. **Angel Team Volunteer** - Community volunteers helping with resources
+4. **Angel Team Leader** - Volunteers coordinating other volunteers
+5. **General Public** - Interested community members, family, advocates
+6. **Admin** - Platform administrators (existing role)
+
+### Profile Structure
+
+#### Baseline Profile Fields (All Users)
+
+**Core Identity**:
+
+- `id` (UUID) - Primary key, links to auth.users
+- `first_name` (TEXT, required) - First name
+- `last_name` (TEXT, required) - Last name
+- `email` (TEXT, required) - Email address (unique, verified)
+- `phone` (TEXT, optional) - Phone number (verified if provided)
+- `avatar_url` (TEXT, optional) - Profile picture
+
+**Account Settings**:
+
+- `user_type` (ENUM, required) - Primary role (from list above)
+- `secondary_roles` (TEXT[], optional) - Additional roles user identifies with
+- `preferred_language` (TEXT, default 'en') - UI language preference
+- `timezone` (TEXT, default 'America/Los_Angeles') - User timezone
+- `notification_preferences` (JSONB) - Email/SMS/push preferences
+
+**Privacy & Security**:
+
+- `profile_visibility` (ENUM, default 'private') - 'public' | 'community' | 'private'
+- `show_on_leaderboard` (BOOLEAN, default false) - For gamification features
+- `data_sharing_consent` (BOOLEAN, default false) - For research/analytics
+- `email_verified` (BOOLEAN, default false) - Email verification status
+- `phone_verified` (BOOLEAN, default false) - Phone verification status
+
+**Location (Optional but Recommended)**:
+
+- `city` (TEXT, optional) - City for better resource matching
+- `state` (TEXT, optional) - State
+- `zip_code` (TEXT, optional) - Zip code for distance calculations
+- `show_location_publicly` (BOOLEAN, default false) - Display location to others
+
+**System Fields**:
+
+- `onboarding_completed` (BOOLEAN, default false) - Wizard completion status
+- `onboarding_step` (INTEGER, default 0) - Current step in wizard
+- `profile_completeness` (INTEGER, default 0) - Percentage complete (0-100)
+- `last_active_at` (TIMESTAMPTZ) - Last activity timestamp
+- `created_at` (TIMESTAMPTZ) - Account creation
+- `updated_at` (TIMESTAMPTZ) - Last profile update
+
+#### Role-Specific Extended Fields
+
+##### 1. Returning Citizen Profile
+
+**Journey Context**:
+
+- `reentry_date` (DATE, optional, private) - Release date (privacy-sensitive)
+- `months_since_reentry` (INTEGER, computed) - Calculated from reentry_date
+- `support_timeline` (ENUM, optional) - 'pre-release' | 'first-90-days' | 'established' | 'long-term'
+
+**Needs & Goals**:
+
+- `primary_needs` (TEXT[], optional) - Categories they're focused on (max 5)
+- `immediate_needs` (TEXT[], optional) - Urgent needs (housing, ID, etc.)
+- `personal_goals` (TEXT, optional) - Free-text goals
+- `goal_categories` (TEXT[], optional) - Structured goal tracking
+
+**Support Network**:
+
+- `has_case_manager` (BOOLEAN, default false) - Has assigned case manager
+- `case_manager_name` (TEXT, optional) - Case manager's name
+- `case_manager_email` (TEXT, optional) - Case manager contact
+- `case_manager_phone` (TEXT, optional) - Case manager phone
+- `emergency_contact_name` (TEXT, optional) - Emergency contact
+- `emergency_contact_phone` (TEXT, optional) - Emergency phone
+- `emergency_contact_relationship` (TEXT, optional) - Relationship to user
+
+**Practical Information**:
+
+- `has_valid_id` (BOOLEAN, optional) - Has government ID
+- `id_type` (TEXT, optional) - Type of ID (license, state ID, etc.)
+- `has_reliable_transportation` (BOOLEAN, optional) - Access to transportation
+- `transportation_method` (TEXT, optional) - Primary transportation method
+- `has_smartphone` (BOOLEAN, optional) - Has smartphone for app access
+- `internet_access` (ENUM, optional) - 'home' | 'mobile' | 'public-library' | 'limited'
+- `accessibility_needs` (TEXT[], optional) - Physical/cognitive accessibility needs
+- `special_accommodations` (TEXT, optional) - Special needs description
+
+**Privacy Note**: All returning citizen fields optional and private by default. Users control what they share.
+
+##### 2. Reentry Coach Profile
+
+**Professional Information**:
+
+- `organization_name` (TEXT, required) - Employer/organization
+- `organization_type` (ENUM, required) - 'government' | 'nonprofit' | 'private' | 'faith-based'
+- `job_title` (TEXT, required) - Current title
+- `years_experience` (INTEGER, optional) - Years in reentry work
+- `credentials` (TEXT[], optional) - Certifications, licenses
+- `specializations` (TEXT[], optional) - Areas of expertise
+
+**Availability & Capacity**:
+
+- `caseload_size` (INTEGER, optional) - Current number of clients
+- `accepting_new_clients` (BOOLEAN, default false) - Available for new clients
+- `max_caseload` (INTEGER, optional) - Maximum capacity
+- `availability_hours` (JSONB, optional) - Weekly availability schedule
+- `preferred_contact_method` (ENUM, required) - 'email' | 'phone' | 'text' | 'in-person'
+- `response_time_expectation` (TEXT, optional) - Expected response time
+
+**Service Areas**:
+
+- `service_categories` (TEXT[], required) - Categories they support (employment, housing, etc.)
+- `geographic_area` (TEXT, optional) - Area they serve
+- `languages_spoken` (TEXT[], optional) - Languages for service delivery
+- `virtual_services` (BOOLEAN, default false) - Offers remote services
+
+**Public Profile** (visible to returning citizens):
+
+- `bio` (TEXT, optional) - Professional bio (500 chars max)
+- `success_stories_count` (INTEGER, default 0) - Number of success stories shared
+- `verified_coach` (BOOLEAN, default false) - Admin-verified status
+
+##### 3. Angel Team Volunteer Profile
+
+**Volunteer Information**:
+
+- `volunteer_since` (DATE, required) - Start date
+- `volunteer_status` (ENUM, required) - 'active' | 'inactive' | 'on-hold'
+- `hours_per_month` (INTEGER, optional) - Typical availability
+- `volunteer_interests` (TEXT[], required) - Areas of interest
+- `skills_to_share` (TEXT[], optional) - Professional/personal skills
+
+**Verification**:
+
+- `background_check_status` (ENUM, required) - 'pending' | 'cleared' | 'expired' | 'failed'
+- `background_check_date` (DATE, optional) - Date of last check
+- `onboarding_completed_date` (DATE, optional) - Training completion
+- `orientation_attended` (BOOLEAN, default false) - Attended orientation
+- `agreements_signed` (JSONB, optional) - Liability waivers, confidentiality
+
+**Engagement**:
+
+- `volunteer_activities` (TEXT[], optional) - Types of volunteer work
+- `total_volunteer_hours` (INTEGER, default 0) - Lifetime hours logged
+- `projects_participated` (TEXT[], optional) - Special projects
+- `preferred_schedule` (JSONB, optional) - Weekly availability
+
+**Recognition**:
+
+- `volunteer_level` (ENUM, default 'bronze') - 'bronze' | 'silver' | 'gold' | 'platinum'
+- `badges_earned` (TEXT[], optional) - Achievement badges
+- `recognition_notes` (TEXT, optional) - Admin notes for recognition
+
+##### 4. Angel Team Leader Profile
+
+Inherits all Volunteer Profile fields, plus:
+
+**Leadership Information**:
+
+- `team_name` (TEXT, required) - Name of team they lead
+- `team_size` (INTEGER, optional) - Number of volunteers managed
+- `leadership_since` (DATE, required) - Start date as leader
+- `leadership_training_completed` (BOOLEAN, default false) - Leadership training status
+
+**Responsibilities**:
+
+- `areas_of_responsibility` (TEXT[], required) - What they oversee
+- `projects_managed` (TEXT[], optional) - Current projects
+- `budget_responsibility` (BOOLEAN, default false) - Manages team budget
+- `can_approve_volunteers` (BOOLEAN, default false) - Can onboard new volunteers
+
+**Communication**:
+
+- `team_meeting_schedule` (TEXT, optional) - Regular meeting schedule
+- `preferred_communication_tools` (TEXT[], optional) - Slack, email, etc.
+- `office_hours` (JSONB, optional) - Availability for team members
+
+##### 5. General Public Profile
+
+**Interest & Engagement**:
+
+- `how_did_you_hear` (TEXT, optional) - Referral source
+- `interest_areas` (TEXT[], optional) - What brought them here
+- `wants_to_volunteer` (BOOLEAN, default false) - Interest in volunteering
+- `wants_to_donate` (BOOLEAN, default false) - Interest in donations
+- `wants_updates` (BOOLEAN, default false) - Newsletter subscription
+- `profession` (TEXT, optional) - Professional background
+- `can_provide_resources` (BOOLEAN, default false) - Can help with resources/connections
+
+**Relationship to Reentry**:
+
+- `relationship_type` (ENUM, optional) - 'family-member' | 'friend' | 'advocate' | 'researcher' | 'curious' | 'other'
+- `motivation` (TEXT, optional) - Why they're interested (free-text)
+
+### Onboarding Flow
+
+#### Step 1: Minimal Signup (< 1 minute)
+
+- First name (required)
+- Last name (required)
+- Email (required)
+- Password (required) OR Phone number for OTP
+- Terms acceptance checkbox
+
+**Output**: Account created (unverified)
+
+#### Step 2: Verification (< 2 minutes)
+
+- Email verification link sent
+- OR Phone OTP code sent
+- User clicks link or enters code
+- Account marked as verified
+
+**Output**: Verified account
+
+#### Step 3: Role Selection (< 30 seconds)
+
+**Prompt**: "Welcome! To personalize your experience, let us know who you are:"
+
+- [ ] **Returning Citizen** - "I'm navigating reentry and looking for resources"
+- [ ] **Reentry Coach** - "I'm a professional supporting returning citizens"
+- [ ] **Angel Team Volunteer** - "I volunteer to help the reentry community"
+- [ ] **Angel Team Leader** - "I coordinate volunteers and projects"
+- [ ] **General Public** - "I'm here to learn, support, or find information"
+
+**Output**: User type set, wizard branches to role-specific questions
+
+#### Step 4: Essential Profile Info (< 3 minutes)
+
+**Questions vary by role**, focusing on:
+
+- Location (city, zip) - "Help us show you nearby resources"
+- Primary needs/interests (checkboxes)
+- Notification preferences (email/SMS)
+- Privacy settings (profile visibility)
+
+**Progress indicator**: "2 of 4 steps complete"
+
+#### Step 5: Extended Profile (Optional, < 5 minutes)
+
+**Returning Citizens**:
+
+- "Tell us more so we can help you better" (all optional)
+- Primary needs (employment, housing, etc.)
+- Support timeline (pre-release, first 90 days, etc.)
+- Transportation access
+- Case manager info
+
+**Coaches**:
+
+- Organization details
+- Specializations
+- Availability preferences
+- Bio for public profile
+
+**Volunteers**:
+
+- Skills and interests
+- Availability (hours per month)
+- Background check upload
+- Preferred activities
+
+**"Skip for now"** button prominent - can complete later
+
+#### Step 6: Completion & Dashboard (< 1 minute)
+
+- **Success message**: "Welcome to Reentry Map, [First Name]!"
+- Profile completion badge/celebration
+- Quick tour of dashboard (3-4 screenshots with highlights)
+- **Call to action** based on role:
+  - Returning Citizens: "Find resources near you"
+  - Coaches: "Explore the resource directory"
+  - Volunteers: "See volunteer opportunities"
+
+**Output**: Redirect to personalized dashboard
+
+### Profile Page Design
+
+#### Layout Structure
+
+**Header Section**:
+
+- Avatar (large, editable)
+- Name (first + last, editable inline)
+- User type badge(s) (e.g., "Returning Citizen" + "Volunteer")
+- Profile completeness progress bar (if < 100%)
+- "Edit Profile" button
+
+**Tabbed Sections** (role-dependent):
+
+**Tab 1: Basic Information** (all users)
+
+- Contact details (email, phone)
+- Location (city, state, zip)
+- Language & timezone
+- Password change
+
+**Tab 2: Role Information** (varies by role)
+
+- Role-specific fields organized into logical groups
+- Collapsible sections with icons
+- Help text for complex fields
+- "Why we ask" tooltips
+
+**Tab 3: Privacy & Notifications**
+
+- Profile visibility settings
+- Data sharing consent
+- Email preferences
+- SMS preferences
+- Push notification settings
+
+**Tab 4: Activity & Stats** (optional)
+
+- Favorites count
+- Reviews written
+- Resources suggested
+- Volunteer hours (if applicable)
+- Achievements/badges
+
+#### Design Principles
+
+**Simplicity**:
+
+- Maximum 3-5 fields per section
+- Plain language labels ("Where do you live?" vs "Residential Address")
+- Icons for visual clarity
+- Inline help text, not modals
+
+**Progressive Disclosure**:
+
+- Show essential fields first
+- "Show more" buttons for advanced options
+- Collapsible sections (closed by default)
+- "Why we ask this" explanations
+
+**Visual Hierarchy**:
+
+- Required fields marked clearly (red asterisk)
+- Optional fields in lighter text
+- Section headers with icons
+- White space between groups
+
+**Accessibility**:
+
+- High contrast
+- Large touch targets (44px minimum)
+- Keyboard navigation
+- Screen reader friendly
+- Error messages clear and actionable
+
+**Mobile-First**:
+
+- Single column layout
+- Thumb-friendly buttons
+- Minimal scrolling per section
+- Save button always visible (sticky)
+
+### Personalized Dashboards
+
+Each role gets a customized dashboard home page:
+
+#### Returning Citizen Dashboard
+
+**Hero Section**:
+
+- "Welcome back, [First Name]"
+- Quick actions: Search Resources | My Favorites | Get Help
+
+**Main Widgets**:
+
+- **Recommended Resources** (based on primary_needs)
+- **Resources Near You** (based on location)
+- **Your Next Steps** (based on goals)
+- **Recent Activity** (your favorites, reviews)
+- **Support Contacts** (case manager quick access)
+
+#### Reentry Coach Dashboard
+
+**Hero Section**:
+
+- "Welcome, [First Name]"
+- Quick actions: Find Resources | Suggest Resource | View Updates
+
+**Main Widgets**:
+
+- **Recently Updated Resources** (in your specializations)
+- **Resources by Category** (your service areas)
+- **Community Activity** (new reviews, suggestions)
+- **Your Contributions** (resources suggested, reviews written)
+- **Helpful Resources** (most reviewed in your area)
+
+#### Volunteer Dashboard
+
+**Hero Section**:
+
+- "Welcome, [First Name]"
+- Quick actions: Log Hours | View Opportunities | Team Updates
+
+**Main Widgets**:
+
+- **Volunteer Opportunities** (matching your interests)
+- **Your Impact Stats** (hours, projects, recognition)
+- **Team Updates** (from your Angel Team Leader)
+- **Training Resources**
+- **Upcoming Events**
+
+#### General Public Dashboard
+
+**Hero Section**:
+
+- "Welcome, [First Name]"
+- Quick actions: Explore Resources | Learn More | Get Involved
+
+**Main Widgets**:
+
+- **Browse Resources** (directory overview)
+- **How to Help** (volunteer, donate, advocate)
+- **Success Stories** (community impact)
+- **Recent Updates** (new resources, platform updates)
+
+### Database Schema Changes
+
+**Expand users table**:
+
+```sql
+ALTER TABLE users
+-- Baseline fields
+ADD COLUMN first_name TEXT,
+ADD COLUMN last_name TEXT,
+ADD COLUMN email TEXT UNIQUE,
+ADD COLUMN user_type TEXT NOT NULL DEFAULT 'general-public',
+ADD COLUMN secondary_roles TEXT[],
+ADD COLUMN preferred_language TEXT DEFAULT 'en',
+ADD COLUMN timezone TEXT DEFAULT 'America/Los_Angeles',
+ADD COLUMN notification_preferences JSONB,
+ADD COLUMN profile_visibility TEXT DEFAULT 'private',
+ADD COLUMN show_on_leaderboard BOOLEAN DEFAULT false,
+ADD COLUMN data_sharing_consent BOOLEAN DEFAULT false,
+ADD COLUMN email_verified BOOLEAN DEFAULT false,
+ADD COLUMN phone_verified BOOLEAN DEFAULT false,
+
+-- Location (optional)
+ADD COLUMN city TEXT,
+ADD COLUMN state TEXT,
+ADD COLUMN zip_code TEXT,
+ADD COLUMN show_location_publicly BOOLEAN DEFAULT false,
+
+-- System fields
+ADD COLUMN onboarding_completed BOOLEAN DEFAULT false,
+ADD COLUMN onboarding_step INTEGER DEFAULT 0,
+ADD COLUMN profile_completeness INTEGER DEFAULT 0,
+ADD COLUMN last_active_at TIMESTAMPTZ;
+
+-- Create indexes
+CREATE INDEX idx_users_user_type ON users(user_type);
+CREATE INDEX idx_users_city ON users(city) WHERE city IS NOT NULL;
+CREATE INDEX idx_users_onboarding ON users(onboarding_completed);
+
+-- Migrate existing data
+UPDATE users SET first_name = split_part(name, ' ', 1);
+UPDATE users SET last_name = split_part(name, ' ', 2);
+UPDATE users SET email = COALESCE(email, phone || '@temp.placeholder');
+```
+
+**Create role-specific extended tables**:
+
+```sql
+-- Returning Citizens
+CREATE TABLE returning_citizen_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  reentry_date DATE,
+  support_timeline TEXT,
+  primary_needs TEXT[],
+  immediate_needs TEXT[],
+  personal_goals TEXT,
+  goal_categories TEXT[],
+  has_case_manager BOOLEAN DEFAULT false,
+  case_manager_name TEXT,
+  case_manager_email TEXT,
+  case_manager_phone TEXT,
+  emergency_contact_name TEXT,
+  emergency_contact_phone TEXT,
+  emergency_contact_relationship TEXT,
+  has_valid_id BOOLEAN,
+  id_type TEXT,
+  has_reliable_transportation BOOLEAN,
+  transportation_method TEXT,
+  has_smartphone BOOLEAN,
+  internet_access TEXT,
+  accessibility_needs TEXT[],
+  special_accommodations TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Reentry Coaches
+CREATE TABLE reentry_coach_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  organization_name TEXT NOT NULL,
+  organization_type TEXT NOT NULL,
+  job_title TEXT NOT NULL,
+  years_experience INTEGER,
+  credentials TEXT[],
+  specializations TEXT[],
+  caseload_size INTEGER,
+  accepting_new_clients BOOLEAN DEFAULT false,
+  max_caseload INTEGER,
+  availability_hours JSONB,
+  preferred_contact_method TEXT NOT NULL,
+  response_time_expectation TEXT,
+  service_categories TEXT[] NOT NULL,
+  geographic_area TEXT,
+  languages_spoken TEXT[],
+  virtual_services BOOLEAN DEFAULT false,
+  bio TEXT,
+  success_stories_count INTEGER DEFAULT 0,
+  verified_coach BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Angel Team Volunteers
+CREATE TABLE volunteer_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  volunteer_since DATE NOT NULL,
+  volunteer_status TEXT NOT NULL DEFAULT 'active',
+  hours_per_month INTEGER,
+  volunteer_interests TEXT[] NOT NULL,
+  skills_to_share TEXT[],
+  background_check_status TEXT NOT NULL DEFAULT 'pending',
+  background_check_date DATE,
+  onboarding_completed_date DATE,
+  orientation_attended BOOLEAN DEFAULT false,
+  agreements_signed JSONB,
+  volunteer_activities TEXT[],
+  total_volunteer_hours INTEGER DEFAULT 0,
+  projects_participated TEXT[],
+  preferred_schedule JSONB,
+  volunteer_level TEXT DEFAULT 'bronze',
+  badges_earned TEXT[],
+  recognition_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Angel Team Leaders (extends volunteer)
+CREATE TABLE team_leader_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  team_name TEXT NOT NULL,
+  team_size INTEGER,
+  leadership_since DATE NOT NULL,
+  leadership_training_completed BOOLEAN DEFAULT false,
+  areas_of_responsibility TEXT[] NOT NULL,
+  projects_managed TEXT[],
+  budget_responsibility BOOLEAN DEFAULT false,
+  can_approve_volunteers BOOLEAN DEFAULT false,
+  team_meeting_schedule TEXT,
+  preferred_communication_tools TEXT[],
+  office_hours JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- General Public
+CREATE TABLE general_public_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  how_did_you_hear TEXT,
+  interest_areas TEXT[],
+  wants_to_volunteer BOOLEAN DEFAULT false,
+  wants_to_donate BOOLEAN DEFAULT false,
+  wants_updates BOOLEAN DEFAULT false,
+  profession TEXT,
+  can_provide_resources BOOLEAN DEFAULT false,
+  relationship_type TEXT,
+  motivation TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Policies (users can only view/edit their own extended profiles)
+ALTER TABLE returning_citizen_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reentry_coach_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE volunteer_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_leader_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE general_public_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Create identical policies for all extended profile tables
+-- (example for returning_citizen_profiles, repeat for others)
+CREATE POLICY "Users can view own profile"
+  ON returning_citizen_profiles FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own profile"
+  ON returning_citizen_profiles FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own profile"
+  ON returning_citizen_profiles FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+```
+
+### Consequences
+
+**Positive**:
+
+- **Better personalization**: Match users to relevant resources and features
+- **Community building**: Connect coaches, volunteers, and returning citizens
+- **Improved outcomes**: Track goals, needs, and progress
+- **Dignity preserved**: Optional fields, privacy controls, no stigmatizing language
+- **Flexibility**: Users can have multiple roles (e.g., returning citizen + volunteer)
+- **Progressive enhancement**: Minimal signup, grow profile over time
+
+**Negative**:
+
+- **Increased complexity**: More fields to maintain, test, and support
+- **Privacy concerns**: Need robust security and clear data policies
+- **Development time**: Significant work for onboarding wizard and role system
+- **User confusion risk**: Must be extremely clear and simple
+- **Data quality**: Optional fields may remain incomplete
+
+### Migration Path
+
+**Phase 0 (Current)**:
+
+- Minimal profile (name, phone, avatar)
+- Single user type (default)
+
+**Phase 1 (Baseline Profile)**:
+
+- Add first_name/last_name separation
+- Add email verification
+- Add basic location fields
+- Add notification preferences
+
+**Phase 2 (Role System)**:
+
+- Add user_type and role selection
+- Create extended profile tables
+- Build onboarding wizard
+- Launch for one role (Returning Citizens)
+
+**Phase 3 (Multi-Role Support)**:
+
+- Enable all user roles
+- Build role-specific dashboards
+- Add role-switching capability
+
+**Phase 4 (Advanced Features)**:
+
+- Goal tracking for returning citizens
+- Coach-client connections
+- Volunteer opportunity matching
+- Community features
+
+### Implementation Priority
+
+**P0 (MVP Must-Have)**:
+
+- First/last name separation
+- Email + email verification
+- Basic location (city, state, zip)
+- Privacy settings
+- Profile completeness calculation
+
+**P1 (Early Enhancement)**:
+
+- User type/role selection
+- Returning citizen extended profile
+- Onboarding wizard (basic version)
+- Personalized dashboard (returning citizens only)
+
+**P2 (Post-Launch)**:
+
+- All five role types supported
+- Full onboarding wizard with branching
+- Role-specific dashboards
+- Coach and volunteer profiles
+
+**P3 (Future)**:
+
+- Multi-role support (users with multiple roles)
+- Advanced matching algorithms
+- Community features (coach-client, mentor-mentee)
+- Goal tracking and progress analytics
+
+### Security & Privacy Considerations
+
+**Data Minimization**:
+
+- Only ask for what's needed
+- Make most fields optional
+- Clear "why we ask" explanations
+
+**Privacy Controls**:
+
+- Default to private profiles
+- Granular visibility settings
+- Ability to hide sensitive fields
+- Export and delete options (GDPR)
+
+**Sensitive Data Handling**:
+
+- Reentry dates stored encrypted
+- Case manager info only for user
+- Emergency contacts private
+- Background check status not public
+
+**Access Control**:
+
+- RLS policies on all profile tables
+- Users only see their own data
+- Admins require explicit permissions
+- Audit logging for sensitive fields
+
+---
+
 ## Next Decisions Needed
 
-1. **ADR-013**: State Management approach (when needed)
-2. **ADR-014**: Form handling library (react-hook-form vs alternatives)
-3. **ADR-015**: Image optimization strategy
-4. **ADR-016**: Monitoring and observability tools
-5. **ADR-017**: CI/CD pipeline configuration
+1. **ADR-014**: State Management approach (when needed)
+2. **ADR-015**: Form handling library (react-hook-form vs alternatives)
+3. **ADR-016**: Image optimization strategy
+4. **ADR-017**: Monitoring and observability tools
+5. **ADR-018**: CI/CD pipeline configuration
 
 ---
 

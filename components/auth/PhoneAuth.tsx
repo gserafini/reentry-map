@@ -7,6 +7,10 @@ import { useState, useEffect } from 'react'
 
 type AuthStep = 'phone' | 'otp'
 
+export interface PhoneAuthProps extends React.ComponentPropsWithoutRef<'div'> {
+  onSuccess?: () => void
+}
+
 /**
  * Phone authentication component using Supabase Auth with SMS OTP
  *
@@ -17,7 +21,7 @@ type AuthStep = 'phone' | 'otp'
  * 4. Verify and create session
  * 5. Auto-create user profile on first sign-in (handled by database trigger)
  */
-export function PhoneAuth({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+export function PhoneAuth({ onSuccess, className, ...props }: PhoneAuthProps) {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [step, setStep] = useState<AuthStep>('phone')
@@ -131,8 +135,14 @@ export function PhoneAuth({ className, ...props }: React.ComponentPropsWithoutRe
 
       // Refresh server components to update auth state in header
       router.refresh()
-      // Redirect to homepage or last visited page
-      router.push('/')
+
+      if (onSuccess) {
+        // Used in modal - stay on current page
+        onSuccess()
+      } else {
+        // Used on standalone page - redirect to home
+        router.push('/')
+      }
     } catch (error: unknown) {
       setError(
         error instanceof Error ? error.message : 'Invalid verification code. Please try again.'
