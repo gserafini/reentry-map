@@ -10,18 +10,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-
-// Helper function to get initials from email
-function getInitials(email: string): string {
-  const name = email.split('@')[0]
-  const parts = name.split(/[._-]/)
-
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase()
-  }
-
-  return name.slice(0, 2).toUpperCase()
-}
+import { getInitials, getAvatarColor } from '@/lib/utils/avatar'
 
 interface AuthButtonProps {
   userEmail?: string | null
@@ -55,13 +44,13 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
         sx={{
           width: 36,
           height: 36,
-          bgcolor: '#000',
+          bgcolor: getAvatarColor(userEmail),
           color: '#fff',
           fontSize: '0.875rem',
           fontWeight: 600,
           cursor: 'pointer',
           '&:hover': {
-            bgcolor: '#333',
+            opacity: 0.9,
           },
         }}
       >
@@ -90,11 +79,11 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
           </ListItemIcon>
           <ListItemText>Favorites</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => router.push('/account/settings')}>
+        <MenuItem onClick={() => router.push('/profile')}>
           <ListItemIcon>
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Account Settings</ListItemText>
+          <ListItemText>Profile</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>

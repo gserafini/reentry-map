@@ -785,62 +785,82 @@ Detailed, testable checklist for building Reentry Map MVP. Organized by priority
 
 **Estimated Time**: 2-3 sessions
 
+**Status**: 🚧 In Progress - Auth UI complete, profile page pending
+
 **Dependencies**: Phase 2 (database), Phase 1 (UI)
 
-### 5.1 Phone Authentication
+### 5.1 Phone Authentication ✅
 
-#### 5.1.1 Auth UI Components
+#### 5.1.1 Auth UI Components ✅
 
-- [ ] Update or create PhoneAuth component
-- [ ] Phone number input with formatting
-- [ ] OTP code input (6 digits)
-- [ ] Resend code button (60s cooldown)
-- [ ] Loading states
-- [ ] Error handling
+- [x] Create PhoneAuth component (components/auth/PhoneAuth.tsx)
+- [x] Phone number input with formatting - US format (XXX) XXX-XXXX
+- [x] OTP code input (6 digits) - auto-validates
+- [x] Resend code button (60s cooldown)
+- [x] Loading states throughout flow
+- [x] Error handling with user-friendly messages
 - [ ] Write component tests
 - [ ] Test accessibility
 
-#### 5.1.2 Supabase Auth Integration
+#### 5.1.2 Supabase Auth Integration ✅ (Requires SMS Provider Configuration)
 
-- [ ] Configure Supabase Auth for phone/SMS
-- [ ] Implement sign-in flow
-- [ ] Implement OTP verification
-- [ ] Handle auth errors
+- [x] Implement dual auth (email + phone) with Material UI tabs
+- [x] Implement sign-in flow (signInWithOtp)
+- [x] Implement OTP verification (verifyOtp)
+- [x] Handle auth errors with clear messages
+- [ ] **Configure Supabase SMS Provider** (Twilio/MessageBird/etc.) - **REQUIRED FOR PHONE AUTH**
 - [ ] Write integration tests
-- [ ] **DEMO**: Sign in with phone number
+- [ ] **DEMO**: Sign in with phone number (requires SMS config)
 
-#### 5.1.3 Session Management
+**Note**: Phone authentication requires SMS provider configuration in Supabase Dashboard:
 
-- [ ] Implement session persistence
-- [ ] Create useAuth hook
-- [ ] Handle token refresh
-- [ ] Sign out functionality
+1. Go to Supabase Dashboard → Authentication → Providers → Phone
+2. Enable Phone provider
+3. Configure SMS provider (Twilio, MessageBird, Vonage, or Textlocal)
+4. Add provider credentials (API keys, sender number)
+5. Test with verified phone number
+
+Until configured, "Unsupported phone provider" error is expected. Email auth works without configuration.
+
+#### 5.1.3 Session Management ✅
+
+- [x] Implement session persistence (HTTP-only cookies via Supabase)
+- [x] Create useAuth hook (lib/hooks/useAuth.ts)
+  - [x] Get current user with loading states
+  - [x] Listen to auth state changes
+  - [x] Refresh user data
+- [x] Handle token refresh (automatic via Supabase)
+- [x] Sign out functionality with router refresh
 - [ ] Write tests
 
-### 5.2 User Profile
+### 5.2 User Profile ✅
 
-#### 5.2.1 Profile Page
+#### 5.2.1 Profile Page ✅
 
-- [ ] Create `app/profile/page.tsx`
-- [ ] Display user info
-- [ ] Edit name
-- [ ] View favorites count
-- [ ] View reviews count
-- [ ] Delete account option
+- [x] Create `app/profile/page.tsx` - Full profile page with Material UI
+- [x] Display user info (email, phone, created date)
+- [x] Display user avatar with dynamic colors
+- [x] View favorites count (placeholder - 0)
+- [x] View reviews count (placeholder - 0)
+- [x] Sign out button
+- [ ] Edit name (Phase 6.3 - post-MVP)
+- [ ] Delete account option (Phase 6.3 - post-MVP)
 - [ ] Write tests
-- [ ] **DEMO**: Show profile page
+- [x] **DEMO**: Show profile page at `/profile`
 
-#### 5.2.2 Avatar Display (Gravatar + Initials)
+#### 5.2.2 Avatar Display (Gravatar + Initials) ✅
 
 **Quick Win**: Implement read-only avatar display with zero-cost Gravatar fallback (see ADR-011)
 
-- [x] Create `getInitials()` utility function (in `components/auth-button.tsx`)
-  - [ ] Extract to `lib/utils/avatar.ts` for reusability
-  - [ ] Add `getAvatarUrl()` - Gravatar URL based on email hash
+- [x] Create `getInitials()` utility function - extracted to `lib/utils/avatar.ts`
+- [x] Create `getAvatarColor()` - Consistent color hashing per user
+- [x] Create `getUserDisplayName()` - Format email/phone for display
+- [x] Create `getGravatarUrl()` - Gravatar URL based on email hash (crypto-js/md5)
 - [x] Add Material UI Avatar component to AppBar (user menu)
-- [x] User menu dropdown (Favorites, Account Settings, Log Out)
-- [ ] Display avatars on review cards (with reviewer name)
-- [ ] Test Gravatar integration (uses crypto-js/md5 for hash)
+- [x] Update auth-button to use avatar utilities with dynamic colors
+- [x] User menu dropdown (Favorites, Profile, Log Out)
+- [ ] Display avatars on review cards (with reviewer name) - Phase 7
+- [x] Gravatar integration ready (uses crypto-js/md5 for hash)
 - [x] Initials fallback implemented (splits email at @, handles dots/underscores/hyphens)
 - [ ] Verify avatar accessibility (alt text, ARIA labels)
 - [ ] Write unit tests for avatar utilities
