@@ -22,13 +22,22 @@ async function checkProfileWithLogin() {
   const failedRequests = []
 
   // Capture failed network requests
-  page.on('response', (response) => {
+  page.on('response', async (response) => {
     if (!response.ok()) {
       const url = response.url()
       const status = response.status()
+      let body = ''
+      try {
+        body = await response.text()
+      } catch {
+        // Ignore - response body not available
+      }
       const failedRequest = `${status} ${url}`
       failedRequests.push(failedRequest)
       console.log(`[network] ${failedRequest}`)
+      if (status >= 500) {
+        console.log(`[network-body] ${body}`)
+      }
     }
   })
 
@@ -54,6 +63,10 @@ async function checkProfileWithLogin() {
   })
 
   try {
+    // Clear all storage to ensure fresh session
+    await context.clearCookies()
+    await context.clearPermissions()
+
     // Navigate to login page
     console.log(`📝 Logging in as: ${TEST_EMAIL}`)
     await page.goto(`${BASE_URL}/auth/login`)

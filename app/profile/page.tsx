@@ -63,25 +63,20 @@ export default function ProfilePage() {
       }
 
       try {
-        console.log('[Profile] Fetching profile for user:', authUser.id)
         const { data, error } = await supabase
           .from('users')
           .select('*')
           .eq('id', authUser.id)
           .single()
 
-        if (error) {
-          console.error('[Profile] Supabase error:', error)
-          throw error
-        }
+        if (error) throw error
 
-        console.log('[Profile] Profile data fetched successfully:', data)
         setProfile(data)
         setFirstName(data.first_name || '')
         setLastName(data.last_name || '')
         setEmail(authUser.email || '')
       } catch (err) {
-        console.error('[Profile] Error fetching profile:', err)
+        console.error('Error fetching profile:', err)
         setError('Failed to load profile')
       } finally {
         setIsLoadingProfile(false)
