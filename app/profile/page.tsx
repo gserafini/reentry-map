@@ -44,6 +44,7 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
 
   const { gravatarUrl, hasGravatar } = useGravatar(authUser?.email, 160)
 
@@ -83,6 +84,7 @@ export default function ProfilePage() {
           setFirstName(newProfile.first_name || '')
           setLastName(newProfile.last_name || '')
           setEmail(authUser.email || '')
+          setPhone(newProfile.phone || '')
         } else if (error) {
           throw error
         } else {
@@ -90,6 +92,7 @@ export default function ProfilePage() {
           setFirstName(data.first_name || '')
           setLastName(data.last_name || '')
           setEmail(authUser.email || '')
+          setPhone(data.phone || '')
         }
       } catch (err) {
         console.error('Error fetching profile:', err)
@@ -116,6 +119,7 @@ export default function ProfilePage() {
         .update({
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
+          phone: phone.trim() || null,
         })
         .eq('id', authUser.id)
 
@@ -150,6 +154,7 @@ export default function ProfilePage() {
     setFirstName(profile?.first_name || '')
     setLastName(profile?.last_name || '')
     setEmail(authUser?.email || '')
+    setPhone(profile?.phone || '')
     setIsEditing(false)
     setError(null)
     setSuccess(null)
@@ -266,16 +271,16 @@ export default function ProfilePage() {
                     : undefined
                 }
               />
-              {authUser.phone && (
-                <TextField
-                  label="Phone"
-                  value={authUser.phone}
-                  disabled
-                  fullWidth
-                  variant="outlined"
-                  helperText="Phone number cannot be changed"
-                />
-              )}
+              <TextField
+                label="Phone Number"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                fullWidth
+                variant="outlined"
+                placeholder="(555) 123-4567"
+                helperText="US phone number (optional)"
+              />
             </Box>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
@@ -302,14 +307,14 @@ export default function ProfilePage() {
                   </Box>
                 </Box>
               )}
-              {authUser.phone && (
+              {profile.phone && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <PhoneIcon fontSize="small" color="action" />
                   <Box>
                     <Typography variant="caption" color="text.secondary" display="block">
                       Phone
                     </Typography>
-                    <Typography>{authUser.phone}</Typography>
+                    <Typography>{profile.phone}</Typography>
                   </Box>
                 </Box>
               )}
