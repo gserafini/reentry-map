@@ -119,23 +119,25 @@ export function PhoneAuth({
   /**
    * Verify OTP code
    */
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleVerifyOTP = async (e?: React.FormEvent, code?: string) => {
+    e?.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
+
+    const otpCode = code || otp
 
     try {
       const formattedPhone = formatPhoneNumber(phone)
 
       // Validate OTP (must be 6 digits)
-      if (otp.length !== 6) {
+      if (otpCode.length !== 6) {
         throw new Error('Please enter the 6-digit verification code')
       }
 
       const { error } = await supabase.auth.verifyOtp({
         phone: formattedPhone,
-        token: otp,
+        token: otpCode,
         type: 'sms',
       })
 
@@ -217,7 +219,9 @@ export function PhoneAuth({
             sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
           >
             <TextField
-              label={mode === 'login' ? 'Log in with my phone' : 'Sign up with my phone'}
+              label={
+                mode === 'login' ? 'Log in with my mobile phone' : 'Sign up with my mobile phone'
+              }
               type="tel"
               placeholder="(555) 123-4567"
               required
@@ -226,7 +230,7 @@ export function PhoneAuth({
               onChange={handlePhoneChange}
               variant="outlined"
               size={minimal ? 'small' : 'medium'}
-              helperText="US phone numbers only"
+              helperText="US mobile numbers only - for SMS verification"
               inputProps={{
                 maxLength: 14, // (XXX) XXX-XXXX
                 autoComplete: 'tel',
@@ -261,9 +265,16 @@ export function PhoneAuth({
               required
               fullWidth
               value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(e) => {
+                const code = e.target.value.replace(/\D/g, '').slice(0, 6)
+                setOtp(code)
+                // Auto-submit when 6 digits entered
+                if (code.length === 6 && !isLoading) {
+                  handleVerifyOTP(undefined, code)
+                }
+              }}
               variant="outlined"
-              helperText="Enter the 6-digit code from your text message"
+              helperText="Code will auto-submit when complete"
               inputProps={{
                 maxLength: 6,
                 inputMode: 'numeric',
