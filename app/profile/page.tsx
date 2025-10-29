@@ -443,28 +443,45 @@ export default function ProfilePage() {
                   </Box>
                 </Box>
               )}
-              {authUser.phone && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PhoneIcon fontSize="small" color="action" />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      Mobile Phone
-                    </Typography>
-                    <Typography>{authUser.phone}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Used for login and notifications •{' '}
-                      <Link
-                        component="button"
-                        variant="caption"
-                        onClick={handleOpenPhoneDialog}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        Change
-                      </Link>
-                    </Typography>
-                  </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PhoneIcon fontSize="small" color="action" />
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Log in using mobile phone
+                  </Typography>
+                  {authUser.phone ? (
+                    <>
+                      <Typography>{authUser.phone}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Used for login and notifications •{' '}
+                        <Link
+                          component="button"
+                          variant="caption"
+                          onClick={handleOpenPhoneDialog}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          Change
+                        </Link>
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <Typography color="text.secondary">Not set</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        <Link
+                          component="button"
+                          variant="caption"
+                          onClick={handleOpenPhoneDialog}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          Add mobile phone
+                        </Link>{' '}
+                        to enable phone login
+                      </Typography>
+                    </>
+                  )}
                 </Box>
-              )}
+              </Box>
             </Box>
           )}
 
@@ -545,17 +562,21 @@ export default function ProfilePage() {
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <PhoneAndroidIcon />
-            <Typography variant="h6">Change Phone Number</Typography>
+            <Typography variant="h6">
+              {authUser?.phone ? 'Change Phone Number' : 'Add Phone Number'}
+            </Typography>
           </Box>
         </DialogTitle>
         <DialogContent>
           {phoneStep === 'phone' ? (
             <Box sx={{ pt: 1 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Enter your new mobile phone number. We&apos;ll send you a verification code via SMS.
+                {authUser?.phone
+                  ? "Enter your new mobile phone number. We'll send you a verification code via SMS."
+                  : "Enter your mobile phone number to enable phone login. We'll send you a verification code via SMS."}
               </Typography>
               <TextField
-                label="New Mobile Phone Number"
+                label={authUser?.phone ? 'New Mobile Phone Number' : 'Mobile Phone Number'}
                 type="tel"
                 placeholder="(555) 123-4567"
                 required
