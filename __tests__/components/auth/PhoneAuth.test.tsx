@@ -39,15 +39,15 @@ describe('PhoneAuth', () => {
     it('renders phone input form', () => {
       render(<PhoneAuth />)
 
-      expect(screen.getByText('Sign In')).toBeInTheDocument()
-      expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument()
+      expect(screen.getByText('Log In')).toBeInTheDocument()
+      expect(screen.getByLabelText(/log in with my mobile phone/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /send verification code/i })).toBeInTheDocument()
     })
 
     it('formats phone number as user types', () => {
       render(<PhoneAuth />)
 
-      const input = screen.getByLabelText(/phone number/i) as HTMLInputElement
+      const input = screen.getByLabelText(/log in with my mobile phone/i) as HTMLInputElement
 
       fireEvent.change(input, { target: { value: '5551234567' } })
 
@@ -57,7 +57,7 @@ describe('PhoneAuth', () => {
     it('limits phone number to 14 characters', () => {
       render(<PhoneAuth />)
 
-      const input = screen.getByLabelText(/phone number/i) as HTMLInputElement
+      const input = screen.getByLabelText(/log in with my mobile phone/i) as HTMLInputElement
 
       fireEvent.change(input, { target: { value: '55512345678901234567' } })
 
@@ -69,7 +69,7 @@ describe('PhoneAuth', () => {
 
       render(<PhoneAuth />)
 
-      const input = screen.getByLabelText(/phone number/i)
+      const input = screen.getByLabelText(/log in with my mobile phone/i)
       const button = screen.getByRole('button', { name: /send verification code/i })
 
       fireEvent.change(input, { target: { value: '5551234567' } })
@@ -86,7 +86,7 @@ describe('PhoneAuth', () => {
     it('shows error for invalid phone number', async () => {
       render(<PhoneAuth />)
 
-      const input = screen.getByLabelText(/phone number/i)
+      const input = screen.getByLabelText(/log in with my mobile phone/i)
       const button = screen.getByRole('button', { name: /send verification code/i })
 
       // Enter invalid phone (too short)
@@ -105,7 +105,7 @@ describe('PhoneAuth', () => {
 
       render(<PhoneAuth />)
 
-      const input = screen.getByLabelText(/phone number/i)
+      const input = screen.getByLabelText(/log in with my mobile phone/i)
       const button = screen.getByRole('button', { name: /send verification code/i })
 
       fireEvent.change(input, { target: { value: '5551234567' } })
@@ -126,7 +126,7 @@ describe('PhoneAuth', () => {
 
       render(<PhoneAuth />)
 
-      const input = screen.getByLabelText(/phone number/i)
+      const input = screen.getByLabelText(/log in with my mobile phone/i)
       const button = screen.getByRole('button', { name: /send verification code/i })
 
       fireEvent.change(input, { target: { value: '5551234567' } })
