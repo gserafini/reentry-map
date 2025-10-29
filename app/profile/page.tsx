@@ -69,12 +69,28 @@ export default function ProfilePage() {
           .eq('id', authUser.id)
           .single()
 
-        if (error) throw error
+        // If profile doesn't exist, create it
+        if (error?.code === 'PGRST116') {
+          const { data: newProfile, error: insertError } = await supabase
+            .from('users')
+            .insert({ id: authUser.id, phone: authUser.phone })
+            .select()
+            .single()
 
-        setProfile(data)
-        setFirstName(data.first_name || '')
-        setLastName(data.last_name || '')
-        setEmail(authUser.email || '')
+          if (insertError) throw insertError
+
+          setProfile(newProfile)
+          setFirstName(newProfile.first_name || '')
+          setLastName(newProfile.last_name || '')
+          setEmail(authUser.email || '')
+        } else if (error) {
+          throw error
+        } else {
+          setProfile(data)
+          setFirstName(data.first_name || '')
+          setLastName(data.last_name || '')
+          setEmail(authUser.email || '')
+        }
       } catch (err) {
         console.error('Error fetching profile:', err)
         setError('Failed to load profile')
