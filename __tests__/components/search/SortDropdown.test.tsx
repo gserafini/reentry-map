@@ -1,31 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  render,
+  screen,
+  waitFor,
+  resetRouterMocks,
+  setMockPathname,
+  setMockSearchParams,
+  getMockRouter,
+} from '@/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 import { SortDropdown } from '@/components/search/SortDropdown'
 import { parseSortParam } from '@/lib/utils/sort'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-
-// Mock Next.js navigation hooks
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  usePathname: vi.fn(),
-  useSearchParams: vi.fn(),
-}))
 
 describe('SortDropdown', () => {
-  const mockPush = vi.fn()
-  const mockPathname = '/search'
-  const mockSearchParams = new URLSearchParams()
-
   beforeEach(() => {
-    vi.clearAllMocks()
-    ;(useRouter as ReturnType<typeof vi.fn>).mockReturnValue({
-      push: mockPush,
-    })
-    ;(usePathname as ReturnType<typeof vi.fn>).mockReturnValue(mockPathname)
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(mockSearchParams)
-
-    // Clear localStorage
+    resetRouterMocks()
+    setMockPathname('/search')
     localStorage.clear()
   })
 
@@ -79,14 +69,13 @@ describe('SortDropdown', () => {
     await user.click(ratingOption)
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/search?sort=rating-desc')
+      expect(getMockRouter().push).toHaveBeenCalledWith('/search?sort=rating-desc')
     })
   })
 
   it('removes page param when changing sort', async () => {
     const user = userEvent.setup()
-    const searchParamsWithPage = new URLSearchParams('page=2')
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(searchParamsWithPage)
+    setMockSearchParams({ page: '2' })
 
     render(<SortDropdown />)
 
@@ -98,7 +87,7 @@ describe('SortDropdown', () => {
     await user.click(nameDesc)
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/search?sort=name-desc')
+      expect(getMockRouter().push).toHaveBeenCalledWith('/search?sort=name-desc')
     })
   })
 
@@ -120,8 +109,7 @@ describe('SortDropdown', () => {
 
   it('removes sort param when selecting default sort', async () => {
     const user = userEvent.setup()
-    const searchParamsWithSort = new URLSearchParams('sort=rating-desc')
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(searchParamsWithSort)
+    setMockSearchParams({ sort: 'rating-desc' })
 
     render(<SortDropdown defaultSort="name-asc" />)
 
@@ -133,14 +121,13 @@ describe('SortDropdown', () => {
     await user.click(nameAsc)
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/search')
+      expect(getMockRouter().push).toHaveBeenCalledWith('/search')
     })
   })
 
   it('preserves other search params when changing sort', async () => {
     const user = userEvent.setup()
-    const searchParamsWithCategory = new URLSearchParams('category=housing&page=2')
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(searchParamsWithCategory)
+    setMockSearchParams({ category: 'housing', page: '2' })
 
     render(<SortDropdown />)
 
@@ -152,13 +139,12 @@ describe('SortDropdown', () => {
     await user.click(ratingOption)
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/search?category=housing&sort=rating-desc')
+      expect(getMockRouter().push).toHaveBeenCalledWith('/search?category=housing&sort=rating-desc')
     })
   })
 
   it('uses sort from URL params if present', () => {
-    const searchParamsWithSort = new URLSearchParams('sort=rating-desc')
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(searchParamsWithSort)
+    setMockSearchParams({ sort: 'rating-desc' })
 
     render(<SortDropdown />)
 

@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import {
+  render,
+  screen,
+  waitFor,
+  resetRouterMocks,
+  getMockRouter,
+  setMockSearchParams,
+  setMockPathname,
+} from '@/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 import { NearMeButton } from '@/components/search/NearMeButton'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserLocation } from '@/lib/context/LocationContext'
-
-// Mock Next.js navigation hooks
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  useSearchParams: vi.fn(),
-}))
 
 // Mock LocationContext
 vi.mock('@/lib/context/LocationContext', () => ({
@@ -17,16 +18,12 @@ vi.mock('@/lib/context/LocationContext', () => ({
 }))
 
 describe('NearMeButton', () => {
-  const mockPush = vi.fn()
-  const mockSearchParams = new URLSearchParams()
   const mockRequestLocation = vi.fn()
 
   beforeEach(() => {
+    resetRouterMocks()
+    setMockPathname('/search')
     vi.clearAllMocks()
-    ;(useRouter as ReturnType<typeof vi.fn>).mockReturnValue({
-      push: mockPush,
-    })
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(mockSearchParams)
     ;(useUserLocation as ReturnType<typeof vi.fn>).mockReturnValue({
       requestLocation: mockRequestLocation,
       loading: false,
@@ -87,13 +84,12 @@ describe('NearMeButton', () => {
     await user.click(button)
 
     expect(mockRequestLocation).not.toHaveBeenCalled()
-    expect(mockPush).toHaveBeenCalledWith('/search?sort=distance-asc')
+    expect(getMockRouter().push).toHaveBeenCalledWith('/search?sort=distance-asc')
   })
 
   it('preserves existing search params when sorting by distance', async () => {
     const user = userEvent.setup()
-    const searchParamsWithCategory = new URLSearchParams('category=housing&search=help')
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(searchParamsWithCategory)
+    setMockSearchParams({ category: 'housing', search: 'help' })
     ;(useUserLocation as ReturnType<typeof vi.fn>).mockReturnValue({
       requestLocation: mockRequestLocation,
       loading: false,
@@ -106,7 +102,9 @@ describe('NearMeButton', () => {
     const button = screen.getByRole('button', { name: /near me/i })
     await user.click(button)
 
-    expect(mockPush).toHaveBeenCalledWith('/search?category=housing&search=help&sort=distance-asc')
+    expect(getMockRouter().push).toHaveBeenCalledWith(
+      '/search?category=housing&search=help&sort=distance-asc'
+    )
   })
 
   it('shows error snackbar when location request fails', async () => {
@@ -122,13 +120,7 @@ describe('NearMeButton', () => {
     ;(useUserLocation as ReturnType<typeof vi.fn>).mockReturnValue({
       requestLocation: mockRequestLocation,
       loading: false,
-      error: {
-        code: 1,
-        message: 'User denied geolocation',
-        PERMISSION_DENIED: 1,
-        POSITION_UNAVAILABLE: 2,
-        TIMEOUT: 3,
-      } as GeolocationPositionError,
+      error: 'permission-denied',
       coordinates: null,
     })
 
@@ -172,13 +164,7 @@ describe('NearMeButton', () => {
     ;(useUserLocation as ReturnType<typeof vi.fn>).mockReturnValue({
       requestLocation: mockRequestLocation,
       loading: false,
-      error: {
-        code: 1,
-        message: 'User denied geolocation',
-        PERMISSION_DENIED: 1,
-        POSITION_UNAVAILABLE: 2,
-        TIMEOUT: 3,
-      } as GeolocationPositionError,
+      error: 'permission-denied',
       coordinates: null,
     })
 

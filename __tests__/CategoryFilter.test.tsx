@@ -1,28 +1,20 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  render,
+  screen,
+  fireEvent,
+  resetRouterMocks,
+  setMockSearchParams,
+  setMockPathname,
+  getMockRouter,
+} from '@/__tests__/test-utils'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
 import type { ResourceCategory } from '@/lib/types/database'
 
-// Mock Next.js navigation hooks
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  useSearchParams: vi.fn(),
-  usePathname: vi.fn(),
-}))
-
 describe('CategoryFilter', () => {
-  const mockPush = vi.fn()
-  let mockSearchParams: URLSearchParams
-
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockSearchParams = new URLSearchParams()
-    ;(useRouter as ReturnType<typeof vi.fn>).mockReturnValue({
-      push: mockPush,
-    })
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(mockSearchParams)
-    ;(usePathname as ReturnType<typeof vi.fn>).mockReturnValue('/resources')
+    resetRouterMocks()
+    setMockPathname('/resources')
   })
 
   it('renders all categories', () => {
@@ -66,37 +58,39 @@ describe('CategoryFilter', () => {
     const employmentCheckbox = screen.getByRole('checkbox', { name: /Filter by Employment/i })
     fireEvent.click(employmentCheckbox)
 
-    // Single category selection uses SEO-friendly URL
-    expect(mockPush).toHaveBeenCalledWith('/resources/category/employment')
+    // Single category selection uses SEO-friendly URL with search param
+    expect(getMockRouter().push).toHaveBeenCalledWith(
+      '/resources/category/employment?search=employment'
+    )
   })
 
   it('handles multiple category selections', () => {
     // Start with one category selected
-    mockSearchParams.set('categories', 'employment')
+    setMockSearchParams({ categories: 'employment' })
 
     render(<CategoryFilter />)
 
     const housingCheckbox = screen.getByRole('checkbox', { name: /Filter by Housing/i })
     fireEvent.click(housingCheckbox)
 
-    expect(mockPush).toHaveBeenCalledWith('/resources?categories=employment%2Chousing')
+    expect(getMockRouter().push).toHaveBeenCalledWith('/resources?categories=employment%2Chousing')
   })
 
   it('removes category when unchecked', () => {
     // Start with two categories selected
-    mockSearchParams.set('categories', 'employment,housing')
+    setMockSearchParams({ categories: 'employment,housing' })
 
     render(<CategoryFilter />)
 
     const employmentCheckbox = screen.getByRole('checkbox', { name: /Filter by Employment/i })
     fireEvent.click(employmentCheckbox)
 
-    // Removing one category from multiple leaves one, so uses SEO-friendly URL
-    expect(mockPush).toHaveBeenCalledWith('/resources/category/housing')
+    // Removing one category from multiple leaves one, so uses SEO-friendly URL with search param
+    expect(getMockRouter().push).toHaveBeenCalledWith('/resources/category/housing?search=housing')
   })
 
   it('shows active filters with chips', () => {
-    mockSearchParams.set('categories', 'employment,housing')
+    setMockSearchParams({ categories: 'employment,housing' })
 
     render(<CategoryFilter />)
 
@@ -107,14 +101,14 @@ describe('CategoryFilter', () => {
   })
 
   it('clears all filters when Clear All is clicked', () => {
-    mockSearchParams.set('categories', 'employment,housing')
+    setMockSearchParams({ categories: 'employment,housing' })
 
     render(<CategoryFilter />)
 
     const clearButton = screen.getByRole('button', { name: /Clear All/i })
     fireEvent.click(clearButton)
 
-    expect(mockPush).toHaveBeenCalledWith('/resources')
+    expect(getMockRouter().push).toHaveBeenCalledWith('/resources')
   })
 
   it('can be collapsed and expanded', () => {
@@ -130,16 +124,18 @@ describe('CategoryFilter', () => {
     expect(screen.getByLabelText('Collapse filters')).toBeInTheDocument()
   })
 
-  it('preserves other query params when updating categories', () => {
-    mockSearchParams.set('search', 'housing')
+  it('sets search param to category name when selecting category', () => {
+    setMockSearchParams({ search: 'housing' })
 
     render(<CategoryFilter />)
 
     const employmentCheckbox = screen.getByRole('checkbox', { name: /Filter by Employment/i })
     fireEvent.click(employmentCheckbox)
 
-    // Single category with search param uses SEO-friendly URL with search query param
-    expect(mockPush).toHaveBeenCalledWith('/resources/category/employment?search=housing')
+    // Single category selection overwrites search param with category name
+    expect(getMockRouter().push).toHaveBeenCalledWith(
+      '/resources/category/employment?search=employment'
+    )
   })
 
   it('supports accessibility', () => {

@@ -1,24 +1,20 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import {
+  render,
+  screen,
+  waitFor,
+  resetRouterMocks,
+  setMockPathname,
+  setMockSearchParams,
+  getMockRouter,
+} from '@/__tests__/test-utils'
 import { userEvent } from '@testing-library/user-event'
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ViewToggle } from '@/components/search/ViewToggle'
-
-// Mock Next.js navigation
-const mockPush = vi.fn()
-const mockPathname = '/resources'
-let mockSearchParams = new URLSearchParams()
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-  usePathname: () => mockPathname,
-  useSearchParams: () => mockSearchParams,
-}))
 
 describe('ViewToggle', () => {
   beforeEach(() => {
-    mockPush.mockClear()
-    // Create fresh URLSearchParams for each test
-    mockSearchParams = new URLSearchParams()
+    resetRouterMocks()
+    setMockPathname('/resources')
     localStorage.clear()
   })
 
@@ -66,7 +62,7 @@ describe('ViewToggle', () => {
 
     it('toggles to list view when list button clicked', async () => {
       const user = userEvent.setup()
-      mockSearchParams.set('view', 'map')
+      setMockSearchParams({ view: 'map' })
       render(<ViewToggle />)
 
       const listButton = screen.getByLabelText('list view')
@@ -116,7 +112,7 @@ describe('ViewToggle', () => {
       await user.click(listButton)
 
       // Should not trigger any changes
-      expect(mockPush).not.toHaveBeenCalled()
+      expect(getMockRouter().push).not.toHaveBeenCalled()
       expect(onViewChange).not.toHaveBeenCalled()
     })
   })
@@ -130,42 +126,40 @@ describe('ViewToggle', () => {
       await user.click(mapButton)
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/resources?view=map')
+        expect(getMockRouter().push).toHaveBeenCalledWith('/resources?view=map')
       })
     })
 
     it('updates URL when toggled to list', async () => {
       const user = userEvent.setup()
-      mockSearchParams.set('view', 'map')
+      setMockSearchParams({ view: 'map' })
       render(<ViewToggle defaultView="list" />)
 
       const listButton = screen.getByLabelText('list view')
       await user.click(listButton)
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/resources')
+        expect(getMockRouter().push).toHaveBeenCalledWith('/resources')
       })
     })
 
     it('removes view param when toggling to default view', async () => {
       const user = userEvent.setup()
-      mockSearchParams.set('view', 'map')
+      setMockSearchParams({ view: 'map' })
       render(<ViewToggle defaultView="list" />)
 
       const listButton = screen.getByLabelText('list view')
       await user.click(listButton)
 
       await waitFor(() => {
-        const calledUrl = mockPush.mock.calls[0][0]
+        const calledUrl = getMockRouter().push.mock.calls[0][0]
         expect(calledUrl).not.toContain('view')
       })
     })
 
     it('preserves other search params when toggling', async () => {
       const user = userEvent.setup()
-      mockSearchParams.set('q', 'housing')
-      mockSearchParams.set('category', 'housing')
-      mockSearchParams.set('sort', 'name-asc')
+      setMockSearchParams({ q: 'housing', category: 'housing', sort: 'name-asc' })
 
       render(<ViewToggle />)
 
@@ -173,7 +167,7 @@ describe('ViewToggle', () => {
       await user.click(mapButton)
 
       await waitFor(() => {
-        const calledUrl = mockPush.mock.calls[0][0]
+        const calledUrl = getMockRouter().push.mock.calls[0][0]
         expect(calledUrl).toContain('q=housing')
         expect(calledUrl).toContain('category=housing')
         expect(calledUrl).toContain('sort=name-asc')
@@ -182,7 +176,7 @@ describe('ViewToggle', () => {
     })
 
     it('loads view from URL params', () => {
-      mockSearchParams.set('view', 'map')
+      setMockSearchParams({ view: 'map' })
       render(<ViewToggle defaultView="list" />)
 
       const mapButton = screen.getByLabelText('map view')
@@ -190,7 +184,7 @@ describe('ViewToggle', () => {
     })
 
     it('ignores invalid URL param values', () => {
-      mockSearchParams.set('view', 'invalid')
+      setMockSearchParams({ view: 'invalid' })
       render(<ViewToggle defaultView="list" />)
 
       const listButton = screen.getByLabelText('list view')
@@ -221,7 +215,7 @@ describe('ViewToggle', () => {
 
     it('prioritizes URL param over localStorage', () => {
       localStorage.setItem('preferredView', 'map')
-      mockSearchParams.set('view', 'list')
+      setMockSearchParams({ view: 'list' })
 
       render(<ViewToggle defaultView="list" />)
 
@@ -310,7 +304,7 @@ describe('ViewToggle', () => {
     it('follows priority: URL > localStorage > default', () => {
       // Test 1: URL param takes precedence over localStorage and default
       localStorage.setItem('preferredView', 'list')
-      mockSearchParams.set('view', 'map')
+      setMockSearchParams({ view: 'map' })
       const { unmount } = render(<ViewToggle defaultView="list" />)
 
       let mapButton = screen.getByLabelText('map view')
@@ -318,7 +312,8 @@ describe('ViewToggle', () => {
 
       // Test 2: localStorage takes precedence over default when no URL param
       unmount()
-      mockSearchParams = new URLSearchParams()
+      resetRouterMocks()
+      setMockPathname('/resources')
       localStorage.setItem('preferredView', 'map')
       render(<ViewToggle defaultView="list" />)
 
@@ -382,7 +377,7 @@ describe('ViewToggle', () => {
 
   describe('External URL Changes', () => {
     it('syncs state when URL params change externally', () => {
-      mockSearchParams.set('view', 'list')
+      setMockSearchParams({ view: 'list' })
       const { unmount } = render(<ViewToggle />)
 
       const listButton = screen.getByLabelText('list view')
@@ -390,8 +385,9 @@ describe('ViewToggle', () => {
 
       // Simulate external URL change
       unmount()
-      mockSearchParams = new URLSearchParams()
-      mockSearchParams.set('view', 'map')
+      resetRouterMocks()
+      setMockPathname('/resources')
+      setMockSearchParams({ view: 'map' })
       render(<ViewToggle />)
 
       const mapButton = screen.getByLabelText('map view')
@@ -400,14 +396,15 @@ describe('ViewToggle', () => {
 
     it('falls back to localStorage when URL param is removed externally', () => {
       localStorage.setItem('preferredView', 'map')
-      mockSearchParams.set('view', 'list')
+      setMockSearchParams({ view: 'list' })
       const { rerender } = render(<ViewToggle />)
 
       const listButton = screen.getByLabelText('list view')
       expect(listButton).toHaveClass('Mui-selected')
 
       // Simulate URL param removal
-      mockSearchParams = new URLSearchParams()
+      resetRouterMocks()
+      setMockPathname('/resources')
       rerender(<ViewToggle />)
 
       const mapButton = screen.getByLabelText('map view')

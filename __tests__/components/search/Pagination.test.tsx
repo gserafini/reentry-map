@@ -1,29 +1,20 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  render,
+  screen,
+  waitFor,
+  resetRouterMocks,
+  setMockPathname,
+  setMockSearchParams,
+  getMockRouter,
+} from '@/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 import { Pagination } from '@/components/search/Pagination'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-
-// Mock Next.js navigation hooks
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  usePathname: vi.fn(),
-  useSearchParams: vi.fn(),
-}))
 
 describe('Pagination', () => {
-  const mockPush = vi.fn()
-  const mockPathname = '/search'
-  const mockSearchParams = new URLSearchParams()
-
   beforeEach(() => {
-    vi.clearAllMocks()
-    ;(useRouter as ReturnType<typeof vi.fn>).mockReturnValue({
-      push: mockPush,
-    })
-    ;(usePathname as ReturnType<typeof vi.fn>).mockReturnValue(mockPathname)
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(mockSearchParams)
-
+    resetRouterMocks()
+    setMockPathname('/search')
     // Mock window.scrollTo
     window.scrollTo = vi.fn()
   })
@@ -92,7 +83,7 @@ describe('Pagination', () => {
     const page2Button = screen.getByRole('button', { name: 'Go to page 2' })
     await user.click(page2Button)
 
-    expect(mockPush).toHaveBeenCalledWith('/search?page=2')
+    expect(getMockRouter().push).toHaveBeenCalledWith('/search?page=2')
   })
 
   it('removes page param when navigating to page 1', async () => {
@@ -104,20 +95,19 @@ describe('Pagination', () => {
     const page1Button = screen.getByRole('button', { name: 'Go to page 1' })
     await user.click(page1Button)
 
-    expect(mockPush).toHaveBeenCalledWith('/search')
+    expect(getMockRouter().push).toHaveBeenCalledWith('/search')
   })
 
   it('preserves existing search params when changing page', async () => {
     const user = userEvent.setup()
-    const searchParamsWithQuery = new URLSearchParams('category=housing&search=test')
-    ;(useSearchParams as ReturnType<typeof vi.fn>).mockReturnValue(searchParamsWithQuery)
+    setMockSearchParams({ category: 'housing', search: 'test' })
 
     render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
 
     const page2Button = screen.getByRole('button', { name: 'Go to page 2' })
     await user.click(page2Button)
 
-    expect(mockPush).toHaveBeenCalledWith('/search?category=housing&search=test&page=2')
+    expect(getMockRouter().push).toHaveBeenCalledWith('/search?category=housing&search=test&page=2')
   })
 
   it('scrolls to top when page changes by default', async () => {
