@@ -128,7 +128,7 @@ export async function checkGravatarExists(email: string): Promise<boolean> {
       return false
     }
 
-    const data = await response.json()
+    const data = (await response.json()) as { exists: boolean }
     return data.exists === true
   } catch {
     return false

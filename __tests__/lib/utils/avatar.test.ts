@@ -66,41 +66,58 @@ describe('avatar utilities', () => {
   })
 
   describe('getUserDisplayName', () => {
+    it('prefers first and last name', () => {
+      expect(getUserDisplayName('John', 'Doe', 'john@example.com', null)).toBe('John Doe')
+    })
+
+    it('uses only first name if last name is missing', () => {
+      expect(getUserDisplayName('John', null, 'john@example.com', null)).toBe('John')
+    })
+
+    it('uses only last name if first name is missing', () => {
+      expect(getUserDisplayName(null, 'Doe', 'john@example.com', null)).toBe('Doe')
+    })
+
     it('formats email username with dot separator', () => {
-      expect(getUserDisplayName('john.doe@example.com', null)).toBe('John Doe')
+      expect(getUserDisplayName(null, null, 'john.doe@example.com', null)).toBe('John Doe')
     })
 
     it('formats email username with underscore separator', () => {
-      expect(getUserDisplayName('jane_smith@example.com', null)).toBe('Jane Smith')
+      expect(getUserDisplayName(null, null, 'jane_smith@example.com', null)).toBe('Jane Smith')
     })
 
     it('formats email username with hyphen separator', () => {
-      expect(getUserDisplayName('bob-jones@example.com', null)).toBe('Bob Jones')
+      expect(getUserDisplayName(null, null, 'bob-jones@example.com', null)).toBe('Bob Jones')
     })
 
     it('capitalizes single word username', () => {
-      expect(getUserDisplayName('alice@example.com', null)).toBe('Alice')
+      expect(getUserDisplayName(null, null, 'alice@example.com', null)).toBe('Alice')
     })
 
     it('formats E.164 phone number', () => {
-      expect(getUserDisplayName(null, '+15551234567')).toBe('(555) 123-4567')
+      expect(getUserDisplayName(null, null, null, '+15551234567')).toBe('(555) 123-4567')
     })
 
     it('returns phone as-is if not E.164 format', () => {
-      expect(getUserDisplayName(null, '555-1234')).toBe('555-1234')
+      expect(getUserDisplayName(null, null, null, '555-1234')).toBe('555-1234')
+    })
+
+    it('prefers first/last name over email', () => {
+      const result = getUserDisplayName('John', 'Doe', 'john@example.com', '+15551234567')
+      expect(result).toBe('John Doe')
     })
 
     it('prefers email over phone', () => {
-      const result = getUserDisplayName('john@example.com', '+15551234567')
+      const result = getUserDisplayName(null, null, 'john@example.com', '+15551234567')
       expect(result).toBe('John')
     })
 
-    it('returns fallback when both are null', () => {
-      expect(getUserDisplayName(null, null)).toBe('Anonymous User')
+    it('returns fallback when all are null', () => {
+      expect(getUserDisplayName(null, null, null, null)).toBe('Anonymous User')
     })
 
     it('handles undefined values', () => {
-      expect(getUserDisplayName(undefined, undefined)).toBe('Anonymous User')
+      expect(getUserDisplayName(undefined, undefined, undefined, undefined)).toBe('Anonymous User')
     })
   })
 

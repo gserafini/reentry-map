@@ -104,15 +104,22 @@ npm run screenshots              # Capture all viewports
 When working on frontend features (especially maps, API integration, or client components):
 
 ```bash
-# Check console for specific page
-node scripts/check-console.mjs /resources
+# Standard pages to always check (unauthenticated):
+node scripts/check-console.mjs /           # Homepage
+node scripts/check-console.mjs /resources  # Resources list
 
-# Check homepage
-node scripts/check-console.mjs /
+# Protected pages (authenticated - requires test user):
+node scripts/check-profile-with-login.mjs  # /profile page
 
-# Check any path
+# Check any other path:
 node scripts/check-console.mjs /path/to/page
 ```
+
+**Standard Console Check List:**
+
+- `/` - Homepage with map
+- `/resources` - Resource list view
+- `/profile` - User profile page (authenticated)
 
 **Troubleshooting Workflow:**
 
