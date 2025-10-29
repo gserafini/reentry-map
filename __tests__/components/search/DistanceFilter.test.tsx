@@ -1,18 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { DistanceFilter } from '@/components/search/DistanceFilter'
-
-// Mock Next.js navigation
-const mockPush = vi.fn()
-const mockPathname = '/search'
-let mockSearchParams = new URLSearchParams()
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-  usePathname: () => mockPathname,
-  useSearchParams: () => mockSearchParams,
-}))
+import {
+  render,
+  resetRouterMocks,
+  setMockSearchParams,
+  setMockPathname,
+} from '@/__tests__/test-utils'
 
 // Mock use-debounce to not debounce in tests
 vi.mock('use-debounce', () => ({
@@ -21,9 +16,8 @@ vi.mock('use-debounce', () => ({
 
 describe('DistanceFilter', () => {
   beforeEach(() => {
-    mockPush.mockClear()
-    // Create fresh URLSearchParams for each test
-    mockSearchParams = new URLSearchParams()
+    resetRouterMocks()
+    setMockPathname('/search')
     localStorage.clear()
   })
 
@@ -55,7 +49,7 @@ describe('DistanceFilter', () => {
   })
 
   it('renders with distance from URL params', () => {
-    mockSearchParams.set('distance', '15')
+    setMockSearchParams({ distance: '15' })
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
@@ -68,23 +62,27 @@ describe('DistanceFilter', () => {
 
   it('updates URL when slider value changes', async () => {
     const user = userEvent.setup()
-    mockSearchParams.set('distance', '20')
+    const mockReplaceState = vi.fn()
+    window.history.replaceState = mockReplaceState
+    setMockSearchParams({ distance: '20' })
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
     // Verify initial state
-    expect(mockPush).toHaveBeenCalledTimes(0)
+    expect(mockReplaceState).toHaveBeenCalledTimes(0)
 
     // Test the clear button interaction which updates URL
     const clearButton = screen.getByLabelText(/clear distance filter/i)
     await user.click(clearButton)
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/search')
+      expect(mockReplaceState).toHaveBeenCalled()
+      const [[, , url]] = mockReplaceState.mock.calls
+      expect(url).toBe('/search')
     })
   })
 
   it('saves distance to localStorage when changed', () => {
-    mockSearchParams.set('distance', '20')
+    setMockSearchParams({ distance: '20' })
 
     render(<DistanceFilter hasLocation={true} />)
 
@@ -98,7 +96,7 @@ describe('DistanceFilter', () => {
   })
 
   it('shows clear button when filter is active', () => {
-    mockSearchParams.set('distance', '15')
+    setMockSearchParams({ distance: '15' })
 
     render(<DistanceFilter hasLocation={true} />)
 
@@ -113,7 +111,9 @@ describe('DistanceFilter', () => {
 
   it('clears filter and resets to default when clear button clicked', async () => {
     const user = userEvent.setup()
-    mockSearchParams.set('distance', '35')
+    const mockReplaceState = vi.fn()
+    window.history.replaceState = mockReplaceState
+    setMockSearchParams({ distance: '35' })
     localStorage.setItem('preferredDistance', '35')
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
@@ -122,16 +122,18 @@ describe('DistanceFilter', () => {
     await user.click(clearButton)
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/search')
+      expect(mockReplaceState).toHaveBeenCalled()
+      const [[, , url]] = mockReplaceState.mock.calls
+      expect(url).toBe('/search')
       expect(localStorage.getItem('preferredDistance')).toBeNull()
     })
   })
 
   it('preserves other search params when updating distance', async () => {
     const user = userEvent.setup()
-    mockSearchParams.set('q', 'housing')
-    mockSearchParams.set('category', 'housing')
-    mockSearchParams.set('distance', '20')
+    const mockReplaceState = vi.fn()
+    window.history.replaceState = mockReplaceState
+    setMockSearchParams({ q: 'housing', category: 'housing', distance: '20' })
 
     render(<DistanceFilter hasLocation={true} />)
 
@@ -139,7 +141,8 @@ describe('DistanceFilter', () => {
     await user.click(clearButton)
 
     await waitFor(() => {
-      const calledUrl = mockPush.mock.calls[0][0]
+      expect(mockReplaceState).toHaveBeenCalled()
+      const [[, , calledUrl]] = mockReplaceState.mock.calls
       expect(calledUrl).toContain('q=housing')
       expect(calledUrl).toContain('category=housing')
       expect(calledUrl).not.toContain('distance')
@@ -148,8 +151,9 @@ describe('DistanceFilter', () => {
 
   it('removes page param when distance changes', async () => {
     const user = userEvent.setup()
-    mockSearchParams.set('distance', '20')
-    mockSearchParams.set('page', '3')
+    const mockReplaceState = vi.fn()
+    window.history.replaceState = mockReplaceState
+    setMockSearchParams({ distance: '20', page: '3' })
 
     render(<DistanceFilter hasLocation={true} />)
 
@@ -157,7 +161,8 @@ describe('DistanceFilter', () => {
     await user.click(clearButton)
 
     await waitFor(() => {
-      const calledUrl = mockPush.mock.calls[0][0]
+      expect(mockReplaceState).toHaveBeenCalled()
+      const [[, , calledUrl]] = mockReplaceState.mock.calls
       expect(calledUrl).not.toContain('page')
     })
   })
@@ -176,7 +181,7 @@ describe('DistanceFilter', () => {
 
   it('prioritizes URL param over localStorage', () => {
     localStorage.setItem('preferredDistance', '40')
-    mockSearchParams.set('distance', '15')
+    setMockSearchParams({ distance: '15' })
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
@@ -192,7 +197,7 @@ describe('DistanceFilter', () => {
   })
 
   it('ignores invalid distance values from URL', () => {
-    mockSearchParams.set('distance', 'invalid')
+    setMockSearchParams({ distance: 'invalid' })
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
@@ -201,7 +206,7 @@ describe('DistanceFilter', () => {
   })
 
   it('ignores out-of-range distance values from URL', () => {
-    mockSearchParams.set('distance', '100')
+    setMockSearchParams({ distance: '100' })
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
@@ -220,7 +225,7 @@ describe('DistanceFilter', () => {
   })
 
   it('shows current distance in helper text', () => {
-    mockSearchParams.set('distance', '10')
+    setMockSearchParams({ distance: '10' })
 
     render(<DistanceFilter hasLocation={true} />)
 
@@ -232,7 +237,7 @@ describe('DistanceFilter', () => {
 
   it('updates helper text when distance changes', () => {
     // Start with distance in URL
-    mockSearchParams.set('distance', '25')
+    setMockSearchParams({ distance: '25' })
     const { unmount } = render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
     // Verify initial render
@@ -241,7 +246,7 @@ describe('DistanceFilter', () => {
 
     // Unmount and change URL params, then re-render
     unmount()
-    mockSearchParams.set('distance', '35')
+    setMockSearchParams({ distance: '35' })
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
     // Verify updated render
