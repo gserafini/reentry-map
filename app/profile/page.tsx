@@ -13,6 +13,11 @@ import {
   TextField,
   Alert,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Link,
 } from '@mui/material'
 import {
   Email as EmailIcon,
@@ -20,6 +25,7 @@ import {
   Edit as EditIcon,
   Save as SaveIcon,
   Cancel as CancelIcon,
+  PhoneAndroid as PhoneAndroidIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getInitials, getAvatarColor, getUserDisplayName } from '@/lib/utils/avatar'
@@ -44,6 +50,15 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+
+  // Phone change dialog state
+  const [isPhoneDialogOpen, setIsPhoneDialogOpen] = useState(false)
+  const [newPhone, setNewPhone] = useState('')
+  const [phoneOtp, setPhoneOtp] = useState('')
+  const [phoneStep, setPhoneStep] = useState<'phone' | 'otp'>('phone')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [isPhoneLoading, setIsPhoneLoading] = useState(false)
+  const [phoneResendCooldown, setPhoneResendCooldown] = useState(0)
 
   const { gravatarUrl, hasGravatar } = useGravatar(authUser?.email, 160)
 
@@ -101,6 +116,142 @@ export default function ProfilePage() {
 
     fetchProfile()
   }, [authUser, supabase])
+
+  // Phone resend cooldown timer
+  useEffect(() => {
+    if (phoneResendCooldown > 0) {
+      const timer = setTimeout(() => setPhoneResendCooldown(phoneResendCooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [phoneResendCooldown])
+
+  // Phone formatting helpers
+  const formatPhoneNumber = (value: string): string => {
+    const digits = value.replace(/\D/g, '')
+    if (digits.startsWith('1')) {
+      return `+${digits}`
+    }
+    return `+1${digits}`
+  }
+
+  const formatPhoneDisplay = (value: string): string => {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length <= 3) return digits
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
+  }
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneDisplay(e.target.value)
+    setNewPhone(formatted)
+  }
+
+  // Open phone change dialog
+  const handleOpenPhoneDialog = () => {
+    setIsPhoneDialogOpen(true)
+    setNewPhone('')
+    setPhoneOtp('')
+    setPhoneStep('phone')
+    setPhoneError(null)
+  }
+
+  // Close phone change dialog
+  const handleClosePhoneDialog = () => {
+    setIsPhoneDialogOpen(false)
+    setNewPhone('')
+    setPhoneOtp('')
+    setPhoneStep('phone')
+    setPhoneError(null)
+    setPhoneResendCooldown(0)
+  }
+
+  // Send OTP to new phone number
+  const handleSendPhoneOTP = async () => {
+    setIsPhoneLoading(true)
+    setPhoneError(null)
+
+    try {
+      const formattedPhone = formatPhoneNumber(newPhone)
+      const digits = newPhone.replace(/\D/g, '')
+
+      if (digits.length !== 10) {
+        throw new Error('Please enter a valid 10-digit phone number')
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        phone: formattedPhone,
+      })
+
+      if (error) throw error
+
+      setPhoneStep('otp')
+      setPhoneResendCooldown(60)
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : 'Failed to send verification code')
+    } finally {
+      setIsPhoneLoading(false)
+    }
+  }
+
+  // Verify OTP and update phone
+  const handleVerifyPhoneOTP = async (code?: string) => {
+    setIsPhoneLoading(true)
+    setPhoneError(null)
+
+    const otpCode = code || phoneOtp
+
+    try {
+      const formattedPhone = formatPhoneNumber(newPhone)
+
+      if (otpCode.length !== 6) {
+        throw new Error('Please enter the 6-digit verification code')
+      }
+
+      const { error } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: otpCode,
+        type: 'phone_change',
+      })
+
+      if (error) throw error
+
+      // Refresh auth state
+      router.refresh()
+      setSuccess('Phone number updated successfully!')
+      handleClosePhoneDialog()
+    } catch (err) {
+      setPhoneError(
+        err instanceof Error ? err.message : 'Invalid verification code. Please try again.'
+      )
+    } finally {
+      setIsPhoneLoading(false)
+    }
+  }
+
+  // Resend OTP
+  const handleResendPhoneOTP = async () => {
+    if (phoneResendCooldown > 0) return
+
+    setIsPhoneLoading(true)
+    setPhoneError(null)
+
+    try {
+      const formattedPhone = formatPhoneNumber(newPhone)
+
+      const { error } = await supabase.auth.updateUser({
+        phone: formattedPhone,
+      })
+
+      if (error) throw error
+
+      setPhoneResendCooldown(60)
+      setPhoneOtp('')
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : 'Failed to resend verification code')
+    } finally {
+      setIsPhoneLoading(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!authUser || !profile) return
@@ -295,13 +446,21 @@ export default function ProfilePage() {
               {authUser.phone && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <PhoneIcon fontSize="small" color="action" />
-                  <Box>
+                  <Box sx={{ flex: 1 }}>
                     <Typography variant="caption" color="text.secondary" display="block">
                       Mobile Phone
                     </Typography>
                     <Typography>{authUser.phone}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Used for login and notifications
+                      Used for login and notifications •{' '}
+                      <Link
+                        component="button"
+                        variant="caption"
+                        onClick={handleOpenPhoneDialog}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        Change
+                      </Link>
                     </Typography>
                   </Box>
                 </Box>
@@ -380,6 +539,126 @@ export default function ProfilePage() {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Phone Change Dialog */}
+      <Dialog open={isPhoneDialogOpen} onClose={handleClosePhoneDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PhoneAndroidIcon />
+            <Typography variant="h6">Change Phone Number</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {phoneStep === 'phone' ? (
+            <Box sx={{ pt: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Enter your new mobile phone number. We&apos;ll send you a verification code via SMS.
+              </Typography>
+              <TextField
+                label="New Mobile Phone Number"
+                type="tel"
+                placeholder="(555) 123-4567"
+                required
+                fullWidth
+                value={newPhone}
+                onChange={handlePhoneChange}
+                variant="outlined"
+                helperText="US mobile numbers only - for SMS verification"
+                inputProps={{
+                  maxLength: 14,
+                  autoComplete: 'tel',
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Carrier charges may apply
+              </Typography>
+              {phoneError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {phoneError}
+                </Alert>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ pt: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                We sent a 6-digit code to {newPhone}
+              </Typography>
+              <TextField
+                label="Verification Code"
+                type="text"
+                placeholder="123456"
+                required
+                fullWidth
+                value={phoneOtp}
+                onChange={(e) => {
+                  const code = e.target.value.replace(/\D/g, '').slice(0, 6)
+                  setPhoneOtp(code)
+                  // Auto-submit when 6 digits entered
+                  if (code.length === 6 && !isPhoneLoading) {
+                    handleVerifyPhoneOTP(code)
+                  }
+                }}
+                variant="outlined"
+                helperText="Code will auto-submit when complete"
+                inputProps={{
+                  maxLength: 6,
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
+                }}
+                autoComplete="one-time-code"
+              />
+              {phoneError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {phoneError}
+                </Alert>
+              )}
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between', mt: 2 }}>
+                <Button
+                  variant="text"
+                  onClick={handleResendPhoneOTP}
+                  disabled={phoneResendCooldown > 0 || isPhoneLoading}
+                  size="small"
+                >
+                  {phoneResendCooldown > 0 ? `Resend in ${phoneResendCooldown}s` : 'Resend code'}
+                </Button>
+                <Button
+                  variant="text"
+                  onClick={() => {
+                    setPhoneStep('phone')
+                    setPhoneOtp('')
+                    setPhoneError(null)
+                  }}
+                  size="small"
+                >
+                  Change phone number
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePhoneDialog} disabled={isPhoneLoading}>
+            Cancel
+          </Button>
+          {phoneStep === 'phone' ? (
+            <Button
+              variant="contained"
+              onClick={handleSendPhoneOTP}
+              disabled={isPhoneLoading || newPhone.replace(/\D/g, '').length !== 10}
+            >
+              {isPhoneLoading ? 'Sending...' : 'Send Code'}
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              onClick={() => handleVerifyPhoneOTP()}
+              disabled={isPhoneLoading || phoneOtp.length !== 6}
+            >
+              {isPhoneLoading ? 'Verifying...' : 'Verify'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 }
