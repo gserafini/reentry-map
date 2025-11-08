@@ -4,6 +4,7 @@ import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline } from '@mu
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
 import { LocationProvider } from '@/lib/context/LocationContext'
+import { PWAWrapper } from '@/components/pwa/PWAWrapper'
 
 // Create MUI theme with dark mode support
 const lightTheme = createTheme({
@@ -47,7 +48,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <MuiThemeWrapper>
         <CssBaseline />
-        <LocationProvider>{children}</LocationProvider>
+        <LocationProvider>
+          {children}
+          <PWAWrapper />
+        </LocationProvider>
       </MuiThemeWrapper>
     </NextThemesProvider>
   )

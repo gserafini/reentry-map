@@ -21,6 +21,7 @@ import {
   Flag as FlagIcon,
   RateReview as ReviewsIcon,
   People as PeopleIcon,
+  Psychology as AIIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
@@ -263,6 +264,13 @@ export default function AdminDashboardPage() {
                   color={stats.pendingUpdates > 0 ? 'error' : 'primary'}
                 >
                   Review Updates ({stats.pendingUpdates})
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<AIIcon />}
+                  onClick={() => router.push('/admin/agents')}
+                >
+                  AI Agents
                 </Button>
               </Box>
             </CardContent>
