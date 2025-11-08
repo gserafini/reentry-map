@@ -180,45 +180,45 @@ export default async function HomePage() {
         </Link>
       </Container>
 
-      {/* SEO Landing Page Test Links (temporary for development) */}
+      {/* SEO Footer - Find Resources by Location */}
       <Box sx={{ bgcolor: 'background.default', py: 4, borderTop: 1, borderColor: 'divider' }}>
         <Container maxWidth="lg">
           <Typography variant="h6" gutterBottom>
-            Find Resources by Location (SEO Landing Pages)
+            Find Resources by Location
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-            Test links for SEO-friendly localized pages
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Browse verified reentry resources in Bay Area cities
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Link href="/search" style={{ textDecoration: 'none' }}>
-              <Chip label="Search (Base)" clickable color="primary" />
+            <Link href="/oakland-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Oakland, CA" clickable color="primary" />
             </Link>
-            <Link href="/search/employment-in-oakland-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Employment in Oakland, CA" clickable />
+            <Link href="/oakland-ca/employment" style={{ textDecoration: 'none' }}>
+              <Chip label="Employment in Oakland" clickable />
             </Link>
-            <Link href="/search/housing-in-oakland-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Housing in Oakland, CA" clickable />
+            <Link href="/oakland-ca/housing" style={{ textDecoration: 'none' }}>
+              <Chip label="Housing in Oakland" clickable />
             </Link>
-            <Link href="/search/food-assistance-in-oakland-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Food Assistance in Oakland, CA" clickable />
+            <Link href="/oakland-ca/food" style={{ textDecoration: 'none' }}>
+              <Chip label="Food in Oakland" clickable />
             </Link>
-            <Link href="/search/employment-in-san-francisco-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Employment in San Francisco, CA" clickable />
+            <Link href="/san-francisco-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="San Francisco, CA" clickable />
             </Link>
-            <Link href="/search/housing-in-berkeley-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Housing in Berkeley, CA" clickable />
+            <Link href="/san-francisco-ca/employment" style={{ textDecoration: 'none' }}>
+              <Chip label="Employment in San Francisco" clickable />
             </Link>
-            <Link href="/search/legal-aid-in-oakland-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Legal Aid in Oakland, CA" clickable />
+            <Link href="/berkeley-ca" style={{ textDecoration: 'none' }}>
+              <Chip label="Berkeley, CA" clickable />
             </Link>
-            <Link
-              href="/search/mental-health-services-in-oakland-ca"
-              style={{ textDecoration: 'none' }}
-            >
-              <Chip label="Mental Health in Oakland, CA" clickable />
+            <Link href="/berkeley-ca/housing" style={{ textDecoration: 'none' }}>
+              <Chip label="Housing in Berkeley" clickable />
             </Link>
-            <Link href="/search/transportation-in-oakland-ca" style={{ textDecoration: 'none' }}>
-              <Chip label="Transportation in Oakland, CA" clickable />
+            <Link href="/oakland-ca/legal-aid" style={{ textDecoration: 'none' }}>
+              <Chip label="Legal Aid in Oakland" clickable />
+            </Link>
+            <Link href="/oakland-ca/mental-health" style={{ textDecoration: 'none' }}>
+              <Chip label="Mental Health in Oakland" clickable />
             </Link>
           </Box>
         </Container>

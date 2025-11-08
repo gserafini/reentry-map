@@ -15,6 +15,8 @@ import type {
 
 export interface GetResourcesOptions extends Partial<ResourceFilters>, PaginationParams {
   sort?: ResourceSort
+  city?: string
+  state?: string
 }
 
 /**
@@ -31,6 +33,8 @@ export async function getResources(
       search,
       categories,
       tags,
+      city,
+      state,
       latitude,
       longitude,
       radius_miles,
@@ -108,6 +112,14 @@ export async function getResources(
         query = query.eq('appointment_required', appointment_required)
       }
 
+      if (city) {
+        query = query.eq('city', city)
+      }
+
+      if (state) {
+        query = query.eq('state', state)
+      }
+
       const { data: resources, error } = await query
 
       if (error) {
@@ -182,6 +194,16 @@ export async function getResources(
     // Apply appointment_required filter
     if (appointment_required !== undefined) {
       query = query.eq('appointment_required', appointment_required)
+    }
+
+    // Apply city filter
+    if (city) {
+      query = query.eq('city', city)
+    }
+
+    // Apply state filter
+    if (state) {
+      query = query.eq('state', state)
     }
 
     // Apply sorting
@@ -348,6 +370,8 @@ export async function getResourcesCount(
       search,
       categories,
       tags,
+      city,
+      state,
       latitude,
       longitude,
       radius_miles,
@@ -416,6 +440,14 @@ export async function getResourcesCount(
         query = query.eq('appointment_required', appointment_required)
       }
 
+      if (city) {
+        query = query.eq('city', city)
+      }
+
+      if (state) {
+        query = query.eq('state', state)
+      }
+
       const { count, error } = await query
 
       if (error) {
@@ -467,6 +499,16 @@ export async function getResourcesCount(
       query = query.eq('appointment_required', appointment_required)
     }
 
+    // Apply city filter
+    if (city) {
+      query = query.eq('city', city)
+    }
+
+    // Apply state filter
+    if (state) {
+      query = query.eq('state', state)
+    }
+
     const { count, error } = await query
 
     if (error) {
@@ -493,6 +535,8 @@ export async function getResourcesCount(
 export async function getCategoryCounts(
   options: {
     search?: string
+    city?: string
+    state?: string
     latitude?: number
     longitude?: number
     radius_miles?: number
@@ -503,7 +547,7 @@ export async function getCategoryCounts(
 }> {
   try {
     const supabase = await createClient()
-    const { search, latitude, longitude, radius_miles } = options
+    const { search, city, state, latitude, longitude, radius_miles } = options
 
     let resources: { categories: string[] }[] = []
 
@@ -541,6 +585,14 @@ export async function getCategoryCounts(
         )
       }
 
+      if (city) {
+        query = query.eq('city', city)
+      }
+
+      if (state) {
+        query = query.eq('state', state)
+      }
+
       const { data, error } = await query
 
       if (error) {
@@ -558,6 +610,14 @@ export async function getCategoryCounts(
         query = query.or(
           `name.ilike.%${search}%,description.ilike.%${search}%,primary_category.ilike.%${search}%,tags.cs.{${searchLower}}`
         )
+      }
+
+      if (city) {
+        query = query.eq('city', city)
+      }
+
+      if (state) {
+        query = query.eq('state', state)
       }
 
       const { data, error } = await query
