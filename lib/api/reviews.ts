@@ -15,12 +15,24 @@ type ResourceReviewInsert = Database['public']['Tables']['resource_reviews']['In
 export async function getResourceReviews(resourceId: string) {
   const supabase = createClient()
 
+  // First check if there are any reviews (avoid query error when no reviews exist)
+  const { count } = await supabase
+    .from('resource_reviews')
+    .select('*', { count: 'exact', head: true })
+    .eq('resource_id', resourceId)
+
+  // If no reviews, return empty array
+  if (!count || count === 0) {
+    return { data: [], error: null }
+  }
+
+  // Fetch reviews with user data
   const { data, error } = await supabase
     .from('resource_reviews')
     .select(
       `
       *,
-      user:users!user_id(id, name, phone, avatar_url)
+      user:users!resource_reviews_user_id_fkey(id, name, phone, avatar_url)
     `
     )
     .eq('resource_id', resourceId)
@@ -28,10 +40,10 @@ export async function getResourceReviews(resourceId: string) {
 
   if (error) {
     console.error('Error fetching reviews:', error)
-    return { data: null, error }
+    return { data: [], error }
   }
 
-  return { data, error: null }
+  return { data: data || [], error: null }
 }
 
 /**
