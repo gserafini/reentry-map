@@ -5,6 +5,7 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   Favorite as FavoriteIcon,
+  AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -15,9 +16,10 @@ import { AuthModal } from '@/components/auth/AuthModal'
 
 interface AuthButtonProps {
   userEmail?: string | null
+  isAdmin?: boolean
 }
 
-export function AuthButton({ userEmail }: AuthButtonProps) {
+export function AuthButton({ userEmail, isAdmin = false }: AuthButtonProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login')
@@ -91,6 +93,14 @@ export function AuthButton({ userEmail }: AuthButtonProps) {
           },
         }}
       >
+        {isAdmin && (
+          <MenuItem onClick={() => router.push('/admin')}>
+            <ListItemIcon>
+              <AdminIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Admin Dashboard</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={() => router.push('/favorites')}>
           <ListItemIcon>
             <FavoriteIcon fontSize="small" />

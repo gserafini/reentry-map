@@ -69,6 +69,36 @@ export default async function RootLayout({
   const userEmail = data?.claims?.email
   const isAuthenticated = !!userEmail
 
+  // Fetch user profile to check admin status
+  // Gracefully fail if profile can't be loaded - admin menu just won't show
+  let isAdmin = false
+  if (isAuthenticated) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('is_admin')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        // Only log errors if they're meaningful (not empty objects or PGRST116 not found)
+        if (profileError && profileError.code !== 'PGRST116') {
+          if (Object.keys(profileError).length > 0) {
+            console.warn('Could not fetch admin status:', profileError.message || profileError)
+          }
+        }
+
+        isAdmin = profile?.is_admin ?? false
+      }
+    } catch {
+      // Silently fail - admin menu just won't show on first load
+      // User can still access /admin directly if they are admin
+    }
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
@@ -81,7 +111,7 @@ export default async function RootLayout({
             }}
           >
             <ClientAppBar
-              authButton={<AuthButton userEmail={userEmail} />}
+              authButton={<AuthButton userEmail={userEmail} isAdmin={isAdmin} />}
               isAuthenticated={isAuthenticated}
             />
             <Box

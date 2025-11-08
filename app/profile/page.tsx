@@ -92,14 +92,18 @@ export default function ProfilePage() {
             .select()
             .single()
 
-          if (insertError) throw insertError
+          if (insertError) {
+            console.error('Error creating profile:', insertError)
+            throw new Error(`Failed to create profile: ${insertError.message || 'Unknown error'}`)
+          }
 
           setProfile(newProfile)
           setFirstName(newProfile.first_name || '')
           setLastName(newProfile.last_name || '')
           setEmail(authUser.email || '')
         } else if (error) {
-          throw error
+          console.error('Profile fetch error:', error)
+          throw new Error(`Failed to fetch profile: ${error.message || JSON.stringify(error)}`)
         } else {
           setProfile(data)
           setFirstName(data.first_name || '')
@@ -108,7 +112,14 @@ export default function ProfilePage() {
         }
       } catch (err) {
         console.error('Error fetching profile:', err)
-        setError('Failed to load profile')
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'object' && err !== null
+              ? JSON.stringify(err)
+              : 'Unknown error'
+        console.error('Detailed error:', errorMessage)
+        setError(`Failed to load profile: ${errorMessage}`)
       } finally {
         setIsLoadingProfile(false)
       }

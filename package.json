@@ -21,7 +21,7 @@
     "test:a11y": "playwright test e2e/accessibility.spec.ts",
     "test:a11y:ui": "playwright test e2e/accessibility.spec.ts --ui",
     "dev:check": "bash scripts/check-dev-compile.sh",
-    "console:check": "node scripts/check-console.mjs / && node scripts/check-console.mjs /resources",
+    "console:check": "node scripts/check-console.mjs / && node scripts/check-console.mjs /resources && node scripts/check-console.mjs /admin",
     "quality": "npm run lint && npx tsc --noEmit && npm run test:run && npm run build && npm run dev:check && npm run console:check",
     "quality:full": "npm run quality && npm run test:e2e",
     "quality:a11y": "npm run lint && npx tsc --noEmit && npm run test:a11y",

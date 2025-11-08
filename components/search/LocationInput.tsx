@@ -192,8 +192,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     }
 
     fetchGeoIPLocation()
-  }, []) // Only run on mount
-  // Intentionally excluding dependencies to only run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount - intentionally excluding dependencies to fetch GeoIP only once
 
   // Update input value when displayName changes
   useEffect(() => {

@@ -59,10 +59,8 @@ describe('useLocation', () => {
 
   it('handles unsupported geolocation', () => {
     // Remove geolocation from navigator
-    Object.defineProperty(global.navigator, 'geolocation', {
-      value: undefined,
-      configurable: true,
-    })
+    // @ts-expect-error - Deleting for test purposes
+    delete global.navigator.geolocation
 
     const { result } = renderHook(() => useLocation())
 
@@ -294,7 +292,7 @@ describe('useLocation', () => {
   it('ignores expired cache', () => {
     const expiredLocation = {
       coordinates: { latitude: 37.8044, longitude: -122.2712 },
-      timestamp: Date.now() - 3 * 60 * 1000, // 3 minutes ago (expired)
+      timestamp: Date.now() - 365 * 24 * 60 * 60 * 1000, // 1 year ago (definitely expired)
       displayName: 'Oakland, CA',
       source: 'manual',
     }

@@ -188,7 +188,8 @@ export function ResourceMap({
         cleanup()
       }
     }
-  }, [isMounted]) // Only initialize once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted]) // Only initialize once on mount - userLocation handled separately below
 
   // Re-center map when userLocation changes (separate effect for efficiency)
   useEffect(() => {

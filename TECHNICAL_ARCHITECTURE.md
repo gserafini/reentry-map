@@ -464,6 +464,7 @@ CREATE POLICY "Users can update own profile"
 The users table will be expanded with comprehensive baseline fields to support role-based profiles and personalized experiences. See ADR-013 and IMPLEMENTATION_CHECKLIST.md Phase 15 for complete details.
 
 **Key additions**:
+
 - **Name fields**: `first_name`, `last_name` (separate from current `name` field)
 - **Contact**: `email` (optional if phone provided), `phone` (optional if email provided)
   - **Important**: At least ONE contact method (email OR phone) must be provided and verified
@@ -477,6 +478,7 @@ The users table will be expanded with comprehensive baseline fields to support r
 - **Tracking**: `last_active_at`
 
 **Contact Method Flexibility**:
+
 - Users can sign up with email+password OR phone+OTP (not both required)
 - At signup, require either:
   - Email (must verify before full access)

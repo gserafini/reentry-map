@@ -129,7 +129,9 @@ describe('useAuth', () => {
   })
 
   it('signs out user and redirects', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null })
+    // Return user initially, then null after sign out
+    mockGetUser.mockResolvedValueOnce({ data: { user: mockUser }, error: null })
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
     mockSignOut.mockResolvedValue({ error: null })
 
     const { result } = renderHook(() => useAuth())
@@ -143,10 +145,13 @@ describe('useAuth', () => {
       await result.current.signOut()
     })
 
+    await waitFor(() => {
+      expect(result.current.user).toBeNull()
+    })
+
     expect(mockSignOut).toHaveBeenCalled()
     expect(mockRefresh).toHaveBeenCalled()
     expect(mockPush).toHaveBeenCalledWith('/')
-    expect(result.current.user).toBeNull()
   })
 
   it('handles sign out error', async () => {

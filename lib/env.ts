@@ -18,6 +18,13 @@ export const env = createEnv({
 
     // Admin contact for system alerts and monitoring
     ADMIN_EMAIL: z.string().email().optional(),
+
+    // GeoIP: Use external IP lookup in development for testing (set to 'true' to enable)
+    // When enabled, fetches your actual external IP for GeoIP instead of using localhost
+    USE_EXTERNAL_IP_IN_DEV: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((val) => val === 'true'),
   },
 
   /**
@@ -52,6 +59,7 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GOOGLE_MAPS_KEY: process.env.GOOGLE_MAPS_KEY,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    USE_EXTERNAL_IP_IN_DEV: process.env.USE_EXTERNAL_IP_IN_DEV,
 
     // Client-side
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
