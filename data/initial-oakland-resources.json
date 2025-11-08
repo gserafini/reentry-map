@@ -4,7 +4,14 @@
     "primary_category": "employment",
     "categories": ["employment", "education"],
     "description": "Provides job training, placement services, and career counseling for Oakland residents. Specializes in helping individuals with barriers to employment, including criminal records.",
-    "services": ["Job readiness training", "Resume writing", "Interview preparation", "Job placement", "Career counseling", "Vocational training"],
+    "services": [
+      "Job readiness training",
+      "Resume writing",
+      "Interview preparation",
+      "Job placement",
+      "Career counseling",
+      "Vocational training"
+    ],
     "address": "2500 Bissell Ave",
     "city": "Oakland",
     "state": "CA",
@@ -30,12 +37,18 @@
     "primary_category": "employment",
     "categories": ["employment", "education"],
     "description": "Workforce development organization offering job training, placement services, and support for youth and adults in Oakland.",
-    "services": ["Job training", "Career counseling", "Youth programs", "Adult education", "Job placement assistance"],
+    "services": [
+      "Job training",
+      "Career counseling",
+      "Youth programs",
+      "Adult education",
+      "Job placement assistance"
+    ],
     "address": "1212 Broadway, Suite 300",
     "city": "Oakland",
     "state": "CA",
     "zip_code": "94612",
-    "latitude": 37.8020,
+    "latitude": 37.802,
     "longitude": -122.2723,
     "phone": "(510) 768-3900",
     "email": "info@oaklandpic.org",
@@ -48,7 +61,7 @@
     "status": "active",
     "verified": true,
     "ai_enriched": false,
-    "completeness_score": 0.90,
+    "completeness_score": 0.9,
     "verification_score": 0.85
   },
   {
@@ -56,13 +69,19 @@
     "primary_category": "employment",
     "categories": ["employment", "education"],
     "description": "Pre-apprenticeship construction training program for Oakland residents. Provides hands-on skills training and job placement in the building trades.",
-    "services": ["Construction training", "Pre-apprenticeship programs", "Job placement", "Financial literacy", "Life skills coaching"],
+    "services": [
+      "Construction training",
+      "Pre-apprenticeship programs",
+      "Job placement",
+      "Financial literacy",
+      "Life skills coaching"
+    ],
     "address": "1701 35th Ave",
     "city": "Oakland",
     "state": "CA",
     "zip_code": "94601",
     "latitude": 37.7771,
-    "longitude": -122.2250,
+    "longitude": -122.225,
     "phone": "(510) 208-7986",
     "email": "info@cypressmandela.org",
     "website": "https://www.cypressmandela.org",
@@ -82,7 +101,13 @@
     "primary_category": "employment",
     "categories": ["employment", "general-support"],
     "description": "Comprehensive reentry services including employment support, case management, and community connection for formerly incarcerated individuals.",
-    "services": ["Employment assistance", "Case management", "Mentorship", "Support groups", "Resource navigation"],
+    "services": [
+      "Employment assistance",
+      "Case management",
+      "Mentorship",
+      "Support groups",
+      "Resource navigation"
+    ],
     "address": "1419 34th Ave",
     "city": "Oakland",
     "state": "CA",
@@ -101,14 +126,20 @@
     "verified": true,
     "ai_enriched": false,
     "completeness_score": 0.93,
-    "verification_score": 0.90
+    "verification_score": 0.9
   },
   {
     "name": "Building Opportunities for Self-Sufficiency (BOSS)",
     "primary_category": "employment",
     "categories": ["employment", "housing", "general-support"],
     "description": "Provides employment services, housing assistance, and support for homeless and low-income individuals in Oakland.",
-    "services": ["Job training", "Employment placement", "Housing navigation", "Benefits assistance", "Case management"],
+    "services": [
+      "Job training",
+      "Employment placement",
+      "Housing navigation",
+      "Benefits assistance",
+      "Case management"
+    ],
     "address": "2065 Kittredge St, Suite E",
     "city": "Oakland",
     "state": "CA",
@@ -134,7 +165,13 @@
     "primary_category": "housing",
     "categories": ["housing", "general-support"],
     "description": "Transitional housing program for formerly incarcerated men providing safe, supportive housing while they rebuild their lives.",
-    "services": ["Transitional housing", "Case management", "Life skills training", "Employment support", "Peer mentorship"],
+    "services": [
+      "Transitional housing",
+      "Case management",
+      "Life skills training",
+      "Employment support",
+      "Peer mentorship"
+    ],
     "address": "3240 E 12th St",
     "city": "Oakland",
     "state": "CA",
@@ -160,7 +197,13 @@
     "primary_category": "housing",
     "categories": ["housing"],
     "description": "Provides housing counseling, rental assistance information, and resources for finding affordable housing in Oakland.",
-    "services": ["Housing counseling", "Rental assistance information", "First-time homebuyer education", "Foreclosure prevention", "Tenant rights education"],
+    "services": [
+      "Housing counseling",
+      "Rental assistance information",
+      "First-time homebuyer education",
+      "Foreclosure prevention",
+      "Tenant rights education"
+    ],
     "address": "1611 Telegraph Ave, Suite 501",
     "city": "Oakland",
     "state": "CA",
@@ -186,7 +229,13 @@
     "primary_category": "housing",
     "categories": ["housing", "general-support"],
     "description": "Homeless outreach and housing navigation services as part of comprehensive community health center.",
-    "services": ["Housing navigation", "Homeless outreach", "Benefits enrollment", "Medical respite care", "Case management"],
+    "services": [
+      "Housing navigation",
+      "Homeless outreach",
+      "Benefits enrollment",
+      "Medical respite care",
+      "Case management"
+    ],
     "address": "3316 E 12th St",
     "city": "Oakland",
     "state": "CA",
@@ -204,7 +253,7 @@
     "status": "active",
     "verified": true,
     "ai_enriched": false,
-    "completeness_score": 0.90,
+    "completeness_score": 0.9,
     "verification_score": 0.88
   },
   {
@@ -212,7 +261,12 @@
     "primary_category": "housing",
     "categories": ["housing"],
     "description": "Provides supportive housing and Section 8 voucher information for low-income Oakland residents.",
-    "services": ["Supportive housing programs", "Section 8 voucher information", "Public housing", "Housing navigation"],
+    "services": [
+      "Supportive housing programs",
+      "Section 8 voucher information",
+      "Public housing",
+      "Housing navigation"
+    ],
     "address": "1619 Harrison St",
     "city": "Oakland",
     "state": "CA",
@@ -231,14 +285,21 @@
     "verified": true,
     "ai_enriched": false,
     "completeness_score": 0.88,
-    "verification_score": 0.90
+    "verification_score": 0.9
   },
   {
     "name": "St. Mary's Center",
     "primary_category": "housing",
     "categories": ["housing", "food", "general-support"],
     "description": "Comprehensive services for homeless and low-income seniors and adults, including housing assistance, meals, and case management.",
-    "services": ["Senior housing", "Meals program", "Case management", "Housing navigation", "Benefits assistance", "Adult day services"],
+    "services": [
+      "Senior housing",
+      "Meals program",
+      "Case management",
+      "Housing navigation",
+      "Benefits assistance",
+      "Adult day services"
+    ],
     "address": "925 Brockhurst St",
     "city": "Oakland",
     "state": "CA",
@@ -264,7 +325,13 @@
     "primary_category": "food",
     "categories": ["food"],
     "description": "Large food bank serving Alameda County with Oakland distribution sites. Provides groceries and fresh produce to families in need.",
-    "services": ["Food pantry", "Emergency food boxes", "Fresh produce distribution", "CalFresh enrollment", "Nutrition education"],
+    "services": [
+      "Food pantry",
+      "Emergency food boxes",
+      "Fresh produce distribution",
+      "CalFresh enrollment",
+      "Nutrition education"
+    ],
     "address": "7900 Edgewater Dr",
     "city": "Oakland",
     "state": "CA",
@@ -342,7 +409,12 @@
     "primary_category": "food",
     "categories": ["food"],
     "description": "Free meals for children and families at various Oakland school sites. Summer meal program and after-school nutrition.",
-    "services": ["Free breakfast and lunch", "Summer meal program", "After-school snacks", "Weekend meal bags"],
+    "services": [
+      "Free breakfast and lunch",
+      "Summer meal program",
+      "After-school snacks",
+      "Weekend meal bags"
+    ],
     "address": "1000 Broadway, Suite 440",
     "city": "Oakland",
     "state": "CA",
@@ -361,14 +433,21 @@
     "verified": true,
     "ai_enriched": false,
     "completeness_score": 0.89,
-    "verification_score": 0.90
+    "verification_score": 0.9
   },
   {
     "name": "LifeLong Medical Care - Multiple Clinics",
     "primary_category": "healthcare",
     "categories": ["healthcare"],
     "description": "Network of community health clinics providing comprehensive primary care to uninsured and underinsured Oakland residents.",
-    "services": ["Primary care", "Dental care", "Vision care", "Pharmacy", "Health insurance enrollment", "Sliding fee scale"],
+    "services": [
+      "Primary care",
+      "Dental care",
+      "Vision care",
+      "Pharmacy",
+      "Health insurance enrollment",
+      "Sliding fee scale"
+    ],
     "address": "3725 Telegraph Ave",
     "city": "Oakland",
     "state": "CA",
@@ -394,7 +473,13 @@
     "primary_category": "healthcare",
     "categories": ["healthcare", "mental-health"],
     "description": "Federally Qualified Health Center providing comprehensive medical, dental, and behavioral health services to the Latino community and all Oakland residents.",
-    "services": ["Primary care", "Dental care", "Behavioral health", "Chronic disease management", "Medi-Cal enrollment"],
+    "services": [
+      "Primary care",
+      "Dental care",
+      "Behavioral health",
+      "Chronic disease management",
+      "Medi-Cal enrollment"
+    ],
     "address": "3121 International Blvd",
     "city": "Oakland",
     "state": "CA",
@@ -420,7 +505,13 @@
     "primary_category": "healthcare",
     "categories": ["healthcare"],
     "description": "Community health center serving West Oakland with primary care, pediatrics, and specialty services.",
-    "services": ["Primary care", "Pediatrics", "Women's health", "Chronic disease management", "Health education"],
+    "services": [
+      "Primary care",
+      "Pediatrics",
+      "Women's health",
+      "Chronic disease management",
+      "Health education"
+    ],
     "address": "700 Adeline St",
     "city": "Oakland",
     "state": "CA",
@@ -446,12 +537,18 @@
     "primary_category": "mental-health",
     "categories": ["mental-health", "substance-abuse-treatment"],
     "description": "Culturally responsive mental health and substance abuse treatment services for Latino families and individuals in Oakland.",
-    "services": ["Individual therapy", "Family therapy", "Substance abuse counseling", "Crisis intervention", "Case management"],
+    "services": [
+      "Individual therapy",
+      "Family therapy",
+      "Substance abuse counseling",
+      "Crisis intervention",
+      "Case management"
+    ],
     "address": "1733 Franklin St, Suite 200",
     "city": "Oakland",
     "state": "CA",
     "zip_code": "94612",
-    "latitude": 37.8080,
+    "latitude": 37.808,
     "longitude": -122.2703,
     "phone": "(510) 834-2988",
     "email": "info@lafamiliacounseling.org",
@@ -464,7 +561,7 @@
     "status": "active",
     "verified": true,
     "ai_enriched": false,
-    "completeness_score": 0.90,
+    "completeness_score": 0.9,
     "verification_score": 0.88
   },
   {
@@ -472,7 +569,13 @@
     "primary_category": "mental-health",
     "categories": ["mental-health"],
     "description": "Community mental health center providing counseling, psychiatric services, and peer support for Oakland residents.",
-    "services": ["Individual therapy", "Group therapy", "Psychiatric medication management", "Peer support groups", "Crisis counseling"],
+    "services": [
+      "Individual therapy",
+      "Group therapy",
+      "Psychiatric medication management",
+      "Peer support groups",
+      "Crisis counseling"
+    ],
     "address": "410 30th St",
     "city": "Oakland",
     "state": "CA",
@@ -498,7 +601,13 @@
     "primary_category": "mental-health",
     "categories": ["mental-health", "housing"],
     "description": "Mental health services and supportive housing for individuals with serious mental illness and co-occurring disorders.",
-    "services": ["Case management", "Psychiatric services", "Supportive housing", "Employment support", "Peer support"],
+    "services": [
+      "Case management",
+      "Psychiatric services",
+      "Supportive housing",
+      "Employment support",
+      "Peer support"
+    ],
     "address": "1340 Arnold Dr, Suite 200",
     "city": "Oakland",
     "state": "CA",
@@ -524,7 +633,13 @@
     "primary_category": "substance-abuse-treatment",
     "categories": ["substance-abuse-treatment", "mental-health"],
     "description": "Comprehensive substance abuse treatment including residential, outpatient, and medication-assisted treatment programs.",
-    "services": ["Residential treatment", "Outpatient counseling", "Medication-assisted treatment (MAT)", "Dual diagnosis treatment", "Perinatal services"],
+    "services": [
+      "Residential treatment",
+      "Outpatient counseling",
+      "Medication-assisted treatment (MAT)",
+      "Dual diagnosis treatment",
+      "Perinatal services"
+    ],
     "address": "1505 Fruitvale Ave",
     "city": "Oakland",
     "state": "CA",
@@ -543,14 +658,21 @@
     "verified": true,
     "ai_enriched": false,
     "completeness_score": 0.93,
-    "verification_score": 0.90
+    "verification_score": 0.9
   },
   {
     "name": "Options Recovery Services",
     "primary_category": "substance-abuse-treatment",
     "categories": ["substance-abuse-treatment", "mental-health"],
     "description": "Outpatient substance abuse treatment with a focus on trauma-informed care and recovery support.",
-    "services": ["Outpatient counseling", "Group therapy", "Individual therapy", "Family education", "Recovery coaching", "Relapse prevention"],
+    "services": [
+      "Outpatient counseling",
+      "Group therapy",
+      "Individual therapy",
+      "Family education",
+      "Recovery coaching",
+      "Relapse prevention"
+    ],
     "address": "2045 Franklin St, Suite 205",
     "city": "Oakland",
     "state": "CA",
@@ -576,7 +698,13 @@
     "primary_category": "substance-abuse-treatment",
     "categories": ["substance-abuse-treatment"],
     "description": "Medication-assisted treatment (MAT) clinic specializing in methadone and buprenorphine treatment for opioid addiction.",
-    "services": ["Methadone treatment", "Buprenorphine treatment", "Individual counseling", "Group counseling", "Urine drug screening"],
+    "services": [
+      "Methadone treatment",
+      "Buprenorphine treatment",
+      "Individual counseling",
+      "Group counseling",
+      "Urine drug screening"
+    ],
     "address": "2740 International Blvd",
     "city": "Oakland",
     "state": "CA",
@@ -594,7 +722,7 @@
     "status": "active",
     "verified": true,
     "ai_enriched": false,
-    "completeness_score": 0.90,
+    "completeness_score": 0.9,
     "verification_score": 0.88
   },
   {
@@ -602,7 +730,13 @@
     "primary_category": "legal-aid",
     "categories": ["legal-aid"],
     "description": "Free legal services for low-income Oakland residents, including criminal record clearing, housing defense, and public benefits advocacy.",
-    "services": ["Criminal record expungement", "Clean slate", "Housing defense", "Public benefits advocacy", "Immigration legal services"],
+    "services": [
+      "Criminal record expungement",
+      "Clean slate",
+      "Housing defense",
+      "Public benefits advocacy",
+      "Immigration legal services"
+    ],
     "address": "2921 Adeline St",
     "city": "Oakland",
     "state": "CA",
@@ -628,7 +762,13 @@
     "primary_category": "legal-aid",
     "categories": ["legal-aid"],
     "description": "Free civil legal services for low-income individuals and families in Alameda County. Handles housing, public benefits, and consumer issues.",
-    "services": ["Housing legal aid", "Eviction defense", "Public benefits appeals", "Consumer protection", "Domestic violence restraining orders"],
+    "services": [
+      "Housing legal aid",
+      "Eviction defense",
+      "Public benefits appeals",
+      "Consumer protection",
+      "Domestic violence restraining orders"
+    ],
     "address": "1800 Harrison St, 17th Floor",
     "city": "Oakland",
     "state": "CA",
@@ -647,14 +787,20 @@
     "verified": true,
     "ai_enriched": false,
     "completeness_score": 0.91,
-    "verification_score": 0.90
+    "verification_score": 0.9
   },
   {
     "name": "Legal Services for Prisoners with Children (LSPC)",
     "primary_category": "legal-aid",
     "categories": ["legal-aid", "general-support"],
     "description": "Legal advocacy organization fighting for the rights of incarcerated parents, children, and families. Provides know-your-rights education and policy advocacy.",
-    "services": ["Legal advocacy", "Know-your-rights workshops", "Policy advocacy", "Community education", "Family reunification support"],
+    "services": [
+      "Legal advocacy",
+      "Know-your-rights workshops",
+      "Policy advocacy",
+      "Community education",
+      "Family reunification support"
+    ],
     "address": "1540 Market St, Suite 490",
     "city": "Oakland",
     "state": "CA",
@@ -706,7 +852,12 @@
     "primary_category": "transportation",
     "categories": ["transportation", "education"],
     "description": "Bicycle education and distribution program providing free bikes and safety training to Oakland youth and adults.",
-    "services": ["Free bicycles", "Bike repair training", "Safety education", "Bike maintenance classes"],
+    "services": [
+      "Free bicycles",
+      "Bike repair training",
+      "Safety education",
+      "Bike maintenance classes"
+    ],
     "address": "4265 Piedmont Ave",
     "city": "Oakland",
     "state": "CA",
@@ -732,13 +883,19 @@
     "primary_category": "id-documents",
     "categories": ["id-documents", "general-support"],
     "description": "County social services providing benefits enrollment and assistance obtaining identification documents.",
-    "services": ["CalFresh (food stamps)", "General Assistance", "Medi-Cal enrollment", "Birth certificate assistance", "ID replacement help"],
+    "services": [
+      "CalFresh (food stamps)",
+      "General Assistance",
+      "Medi-Cal enrollment",
+      "Birth certificate assistance",
+      "ID replacement help"
+    ],
     "address": "401 Broadway",
     "city": "Oakland",
     "state": "CA",
     "zip_code": "94607",
     "latitude": 37.7978,
-    "longitude": -122.2760,
+    "longitude": -122.276,
     "phone": "(510) 267-8800",
     "email": "info@acgov.org",
     "website": "https://www.alamedacountysocialservices.org",
@@ -750,7 +907,7 @@
     "status": "active",
     "verified": true,
     "ai_enriched": false,
-    "completeness_score": 0.90,
+    "completeness_score": 0.9,
     "verification_score": 0.92
   },
   {
@@ -758,7 +915,13 @@
     "primary_category": "id-documents",
     "categories": ["id-documents"],
     "description": "California Department of Motor Vehicles office providing ID cards, driver's licenses, and vehicle registration.",
-    "services": ["California ID cards", "Driver's licenses", "Vehicle registration", "REAL ID", "Disabled person parking placards"],
+    "services": [
+      "California ID cards",
+      "Driver's licenses",
+      "Vehicle registration",
+      "REAL ID",
+      "Disabled person parking placards"
+    ],
     "address": "5300 Claremont Ave",
     "city": "Oakland",
     "state": "CA",
@@ -784,7 +947,14 @@
     "primary_category": "education",
     "categories": ["education", "employment"],
     "description": "Community college offering degree programs, vocational training, and adult education including GED preparation.",
-    "services": ["GED preparation", "Vocational training", "Associate degrees", "Career technical education", "Adult education", "ESL classes"],
+    "services": [
+      "GED preparation",
+      "Vocational training",
+      "Associate degrees",
+      "Career technical education",
+      "Adult education",
+      "ESL classes"
+    ],
     "address": "900 Fallon St",
     "city": "Oakland",
     "state": "CA",
@@ -810,7 +980,14 @@
     "primary_category": "education",
     "categories": ["education"],
     "description": "Adult education programs including high school diploma, GED, ESL, and career technical education.",
-    "services": ["High school diploma", "GED preparation", "ESL classes", "Citizenship classes", "Computer skills", "Vocational training"],
+    "services": [
+      "High school diploma",
+      "GED preparation",
+      "ESL classes",
+      "Citizenship classes",
+      "Computer skills",
+      "Vocational training"
+    ],
     "address": "Multiple locations - main office 1025 2nd Ave",
     "city": "Oakland",
     "state": "CA",
@@ -836,7 +1013,14 @@
     "primary_category": "education",
     "categories": ["education", "employment"],
     "description": "Community college in the Oakland hills offering degree and certificate programs with strong health sciences and environmental programs.",
-    "services": ["Associate degrees", "Certificate programs", "Transfer preparation", "Nursing programs", "Environmental science", "Adult education"],
+    "services": [
+      "Associate degrees",
+      "Certificate programs",
+      "Transfer preparation",
+      "Nursing programs",
+      "Environmental science",
+      "Adult education"
+    ],
     "address": "12500 Campus Dr",
     "city": "Oakland",
     "state": "CA",
@@ -862,7 +1046,13 @@
     "primary_category": "clothing",
     "categories": ["clothing"],
     "description": "Free clothing closet providing professional attire for job interviews and everyday clothing for families in need.",
-    "services": ["Professional clothing", "Casual clothing", "Interview attire", "Children's clothing", "Shoes and accessories"],
+    "services": [
+      "Professional clothing",
+      "Casual clothing",
+      "Interview attire",
+      "Children's clothing",
+      "Shoes and accessories"
+    ],
     "address": "4501 Lincoln Ave",
     "city": "Oakland",
     "state": "CA",
@@ -881,14 +1071,20 @@
     "verified": true,
     "ai_enriched": false,
     "completeness_score": 0.82,
-    "verification_score": 0.80
+    "verification_score": 0.8
   },
   {
     "name": "Dress for Success East Bay",
     "primary_category": "clothing",
     "categories": ["clothing", "employment"],
     "description": "Provides professional attire, career development tools, and network of support for women entering the workforce.",
-    "services": ["Professional clothing", "Career coaching", "Interview preparation", "Networking events", "Ongoing wardrobe support"],
+    "services": [
+      "Professional clothing",
+      "Career coaching",
+      "Interview preparation",
+      "Networking events",
+      "Ongoing wardrobe support"
+    ],
     "address": "449 15th St, Suite 200",
     "city": "Oakland",
     "state": "CA",
@@ -906,7 +1102,7 @@
     "status": "active",
     "verified": true,
     "ai_enriched": false,
-    "completeness_score": 0.90,
+    "completeness_score": 0.9,
     "verification_score": 0.88
   },
   {
@@ -914,7 +1110,14 @@
     "primary_category": "faith-based",
     "categories": ["faith-based", "general-support"],
     "description": "Historic Oakland church with extensive community programs including food pantry, job readiness, and family support services.",
-    "services": ["Food pantry", "Job readiness program", "Youth programs", "Senior services", "Emergency assistance", "Worship services"],
+    "services": [
+      "Food pantry",
+      "Job readiness program",
+      "Youth programs",
+      "Senior services",
+      "Emergency assistance",
+      "Worship services"
+    ],
     "address": "8500 A St",
     "city": "Oakland",
     "state": "CA",
@@ -940,7 +1143,13 @@
     "primary_category": "faith-based",
     "categories": ["faith-based", "substance-abuse-treatment", "housing"],
     "description": "Faith-based residential recovery program for men struggling with addiction and homelessness.",
-    "services": ["Residential recovery program", "Substance abuse counseling", "Life skills training", "Employment assistance", "Spiritual support"],
+    "services": [
+      "Residential recovery program",
+      "Substance abuse counseling",
+      "Life skills training",
+      "Employment assistance",
+      "Spiritual support"
+    ],
     "address": "1034 66th Ave",
     "city": "Oakland",
     "state": "CA",
@@ -966,7 +1175,14 @@
     "primary_category": "general-support",
     "categories": ["general-support", "employment"],
     "description": "Community-based organization providing wraparound services for Oakland residents affected by violence and incarceration.",
-    "services": ["Case management", "Employment support", "Conflict resolution", "Victim services", "Family reunification", "Community events"],
+    "services": [
+      "Case management",
+      "Employment support",
+      "Conflict resolution",
+      "Victim services",
+      "Family reunification",
+      "Community events"
+    ],
     "address": "1722 Broadway, Suite 300",
     "city": "Oakland",
     "state": "CA",
@@ -992,7 +1208,14 @@
     "primary_category": "general-support",
     "categories": ["general-support", "education"],
     "description": "Public library providing free computer access, internet, resume help, and community resources.",
-    "services": ["Computer access", "Internet access", "Resume assistance", "Job search resources", "Educational programs", "Free library card"],
+    "services": [
+      "Computer access",
+      "Internet access",
+      "Resume assistance",
+      "Job search resources",
+      "Educational programs",
+      "Free library card"
+    ],
     "address": "125 14th St",
     "city": "Oakland",
     "state": "CA",
@@ -1018,12 +1241,19 @@
     "primary_category": "general-support",
     "categories": ["general-support"],
     "description": "Family resource centers throughout Oakland providing parent education, child development services, and family support.",
-    "services": ["Parent education", "Child development services", "Case management", "Food assistance", "Early childhood education", "Family support groups"],
+    "services": [
+      "Parent education",
+      "Child development services",
+      "Case management",
+      "Food assistance",
+      "Early childhood education",
+      "Family support groups"
+    ],
     "address": "Multiple locations - main office 1539 Fruitvale Ave",
     "city": "Oakland",
     "state": "CA",
     "zip_code": "94601",
-    "latitude": 37.7810,
+    "latitude": 37.781,
     "longitude": -122.2245,
     "phone": "(510) 534-6656",
     "email": "info@safepassages.org",
@@ -1044,7 +1274,13 @@
     "primary_category": "general-support",
     "categories": ["general-support", "education"],
     "description": "Coordinates community schools initiative providing wraparound services at school sites including health, social services, and family engagement.",
-    "services": ["School-based health centers", "Family resource centers", "After-school programs", "Parent engagement", "Community partnerships"],
+    "services": [
+      "School-based health centers",
+      "Family resource centers",
+      "After-school programs",
+      "Parent engagement",
+      "Community partnerships"
+    ],
     "address": "313 W Winton Ave",
     "city": "Oakland",
     "state": "CA",
@@ -1070,12 +1306,18 @@
     "primary_category": "employment",
     "categories": ["employment", "general-support"],
     "description": "Coordinates Oakland's workforce system connecting job seekers with training and employment opportunities.",
-    "services": ["Job search assistance", "Skills training", "Career counseling", "Employer connections", "Youth employment programs"],
+    "services": [
+      "Job search assistance",
+      "Skills training",
+      "Career counseling",
+      "Employer connections",
+      "Youth employment programs"
+    ],
     "address": "1212 Broadway, Suite 300",
     "city": "Oakland",
     "state": "CA",
     "zip_code": "94612",
-    "latitude": 37.8020,
+    "latitude": 37.802,
     "longitude": -122.2723,
     "phone": "(510) 768-3900",
     "email": "info@oaklandworkforce.org",

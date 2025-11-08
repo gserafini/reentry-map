@@ -1,9 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
 
-type ResourceReview = Database['public']['Tables']['resource_reviews']['Row']
 type ResourceReviewInsert = Database['public']['Tables']['resource_reviews']['Insert']
-type ReviewHelpfulness = Database['public']['Tables']['review_helpfulness']['Row']
 
 /**
  * Reviews API
@@ -22,7 +20,7 @@ export async function getResourceReviews(resourceId: string) {
     .select(
       `
       *,
-      user:users(id, email, phone)
+      user:users!user_id(id, name, phone, avatar_url)
     `
     )
     .eq('resource_id', resourceId)
@@ -63,11 +61,7 @@ export async function getUserReview(userId: string, resourceId: string) {
 export async function submitReview(review: ResourceReviewInsert) {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from('resource_reviews')
-    .insert(review)
-    .select()
-    .single()
+  const { data, error } = await supabase.from('resource_reviews').insert(review).select().single()
 
   if (error) {
     console.error('Error submitting review:', error)
@@ -121,11 +115,7 @@ export async function deleteReview(reviewId: string, userId: string) {
 /**
  * Vote on review helpfulness
  */
-export async function voteReviewHelpfulness(
-  userId: string,
-  reviewId: string,
-  isHelpful: boolean
-) {
+export async function voteReviewHelpfulness(userId: string, reviewId: string, isHelpful: boolean) {
   const supabase = createClient()
 
   const vote = {

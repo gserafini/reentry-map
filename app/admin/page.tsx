@@ -6,7 +6,7 @@ import {
   Container,
   Typography,
   Box,
-  Grid2 as Grid,
+  Grid,
   Card,
   CardContent,
   CardActions,
@@ -246,7 +246,11 @@ export default function AdminDashboardPage() {
                 Quick Actions
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
-                <Button variant="outlined" startIcon={<ResourcesIcon />} onClick={() => router.push('/admin/resources')}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ResourcesIcon />}
+                  onClick={() => router.push('/admin/resources')}
+                >
                   Manage Resources
                 </Button>
                 <Button

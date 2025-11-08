@@ -47,7 +47,7 @@ export function LocalBusiness({ resource }: LocalBusinessProps) {
       streetAddress: resource.address,
       addressLocality: resource.city,
       addressRegion: resource.state,
-      postalCode: resource.zip_code,
+      postalCode: resource.zip,
       addressCountry: 'US',
     },
     ...(resource.latitude &&

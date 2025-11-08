@@ -351,6 +351,7 @@ export type Database = {
           ai_verification_score: number | null
           appointment_required: boolean | null
           categories: string[] | null
+          change_log: Json | null
           city: string | null
           county: string | null
           created_at: string | null
@@ -360,10 +361,14 @@ export type Database = {
           email: string | null
           hours: Json | null
           id: string
+          is_parent: boolean | null
           latitude: number
+          location_name: string | null
           logo_url: string | null
           longitude: number
           name: string
+          org_name: string | null
+          parent_resource_id: string | null
           phone: string | null
           phone_last_verified: string | null
           phone_verified: boolean | null
@@ -396,6 +401,7 @@ export type Database = {
           ai_verification_score?: number | null
           appointment_required?: boolean | null
           categories?: string[] | null
+          change_log?: Json | null
           city?: string | null
           county?: string | null
           created_at?: string | null
@@ -405,10 +411,14 @@ export type Database = {
           email?: string | null
           hours?: Json | null
           id?: string
+          is_parent?: boolean | null
           latitude: number
+          location_name?: string | null
           logo_url?: string | null
           longitude: number
           name: string
+          org_name?: string | null
+          parent_resource_id?: string | null
           phone?: string | null
           phone_last_verified?: string | null
           phone_verified?: boolean | null
@@ -441,6 +451,7 @@ export type Database = {
           ai_verification_score?: number | null
           appointment_required?: boolean | null
           categories?: string[] | null
+          change_log?: Json | null
           city?: string | null
           county?: string | null
           created_at?: string | null
@@ -450,10 +461,14 @@ export type Database = {
           email?: string | null
           hours?: Json | null
           id?: string
+          is_parent?: boolean | null
           latitude?: number
+          location_name?: string | null
           logo_url?: string | null
           longitude?: number
           name?: string
+          org_name?: string | null
+          parent_resource_id?: string | null
           phone?: string | null
           phone_last_verified?: string | null
           phone_verified?: boolean | null

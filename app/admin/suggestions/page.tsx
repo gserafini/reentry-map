@@ -91,7 +91,11 @@ export default function AdminSuggestionsPage() {
   const handleApprove = async (suggestion: ResourceSuggestion) => {
     setActionInProgress(true)
 
-    const { error } = await updateSuggestionStatus(suggestion.id, 'approved', 'Approved and added to resources')
+    const { error } = await updateSuggestionStatus(
+      suggestion.id,
+      'approved',
+      'Approved and added to resources'
+    )
 
     if (error) {
       alert('Failed to approve suggestion')
@@ -112,7 +116,11 @@ export default function AdminSuggestionsPage() {
 
     setActionInProgress(true)
 
-    const { error } = await updateSuggestionStatus(selectedSuggestion.id, 'rejected', adminNotes || 'Rejected')
+    const { error } = await updateSuggestionStatus(
+      selectedSuggestion.id,
+      'rejected',
+      adminNotes || 'Rejected'
+    )
 
     if (error) {
       alert('Failed to reject suggestion')
@@ -129,7 +137,11 @@ export default function AdminSuggestionsPage() {
   const handleMarkDuplicate = async (suggestion: ResourceSuggestion) => {
     setActionInProgress(true)
 
-    const { error } = await updateSuggestionStatus(suggestion.id, 'duplicate', 'Marked as duplicate')
+    const { error } = await updateSuggestionStatus(
+      suggestion.id,
+      'duplicate',
+      'Marked as duplicate'
+    )
 
     if (error) {
       alert('Failed to mark as duplicate')
@@ -200,14 +212,24 @@ export default function AdminSuggestionsPage() {
           {suggestions.map((suggestion) => (
             <Card key={suggestion.id} variant="outlined">
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    mb: 2,
+                  }}
+                >
                   <Box>
                     <Typography variant="h6" gutterBottom>
                       {suggestion.name}
                     </Typography>
                     <Chip label={suggestion.category} size="small" sx={{ mb: 1 }} />
                     <Typography variant="caption" color="text.secondary" display="block">
-                      Submitted: {new Date(suggestion.created_at).toLocaleDateString()}
+                      Submitted:{' '}
+                      {suggestion.created_at
+                        ? new Date(suggestion.created_at).toLocaleDateString()
+                        : 'Unknown'}
                     </Typography>
                   </Box>
                 </Box>
@@ -218,7 +240,14 @@ export default function AdminSuggestionsPage() {
                   </Typography>
                 )}
 
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 2 }}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 2,
+                    mt: 2,
+                  }}
+                >
                   {suggestion.address && (
                     <Typography variant="body2">
                       <strong>Address:</strong> {suggestion.address}
@@ -227,11 +256,6 @@ export default function AdminSuggestionsPage() {
                   {suggestion.phone && (
                     <Typography variant="body2">
                       <strong>Phone:</strong> {suggestion.phone}
-                    </Typography>
-                  )}
-                  {suggestion.email && (
-                    <Typography variant="body2">
-                      <strong>Email:</strong> {suggestion.email}
                     </Typography>
                   )}
                   {suggestion.website && (
@@ -244,16 +268,10 @@ export default function AdminSuggestionsPage() {
                   )}
                 </Box>
 
-                {suggestion.hours && (
-                  <Typography variant="body2" sx={{ mt: 2 }}>
-                    <strong>Hours:</strong> {suggestion.hours}
-                  </Typography>
-                )}
-
-                {suggestion.notes && (
+                {suggestion.review_notes && (
                   <Alert severity="info" sx={{ mt: 2 }}>
                     <Typography variant="body2">
-                      <strong>Notes:</strong> {suggestion.notes}
+                      <strong>Review Notes:</strong> {suggestion.review_notes}
                     </Typography>
                   </Alert>
                 )}
@@ -290,7 +308,12 @@ export default function AdminSuggestionsPage() {
       )}
 
       {/* Reject Dialog */}
-      <Dialog open={showRejectDialog} onClose={() => setShowRejectDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={showRejectDialog}
+        onClose={() => setShowRejectDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Reject Suggestion</DialogTitle>
         <DialogContent>
           <Typography variant="body2" paragraph>

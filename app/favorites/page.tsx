@@ -2,15 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Container,
-  Typography,
-  Box,
-  Grid2 as Grid,
-  CircularProgress,
-  Alert,
-  Button,
-} from '@mui/material'
+import { Container, Typography, Box, Grid, CircularProgress, Alert, Button } from '@mui/material'
 import { FavoriteBorder as FavoriteBorderIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getUserFavorites } from '@/lib/api/favorites'
@@ -89,7 +81,7 @@ export default function FavoritesPage() {
           My Favorites
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Resources you've saved for quick access
+          Resources you&apos;ve saved for quick access
         </Typography>
       </Box>
 

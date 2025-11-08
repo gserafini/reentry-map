@@ -97,7 +97,11 @@ export default function AdminResourcesPage() {
         if (search) params.append('search', search)
 
         const response = await fetch(`/api/admin/resources?${params}`)
-        const result = await response.json()
+        const result = (await response.json()) as {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: any[]
+          pagination?: { total: number; totalPages: number }
+        }
 
         setResources(result.data || [])
         setTotal(result.pagination?.total || 0)
@@ -299,7 +303,8 @@ export default function AdminResourcesPage() {
         <DialogTitle>Delete Resource?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete <strong>{deletingResource?.name}</strong>? This action cannot be undone.
+            Are you sure you want to delete <strong>{deletingResource?.name}</strong>? This action
+            cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>

@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
 
-type ResourceSuggestion = Database['public']['Tables']['resource_suggestions']['Row']
 type ResourceSuggestionInsert = Database['public']['Tables']['resource_suggestions']['Insert']
 
 /**

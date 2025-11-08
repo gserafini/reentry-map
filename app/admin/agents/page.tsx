@@ -10,7 +10,7 @@ import {
   CardContent,
   CardActions,
   Button,
-  Grid2 as Grid,
+  Grid,
   CircularProgress,
   Alert,
   Chip,
@@ -227,7 +227,9 @@ export default function AgentsPage() {
                 <Button
                   size="small"
                   variant="contained"
-                  startIcon={runningAgent === agent.type ? <CircularProgress size={16} /> : <PlayIcon />}
+                  startIcon={
+                    runningAgent === agent.type ? <CircularProgress size={16} /> : <PlayIcon />
+                  }
                   onClick={() => runAgent(agent.type)}
                   disabled={runningAgent !== null}
                   fullWidth
@@ -285,6 +287,7 @@ export default function AgentsPage() {
                     <Chip
                       label={log.status}
                       size="small"
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       color={getStatusColor(log.status) as any}
                     />
                   </TableCell>

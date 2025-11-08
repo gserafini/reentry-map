@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
 
-type ResourceUpdate = Database['public']['Tables']['resource_updates']['Row']
 type ResourceUpdateInsert = Database['public']['Tables']['resource_updates']['Insert']
 
 /**
@@ -16,11 +15,7 @@ type ResourceUpdateInsert = Database['public']['Tables']['resource_updates']['In
 export async function submitUpdate(update: ResourceUpdateInsert) {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from('resource_updates')
-    .insert(update)
-    .select()
-    .single()
+  const { data, error } = await supabase.from('resource_updates').insert(update).select().single()
 
   if (error) {
     console.error('Error submitting update:', error)

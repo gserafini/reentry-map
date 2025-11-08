@@ -32,6 +32,18 @@ const eslintConfig = [
   ...compat.extends('plugin:jsx-a11y/recommended'),
   ...compat.extends('plugin:prettier/recommended'), // Must be last to override other configs
   {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.setup.ts', '**/*.config.ts', '**/*.config.mts', '**/*.config.js'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

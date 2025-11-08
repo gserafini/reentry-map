@@ -8,7 +8,7 @@ import {
   Box,
   Button,
   TextField,
-  Grid2 as Grid,
+  Grid,
   FormControl,
   InputLabel,
   Select,
@@ -18,7 +18,6 @@ import {
   Checkbox,
   FormControlLabel,
   Paper,
-  Chip,
   Divider,
 } from '@mui/material'
 import {
@@ -110,7 +109,8 @@ export default function NewResourcePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [name, address, primary_category]) // Dependencies for shortcuts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, address, primary_category]) // handleGeocode and handleSubmit are stable
 
   const handleGeocode = async () => {
     if (!address) {
@@ -131,7 +131,7 @@ export default function NewResourcePage() {
       } else {
         setError('Could not geocode address. Check the address and try again.')
       }
-    } catch (err) {
+    } catch {
       setError('Geocoding failed. You can save without coordinates.')
     } finally {
       setGeocoding(false)
@@ -243,7 +243,8 @@ export default function NewResourcePage() {
       {/* Keyboard Shortcuts Help */}
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Save) | Ctrl+Shift+S (Save & Add Another) | Ctrl+G (Geocode) | Tab (Next Field)
+          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Save) | Ctrl+Shift+S (Save & Add Another) |
+          Ctrl+G (Geocode) | Tab (Next Field)
         </Typography>
       </Alert>
 
@@ -260,7 +261,13 @@ export default function NewResourcePage() {
       )}
 
       <Paper sx={{ p: 3 }}>
-        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }}>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSubmit(false)
+          }}
+        >
           <Grid container spacing={3}>
             {/* Essential Fields - Always Visible */}
             <Grid size={12}>
@@ -277,7 +284,6 @@ export default function NewResourcePage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 fullWidth
-                autoFocus
                 placeholder="e.g., Oakland Job Center"
               />
             </Grid>
@@ -420,7 +426,9 @@ export default function NewResourcePage() {
 
             <Grid size={{ xs: 12, md: 6 }}>
               <FormControlLabel
-                control={<Checkbox checked={verified} onChange={(e) => setVerified(e.target.checked)} />}
+                control={
+                  <Checkbox checked={verified} onChange={(e) => setVerified(e.target.checked)} />
+                }
                 label="Mark as Verified"
               />
             </Grid>
@@ -428,7 +436,11 @@ export default function NewResourcePage() {
             {/* Action Buttons */}
             <Grid size={12}>
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                <Button variant="outlined" onClick={() => router.push('/admin/resources')} disabled={saving}>
+                <Button
+                  variant="outlined"
+                  onClick={() => router.push('/admin/resources')}
+                  disabled={saving}
+                >
                   Cancel
                 </Button>
                 <Button

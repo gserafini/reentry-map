@@ -4,7 +4,7 @@
  * Only creates pages where we have meaningful content (5+ resources)
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaticClient } from '@/lib/supabase/server'
 import type { ResourceCategory } from '@/lib/types/database'
 
 export interface CityPageData {
@@ -37,7 +37,7 @@ export interface CategoryInCityPageData {
  * Threshold: 5+ total resources
  */
 export async function getCityPages(): Promise<CityPageData[]> {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
 
   // Get city totals
   const { data: cityTotals, error: cityError } = await supabase
@@ -64,7 +64,7 @@ export async function getCityPages(): Promise<CityPageData[]> {
 
   // Filter cities with 5+ resources
   const validCities = Object.entries(cityCounts)
-    .filter(([_, count]) => count >= 5)
+    .filter(([, count]) => count >= 5)
     .map(([key]) => {
       const [city, state] = key.split('|')
       return { city, state }
@@ -87,7 +87,8 @@ export async function getCityPages(): Promise<CityPageData[]> {
     // Calculate category counts
     const categoryCounts = cityResources.reduce(
       (acc, resource) => {
-        acc[resource.primary_category] = (acc[resource.primary_category] || 0) + 1
+        const category = resource.primary_category as ResourceCategory
+        acc[category] = (acc[category] || 0) + 1
         return acc
       },
       {} as Record<ResourceCategory, number>
@@ -128,7 +129,7 @@ export async function getCityPages(): Promise<CityPageData[]> {
  * Threshold: 3+ resources in that category/city combo
  */
 export async function getCategoryInCityPages(): Promise<CategoryInCityPageData[]> {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
 
   const { data: resources, error } = await supabase
     .from('resources')

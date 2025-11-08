@@ -137,7 +137,11 @@ export default function MySuggestionsPage() {
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             Know a resource that should be listed? Share it with the community!
           </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => router.push('/suggest-resource')}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => router.push('/suggest-resource')}
+          >
             Suggest a Resource
           </Button>
         </Box>
@@ -149,7 +153,14 @@ export default function MySuggestionsPage() {
           {suggestions.map((suggestion) => (
             <Card key={suggestion.id} variant="outlined">
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    mb: 2,
+                  }}
+                >
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="h6" gutterBottom>
                       {suggestion.name}
@@ -157,13 +168,17 @@ export default function MySuggestionsPage() {
                     <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
                       <Chip label={suggestion.category} size="small" />
                       <Chip
-                        label={getStatusLabel(suggestion.status)}
+                        label={getStatusLabel(suggestion.status || 'pending')}
                         size="small"
-                        color={getStatusColor(suggestion.status) as any}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        color={getStatusColor(suggestion.status || 'pending') as any}
                       />
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      Submitted: {new Date(suggestion.created_at).toLocaleDateString()}
+                      Submitted:{' '}
+                      {suggestion.created_at
+                        ? new Date(suggestion.created_at).toLocaleDateString()
+                        : 'Unknown'}
                       {suggestion.reviewed_at &&
                         ` • Reviewed: ${new Date(suggestion.reviewed_at).toLocaleDateString()}`}
                     </Typography>
@@ -197,10 +212,10 @@ export default function MySuggestionsPage() {
                   </Typography>
                 )}
 
-                {suggestion.admin_notes && (
+                {suggestion.review_notes && (
                   <Alert severity="info" sx={{ mt: 2 }}>
                     <Typography variant="body2">
-                      <strong>Admin Note:</strong> {suggestion.admin_notes}
+                      <strong>Admin Note:</strong> {suggestion.review_notes}
                     </Typography>
                   </Alert>
                 )}

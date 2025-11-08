@@ -24,14 +24,15 @@ export type ResourceCardResource = {
   name: string
   primary_category?: string | null
   address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
   rating_average?: number | null
   rating_count?: number | null
   latitude?: number | null
   longitude?: number | null
   website?: string | null
   slug?: string | null
-  state?: string | null
-  city?: string | null
 }
 
 interface ResourceCardProps {
@@ -45,6 +46,7 @@ interface ResourceCardProps {
 
 export function ResourceCard({
   resource,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onFavorite,
   userLocation: providedLocation,
 }: ResourceCardProps) {
@@ -137,8 +139,14 @@ export function ResourceCard({
             }}
             data-testid="resource-address"
           >
-            <Typography variant="body2" component="span">
+            <Typography variant="body2" component="div">
               {resource.address}
+            </Typography>
+            <Typography variant="body2" component="div">
+              {resource.city && <>{resource.city}</>}
+              {resource.city && resource.state && ', '}
+              {resource.state && <>{resource.state}</>}
+              {resource.zip && <> {resource.zip}</>}
             </Typography>
           </Link>
         ) : (

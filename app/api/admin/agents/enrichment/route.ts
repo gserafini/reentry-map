@@ -8,10 +8,10 @@ import { EnrichmentAgent } from '@/lib/ai-agents'
  * Trigger the Enrichment Agent to enrich existing resources
  * Requires admin authentication
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // Check authentication
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()

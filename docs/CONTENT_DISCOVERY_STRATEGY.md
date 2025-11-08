@@ -9,9 +9,11 @@
 ### Primary Sources (High Quality, High Coverage)
 
 #### 1. **211 Directories**
+
 The most comprehensive source for social services in any region.
 
 **For Oakland/Alameda County:**
+
 - **Alameda County 211**: https://www.211alamedacounty.org
   - Searchable database of vetted community resources
   - Categories align with our schema
@@ -28,6 +30,7 @@ The most comprehensive source for social services in any region.
 #### 2. **Government Databases**
 
 **Alameda County Resources:**
+
 - **Alameda County Social Services**: https://www.alamedacountysocialservices.org
   - CalWORKs employment services
   - General Assistance programs
@@ -47,6 +50,7 @@ The most comprehensive source for social services in any region.
 #### 3. **Reentry-Specific Organizations**
 
 **National/Regional:**
+
 - **Root & Rebound**: https://www.rootandrebound.org/resources
   - California reentry legal guide
   - Resource directory for formerly incarcerated individuals
@@ -109,6 +113,7 @@ The most comprehensive source for social services in any region.
   - "oakland social security card replacement"
 
 **Advanced Search Operators:**
+
 ```
 site:gov "oakland" "employment services"
 site:org "oakland" "reentry" "housing"
@@ -120,6 +125,7 @@ filetype:pdf "alameda county" "resource directory"
 #### 6. **Yelp & Google Maps**
 
 Search for service categories + "nonprofit" or "community"
+
 - Filter by rating (3+ stars)
 - Check reviews for legitimacy
 - Verify hours and contact info
@@ -155,6 +161,7 @@ Search for service categories + "nonprofit" or "community"
 ### Geocoding
 
 **After collecting address, use Google Geocoding API:**
+
 1. Send address to Geocoding API
 2. Receive latitude/longitude
 3. Verify coordinates place marker in correct location
@@ -189,6 +196,7 @@ Search for service categories + "nonprofit" or "community"
 ### Data Quality Tiers
 
 **Tier 1: Verified** ⭐⭐⭐⭐⭐
+
 - All fields complete
 - Phone number verified by call
 - Website checked and current
@@ -196,11 +204,13 @@ Search for service categories + "nonprofit" or "community"
 - Photo available
 
 **Tier 2: Standard** ⭐⭐⭐⭐
+
 - Core fields complete (name, address, phone, category)
 - Website checked
 - Hours may be missing or unverified
 
 **Tier 3: Basic** ⭐⭐⭐
+
 - Name, address, category only
 - May be missing phone/website
 - Requires follow-up verification
@@ -266,10 +276,10 @@ async function discoverResources(city: string, category: ResourceCategory) {
   const enriched = await enrichResources(unique)
 
   // 6. Score completeness and quality
-  const scored = enriched.map(r => ({
+  const scored = enriched.map((r) => ({
     ...r,
     completeness_score: calculateCompleteness(r),
-    verification_score: 0.5 // Manual verification needed
+    verification_score: 0.5, // Manual verification needed
   }))
 
   // 7. Return for admin review
@@ -335,12 +345,14 @@ Content-Type: application/json
 ### Verification Schedule
 
 **Quarterly Verification** (every 90 days):
+
 - Phone number still works?
 - Website still active?
 - Hours of operation current?
 - Organization still operating?
 
 **Annual Deep Verification**:
+
 - Visit location if possible
 - Update photos
 - Refresh description and services
@@ -365,12 +377,12 @@ async function verifyResource(resourceId: string) {
   const verification_score = calculateVerificationScore({
     phoneValid,
     websiteActive,
-    googleMapsExists: !!googleMapsData
+    googleMapsExists: !!googleMapsData,
   })
 
   await updateResource(resourceId, {
     verification_score,
-    last_verified: new Date()
+    last_verified: new Date(),
   })
 }
 ```
@@ -384,6 +396,7 @@ async function verifyResource(resourceId: string) {
 **Goal**: 50+ resources across all categories
 
 **Minimum per category:**
+
 - Employment: 5 resources
 - Housing: 5 resources
 - Food: 5 resources
@@ -399,6 +412,7 @@ async function verifyResource(resourceId: string) {
 - General Support: 3 resources
 
 **Quality Targets:**
+
 - 80%+ resources at Tier 2 or higher
 - 100% have verified address + phone
 - 90%+ have working website
@@ -407,6 +421,7 @@ async function verifyResource(resourceId: string) {
 ### Expansion Strategy
 
 **After Oakland MVP:**
+
 1. Berkeley, CA (adjacent city, high overlap)
 2. San Francisco, CA (major metro)
 3. Richmond, CA (Contra Costa County)
@@ -414,6 +429,7 @@ async function verifyResource(resourceId: string) {
 5. Sacramento, CA (state capital)
 
 **Each city requires:**
+
 - 30+ resources minimum before launching city page
 - 5+ resources per major category (Employment, Housing, Food)
 - Local 211 directory scraped
@@ -424,17 +440,20 @@ async function verifyResource(resourceId: string) {
 ## Tools & Resources
 
 ### Discovery Tools
+
 - **211 Directories**: Primary source
 - **Google Custom Search API**: Programmatic web search
 - **Google Maps API**: Business verification
 - **Yelp Fusion API**: Supplemental data
 
 ### Verification Tools
+
 - **Twilio Lookup API**: Phone number verification
 - **Website uptime monitors**: Check website status
 - **Google Geocoding API**: Address validation
 
 ### Data Management
+
 - **Google Sheets**: Manual collection (interim)
 - **JSON files**: Bulk import format
 - **Supabase**: Final storage

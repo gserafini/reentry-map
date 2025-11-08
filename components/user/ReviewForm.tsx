@@ -39,12 +39,7 @@ interface ReviewFormProps {
  * - Includes rating, text, pros/cons, tips
  * - Form validation
  */
-export function ReviewForm({
-  resourceId,
-  resourceName,
-  onSuccess,
-  onCancel,
-}: ReviewFormProps) {
+export function ReviewForm({ resourceId, resourceName, onSuccess, onCancel }: ReviewFormProps) {
   const { user, isAuthenticated } = useAuth()
   const router = useRouter()
 
@@ -221,7 +216,11 @@ export function ReviewForm({
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
+        >
           {/* Rating */}
           <FormControl>
             <FormLabel>Your Rating *</FormLabel>
@@ -289,12 +288,17 @@ export function ReviewForm({
           {/* Checkboxes */}
           <Box>
             <FormControlLabel
-              control={<Checkbox checked={wasHelpful} onChange={(e) => setWasHelpful(e.target.checked)} />}
+              control={
+                <Checkbox checked={wasHelpful} onChange={(e) => setWasHelpful(e.target.checked)} />
+              }
               label="This resource was helpful to me"
             />
             <FormControlLabel
               control={
-                <Checkbox checked={wouldRecommend} onChange={(e) => setWouldRecommend(e.target.checked)} />
+                <Checkbox
+                  checked={wouldRecommend}
+                  onChange={(e) => setWouldRecommend(e.target.checked)}
+                />
               }
               label="I would recommend this resource"
             />

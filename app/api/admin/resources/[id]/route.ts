@@ -5,10 +5,8 @@ import { createClient } from '@/lib/supabase/server'
  * GET /api/admin/resources/[id]
  * Get a single resource (admin only)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const supabase = await createClient()
     const {
@@ -30,11 +28,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('id', params.id)
-      .single()
+    const { data, error } = await supabase.from('resources').select('*').eq('id', id).single()
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -46,10 +40,7 @@ export async function GET(
     return NextResponse.json({ data })
   } catch (error) {
     console.error('Error fetching resource:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch resource' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch resource' }, { status: 500 })
   }
 }
 
@@ -57,10 +48,8 @@ export async function GET(
  * PUT /api/admin/resources/[id]
  * Update a resource (admin only)
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const supabase = await createClient()
     const {
@@ -82,7 +71,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await request.json()) as any
 
     // Update resource
     const { data, error } = await supabase
@@ -103,7 +93,7 @@ export async function PUT(
         email: body.email || null,
         website: body.website || null,
         hours: body.hours || null,
-        services: body.services || null,
+        services_offered: body.services_offered || null,
         eligibility_requirements: body.eligibility_requirements || null,
         required_documents: body.required_documents || null,
         fees: body.fees || null,
@@ -112,7 +102,7 @@ export async function PUT(
         status: body.status,
         verified: body.verified,
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
@@ -123,10 +113,7 @@ export async function PUT(
     return NextResponse.json({ data })
   } catch (error) {
     console.error('Error updating resource:', error)
-    return NextResponse.json(
-      { error: 'Failed to update resource' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update resource' }, { status: 500 })
   }
 }
 
@@ -136,8 +123,9 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const supabase = await createClient()
     const {
@@ -159,10 +147,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { error } = await supabase
-      .from('resources')
-      .delete()
-      .eq('id', params.id)
+    const { error } = await supabase.from('resources').delete().eq('id', id)
 
     if (error) {
       throw error
@@ -171,9 +156,6 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting resource:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete resource' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to delete resource' }, { status: 500 })
   }
 }

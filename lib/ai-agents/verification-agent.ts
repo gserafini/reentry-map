@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BaseAgent } from './base-agent'
 import { createClient } from '@/lib/supabase/client'
 
-interface VerificationResult {
+interface _VerificationResult {
   resourceId: string
   isValid: boolean
   issues: string[]
@@ -26,7 +27,7 @@ export class VerificationAgent extends BaseAgent {
   }
 
   async run(): Promise<void> {
-    const logId = await this.startLog()
+    const _logId = await this.startLog()
     let totalCost = 0
     let resourcesProcessed = 0
     let resourcesUpdated = 0
@@ -128,7 +129,7 @@ export class VerificationAgent extends BaseAgent {
 
     // 3. Update verification status
     const supabase = createClient()
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       last_verified: new Date().toISOString(),
     }
 
@@ -206,7 +207,7 @@ export class VerificationAgent extends BaseAgent {
    * Advanced verification using AI (phone call transcription, etc.)
    * This would be implemented in a production environment
    */
-  private async performAdvancedVerification(resource: any): Promise<{
+  private async performAdvancedVerification(_resource: any): Promise<{
     isValid: boolean
     issues: string[]
     costCents: number

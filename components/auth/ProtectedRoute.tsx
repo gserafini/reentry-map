@@ -26,11 +26,11 @@ export function ProtectedRoute({
   requireAuth = true,
   redirectTo = '/login',
 }: ProtectedRouteProps) {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && requireAuth && !user) {
+    if (!isLoading && requireAuth && !user) {
       // Store the intended destination to redirect back after login
       const currentPath = window.location.pathname
       if (currentPath !== redirectTo) {
@@ -38,10 +38,10 @@ export function ProtectedRoute({
       }
       router.push(redirectTo)
     }
-  }, [user, loading, requireAuth, redirectTo, router])
+  }, [user, isLoading, requireAuth, redirectTo, router])
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (isLoading) {
     return (
       <Box
         sx={{

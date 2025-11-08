@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createBrowserClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { env } from '@/lib/env'
 
@@ -32,4 +33,14 @@ export async function createClient() {
       },
     }
   )
+}
+
+/**
+ * Create a static Supabase client for use in generateStaticParams and other
+ * build-time contexts where cookies are not available.
+ *
+ * This client uses the anonymous key and is suitable for reading public data only.
+ */
+export function createStaticClient() {
+  return createBrowserClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
 }

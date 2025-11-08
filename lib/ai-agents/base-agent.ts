@@ -12,7 +12,7 @@ interface AgentLogData {
   resources_added?: number
   resources_updated?: number
   error_message?: string | null
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
   cost_cents?: number | null
 }
 
@@ -126,9 +126,7 @@ export abstract class BaseAgent {
       const content = response.choices[0]?.message?.content || ''
       const usage = response.usage
 
-      const costCents = usage
-        ? this.calculateCost(usage.prompt_tokens, usage.completion_tokens)
-        : 0
+      const costCents = usage ? this.calculateCost(usage.prompt_tokens, usage.completion_tokens) : 0
 
       return { content, costCents }
     } catch (error) {

@@ -73,6 +73,14 @@ export function getAllCategories(): ResourceCategory[] {
 }
 
 /**
+ * Get all categories as array of objects with value and label
+ */
+export const CATEGORIES = (Object.keys(CATEGORY_CONFIG) as ResourceCategory[]).map((key) => ({
+  value: key,
+  label: CATEGORY_CONFIG[key].label,
+}))
+
+/**
  * Get category display label
  */
 export function getCategoryLabel(category: ResourceCategory): string {

@@ -15,7 +15,7 @@ import {
   MenuItem,
   CircularProgress,
   Paper,
-  Grid2 as Grid,
+  Grid,
   Divider,
 } from '@mui/material'
 import {
@@ -95,6 +95,7 @@ export default function SuggestResourcePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, category, address])
 
   const handleGeocode = async () => {
@@ -112,7 +113,6 @@ export default function SuggestResourcePage() {
         setLatitude(coords.latitude)
         setLongitude(coords.longitude)
         // Show brief success feedback
-        const successMsg = 'Coordinates added successfully!'
         setError(null)
         setTimeout(() => {
           // Clear any lingering messages
@@ -120,7 +120,7 @@ export default function SuggestResourcePage() {
       } else {
         setError('Could not geocode address. You can still submit without coordinates.')
       }
-    } catch (err) {
+    } catch {
       setError('Geocoding failed. You can submit without coordinates.')
     } finally {
       setGeocoding(false)
@@ -146,16 +146,14 @@ export default function SuggestResourcePage() {
 
     try {
       const suggestion: ResourceSuggestionInsert = {
-        user_id: user.id,
+        suggested_by: user.id,
         name: name.trim(),
         description: description.trim() || null,
         category,
         address: address.trim() || null,
         phone: phone.trim() || null,
-        email: email.trim() || null,
         website: website.trim() || null,
-        hours: hours.trim() || null,
-        notes: notes.trim() || null,
+        reason: notes.trim() || null,
       }
 
       const { error: submitError } = await submitSuggestion(suggestion)
@@ -234,7 +232,8 @@ export default function SuggestResourcePage() {
       {/* Keyboard Shortcuts Help */}
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Submit) | Ctrl+Shift+S (Submit & Add Another) | Ctrl+G (Geocode) | Tab (Next Field)
+          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Submit) | Ctrl+Shift+S (Submit & Add Another)
+          | Ctrl+G (Geocode) | Tab (Next Field)
         </Typography>
       </Alert>
 
@@ -253,7 +252,13 @@ export default function SuggestResourcePage() {
       )}
 
       <Paper sx={{ p: 3 }}>
-        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }}>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSubmit(false)
+          }}
+        >
           <Grid container spacing={3}>
             {/* Essential Fields */}
             <Grid size={12}>
@@ -270,7 +275,6 @@ export default function SuggestResourcePage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 fullWidth
-                autoFocus
                 placeholder="e.g., Oakland Job Center"
                 helperText="Official name of the organization or program"
               />
@@ -279,7 +283,11 @@ export default function SuggestResourcePage() {
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth required>
                 <InputLabel>Category</InputLabel>
-                <Select value={category} label="Category" onChange={(e) => setCategory(e.target.value)}>
+                <Select
+                  value={category}
+                  label="Category"
+                  onChange={(e) => setCategory(e.target.value)}
+                >
                   {CATEGORIES.map((cat) => (
                     <MenuItem key={cat.value} value={cat.value}>
                       {cat.label}
@@ -437,9 +445,9 @@ export default function SuggestResourcePage() {
           <strong>What happens next?</strong>
         </Typography>
         <Typography variant="body2">
-          Our team will review your suggestion and verify the information. You can check the status of
-          your submission on the "My Suggestions" page. Approved suggestions will be added to the
-          resource directory.
+          Our team will review your suggestion and verify the information. You can check the status
+          of your submission on the &ldquo;My Suggestions&rdquo; page. Approved suggestions will be
+          added to the resource directory.
         </Typography>
       </Alert>
     </Container>

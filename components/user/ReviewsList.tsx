@@ -70,9 +70,7 @@ export function ReviewsList({ resourceId, onWriteReviewClick }: ReviewsListProps
           const { data: votes } = await getUserHelpfulnessVotes(user.id, reviewIds)
 
           if (votes) {
-            const votesMap = new Map(
-              votes.map((v) => [v.review_id, { is_helpful: v.is_helpful }])
-            )
+            const votesMap = new Map(votes.map((v) => [v.review_id, { is_helpful: v.is_helpful }]))
             setUserVotes(votesMap)
           }
         }
@@ -88,7 +86,10 @@ export function ReviewsList({ resourceId, onWriteReviewClick }: ReviewsListProps
   const sortedReviews = [...reviews].sort((a, b) => {
     switch (sortBy) {
       case 'recent':
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        return (
+          new Date(b.created_at || new Date()).getTime() -
+          new Date(a.created_at || new Date()).getTime()
+        )
       case 'helpful':
         return (b.helpful_count || 0) - (a.helpful_count || 0)
       case 'rating_high':
@@ -144,13 +145,15 @@ export function ReviewsList({ resourceId, onWriteReviewClick }: ReviewsListProps
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6">
-          Reviews ({reviews.length})
-        </Typography>
+        <Typography variant="h6">Reviews ({reviews.length})</Typography>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Sort by</InputLabel>
-            <Select value={sortBy} label="Sort by" onChange={(e) => setSortBy(e.target.value as SortOption)}>
+            <Select
+              value={sortBy}
+              label="Sort by"
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+            >
               <MenuItem value="recent">Most Recent</MenuItem>
               <MenuItem value="helpful">Most Helpful</MenuItem>
               <MenuItem value="rating_high">Highest Rating</MenuItem>

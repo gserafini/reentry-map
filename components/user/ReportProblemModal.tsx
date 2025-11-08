@@ -105,11 +105,11 @@ export function ReportProblemModal({
 
     try {
       const update: ResourceUpdateInsert = {
-        user_id: user.id,
+        reported_by: user.id,
         resource_id: resourceId,
         update_type: updateType,
         description: description.trim(),
-        suggested_value: suggestedValue.trim() || null,
+        new_value: suggestedValue.trim() || null,
       }
 
       const { error: submitError } = await submitUpdate(update)
@@ -135,9 +135,7 @@ export function ReportProblemModal({
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>Report a Problem</DialogTitle>
         <DialogContent>
-          <Alert severity="info">
-            Please sign in to report issues with this resource.
-          </Alert>
+          <Alert severity="info">Please sign in to report issues with this resource.</Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
@@ -185,7 +183,11 @@ export function ReportProblemModal({
 
           <FormControl fullWidth required sx={{ mb: 3 }}>
             <InputLabel>Issue Type</InputLabel>
-            <Select value={updateType} label="Issue Type" onChange={(e) => setUpdateType(e.target.value)}>
+            <Select
+              value={updateType}
+              label="Issue Type"
+              onChange={(e) => setUpdateType(e.target.value)}
+            >
               {UPDATE_TYPES.map((type) => (
                 <MenuItem key={type.value} value={type.value}>
                   {type.label}

@@ -1,6 +1,7 @@
+import type { Resource } from '@/lib/types/database'
 import { MetadataRoute } from 'next'
 import { getCityPages, getCategoryInCityPages } from '@/lib/api/seo-pages'
-import { getResources } from '@/lib/api/resources'
+import { createStaticClient } from '@/lib/supabase/server'
 import { generateSeoUrl } from '@/lib/utils/seo-url'
 
 /**
@@ -10,6 +11,7 @@ import { generateSeoUrl } from '@/lib/utils/seo-url'
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://reentrymap.org'
+  const supabase = createStaticClient()
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -52,11 +54,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   // Individual resource pages
-  const { data: resources } = await getResources({ limit: 1000 })
+  const { data: resources } = await supabase
+    .from('resources')
+    .select('id, name, updated_at, created_at')
+    .eq('status', 'active')
+    .limit(1000)
+
   const resourcePagesSitemap: MetadataRoute.Sitemap =
     resources?.map((resource) => ({
-      url: `${baseUrl}${generateSeoUrl(resource)}`,
-      lastModified: new Date(resource.updated_at || resource.created_at),
+      url: `${baseUrl}${generateSeoUrl({ id: resource.id, name: resource.name } as Resource)}`,
+      lastModified: new Date(resource.updated_at || resource.created_at || Date.now()),
       changeFrequency: 'monthly',
       priority: 0.7,
     })) || []

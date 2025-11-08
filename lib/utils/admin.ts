@@ -12,11 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 export async function isAdmin(userId: string): Promise<boolean> {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', userId)
-    .single()
+  const { data, error } = await supabase.from('users').select('is_admin').eq('id', userId).single()
 
   if (error) {
     console.error('Error checking admin status:', error)

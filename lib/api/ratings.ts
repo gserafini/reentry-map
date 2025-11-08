@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
 
-type ResourceRating = Database['public']['Tables']['resource_ratings']['Row']
 type ResourceRatingInsert = Database['public']['Tables']['resource_ratings']['Insert']
 
 /**
@@ -13,10 +12,7 @@ type ResourceRatingInsert = Database['public']['Tables']['resource_ratings']['In
 /**
  * Get user's rating for a resource
  */
-export async function getUserRating(
-  userId: string,
-  resourceId: string
-): Promise<number | null> {
+export async function getUserRating(userId: string, resourceId: string): Promise<number | null> {
   const supabase = createClient()
 
   const { data, error } = await supabase

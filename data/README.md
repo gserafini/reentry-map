@@ -9,6 +9,7 @@ This directory contains the initial dataset of Oakland reentry resources, compil
 **Total Resources**: 51 verified Oakland resources
 
 **Coverage by Category**:
+
 - Employment: 6 resources
 - Housing: 5 resources
 - Food: 5 resources
@@ -24,6 +25,7 @@ This directory contains the initial dataset of Oakland reentry resources, compil
 - General Support: 5 resources
 
 **Quality Standards**:
+
 - ✅ All resources meet Tier 2 quality or higher
 - ✅ 100% have verified address, city, state, zip code
 - ✅ 94% have phone numbers
@@ -63,6 +65,7 @@ Resources compiled from:
 ### Option 1: Admin Dashboard Bulk Import (Recommended)
 
 1. Start your local development server:
+
    ```bash
    npm run dev
    ```
@@ -115,30 +118,38 @@ After import, verify:
 ## Data Quality Notes
 
 ### Geocoding Accuracy
+
 All coordinates verified using Google Geocoding API and cross-checked with Google Maps. Coordinates place markers at correct business locations.
 
 ### Phone Numbers
+
 Format: (510) 555-1234 - All Oakland area code (510)
 Status: 94% of resources have phone numbers
 
 ### Websites
+
 All URLs checked for:
+
 - Valid HTTPS/HTTP
 - Page loads successfully
 - Contact information matches resource
 - Status: 90% have verified websites
 
 ### Hours of Operation
+
 Included where available from official sources. Some resources have "varies by location" or "by appointment" - these are accurate per source data.
 
 ### Verification Scores
+
 - **completeness_score**: 0.82-0.95 (average: 0.89)
   - Based on: fields filled, description quality, service detail
 - **verification_score**: 0.80-0.93 (average: 0.87)
   - Based on: phone verified, website active, official source
 
 ### Tags
+
 Resources tagged with:
+
 - `reentry-friendly` - Explicitly welcomes formerly incarcerated individuals
 - `reentry-specific` - Specializes in reentry services
 - `second-chance-employer` - Hires individuals with criminal records
@@ -150,24 +161,29 @@ Resources tagged with:
 This dataset includes well-known Oakland organizations:
 
 **Employment & Training**:
+
 - Rubicon Programs (major Oakland employer for second-chance hiring)
 - Cypress Mandela Training Center (construction trades)
 - Oakland Private Industry Council (workforce development)
 
 **Housing**:
+
 - Building Hope (reentry-specific transitional housing)
 - Oakland Housing Authority (public housing)
 
 **Health & Mental Health**:
+
 - LifeLong Medical Care (FQHC with multiple Oakland clinics)
 - Tiburcio Vasquez Health Center (Latino community health)
 - HealthRIGHT 360 (substance abuse treatment leader)
 
 **Legal Aid**:
+
 - East Bay Community Law Center (expungement specialists)
 - Bay Area Legal Aid (eviction defense)
 
 **General Support**:
+
 - The Homecoming Project (reentry-specific wraparound services)
 - Oakland Public Library (free computer access, job resources)
 
@@ -199,12 +215,14 @@ This dataset includes well-known Oakland organizations:
 ## Maintenance
 
 **Quarterly Review** (every 90 days):
+
 - Verify phone numbers still work
 - Check websites still active
 - Update hours of operation
 - Confirm organization still operating
 
 **Annual Deep Dive**:
+
 - Visit locations when possible
 - Update photos
 - Refresh service descriptions
@@ -213,6 +231,7 @@ This dataset includes well-known Oakland organizations:
 ## Contact Information
 
 For questions about this dataset:
+
 - **Email**: gserafini@gmail.com
 - **Dataset Created**: 2025-01-08
 - **Last Updated**: 2025-01-08

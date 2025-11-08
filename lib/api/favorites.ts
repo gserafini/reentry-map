@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
 
-type UserFavorite = Database['public']['Tables']['user_favorites']['Row']
 type UserFavoriteInsert = Database['public']['Tables']['user_favorites']['Insert']
 
 /**

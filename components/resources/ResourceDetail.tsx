@@ -28,6 +28,7 @@ import {
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
   LocationOn as LocationOnIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { SingleResourceMap } from '@/components/map'
@@ -38,8 +39,10 @@ import { RatingStars } from '@/components/user/RatingStars'
 import { ReviewsList } from '@/components/user/ReviewsList'
 import { ReviewForm } from '@/components/user/ReviewForm'
 import { ReportProblemModal } from '@/components/user/ReportProblemModal'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Flag as FlagIcon } from '@mui/icons-material'
+import { useAuth } from '@/lib/hooks/useAuth'
+import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 
 interface ResourceDetailProps {
   resource: Resource
@@ -48,6 +51,22 @@ interface ResourceDetailProps {
 export function ResourceDetail({ resource }: ResourceDetailProps) {
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const { user } = useAuth()
+
+  // Check admin status
+  useEffect(() => {
+    async function checkAdmin() {
+      if (user) {
+        const adminStatus = await checkCurrentUserIsAdmin()
+        setIsAdmin(adminStatus)
+      } else {
+        setIsAdmin(false)
+      }
+    }
+    checkAdmin()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const handleGetDirections = () => {
     const address = encodeURIComponent(resource.address)
@@ -141,6 +160,20 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               <Chip icon={<VerifiedIcon />} label="Verified" color="success" variant="outlined" />
             )}
             <FavoriteButton resourceId={resource.id} size="large" />
+            {isAdmin && (
+              <Tooltip title="Edit this resource (admin only)">
+                <Button
+                  component={Link}
+                  href={`/admin/resources/${resource.id}/edit`}
+                  variant="contained"
+                  size="small"
+                  startIcon={<EditIcon />}
+                  color="primary"
+                >
+                  Edit
+                </Button>
+              </Tooltip>
+            )}
             <Tooltip title="Report a problem with this resource">
               <Button
                 variant="outlined"
@@ -201,10 +234,22 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                   },
                 }}
               >
-                <Typography variant="body1" component="span" itemProp="streetAddress">
-                  {resource.address}
-                  {resource.zip && <span itemProp="postalCode"> {resource.zip}</span>}
-                </Typography>
+                <Box>
+                  <Typography variant="body1" component="div" itemProp="streetAddress">
+                    {resource.address}
+                  </Typography>
+                  <Typography variant="body1" component="div">
+                    {resource.city && <span itemProp="addressLocality">{resource.city}</span>}
+                    {resource.city && resource.state && ', '}
+                    {resource.state && <span itemProp="addressRegion">{resource.state}</span>}
+                    {resource.zip && (
+                      <>
+                        {' '}
+                        <span itemProp="postalCode">{resource.zip}</span>
+                      </>
+                    )}
+                  </Typography>
+                </Box>
               </MuiLink>
             </Tooltip>
           </Box>
@@ -600,10 +645,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             />
           </Box>
         )}
-        <ReviewsList
-          resourceId={resource.id}
-          onWriteReviewClick={() => setShowReviewForm(true)}
-        />
+        <ReviewsList resourceId={resource.id} onWriteReviewClick={() => setShowReviewForm(true)} />
       </Box>
     </Box>
   )

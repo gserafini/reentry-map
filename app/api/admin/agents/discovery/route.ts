@@ -8,10 +8,10 @@ import { DiscoveryAgent } from '@/lib/ai-agents'
  * Trigger the Discovery Agent to find new resources
  * Requires admin authentication
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // Check authentication
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()

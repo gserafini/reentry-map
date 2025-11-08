@@ -1,7 +1,21 @@
-import { Container, Typography, Box, Alert, Grid2 as Grid, Paper, Card, CardContent, Chip } from '@mui/material'
+import {
+  Container,
+  Typography,
+  Box,
+  Alert,
+  Grid,
+  Paper,
+  Card,
+  CardContent,
+  Chip,
+} from '@mui/material'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { LocationCity as LocationIcon, Star as StarIcon, FiberNew as NewIcon } from '@mui/icons-material'
+import {
+  LocationCity as LocationIcon,
+  Star as StarIcon,
+  FiberNew as NewIcon,
+} from '@mui/icons-material'
 import { getResources, getCategoryCounts } from '@/lib/api/resources'
 import { parseCitySlug, getCityPageData } from '@/lib/api/seo-pages'
 import { ResourceList } from '@/components/resources/ResourceList'
@@ -10,7 +24,8 @@ import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { SortDropdown } from '@/components/search/SortDropdown'
 import { Pagination } from '@/components/search/Pagination'
 import { parseSortParam } from '@/lib/utils/sort'
-import { getCategoryLabel, getCategoryIcon } from '@/lib/utils/categories'
+import { getCategoryLabel } from '@/lib/utils/categories'
+import { getCategoryIcon } from '@/lib/utils/category-icons'
 import { BreadcrumbList, CollectionPage, ItemList } from '@/components/seo/StructuredData'
 import type { Metadata } from 'next'
 import type { ResourceCategory } from '@/lib/types/database'
@@ -79,7 +94,9 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
           <Typography variant="h6" gutterBottom>
             Error Loading Resources
           </Typography>
-          <Typography>We encountered an issue loading resources. Please try again later.</Typography>
+          <Typography>
+            We encountered an issue loading resources. Please try again later.
+          </Typography>
         </Alert>
       </Container>
     )
@@ -114,145 +131,151 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Hero Section */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <LocationIcon sx={{ fontSize: 48, color: 'primary.main' }} />
-          <Typography variant="h3" component="h1">
-            Reentry Resources in {city}, {state}
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <LocationIcon sx={{ fontSize: 48, color: 'primary.main' }} />
+            <Typography variant="h3" component="h1">
+              Reentry Resources in {city}, {state}
+            </Typography>
+          </Box>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+            {cityData.totalResources} verified resources to help with employment, housing, food,
+            healthcare, and more
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Browse community resources in {city} for individuals navigating reentry. All listings
+            are regularly updated and verified to ensure accuracy.
           </Typography>
         </Box>
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-          {cityData.totalResources} verified resources to help with employment, housing, food, healthcare, and
-          more
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Browse community resources in {city} for individuals navigating reentry. All listings are regularly
-          updated and verified to ensure accuracy.
-        </Typography>
-      </Box>
 
-      {/* Stats & Highlights */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        {/* Top Rated Resource */}
-        {cityData.topRatedResourceId && (
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <StarIcon color="warning" />
-                  <Typography variant="h6">Top Rated</Typography>
-                </Box>
-                <Link
-                  href={`/r/${cityData.topRatedResourceId}`}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  <Typography variant="body1" sx={{ fontWeight: 500, '&:hover': { color: 'primary.main' } }}>
-                    {cityData.topRatedResourceName}
+        {/* Stats & Highlights */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          {/* Top Rated Resource */}
+          {cityData.topRatedResourceId && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <StarIcon color="warning" />
+                    <Typography variant="h6">Top Rated</Typography>
+                  </Box>
+                  <Link
+                    href={`/r/${cityData.topRatedResourceId}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <Typography
+                      variant="body1"
+                      sx={{ fontWeight: 500, '&:hover': { color: 'primary.main' } }}
+                    >
+                      {cityData.topRatedResourceName}
+                    </Typography>
+                  </Link>
+                  <Typography variant="body2" color="text.secondary">
+                    {cityData.topRatedResourceRating?.toFixed(1)} stars
                   </Typography>
-                </Link>
-                <Typography variant="body2" color="text.secondary">
-                  {cityData.topRatedResourceRating?.toFixed(1)} stars
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
 
-        {/* Newest Resource */}
-        {cityData.newestResourceId && (
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <NewIcon color="success" />
-                  <Typography variant="h6">Recently Added</Typography>
-                </Box>
-                <Link
-                  href={`/r/${cityData.newestResourceId}`}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  <Typography variant="body1" sx={{ fontWeight: 500, '&:hover': { color: 'primary.main' } }}>
-                    {cityData.newestResourceName}
+          {/* Newest Resource */}
+          {cityData.newestResourceId && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <NewIcon color="success" />
+                    <Typography variant="h6">Recently Added</Typography>
+                  </Box>
+                  <Link
+                    href={`/r/${cityData.newestResourceId}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <Typography
+                      variant="body1"
+                      sx={{ fontWeight: 500, '&:hover': { color: 'primary.main' } }}
+                    >
+                      {cityData.newestResourceName}
+                    </Typography>
+                  </Link>
+                  <Typography variant="body2" color="text.secondary">
+                    Added {new Date(cityData.newestResourceDate || '').toLocaleDateString()}
                   </Typography>
-                </Link>
-                <Typography variant="body2" color="text.secondary">
-                  Added {new Date(cityData.newestResourceDate || '').toLocaleDateString()}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+        </Grid>
 
-      {/* Browse by Category */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom>
-          Browse by Category
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {Object.entries(cityData.categoryCounts)
-            .sort(([, a], [, b]) => b - a)
-            .map(([category, count]) => {
-              const Icon = getCategoryIcon(category as ResourceCategory)
-              return (
-                <Link
-                  key={category}
-                  href={`/${cityStateSlug}/${category}`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Chip
-                    icon={<Icon />}
-                    label={`${getCategoryLabel(category as ResourceCategory)} (${count})`}
-                    clickable
-                    color="primary"
-                    variant="outlined"
-                  />
-                </Link>
-              )
-            })}
+        {/* Browse by Category */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h5" component="h2" gutterBottom>
+            Browse by Category
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {Object.entries(cityData.categoryCounts)
+              .sort(([, a], [, b]) => b - a)
+              .map(([category, count]) => {
+                const Icon = getCategoryIcon(category as ResourceCategory)
+                return (
+                  <Link
+                    key={category}
+                    href={`/${cityStateSlug}/${category}`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Chip
+                      icon={<Icon />}
+                      label={`${getCategoryLabel(category as ResourceCategory)} (${count})`}
+                      clickable
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Link>
+                )
+              })}
+          </Box>
         </Box>
-      </Box>
 
-      {/* Resources List */}
-      <Grid container spacing={3}>
-        {/* Filter Sidebar */}
-        <Grid size={{ xs: 12, md: 3 }}>
-          <Card>
-            <CategoryFilter categoryCounts={categoryCounts || undefined} />
-          </Card>
+        {/* Resources List */}
+        <Grid container spacing={3}>
+          {/* Filter Sidebar */}
+          <Grid size={{ xs: 12, md: 3 }}>
+            <Card>
+              <CategoryFilter categoryCounts={categoryCounts || undefined} />
+            </Card>
+          </Grid>
+
+          {/* Results */}
+          <Grid size={{ xs: 12, md: 9 }}>
+            {/* Sort dropdown */}
+            {hasResults && (
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                <SortDropdown />
+              </Box>
+            )}
+
+            {/* Map */}
+            {hasResults && (
+              <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden', borderRadius: 2 }}>
+                <ResourceMapWithLocation resources={resources || []} height="500px" />
+              </Paper>
+            )}
+
+            {/* Resource List */}
+            <ResourceList resources={resources || []} />
+
+            {/* Pagination */}
+            {hasResults && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={cityData.totalResources}
+                pageSize={PAGE_SIZE}
+              />
+            )}
+          </Grid>
         </Grid>
-
-        {/* Results */}
-        <Grid size={{ xs: 12, md: 9 }}>
-          {/* Sort dropdown */}
-          {hasResults && (
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <SortDropdown />
-            </Box>
-          )}
-
-          {/* Map */}
-          {hasResults && (
-            <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden', borderRadius: 2 }}>
-              <ResourceMapWithLocation resources={resources || []} height="500px" />
-            </Paper>
-          )}
-
-          {/* Resource List */}
-          <ResourceList resources={resources || []} />
-
-          {/* Pagination */}
-          {hasResults && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalCount={cityData.totalResources}
-              pageSize={PAGE_SIZE}
-            />
-          )}
-        </Grid>
-      </Grid>
-    </Container>
+      </Container>
     </>
   )
 }

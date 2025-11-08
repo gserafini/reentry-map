@@ -8,7 +8,7 @@ import {
   Box,
   Button,
   TextField,
-  Grid2 as Grid,
+  Grid,
   FormControl,
   InputLabel,
   Select,
@@ -34,6 +34,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 import { CATEGORIES } from '@/lib/utils/categories'
 import { geocodeAddress } from '@/lib/utils/geocoding'
+import type { Resource } from '@/lib/types/database'
 
 export default function EditResourcePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
@@ -99,7 +100,8 @@ export default function EditResourcePage() {
         const response = await fetch(`/api/admin/resources/${resourceId}`)
         if (!response.ok) throw new Error('Failed to load resource')
 
-        const data = await response.json()
+        const result = (await response.json()) as { data: Resource }
+        const { data } = result
 
         // Populate form fields
         setName(data.name || '')
@@ -108,9 +110,11 @@ export default function EditResourcePage() {
         setPhone(data.phone || '')
         setDescription(data.description || '')
         setWebsite(data.website || '')
-        setHours(data.hours || '')
+        setHours(
+          typeof data.hours === 'string' ? data.hours : data.hours ? JSON.stringify(data.hours) : ''
+        )
         setEmail(data.email || '')
-        setServices(data.services ? data.services.join(', ') : '')
+        setServices(Array.isArray(data.services_offered) ? data.services_offered.join(', ') : '')
         setVerified(data.verified || false)
         setStatus(data.status || 'active')
         setLatitude(data.latitude)
@@ -150,6 +154,7 @@ export default function EditResourcePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, address, primary_category])
 
   const handleGeocode = async () => {
@@ -171,7 +176,7 @@ export default function EditResourcePage() {
       } else {
         setError('Could not geocode address. Check the address and try again.')
       }
-    } catch (err) {
+    } catch {
       setError('Geocoding failed. You can save without coordinates.')
     } finally {
       setGeocoding(false)
@@ -290,7 +295,13 @@ export default function EditResourcePage() {
       )}
 
       <Paper sx={{ p: 3 }}>
-        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSubmit()
+          }}
+        >
           <Grid container spacing={3}>
             {/* Essential Fields - Always Visible */}
             <Grid size={12}>
@@ -449,7 +460,9 @@ export default function EditResourcePage() {
 
             <Grid size={{ xs: 12, md: 6 }}>
               <FormControlLabel
-                control={<Checkbox checked={verified} onChange={(e) => setVerified(e.target.checked)} />}
+                control={
+                  <Checkbox checked={verified} onChange={(e) => setVerified(e.target.checked)} />
+                }
                 label="Mark as Verified"
               />
             </Grid>
@@ -467,7 +480,11 @@ export default function EditResourcePage() {
                   Delete
                 </Button>
                 <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Button variant="outlined" onClick={() => router.push('/admin/resources')} disabled={saving}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => router.push('/admin/resources')}
+                    disabled={saving}
+                  >
                     Cancel
                   </Button>
                   <Button

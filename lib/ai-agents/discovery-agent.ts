@@ -12,7 +12,7 @@ interface DiscoveredResource {
   hours?: string
   services?: string[]
   eligibility?: string
-  source: string
+  source?: { name: string; url: string }
   confidence: number
 }
 
@@ -33,7 +33,7 @@ export class DiscoveryAgent extends BaseAgent {
   }
 
   async run(): Promise<void> {
-    const logId = await this.startLog()
+    const _logId = await this.startLog()
     let totalCost = 0
     let resourcesAdded = 0
     let resourcesProcessed = 0
@@ -99,7 +99,7 @@ export class DiscoveryAgent extends BaseAgent {
   /**
    * Discover resources from a specific source
    */
-  private async discoverFromSource(source: {
+  private async discoverFromSource(_source: {
     name: string
     url: string
   }): Promise<DiscoveredResource[]> {
@@ -148,7 +148,7 @@ export class DiscoveryAgent extends BaseAgent {
       eligibility_requirements: resource.eligibility || null,
       status: 'pending', // Requires admin review
       ai_enriched: true,
-      source: resource.source,
+      source: null,
     })
 
     if (error) {
@@ -160,7 +160,10 @@ export class DiscoveryAgent extends BaseAgent {
   /**
    * Extract resource information from text using GPT-4o-mini
    */
-  private async extractResourceInfo(text: string, sourceUrl: string): Promise<DiscoveredResource[]> {
+  private async extractResourceInfo(
+    text: string,
+    sourceUrl: string
+  ): Promise<DiscoveredResource[]> {
     const prompt = `You are helping to build a directory of reentry resources for individuals who have been formerly incarcerated.
 
 Analyze the following text from ${sourceUrl} and extract any reentry resources mentioned. For each resource, provide:
@@ -184,13 +187,19 @@ ${text}
 Respond ONLY with valid JSON, no other text.`
 
     try {
-      const { content, costCents } = await this.callOpenAI([
-        { role: 'system', content: 'You are a helpful assistant that extracts resource information.' },
+      const { content, costCents: _costCents } = await this.callOpenAI([
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that extracts resource information.',
+        },
         { role: 'user', content: prompt },
       ])
 
       const resources = JSON.parse(content) as DiscoveredResource[]
-      return resources.map((r) => ({ ...r, source: sourceUrl }))
+      return resources.map((r) => ({
+        ...r,
+        source: { name: 'web_discovery', url: sourceUrl },
+      }))
     } catch (error) {
       console.error('Error extracting resource info:', error)
       return []

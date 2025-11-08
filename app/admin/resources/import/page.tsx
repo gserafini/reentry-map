@@ -17,7 +17,6 @@ import {
   TableHead,
   TableRow,
   Chip,
-  Divider,
 } from '@mui/material'
 import {
   Upload as UploadIcon,
@@ -70,6 +69,7 @@ export default function BulkImportPage() {
     checkAdmin()
   }, [user, authLoading, isAuthenticated, router])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validateResource = (resource: any): { valid: boolean; errors: string[] } => {
     const errors: string[] = []
 
@@ -98,10 +98,12 @@ export default function BulkImportPage() {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const json = JSON.parse(e.target?.result as string)
+        const json = JSON.parse(e.target?.result as string) as unknown
 
         // Ensure it's an array
-        const resourcesArray = Array.isArray(json) ? json : json.resources || []
+        const resourcesArray = Array.isArray(json)
+          ? json
+          : (json as { resources?: unknown[] }).resources || []
 
         if (!Array.isArray(resourcesArray)) {
           setError('Invalid JSON format. Expected an array of resources.')
@@ -109,7 +111,8 @@ export default function BulkImportPage() {
         }
 
         // Validate each resource
-        const previews: ResourcePreview[] = resourcesArray.map((resource) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const previews: ResourcePreview[] = resourcesArray.map((resource: any) => {
           const { valid, errors } = validateResource(resource)
           return {
             name: resource.name || '',
@@ -154,12 +157,14 @@ export default function BulkImportPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = (await response.json()) as { message?: string }
         throw new Error(errorData.message || 'Failed to import resources')
       }
 
-      const result = await response.json()
-      setSuccess(`Successfully imported ${result.imported} resource${result.imported === 1 ? '' : 's'}`)
+      const result = (await response.json()) as { imported: number }
+      setSuccess(
+        `Successfully imported ${result.imported} resource${result.imported === 1 ? '' : 's'}`
+      )
 
       // Clear the form after success
       setTimeout(() => {
@@ -208,8 +213,8 @@ export default function BulkImportPage() {
         <Typography variant="body2" component="div">
           <strong>Required fields:</strong> name, primary_category, address
           <br />
-          <strong>Optional fields:</strong> phone, email, website, description, hours, services (array), latitude,
-          longitude, status, verified
+          <strong>Optional fields:</strong> phone, email, website, description, hours, services
+          (array), latitude, longitude, status, verified
         </Typography>
       </Alert>
 
@@ -275,7 +280,9 @@ export default function BulkImportPage() {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Chip icon={<CheckIcon />} label={`${validCount} Valid`} color="success" />
-                {invalidCount > 0 && <Chip icon={<WarningIcon />} label={`${invalidCount} Invalid`} color="error" />}
+                {invalidCount > 0 && (
+                  <Chip icon={<WarningIcon />} label={`${invalidCount} Invalid`} color="error" />
+                )}
               </Box>
               <Button
                 variant="contained"

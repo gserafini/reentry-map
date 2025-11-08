@@ -157,9 +157,7 @@ export function RatingStars({
             />
           </Box>
         </Tooltip>
-        {loading && (
-          <CircularProgress size={size === 'small' ? 12 : size === 'large' ? 20 : 16} />
-        )}
+        {loading && <CircularProgress size={size === 'small' ? 12 : size === 'large' ? 20 : 16} />}
       </Box>
       {!readOnly && displayRating !== null && (
         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>

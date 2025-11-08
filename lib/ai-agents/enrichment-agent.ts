@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BaseAgent } from './base-agent'
 import { createClient } from '@/lib/supabase/client'
 import { geocodeAddress } from '@/lib/utils/geocoding'
 
-interface EnrichmentResult {
+interface _EnrichmentResult {
   resourceId: string
   fieldsEnriched: string[]
   success: boolean
@@ -26,7 +27,7 @@ export class EnrichmentAgent extends BaseAgent {
   }
 
   async run(): Promise<void> {
-    const logId = await this.startLog()
+    const _logId = await this.startLog()
     let totalCost = 0
     let resourcesProcessed = 0
     let resourcesUpdated = 0
@@ -128,7 +129,7 @@ export class EnrichmentAgent extends BaseAgent {
           const enriched = await this.enrichFromWebsite(resource.website)
           totalCost += enriched.costCents || 0
 
-          const updates: any = {}
+          const updates: Record<string, unknown> = {}
           if (enriched.hours && !resource.hours) {
             updates.hours = enriched.hours
             fieldsEnriched.push('hours')
@@ -176,7 +177,7 @@ export class EnrichmentAgent extends BaseAgent {
   /**
    * Enrich resource data from its website
    */
-  private async enrichFromWebsite(websiteUrl: string): Promise<{
+  private async enrichFromWebsite(_websiteUrl: string): Promise<{
     hours?: string
     description?: string
     services?: string[]
@@ -194,7 +195,10 @@ export class EnrichmentAgent extends BaseAgent {
   /**
    * Extract structured data from website content using AI
    */
-  private async extractWebsiteData(content: string, websiteUrl: string): Promise<{
+  private async extractWebsiteData(
+    content: string,
+    websiteUrl: string
+  ): Promise<{
     hours?: string
     description?: string
     services?: string[]
@@ -226,8 +230,8 @@ Respond ONLY with valid JSON in this format:
         { role: 'user', content: prompt },
       ])
 
-      const parsed = JSON.parse(responseContent)
-      return { ...parsed, costCents }
+      const parsed = JSON.parse(responseContent) as Record<string, unknown>
+      return { ...(parsed as object), costCents }
     } catch (error) {
       console.error('Error extracting website data:', error)
       return { costCents: 0 }

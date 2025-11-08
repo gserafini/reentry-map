@@ -104,7 +104,11 @@ export default function AdminUpdatesPage() {
 
     setActionInProgress(true)
 
-    const { error } = await updateUpdateStatus(selectedUpdate.id, actionType, adminNotes || undefined)
+    const { error } = await updateUpdateStatus(
+      selectedUpdate.id,
+      actionType,
+      adminNotes || undefined
+    )
 
     if (error) {
       alert(`Failed to ${actionType} update`)
@@ -191,19 +195,37 @@ export default function AdminUpdatesPage() {
           {updates.map((update) => (
             <Card key={update.id} variant="outlined">
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    mb: 2,
+                  }}
+                >
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="h6" gutterBottom>
                       {update.resource?.name || 'Unknown Resource'}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                      <Chip label={getUpdateTypeLabel(update.update_type)} size="small" color="error" />
+                      <Chip
+                        label={getUpdateTypeLabel(update.update_type)}
+                        size="small"
+                        color="error"
+                      />
                     </Box>
                     <Typography variant="caption" color="text.secondary" display="block">
-                      Reported: {new Date(update.created_at).toLocaleDateString()}
+                      Reported:{' '}
+                      {update.created_at
+                        ? new Date(update.created_at).toLocaleDateString()
+                        : 'Unknown'}
                     </Typography>
                   </Box>
-                  <MuiLink href={`/resources/${update.resource_id}`} target="_blank" rel="noopener noreferrer">
+                  <MuiLink
+                    href={`/resources/${update.resource_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <Button size="small">View Resource</Button>
                   </MuiLink>
                 </Box>
@@ -212,10 +234,10 @@ export default function AdminUpdatesPage() {
                   <strong>Description:</strong> {update.description}
                 </Typography>
 
-                {update.suggested_value && (
+                {update.new_value && (
                   <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2">
-                      <strong>Suggested Correction:</strong> {update.suggested_value}
+                      <strong>Suggested Correction:</strong> {update.new_value}
                     </Typography>
                   </Alert>
                 )}
@@ -251,7 +273,12 @@ export default function AdminUpdatesPage() {
       )}
 
       {/* Action Dialog */}
-      <Dialog open={showActionDialog} onClose={() => setShowActionDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={showActionDialog}
+        onClose={() => setShowActionDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{actionType === 'applied' ? 'Mark as Applied' : 'Reject Report'}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" paragraph>
@@ -265,7 +292,9 @@ export default function AdminUpdatesPage() {
             value={adminNotes}
             onChange={(e) => setAdminNotes(e.target.value)}
             fullWidth
-            placeholder={actionType === 'applied' ? 'Optional notes' : 'This will be visible to the user'}
+            placeholder={
+              actionType === 'applied' ? 'Optional notes' : 'This will be visible to the user'
+            }
           />
         </DialogContent>
         <DialogActions>
@@ -278,7 +307,13 @@ export default function AdminUpdatesPage() {
             variant="contained"
             disabled={actionInProgress}
           >
-            {actionInProgress ? <CircularProgress size={24} /> : actionType === 'applied' ? 'Confirm' : 'Reject'}
+            {actionInProgress ? (
+              <CircularProgress size={24} />
+            ) : actionType === 'applied' ? (
+              'Confirm'
+            ) : (
+              'Reject'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

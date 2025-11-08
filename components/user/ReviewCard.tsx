@@ -89,11 +89,13 @@ export function ReviewCard({ review, userVote, onVoteChange }: ReviewCardProps) 
     ? getUserDisplayName(review.user.email, review.user.phone)
     : 'Anonymous'
 
-  const reviewDate = new Date(review.created_at).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const reviewDate = review.created_at
+    ? new Date(review.created_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Unknown date'
 
   const isOwnReview = user?.id === review.user_id
 
@@ -101,7 +103,9 @@ export function ReviewCard({ review, userVote, onVoteChange }: ReviewCardProps) 
     <Card variant="outlined">
       <CardContent>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}
+        >
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" fontWeight={600}>
               {reviewerName}
@@ -111,7 +115,8 @@ export function ReviewCard({ review, userVote, onVoteChange }: ReviewCardProps) 
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {reviewDate}
-              {review.visited_date && ` • Visited: ${new Date(review.visited_date).toLocaleDateString()}`}
+              {review.visited_date &&
+                ` • Visited: ${new Date(review.visited_date).toLocaleDateString()}`}
             </Typography>
           </Box>
           <Rating value={review.rating} readOnly size="small" />
@@ -160,8 +165,12 @@ export function ReviewCard({ review, userVote, onVoteChange }: ReviewCardProps) 
 
         {/* Badges */}
         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          {review.was_helpful && <Chip label="Found it helpful" size="small" color="success" variant="outlined" />}
-          {review.would_recommend && <Chip label="Would recommend" size="small" color="primary" variant="outlined" />}
+          {review.was_helpful && (
+            <Chip label="Found it helpful" size="small" color="success" variant="outlined" />
+          )}
+          {review.would_recommend && (
+            <Chip label="Would recommend" size="small" color="primary" variant="outlined" />
+          )}
         </Box>
 
         {/* Helpfulness Voting */}
