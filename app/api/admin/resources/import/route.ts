@@ -47,38 +47,75 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Resources must be an array' }, { status: 400 })
     }
 
-    // Validate and prepare resources for import
+    // Validate and prepare resources for import with provenance tracking
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const validResources = resources.map((resource: any) => ({
-      name: resource.name,
-      description: resource.description || null,
-      primary_category: resource.primary_category,
-      categories: resource.categories || null,
-      tags: resource.tags || null,
-      address: resource.address,
-      city: resource.city || null,
-      state: resource.state || 'CA',
-      zip: resource.zip || resource.zip_code || null,
-      latitude: resource.latitude || null,
-      longitude: resource.longitude || null,
-      phone: resource.phone || null,
-      email: resource.email || null,
-      website: resource.website || null,
-      hours: resource.hours || null,
-      services_offered: resource.services || resource.services_offered || null,
-      eligibility_requirements:
-        resource.eligibility_criteria || resource.eligibility_requirements || null,
-      required_documents: resource.required_documents || null,
-      fees: resource.fees || null,
-      languages: resource.languages || null,
-      accessibility_features: resource.accessibility || resource.accessibility_features || null,
-      status: resource.status || 'active',
-      verified: resource.verified || false,
-      ai_enriched: resource.ai_enriched || false,
-      completeness_score: resource.completeness_score || null,
-      verification_score: resource.verification_score || null,
-      source: 'admin_import',
-    }))
+    const validResources = resources.map((resource: any) => {
+      // Extract source provenance if available
+      const sourceData = resource.source || {}
+      const sourceName =
+        sourceData.discovered_by || sourceData.name || sourceData.research_method || 'admin_import'
+
+      // Build initial change_log entry with full provenance
+      const initialChangeLog = [
+        {
+          timestamp: new Date().toISOString(),
+          action: 'created',
+          source: sourceName,
+          user_id: null, // Set by trigger if authenticated
+          user_email: null, // Set by trigger if authenticated
+          initial_data: {
+            name: resource.name,
+            address: resource.address,
+            city: resource.city,
+            state: resource.state,
+            primary_category: resource.primary_category,
+          },
+          // Add detailed provenance if available
+          ...(resource.source && {
+            provenance: {
+              source_name: sourceData.name,
+              source_url: sourceData.url,
+              accessed_date: sourceData.accessed_date,
+              research_method: sourceData.research_method,
+              discovered_by: sourceData.discovered_by,
+              notes: sourceData.notes,
+            },
+          }),
+        },
+      ]
+
+      return {
+        name: resource.name,
+        description: resource.description || null,
+        primary_category: resource.primary_category,
+        categories: resource.categories || null,
+        tags: resource.tags || null,
+        address: resource.address,
+        city: resource.city || null,
+        state: resource.state || 'CA',
+        zip: resource.zip || resource.zip_code || null,
+        latitude: resource.latitude || null,
+        longitude: resource.longitude || null,
+        phone: resource.phone || null,
+        email: resource.email || null,
+        website: resource.website || null,
+        hours: resource.hours || null,
+        services_offered: resource.services || resource.services_offered || null,
+        eligibility_requirements:
+          resource.eligibility_criteria || resource.eligibility_requirements || null,
+        required_documents: resource.required_documents || null,
+        fees: resource.fees || null,
+        languages: resource.languages || null,
+        accessibility_features: resource.accessibility || resource.accessibility_features || null,
+        status: resource.status || 'active',
+        verified: resource.verified || false,
+        ai_enriched: resource.ai_enriched || false,
+        completeness_score: resource.completeness_score || null,
+        verification_score: resource.verification_score || null,
+        source: sourceName,
+        change_log: initialChangeLog,
+      }
+    })
 
     // Stats tracking
     let skipped = 0
