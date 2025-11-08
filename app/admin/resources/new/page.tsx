@@ -6,45 +6,50 @@ import {
   Container,
   Typography,
   Box,
-  TextField,
   Button,
-  Alert,
+  TextField,
+  Grid2 as Grid,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
+  Alert,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
   Paper,
-  Grid2 as Grid,
+  Chip,
   Divider,
 } from '@mui/material'
 import {
-  AddCircle as AddCircleIcon,
-  Send as SendIcon,
+  Save as SaveIcon,
+  Add as AddIcon,
+  ContentCopy as CopyIcon,
   MyLocation as GeocodeIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { submitSuggestion } from '@/lib/api/suggestions'
+import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 import { CATEGORIES } from '@/lib/utils/categories'
 import { geocodeAddress } from '@/lib/utils/geocoding'
-import type { Database } from '@/lib/types/database'
 
-type ResourceSuggestionInsert = Database['public']['Tables']['resource_suggestions']['Insert']
-
-export default function SuggestResourcePage() {
+export default function NewResourcePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(true)
 
-  // Form state
+  // Form state - minimal required fields for rapid entry
   const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
+  const [primary_category, setPrimaryCategory] = useState('general_support')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
+  const [description, setDescription] = useState('')
   const [website, setWebsite] = useState('')
   const [hours, setHours] = useState('')
-  const [notes, setNotes] = useState('')
+  const [email, setEmail] = useState('')
+  const [services, setServices] = useState('')
+  const [verified, setVerified] = useState(false)
+  const [status, setStatus] = useState('active')
 
   // Geocoding state
   const [latitude, setLatitude] = useState<number | null>(null)
@@ -52,36 +57,46 @@ export default function SuggestResourcePage() {
   const [geocoding, setGeocoding] = useState(false)
 
   // UI state
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
   // Ref for auto-focus
   const nameRef = useRef<HTMLInputElement>(null)
 
-  // Redirect if not authenticated
+  // Check admin
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login?redirect=/suggest-resource')
+    async function checkAdmin() {
+      if (!authLoading && !isAuthenticated) {
+        router.push('/auth/login?redirect=/admin/resources/new')
+        return
+      }
+      if (user) {
+        const adminStatus = await checkCurrentUserIsAdmin()
+        setIsAdmin(adminStatus)
+        if (!adminStatus) router.push('/')
+        setCheckingAdmin(false)
+      }
     }
-  }, [authLoading, isAuthenticated, router])
+    checkAdmin()
+  }, [user, authLoading, isAuthenticated, router])
 
   // Auto-focus name field on load
   useEffect(() => {
-    if (isAuthenticated && nameRef.current) {
+    if (isAdmin && nameRef.current) {
       nameRef.current.focus()
     }
-  }, [isAuthenticated])
+  }, [isAdmin])
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+S / Cmd+S - Submit
+      // Ctrl+S / Cmd+S - Save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
         handleSubmit(false)
       }
-      // Ctrl+Shift+S / Cmd+Shift+S - Submit and suggest another
+      // Ctrl+Shift+S / Cmd+Shift+S - Save and add another
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
         e.preventDefault()
         handleSubmit(true)
@@ -95,7 +110,7 @@ export default function SuggestResourcePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [name, category, address])
+  }, [name, address, primary_category]) // Dependencies for shortcuts
 
   const handleGeocode = async () => {
     if (!address) {
@@ -111,99 +126,97 @@ export default function SuggestResourcePage() {
       if (coords) {
         setLatitude(coords.latitude)
         setLongitude(coords.longitude)
-        // Show brief success feedback
-        const successMsg = 'Coordinates added successfully!'
-        setError(null)
-        setTimeout(() => {
-          // Clear any lingering messages
-        }, 2000)
+        setSuccess(true)
+        setTimeout(() => setSuccess(false), 2000)
       } else {
-        setError('Could not geocode address. You can still submit without coordinates.')
+        setError('Could not geocode address. Check the address and try again.')
       }
     } catch (err) {
-      setError('Geocoding failed. You can submit without coordinates.')
+      setError('Geocoding failed. You can save without coordinates.')
     } finally {
       setGeocoding(false)
     }
   }
 
-  const handleSubmit = async (submitAnother: boolean) => {
-    if (!user) return
-
+  const handleSubmit = async (addAnother: boolean) => {
     // Validation
     if (!name.trim()) {
-      setError('Resource name is required')
+      setError('Name is required')
+      return
+    }
+    if (!address.trim()) {
+      setError('Address is required')
       return
     }
 
-    if (!category) {
-      setError('Please select a category')
-      return
-    }
-
-    setLoading(true)
+    setSaving(true)
     setError(null)
 
     try {
-      const suggestion: ResourceSuggestionInsert = {
-        user_id: user.id,
+      const resource = {
         name: name.trim(),
-        description: description.trim() || null,
-        category,
-        address: address.trim() || null,
+        primary_category,
+        address: address.trim(),
         phone: phone.trim() || null,
-        email: email.trim() || null,
+        description: description.trim() || null,
         website: website.trim() || null,
         hours: hours.trim() || null,
-        notes: notes.trim() || null,
+        email: email.trim() || null,
+        services: services ? services.split(',').map((s) => s.trim()) : null,
+        verified,
+        status,
+        latitude,
+        longitude,
       }
 
-      const { error: submitError } = await submitSuggestion(suggestion)
+      const response = await fetch('/api/admin/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resource),
+      })
 
-      if (submitError) {
-        setError('Failed to submit suggestion. Please try again.')
+      if (!response.ok) throw new Error('Failed to create resource')
+
+      if (addAnother) {
+        // Reset form but keep category and some defaults
+        const lastCategory = primary_category
+        resetForm()
+        setPrimaryCategory(lastCategory)
+        setStatus(status)
+        setVerified(verified)
+        nameRef.current?.focus()
       } else {
-        setSuccess(true)
-
-        if (submitAnother) {
-          // Reset form but keep category
-          const lastCategory = category
-          resetForm()
-          setCategory(lastCategory)
-          setSuccess(false)
-          nameRef.current?.focus()
-        } else {
-          // Redirect after success
-          setTimeout(() => {
-            router.push('/my-suggestions')
-          }, 2000)
-        }
+        router.push('/admin/resources')
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
+      setError('Failed to create resource. Please try again.')
       console.error(err)
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   const resetForm = () => {
     setName('')
-    setDescription('')
-    setCategory('')
     setAddress('')
     setPhone('')
-    setEmail('')
+    setDescription('')
     setWebsite('')
     setHours('')
-    setNotes('')
+    setEmail('')
+    setServices('')
     setLatitude(null)
     setLongitude(null)
     setError(null)
   }
 
-  // Show loading while checking auth
-  if (authLoading) {
+  const copyLastEntry = () => {
+    // This would ideally load the last created resource
+    // For now, just show a message
+    alert('Copy last entry feature - would copy previous resource details')
+  }
+
+  if (authLoading || checkingAdmin) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -213,38 +226,26 @@ export default function SuggestResourcePage() {
     )
   }
 
-  // Don't render if not authenticated (redirect will happen)
-  if (!isAuthenticated || !user) {
-    return null
-  }
+  if (!isAdmin) return null
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
-      <Box sx={{ mb: 3, textAlign: 'center' }}>
-        <AddCircleIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-        <Typography variant="h4" component="h1" gutterBottom>
-          Suggest a Resource
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1">
+          Add New Resource
         </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Know a resource that should be listed? Share it with the community!
-        </Typography>
+        <Button variant="outlined" onClick={() => router.push('/admin/resources')}>
+          Back to List
+        </Button>
       </Box>
 
       {/* Keyboard Shortcuts Help */}
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Submit) | Ctrl+Shift+S (Submit & Add Another) | Ctrl+G (Geocode) | Tab (Next Field)
+          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Save) | Ctrl+Shift+S (Save & Add Another) | Ctrl+G (Geocode) | Tab (Next Field)
         </Typography>
       </Alert>
-
-      {/* Success Message */}
-      {success && (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          Thank you! Your suggestion has been submitted and will be reviewed by our team.
-          Redirecting...
-        </Alert>
-      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -252,10 +253,16 @@ export default function SuggestResourcePage() {
         </Alert>
       )}
 
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Coordinates added successfully!
+        </Alert>
+      )}
+
       <Paper sx={{ p: 3 }}>
         <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }}>
           <Grid container spacing={3}>
-            {/* Essential Fields */}
+            {/* Essential Fields - Always Visible */}
             <Grid size={12}>
               <Typography variant="h6" gutterBottom>
                 Essential Information *
@@ -272,14 +279,17 @@ export default function SuggestResourcePage() {
                 fullWidth
                 autoFocus
                 placeholder="e.g., Oakland Job Center"
-                helperText="Official name of the organization or program"
               />
             </Grid>
 
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth required>
                 <InputLabel>Category</InputLabel>
-                <Select value={category} label="Category" onChange={(e) => setCategory(e.target.value)}>
+                <Select
+                  value={primary_category}
+                  label="Category"
+                  onChange={(e) => setPrimaryCategory(e.target.value)}
+                >
                   {CATEGORIES.map((cat) => (
                     <MenuItem key={cat.value} value={cat.value}>
                       {cat.label}
@@ -294,9 +304,9 @@ export default function SuggestResourcePage() {
                 label="Address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                required
                 fullWidth
                 placeholder="123 Main St, Oakland, CA 94601"
-                helperText="Full street address including city, state, and zip code"
               />
             </Grid>
 
@@ -323,12 +333,11 @@ export default function SuggestResourcePage() {
 
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
-                label="Phone Number"
+                label="Phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 fullWidth
                 placeholder="(510) 555-1234"
-                helperText="Contact phone number"
               />
             </Grid>
 
@@ -340,13 +349,12 @@ export default function SuggestResourcePage() {
                 onChange={(e) => setEmail(e.target.value)}
                 fullWidth
                 placeholder="contact@example.org"
-                helperText="Contact email address"
               />
             </Grid>
 
             <Divider sx={{ width: '100%', my: 2 }} />
 
-            {/* Additional Details */}
+            {/* Additional Fields - Optional */}
             <Grid size={12}>
               <Typography variant="h6" gutterBottom>
                 Additional Details (Optional)
@@ -356,92 +364,103 @@ export default function SuggestResourcePage() {
             <Grid size={12}>
               <TextField
                 label="Description"
-                multiline
-                rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                multiline
+                rows={2}
                 fullWidth
-                placeholder="What services does this resource provide?"
-                helperText="Brief description of services offered"
+                placeholder="Brief description of services..."
               />
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 label="Website"
-                type="url"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
                 fullWidth
                 placeholder="https://example.org"
-                helperText="Organization website URL"
               />
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
-                label="Hours of Operation"
+                label="Hours"
                 value={hours}
                 onChange={(e) => setHours(e.target.value)}
                 fullWidth
                 placeholder="Mon-Fri 9am-5pm"
-                helperText="When are they open?"
               />
             </Grid>
 
             <Grid size={12}>
               <TextField
-                label="Additional Notes"
-                multiline
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                label="Services (comma-separated)"
+                value={services}
+                onChange={(e) => setServices(e.target.value)}
                 fullWidth
-                placeholder="Any other information that might be helpful..."
-                helperText="Eligibility requirements, special programs, etc."
+                placeholder="Job training, Resume help, Interview prep"
+                helperText="Separate multiple services with commas"
+              />
+            </Grid>
+
+            <Divider sx={{ width: '100%', my: 2 }} />
+
+            {/* Status Options */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select value={status} label="Status" onChange={(e) => setStatus(e.target.value)}>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="pending">Pending Review</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormControlLabel
+                control={<Checkbox checked={verified} onChange={(e) => setVerified(e.target.checked)} />}
+                label="Mark as Verified"
               />
             </Grid>
 
             {/* Action Buttons */}
             <Grid size={12}>
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                <Button variant="outlined" onClick={() => router.back()} disabled={loading}>
+                <Button variant="outlined" onClick={() => router.push('/admin/resources')} disabled={saving}>
                   Cancel
                 </Button>
                 <Button
-                  variant="contained"
-                  startIcon={loading ? <CircularProgress size={16} /> : <AddCircleIcon />}
-                  onClick={() => handleSubmit(true)}
-                  disabled={loading || success}
+                  variant="outlined"
+                  startIcon={<CopyIcon />}
+                  onClick={copyLastEntry}
+                  disabled={saving}
                 >
-                  Submit & Add Another
+                  Copy Last
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={saving ? <CircularProgress size={16} /> : <AddIcon />}
+                  onClick={() => handleSubmit(true)}
+                  disabled={saving}
+                >
+                  Save & Add Another
                 </Button>
                 <Button
                   type="submit"
                   variant="contained"
                   color="success"
-                  startIcon={loading ? <CircularProgress size={16} /> : <SendIcon />}
-                  disabled={loading || success}
+                  startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
+                  disabled={saving}
                 >
-                  Submit Suggestion
+                  Save
                 </Button>
               </Box>
             </Grid>
           </Grid>
         </Box>
       </Paper>
-
-      {/* Info Box */}
-      <Alert severity="info" sx={{ mt: 3 }}>
-        <Typography variant="body2" gutterBottom>
-          <strong>What happens next?</strong>
-        </Typography>
-        <Typography variant="body2">
-          Our team will review your suggestion and verify the information. You can check the status of
-          your submission on the "My Suggestions" page. Approved suggestions will be added to the
-          resource directory.
-        </Typography>
-      </Alert>
     </Container>
   )
 }
