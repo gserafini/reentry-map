@@ -22,6 +22,7 @@ import {
   RateReview as ReviewsIcon,
   People as PeopleIcon,
   Psychology as AIIcon,
+  AutoAwesome as PromptIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
@@ -275,6 +276,14 @@ export default function AdminDashboardPage() {
                   onClick={() => router.push('/admin/agents')}
                 >
                   AI Agents
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<PromptIcon />}
+                  onClick={() => router.push('/admin/prompt-generator')}
+                  sx={{ bgcolor: 'success.main', '&:hover': { bgcolor: 'success.dark' } }}
+                >
+                  Prompt Generator
                 </Button>
               </Box>
             </CardContent>
