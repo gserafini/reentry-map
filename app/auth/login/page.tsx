@@ -1,29 +1,55 @@
 'use client'
 
-import { LoginForm } from '@/components/login-form'
-import { PhoneAuth } from '@/components/auth/PhoneAuth'
-import { Box, Tab, Tabs } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Container, Box, Typography } from '@mui/material'
+import { AuthModal } from '@/components/auth/AuthModal'
+import { useAuth } from '@/lib/hooks/useAuth'
 
-export default function Page() {
-  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email')
+export default function LoginPage() {
+  const [modalOpen, setModalOpen] = useState(true)
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // If user is already authenticated, redirect them
+    if (!isLoading && isAuthenticated) {
+      // Check if there's a redirect parameter
+      const redirect = searchParams.get('redirect') || sessionStorage.getItem('redirectAfterLogin')
+
+      // Clear the redirect from sessionStorage
+      sessionStorage.removeItem('redirectAfterLogin')
+
+      // Redirect to the intended page or home
+      router.push(redirect || '/')
+    }
+  }, [isAuthenticated, isLoading, router, searchParams])
+
+  const handleClose = () => {
+    setModalOpen(false)
+    // Go back or to home if user closes the modal
+    router.back()
+  }
+
+  // Don't show anything while loading or if already authenticated
+  if (isLoading || isAuthenticated) {
+    return null
+  }
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <Box sx={{ mb: 2 }}>
-          <Tabs
-            value={authMethod}
-            onChange={(_, value) => setAuthMethod(value)}
-            variant="fullWidth"
-            aria-label="authentication method tabs"
-          >
-            <Tab label="Email" value="email" />
-            <Tab label="Phone" value="phone" />
-          </Tabs>
+    <>
+      <Container maxWidth="sm" sx={{ py: 8 }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h4" gutterBottom>
+            Sign In
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Please sign in to continue
+          </Typography>
         </Box>
-        {authMethod === 'email' ? <LoginForm /> : <PhoneAuth />}
-      </div>
-    </div>
+      </Container>
+      <AuthModal open={modalOpen} onClose={handleClose} initialMode="login" />
+    </>
   )
 }

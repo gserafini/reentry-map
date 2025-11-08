@@ -33,15 +33,30 @@ import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { SingleResourceMap } from '@/components/map'
 import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import { getCategoryLabel } from '@/lib/utils/categories'
+import { FavoriteButton } from '@/components/user/FavoriteButton'
+import { RatingStars } from '@/components/user/RatingStars'
+import { ReviewsList } from '@/components/user/ReviewsList'
+import { ReviewForm } from '@/components/user/ReviewForm'
+import { ReportProblemModal } from '@/components/user/ReportProblemModal'
+import { useState } from 'react'
+import { Flag as FlagIcon } from '@mui/icons-material'
 
 interface ResourceDetailProps {
   resource: Resource
 }
 
 export function ResourceDetail({ resource }: ResourceDetailProps) {
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+
   const handleGetDirections = () => {
     const address = encodeURIComponent(resource.address)
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+  }
+
+  const handleReviewSuccess = () => {
+    setShowReviewForm(false)
+    // The ReviewsList component will automatically refresh
   }
 
   // Generate Schema.org structured data for SEO
@@ -121,10 +136,31 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           >
             {resource.name}
           </Typography>
-          {resource.verified && (
-            <Chip icon={<VerifiedIcon />} label="Verified" color="success" variant="outlined" />
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {resource.verified && (
+              <Chip icon={<VerifiedIcon />} label="Verified" color="success" variant="outlined" />
+            )}
+            <FavoriteButton resourceId={resource.id} size="large" />
+            <Tooltip title="Report a problem with this resource">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<FlagIcon />}
+                onClick={() => setShowReportModal(true)}
+              >
+                Report
+              </Button>
+            </Tooltip>
+          </Box>
         </Box>
+
+        {/* Report Problem Modal */}
+        <ReportProblemModal
+          open={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          resourceId={resource.id}
+          resourceName={resource.name}
+        />
 
         {/* Address with Get Directions button */}
         <Box
@@ -183,29 +219,38 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           </Button>
         </Box>
 
-        {/* Rating */}
-        {resource.rating_average !== null && (
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-            itemProp="aggregateRating"
-            itemScope
-            itemType="https://schema.org/AggregateRating"
-          >
-            <Rating
-              value={resource.rating_average}
-              precision={0.5}
-              readOnly
-              aria-label={`Rating: ${resource.rating_average.toFixed(1)} out of 5`}
-            />
-            <Typography variant="body2" color="text.secondary">
-              <span itemProp="ratingValue">{resource.rating_average.toFixed(1)}</span> (
-              <span itemProp="ratingCount">{resource.rating_count}</span> review
-              {resource.rating_count !== 1 ? 's' : ''})
+        {/* Average Rating */}
+        <Box sx={{ mb: 2 }}>
+          {resource.rating_average !== null && (
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
+              itemProp="aggregateRating"
+              itemScope
+              itemType="https://schema.org/AggregateRating"
+            >
+              <Rating
+                value={resource.rating_average}
+                precision={0.5}
+                readOnly
+                aria-label={`Average rating: ${resource.rating_average.toFixed(1)} out of 5`}
+              />
+              <Typography variant="body2" color="text.secondary">
+                <span itemProp="ratingValue">{resource.rating_average.toFixed(1)}</span> (
+                <span itemProp="ratingCount">{resource.rating_count}</span> rating
+                {resource.rating_count !== 1 ? 's' : ''})
+              </Typography>
+              <meta itemProp="bestRating" content="5" />
+              <meta itemProp="worstRating" content="1" />
+            </Box>
+          )}
+          {/* Interactive Rating - Rate this resource */}
+          <Box>
+            <Typography variant="body2" gutterBottom sx={{ fontWeight: 500 }}>
+              Rate this resource:
             </Typography>
-            <meta itemProp="bestRating" content="5" />
-            <meta itemProp="worstRating" content="1" />
+            <RatingStars resourceId={resource.id} resourceName={resource.name} />
           </Box>
-        )}
+        </Box>
       </Box>
 
       {/* Contact Information - Full width at top */}
@@ -542,6 +587,24 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           </Box>
         </Box>
       )}
+
+      {/* Reviews Section */}
+      <Box sx={{ mt: 4 }}>
+        {showReviewForm && (
+          <Box sx={{ mb: 4 }}>
+            <ReviewForm
+              resourceId={resource.id}
+              resourceName={resource.name}
+              onSuccess={handleReviewSuccess}
+              onCancel={() => setShowReviewForm(false)}
+            />
+          </Box>
+        )}
+        <ReviewsList
+          resourceId={resource.id}
+          onWriteReviewClick={() => setShowReviewForm(true)}
+        />
+      </Box>
     </Box>
   )
 }

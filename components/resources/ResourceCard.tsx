@@ -17,6 +17,7 @@ import type { Resource } from '@/lib/types/database'
 import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import { getResourceUrl } from '@/lib/utils/resource-url'
+import { FavoriteButton } from '@/components/user/FavoriteButton'
 
 export type ResourceCardResource = {
   id?: string
@@ -174,16 +175,9 @@ export function ResourceCard({
         )}
       </CardContent>
 
-      <CardActions sx={{ justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            size="small"
-            aria-label={`Save ${resource.name}`}
-            onClick={() => onFavorite?.(resource.id)}
-            variant="outlined"
-          >
-            Save
-          </Button>
+      <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {resource.id && <FavoriteButton resourceId={resource.id} size="medium" />}
           {resource.website ? (
             <Link
               href={resource.website}
