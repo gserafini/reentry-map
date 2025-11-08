@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import {
   Container,
   Typography,
@@ -18,13 +18,16 @@ import {
   Checkbox,
   FormControlLabel,
   Paper,
-  Chip,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material'
 import {
   Save as SaveIcon,
-  Add as AddIcon,
-  ContentCopy as CopyIcon,
+  Delete as DeleteIcon,
   MyLocation as GeocodeIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -32,13 +35,17 @@ import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 import { CATEGORIES } from '@/lib/utils/categories'
 import { geocodeAddress } from '@/lib/utils/geocoding'
 
-export default function NewResourcePage() {
+export default function EditResourcePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const router = useRouter()
+  const params = useParams()
+  const resourceId = params.id as string
+
   const [isAdmin, setIsAdmin] = useState(false)
   const [checkingAdmin, setCheckingAdmin] = useState(true)
+  const [loading, setLoading] = useState(true)
 
-  // Form state - minimal required fields for rapid entry
+  // Form state
   const [name, setName] = useState('')
   const [primary_category, setPrimaryCategory] = useState('general_support')
   const [address, setAddress] = useState('')
@@ -58,8 +65,10 @@ export default function NewResourcePage() {
 
   // UI state
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Ref for auto-focus
   const nameRef = useRef<HTMLInputElement>(null)
@@ -68,7 +77,7 @@ export default function NewResourcePage() {
   useEffect(() => {
     async function checkAdmin() {
       if (!authLoading && !isAuthenticated) {
-        router.push('/auth/login?redirect=/admin/resources/new')
+        router.push(`/auth/login?redirect=/admin/resources/${resourceId}/edit`)
         return
       }
       if (user) {
@@ -79,14 +88,50 @@ export default function NewResourcePage() {
       }
     }
     checkAdmin()
-  }, [user, authLoading, isAuthenticated, router])
+  }, [user, authLoading, isAuthenticated, router, resourceId])
+
+  // Load resource data
+  useEffect(() => {
+    async function loadResource() {
+      if (!isAdmin) return
+
+      try {
+        const response = await fetch(`/api/admin/resources/${resourceId}`)
+        if (!response.ok) throw new Error('Failed to load resource')
+
+        const data = await response.json()
+
+        // Populate form fields
+        setName(data.name || '')
+        setPrimaryCategory(data.primary_category || 'general_support')
+        setAddress(data.address || '')
+        setPhone(data.phone || '')
+        setDescription(data.description || '')
+        setWebsite(data.website || '')
+        setHours(data.hours || '')
+        setEmail(data.email || '')
+        setServices(data.services ? data.services.join(', ') : '')
+        setVerified(data.verified || false)
+        setStatus(data.status || 'active')
+        setLatitude(data.latitude)
+        setLongitude(data.longitude)
+      } catch (err) {
+        setError('Failed to load resource. Please try again.')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadResource()
+  }, [isAdmin, resourceId])
 
   // Auto-focus name field on load
   useEffect(() => {
-    if (isAdmin && nameRef.current) {
+    if (!loading && isAdmin && nameRef.current) {
       nameRef.current.focus()
     }
-  }, [isAdmin])
+  }, [loading, isAdmin])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -94,12 +139,7 @@ export default function NewResourcePage() {
       // Ctrl+S / Cmd+S - Save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        handleSubmit(false)
-      }
-      // Ctrl+Shift+S / Cmd+Shift+S - Save and add another
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
-        e.preventDefault()
-        handleSubmit(true)
+        handleSubmit()
       }
       // Ctrl+G / Cmd+G - Geocode address
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
@@ -110,7 +150,7 @@ export default function NewResourcePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [name, address, primary_category]) // Dependencies for shortcuts
+  }, [name, address, primary_category])
 
   const handleGeocode = async () => {
     if (!address) {
@@ -138,7 +178,7 @@ export default function NewResourcePage() {
     }
   }
 
-  const handleSubmit = async (addAnother: boolean) => {
+  const handleSubmit = async () => {
     // Validation
     if (!name.trim()) {
       setError('Name is required')
@@ -169,54 +209,44 @@ export default function NewResourcePage() {
         longitude,
       }
 
-      const response = await fetch('/api/admin/resources', {
-        method: 'POST',
+      const response = await fetch(`/api/admin/resources/${resourceId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(resource),
       })
 
-      if (!response.ok) throw new Error('Failed to create resource')
+      if (!response.ok) throw new Error('Failed to update resource')
 
-      if (addAnother) {
-        // Reset form but keep category and some defaults
-        const lastCategory = primary_category
-        resetForm()
-        setPrimaryCategory(lastCategory)
-        setStatus(status)
-        setVerified(verified)
-        nameRef.current?.focus()
-      } else {
-        router.push('/admin/resources')
-      }
+      router.push('/admin/resources')
     } catch (err) {
-      setError('Failed to create resource. Please try again.')
+      setError('Failed to update resource. Please try again.')
       console.error(err)
     } finally {
       setSaving(false)
     }
   }
 
-  const resetForm = () => {
-    setName('')
-    setAddress('')
-    setPhone('')
-    setDescription('')
-    setWebsite('')
-    setHours('')
-    setEmail('')
-    setServices('')
-    setLatitude(null)
-    setLongitude(null)
+  const handleDelete = async () => {
+    setDeleting(true)
     setError(null)
+
+    try {
+      const response = await fetch(`/api/admin/resources/${resourceId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete resource')
+
+      router.push('/admin/resources')
+    } catch (err) {
+      setError('Failed to delete resource. Please try again.')
+      console.error(err)
+      setDeleting(false)
+      setShowDeleteDialog(false)
+    }
   }
 
-  const copyLastEntry = () => {
-    // This would ideally load the last created resource
-    // For now, just show a message
-    alert('Copy last entry feature - would copy previous resource details')
-  }
-
-  if (authLoading || checkingAdmin) {
+  if (authLoading || checkingAdmin || loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -233,7 +263,7 @@ export default function NewResourcePage() {
       {/* Header */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1">
-          Add New Resource
+          Edit Resource
         </Typography>
         <Button variant="outlined" onClick={() => router.push('/admin/resources')}>
           Back to List
@@ -243,7 +273,7 @@ export default function NewResourcePage() {
       {/* Keyboard Shortcuts Help */}
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Save) | Ctrl+Shift+S (Save & Add Another) | Ctrl+G (Geocode) | Tab (Next Field)
+          <strong>Keyboard Shortcuts:</strong> Ctrl+S (Save) | Ctrl+G (Geocode) | Tab (Next Field)
         </Typography>
       </Alert>
 
@@ -255,12 +285,12 @@ export default function NewResourcePage() {
 
       {success && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          Coordinates added successfully!
+          Coordinates updated successfully!
         </Alert>
       )}
 
       <Paper sx={{ p: 3 }}>
-        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }}>
+        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
           <Grid container spacing={3}>
             {/* Essential Fields - Always Visible */}
             <Grid size={12}>
@@ -277,7 +307,6 @@ export default function NewResourcePage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 fullWidth
-                autoFocus
                 placeholder="e.g., Oakland Job Center"
               />
             </Grid>
@@ -427,40 +456,53 @@ export default function NewResourcePage() {
 
             {/* Action Buttons */}
             <Grid size={12}>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                <Button variant="outlined" onClick={() => router.push('/admin/resources')} disabled={saving}>
-                  Cancel
-                </Button>
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between', mt: 2 }}>
                 <Button
                   variant="outlined"
-                  startIcon={<CopyIcon />}
-                  onClick={copyLastEntry}
-                  disabled={saving}
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={saving || deleting}
                 >
-                  Copy Last
+                  Delete
                 </Button>
-                <Button
-                  variant="contained"
-                  startIcon={saving ? <CircularProgress size={16} /> : <AddIcon />}
-                  onClick={() => handleSubmit(true)}
-                  disabled={saving}
-                >
-                  Save & Add Another
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="success"
-                  startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
-                  disabled={saving}
-                >
-                  Save
-                </Button>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button variant="outlined" onClick={() => router.push('/admin/resources')} disabled={saving}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="success"
+                    startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
+                    disabled={saving}
+                  >
+                    Save Changes
+                  </Button>
+                </Box>
               </Box>
             </Grid>
           </Grid>
         </Box>
       </Paper>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
+        <DialogTitle>Delete Resource?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete &quot;{name}&quot;? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteDialog(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
+            {deleting ? <CircularProgress size={20} /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 }

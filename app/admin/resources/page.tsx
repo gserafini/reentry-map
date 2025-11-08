@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import NextLink from 'next/link'
 import {
+  Container,
+  Typography,
   Box,
   Button,
   TextField,
@@ -14,261 +15,300 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Typography,
   Chip,
   IconButton,
-  InputAdornment,
+  CircularProgress,
+  Alert,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  CircularProgress,
-  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Pagination,
 } from '@mui/material'
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Upload as UploadIcon,
   Search as SearchIcon,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
-import type { Database } from '@/lib/types/database'
+import { useAuth } from '@/lib/hooks/useAuth'
+import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 
-type Resource = Database['public']['Tables']['resources']['Row']
+interface Resource {
+  id: string
+  name: string
+  primary_category: string
+  address: string
+  status: string
+  verified: boolean
+  created_at: string
+}
 
-export default function ResourcesListPage() {
+export default function AdminResourcesPage() {
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(true)
   const [resources, setResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingResource, setDeletingResource] = useState<Resource | null>(null)
 
-  const supabase = createClient()
-
+  // Check admin status
   useEffect(() => {
-    loadResources()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryFilter, statusFilter])
+    async function checkAdmin() {
+      if (!authLoading && !isAuthenticated) {
+        router.push('/auth/login?redirect=/admin/resources')
+        return
+      }
 
-  async function loadResources() {
-    try {
+      if (user) {
+        const adminStatus = await checkCurrentUserIsAdmin()
+        setIsAdmin(adminStatus)
+        if (!adminStatus) router.push('/')
+        setCheckingAdmin(false)
+      }
+    }
+    checkAdmin()
+  }, [user, authLoading, isAuthenticated, router])
+
+  // Fetch resources
+  useEffect(() => {
+    async function fetchResources() {
+      if (!isAdmin) return
+
       setLoading(true)
-      let query = supabase.from('resources').select('*').order('created_at', { ascending: false })
+      try {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: '20',
+        })
+        if (statusFilter !== 'all') params.append('status', statusFilter)
+        if (search) params.append('search', search)
 
-      if (categoryFilter !== 'all') {
-        query = query.eq('primary_category', categoryFilter)
+        const response = await fetch(`/api/admin/resources?${params}`)
+        const result = await response.json()
+
+        setResources(result.data || [])
+        setTotal(result.pagination?.total || 0)
+        setTotalPages(result.pagination?.totalPages || 1)
+      } catch (error) {
+        console.error('Error fetching resources:', error)
       }
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setResources(data || [])
-    } catch (err) {
-      setError('Failed to load resources')
-      console.error(err)
-    } finally {
       setLoading(false)
     }
-  }
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-      return
+    if (isAdmin && !checkingAdmin) {
+      fetchResources()
     }
+  }, [isAdmin, checkingAdmin, page, statusFilter, search])
+
+  const handleDelete = async () => {
+    if (!deletingResource) return
 
     try {
-      const { error } = await supabase.from('resources').delete().eq('id', id)
+      const response = await fetch(`/api/admin/resources/${deletingResource.id}`, {
+        method: 'DELETE',
+      })
 
-      if (error) throw error
-
-      setResources(resources.filter((r) => r.id !== id))
-    } catch (err) {
+      if (response.ok) {
+        setResources(resources.filter((r) => r.id !== deletingResource.id))
+        setDeleteDialogOpen(false)
+        setDeletingResource(null)
+      } else {
+        alert('Failed to delete resource')
+      }
+    } catch (error) {
+      console.error('Error deleting resource:', error)
       alert('Failed to delete resource')
-      console.error(err)
     }
   }
 
-  const filteredResources = resources.filter(
-    (resource) =>
-      resource.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      resource.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  if (authLoading || checkingAdmin) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    )
+  }
+
+  if (!isAdmin) return null
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1">
           Manage Resources
         </Typography>
-        <Button
-          onClick={() => router.push('/admin/resources/new')}
-          variant="contained"
-          startIcon={<AddIcon />}
-        >
-          Add Resource
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<UploadIcon />}
+            onClick={() => router.push('/admin/resources/import')}
+          >
+            Bulk Import
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => router.push('/admin/resources/new')}
+          >
+            Add Resource
+          </Button>
+        </Box>
       </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <TextField
             placeholder="Search resources..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ flexGrow: 1, minWidth: 300 }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            size="small"
+            sx={{ flexGrow: 1, minWidth: 200 }}
             InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
             }}
           />
-
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Category</InputLabel>
-            <Select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              label="Category"
-            >
-              <MenuItem value="all">All Categories</MenuItem>
-              <MenuItem value="employment">Employment</MenuItem>
-              <MenuItem value="housing">Housing</MenuItem>
-              <MenuItem value="food">Food</MenuItem>
-              <MenuItem value="healthcare">Healthcare</MenuItem>
-              <MenuItem value="legal_aid">Legal Aid</MenuItem>
-              <MenuItem value="general_support">General Support</MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl sx={{ minWidth: 180 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Status</InputLabel>
             <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
               label="Status"
+              onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <MenuItem value="all">All Status</MenuItem>
+              <MenuItem value="all">All</MenuItem>
               <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
               <MenuItem value="inactive">Inactive</MenuItem>
-              <MenuItem value="pending_verification">Pending Verification</MenuItem>
             </Select>
           </FormControl>
         </Box>
       </Paper>
 
-      {/* Resources Table */}
+      {/* Results Summary */}
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {total} resource{total !== 1 ? 's' : ''} found
+      </Typography>
+
+      {/* Table */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>
-      ) : filteredResources.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            No resources found. {searchQuery && 'Try a different search term or '}
-            <NextLink href="/admin/resources/new" style={{ color: 'inherit' }}>
-              add your first resource
-            </NextLink>
-            .
-          </Typography>
-        </Paper>
+      ) : resources.length === 0 ? (
+        <Alert severity="info">No resources found. Add your first resource to get started.</Alert>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Phone</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredResources.map((resource) => (
-                <TableRow key={resource.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {resource.name}
-                    </Typography>
-                    {resource.description && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
+        <>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Category</TableCell>
+                  <TableCell>Address</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Verified</TableCell>
+                  <TableCell>Created</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {resources.map((resource) => (
+                  <TableRow key={resource.id}>
+                    <TableCell>{resource.name}</TableCell>
+                    <TableCell>
+                      <Chip label={resource.primary_category} size="small" />
+                    </TableCell>
+                    <TableCell>{resource.address}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={resource.status}
+                        size="small"
+                        color={
+                          resource.status === 'active'
+                            ? 'success'
+                            : resource.status === 'pending'
+                              ? 'warning'
+                              : 'default'
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {resource.verified ? (
+                        <Chip label="Yes" size="small" color="success" />
+                      ) : (
+                        <Chip label="No" size="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>{new Date(resource.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        onClick={() => router.push(`/admin/resources/${resource.id}/edit`)}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          setDeletingResource(resource)
+                          setDeleteDialogOpen(true)
                         }}
                       >
-                        {resource.description}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={resource.primary_category.replace(/_/g, ' ')}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={resource.status}
-                      size="small"
-                      color={
-                        resource.status === 'active'
-                          ? 'success'
-                          : resource.status === 'inactive'
-                            ? 'default'
-                            : 'warning'
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{resource.address || '—'}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{resource.phone || '—'}</Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      onClick={() => router.push(`/admin/resources/${resource.id}`)}
-                      size="small"
-                      color="primary"
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(resource.id, resource.name)}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(_e, value) => setPage(value)}
+                color="primary"
+              />
+            </Box>
+          )}
+        </>
       )}
-    </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Resource?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete <strong>{deletingResource?.name}</strong>? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDelete} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
   )
 }
