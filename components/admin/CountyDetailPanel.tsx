@@ -201,7 +201,9 @@ export function CountyDetailPanel({ fips, onClose }: CountyDetailPanelProps) {
                 <p className="text-sm text-muted-foreground">Annual Releases</p>
               </div>
               <p className="mt-2 text-2xl font-semibold">
-                {detail.county.reentry_population ? detail.county.reentry_population.toLocaleString() : 'N/A'}
+                {detail.county.reentry_population
+                  ? detail.county.reentry_population.toLocaleString()
+                  : 'N/A'}
               </p>
             </div>
           </div>
@@ -209,19 +211,27 @@ export function CountyDetailPanel({ fips, onClose }: CountyDetailPanelProps) {
           {/* Resource Metrics */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="text-center">
-              <p className="text-3xl font-bold text-emerald-600">{detail.metrics.total_resources}</p>
+              <p className="text-3xl font-bold text-emerald-600">
+                {detail.metrics.total_resources}
+              </p>
               <p className="text-sm text-muted-foreground">Total Resources</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">{detail.metrics.verified_resources}</p>
+              <p className="text-3xl font-bold text-blue-600">
+                {detail.metrics.verified_resources}
+              </p>
               <p className="text-sm text-muted-foreground">Verified</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-purple-600">{detail.metrics.categories_covered}/13</p>
+              <p className="text-3xl font-bold text-purple-600">
+                {detail.metrics.categories_covered}/13
+              </p>
               <p className="text-sm text-muted-foreground">Categories</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-orange-600">{detail.metrics.unique_resources}</p>
+              <p className="text-3xl font-bold text-orange-600">
+                {detail.metrics.unique_resources}
+              </p>
               <p className="text-sm text-muted-foreground">Unique</p>
             </div>
           </div>
@@ -234,7 +244,10 @@ export function CountyDetailPanel({ fips, onClose }: CountyDetailPanelProps) {
                 {Object.entries(detail.resources.by_category)
                   .sort(([, a], [, b]) => b - a)
                   .map(([category, count]) => (
-                    <div key={category} className="flex items-center justify-between rounded border px-3 py-2">
+                    <div
+                      key={category}
+                      className="flex items-center justify-between rounded border px-3 py-2"
+                    >
                       <span className="text-sm capitalize">{category.replace(/_/g, ' ')}</span>
                       <Badge variant="outline">{count}</Badge>
                     </div>
@@ -250,22 +263,33 @@ export function CountyDetailPanel({ fips, onClose }: CountyDetailPanelProps) {
               <div className="flex items-center justify-between">
                 <span className="text-sm">vs. {detail.comparison.state.name}</span>
                 <span className="font-semibold">
-                  {detail.metrics.coverage_score > detail.comparison.state.coverage_score ? '↑' : '↓'}{' '}
-                  {Math.abs(detail.metrics.coverage_score - detail.comparison.state.coverage_score).toFixed(1)}%
+                  {detail.metrics.coverage_score > detail.comparison.state.coverage_score
+                    ? '↑'
+                    : '↓'}{' '}
+                  {Math.abs(
+                    detail.metrics.coverage_score - detail.comparison.state.coverage_score
+                  ).toFixed(1)}
+                  %
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">vs. National Average</span>
                 <span className="font-semibold">
-                  {detail.metrics.coverage_score > detail.comparison.national.coverage_score ? '↑' : '↓'}{' '}
-                  {Math.abs(detail.metrics.coverage_score - detail.comparison.national.coverage_score).toFixed(1)}%
+                  {detail.metrics.coverage_score > detail.comparison.national.coverage_score
+                    ? '↑'
+                    : '↓'}{' '}
+                  {Math.abs(
+                    detail.metrics.coverage_score - detail.comparison.national.coverage_score
+                  ).toFixed(1)}
+                  %
                 </span>
               </div>
               {detail.comparison.rank_in_state && (
                 <div className="flex items-center justify-between border-t pt-2">
                   <span className="text-sm">Rank in State</span>
                   <span className="font-semibold">
-                    #{detail.comparison.rank_in_state} of {detail.comparison.total_counties_in_state}
+                    #{detail.comparison.rank_in_state} of{' '}
+                    {detail.comparison.total_counties_in_state}
                   </span>
                 </div>
               )}
@@ -274,7 +298,11 @@ export function CountyDetailPanel({ fips, onClose }: CountyDetailPanelProps) {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={handleTriggerResearch} disabled={triggeringResearch} className="flex items-center gap-2">
+            <Button
+              onClick={handleTriggerResearch}
+              disabled={triggeringResearch}
+              className="flex items-center gap-2"
+            >
               <Search className="h-4 w-4" />
               {triggeringResearch ? 'Triggering...' : 'Trigger Research'}
             </Button>

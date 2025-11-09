@@ -22,7 +22,11 @@ export default async function CoverageMapPage() {
   }
 
   // Check admin status
-  const { data: profile, error: profileError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
 
   if (profileError || !profile?.is_admin) {
     redirect('/') // Redirect non-admins to home
@@ -33,8 +37,8 @@ export default async function CoverageMapPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold">Coverage Tracking System</h1>
         <p className="mt-2 text-muted-foreground">
-          Geographic coverage metrics, resource distribution analysis, and expansion planning for reentry resources across
-          the United States.
+          Geographic coverage metrics, resource distribution analysis, and expansion planning for
+          reentry resources across the United States.
         </p>
       </div>
 

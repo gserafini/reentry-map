@@ -21,7 +21,11 @@ export function AdminNav() {
         <Button startIcon={<DashboardIcon />} sx={{ mr: 2 }} onClick={() => router.push('/admin')}>
           Dashboard
         </Button>
-        <Button startIcon={<MapIcon />} sx={{ mr: 2 }} onClick={() => router.push('/admin/coverage-map')}>
+        <Button
+          startIcon={<MapIcon />}
+          sx={{ mr: 2 }}
+          onClick={() => router.push('/admin/coverage-map')}
+        >
           Coverage Map
         </Button>
         <Button

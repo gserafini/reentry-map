@@ -1,12 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { CoverageMap } from './CoverageMap'
+import { CoverageMap, CoverageMetrics, CoverageSummary } from './CoverageMap'
 import { CountyDetailPanel } from './CountyDetailPanel'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RefreshCw, Download, TrendingUp, MapPin, Target } from 'lucide-react'
+
+interface CoverageReportData {
+  summary: CoverageSummary
+  national: CoverageMetrics | null
+  states: CoverageMetrics[]
+  counties: CoverageMetrics[]
+  cities: CoverageMetrics[]
+}
 
 export function CoverageMapDashboard() {
   const [selectedCounty, setSelectedCounty] = useState<string | null>(null)
@@ -14,7 +22,9 @@ export function CoverageMapDashboard() {
   const [isCalculating, setIsCalculating] = useState(false)
 
   async function handleRecalculateAll() {
-    if (!confirm('Recalculate coverage metrics for all geographies? This may take a few minutes.')) {
+    if (
+      !confirm('Recalculate coverage metrics for all geographies? This may take a few minutes.')
+    ) {
       return
     }
 
@@ -36,7 +46,9 @@ export function CoverageMapDashboard() {
       window.location.reload()
     } catch (err) {
       console.error('Error recalculating coverage:', err)
-      alert('Failed to recalculate coverage: ' + (err instanceof Error ? err.message : 'Unknown error'))
+      alert(
+        'Failed to recalculate coverage: ' + (err instanceof Error ? err.message : 'Unknown error')
+      )
     } finally {
       setIsCalculating(false)
     }
@@ -47,7 +59,7 @@ export function CoverageMapDashboard() {
       const response = await fetch('/api/admin/coverage/metrics')
       if (!response.ok) throw new Error('Failed to fetch metrics')
 
-      const data = await response.json()
+      const data = (await response.json()) as CoverageReportData
 
       // Create CSV export
       const csv = generateCSVReport(data)
@@ -72,34 +84,38 @@ export function CoverageMapDashboard() {
       window.open('/api/admin/coverage/donor-report?format=html', '_blank')
     } catch (err) {
       console.error('Error generating donor report:', err)
-      alert('Failed to generate donor report: ' + (err instanceof Error ? err.message : 'Unknown error'))
+      alert(
+        'Failed to generate donor report: ' + (err instanceof Error ? err.message : 'Unknown error')
+      )
     }
   }
 
-  function generateCSVReport(data: any): string {
+  function generateCSVReport(data: CoverageReportData): string {
     const lines: string[] = []
 
     // Header
-    lines.push('Geography Type,Geography Name,Coverage Score,Total Resources,Verified Resources,Categories Covered,Unique Resources')
+    lines.push(
+      'Geography Type,Geography Name,Coverage Score,Total Resources,Verified Resources,Categories Covered,Unique Resources'
+    )
 
     // National
     if (data.national) {
       lines.push(
-        `National,${data.national.geography_name},${data.national.coverage_score},${data.national.total_resources},${data.national.verified_resources},${data.national.categories_covered},${data.national.unique_resources}`,
+        `National,${data.national.geography_name},${data.national.coverage_score},${data.national.total_resources},${data.national.verified_resources},${data.national.categories_covered},${data.national.unique_resources}`
       )
     }
 
     // States
-    data.states?.forEach((s: any) => {
+    data.states?.forEach((s) => {
       lines.push(
-        `State,${s.geography_name},${s.coverage_score},${s.total_resources},${s.verified_resources},${s.categories_covered},${s.unique_resources}`,
+        `State,${s.geography_name},${s.coverage_score},${s.total_resources},${s.verified_resources},${s.categories_covered},${s.unique_resources}`
       )
     })
 
     // Counties
-    data.counties?.forEach((c: any) => {
+    data.counties?.forEach((c) => {
       lines.push(
-        `County,"${c.geography_name}",${c.coverage_score},${c.total_resources},${c.verified_resources},${c.categories_covered},${c.unique_resources}`,
+        `County,"${c.geography_name}",${c.coverage_score},${c.total_resources},${c.verified_resources},${c.categories_covered},${c.unique_resources}`
       )
     })
 
@@ -115,15 +131,27 @@ export function CoverageMapDashboard() {
           <CardDescription>Manage coverage tracking and generate reports</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Button onClick={handleRecalculateAll} disabled={isCalculating} className="flex items-center gap-2">
+          <Button
+            onClick={handleRecalculateAll}
+            disabled={isCalculating}
+            className="flex items-center gap-2"
+          >
             <RefreshCw className={`h-4 w-4 ${isCalculating ? 'animate-spin' : ''}`} />
             {isCalculating ? 'Calculating...' : 'Recalculate All Metrics'}
           </Button>
-          <Button onClick={handleExportReport} variant="outline" className="flex items-center gap-2">
+          <Button
+            onClick={handleExportReport}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
             <Download className="h-4 w-4" />
             Export CSV Report
           </Button>
-          <Button onClick={handleGenerateDonorReport} variant="outline" className="flex items-center gap-2">
+          <Button
+            onClick={handleGenerateDonorReport}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
             <Download className="h-4 w-4" />
             Generate Donor Report
           </Button>
@@ -131,7 +159,10 @@ export function CoverageMapDashboard() {
       </Card>
 
       {/* View Mode Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
+      <Tabs
+        value={viewMode}
+        onValueChange={(v) => setViewMode(v as 'coverage' | 'resources' | 'priority')}
+      >
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="coverage" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -172,21 +203,25 @@ export function CoverageMapDashboard() {
         <CardHeader>
           <CardTitle>About Coverage Tracking</CardTitle>
         </CardHeader>
-        <CardContent className="prose prose-sm max-w-none dark:prose-invert">
+        <CardContent className="prose prose-sm dark:prose-invert max-w-none">
           <h4>Coverage Score Formula</h4>
           <p>The coverage score is a weighted composite of four key metrics:</p>
           <ul>
             <li>
-              <strong>Resource Count (30%)</strong>: Number of resources vs. target (50 resources = 100%)
+              <strong>Resource Count (30%)</strong>: Number of resources vs. target (50 resources =
+              100%)
             </li>
             <li>
-              <strong>Category Coverage (30%)</strong>: Breadth across 13 categories (all categories = 100%)
+              <strong>Category Coverage (30%)</strong>: Breadth across 13 categories (all categories
+              = 100%)
             </li>
             <li>
-              <strong>Population Coverage (20%)</strong>: Resources per 1,000 returning citizens (5 per 1K = 100%)
+              <strong>Population Coverage (20%)</strong>: Resources per 1,000 returning citizens (5
+              per 1K = 100%)
             </li>
             <li>
-              <strong>Verification Quality (20%)</strong>: Percentage verified in last 90 days + avg verification score
+              <strong>Verification Quality (20%)</strong>: Percentage verified in last 90 days + avg
+              verification score
             </li>
           </ul>
 
@@ -212,19 +247,23 @@ export function CoverageMapDashboard() {
           <h4>Using This Dashboard</h4>
           <ol>
             <li>
-              <strong>View Mode</strong>: Switch between Coverage, Resources, and Priority views using the tabs
+              <strong>View Mode</strong>: Switch between Coverage, Resources, and Priority views
+              using the tabs
             </li>
             <li>
               <strong>Explore Counties</strong>: Click on a county marker to see detailed metrics
             </li>
             <li>
-              <strong>Trigger Research</strong>: Queue AI research agents to discover resources for specific counties
+              <strong>Trigger Research</strong>: Queue AI research agents to discover resources for
+              specific counties
             </li>
             <li>
-              <strong>Export Data</strong>: Generate CSV reports for analysis or PDF reports for donors
+              <strong>Export Data</strong>: Generate CSV reports for analysis or PDF reports for
+              donors
             </li>
             <li>
-              <strong>Recalculate Metrics</strong>: Refresh all coverage scores after adding new resources
+              <strong>Recalculate Metrics</strong>: Refresh all coverage scores after adding new
+              resources
             </li>
           </ol>
         </CardContent>

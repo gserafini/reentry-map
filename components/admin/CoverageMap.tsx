@@ -34,7 +34,7 @@ export interface CountyData {
   priority_tier: number | null
   priority_weight: number | null
   priority_reason: string | null
-  geometry: any
+  geometry: unknown // GeoJSON object
   center_lat: number | null
   center_lng: number | null
 }
@@ -52,12 +52,24 @@ export interface CoverageMetrics {
   reentry_population: number | null
 }
 
+export interface CoverageSummary {
+  last_updated: string
+  total_resources: number
+  national_coverage: number
+  states_with_coverage: number
+  counties_with_coverage: number
+  cities_with_coverage: number
+  tier1_counties_total: number
+  tier1_counties_covered: number
+  tier1_coverage_percent: number
+}
+
 export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMapProps) {
   const [counties, setCounties] = useState<CountyData[]>([])
   const [metrics, setMetrics] = useState<Record<string, CoverageMetrics>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [summary, setSummary] = useState<any>(null)
+  const [summary, setSummary] = useState<CoverageSummary | null>(null)
 
   useEffect(() => {
     async function loadCoverageData() {
@@ -70,7 +82,7 @@ export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMa
         if (!metricsResponse.ok) throw new Error('Failed to load coverage metrics')
 
         const metricsData = (await metricsResponse.json()) as {
-          summary: any
+          summary: CoverageSummary
           counties?: CoverageMetrics[]
         }
         setSummary(metricsData.summary)
@@ -100,6 +112,17 @@ export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMa
 
     loadCoverageData()
   }, [])
+
+  if (loading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Loading Coverage Data...</CardTitle>
+          <CardDescription>Please wait while we load coverage metrics</CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
 
   if (error) {
     return (
@@ -207,7 +230,12 @@ export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMa
       {/* Map Component */}
       <Card>
         <CardContent className="p-0">
-          <CoverageMapLeaflet counties={counties} metrics={metrics} viewMode={viewMode} onCountyClick={onCountyClick} />
+          <CoverageMapLeaflet
+            counties={counties}
+            metrics={metrics}
+            viewMode={viewMode}
+            onCountyClick={onCountyClick}
+          />
         </CardContent>
       </Card>
     </div>

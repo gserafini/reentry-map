@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { CountyData, CoverageMetrics } from './CoverageMap'
 
 // Fix for default marker icons in Leaflet with Next.js
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -20,7 +21,12 @@ interface CoverageMapLeafletProps {
   onCountyClick?: (fips: string) => void
 }
 
-export default function CoverageMapLeaflet({ counties, metrics, viewMode, onCountyClick }: CoverageMapLeafletProps) {
+export default function CoverageMapLeaflet({
+  counties,
+  metrics,
+  viewMode,
+  onCountyClick,
+}: CoverageMapLeafletProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
 
@@ -32,7 +38,8 @@ export default function CoverageMapLeaflet({ counties, metrics, viewMode, onCoun
 
     // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 18,
       minZoom: 3,
     }).addTo(map)
@@ -107,8 +114,9 @@ export default function CoverageMapLeaflet({ counties, metrics, viewMode, onCoun
   )
 }
 
-function getColor(score: number, viewMode: string): string {
+function getColor(score: number, _viewMode: string): string {
   // Color scheme for coverage scores
+  // viewMode parameter reserved for future use (different color schemes per view mode)
   if (score >= 90) return '#065f46' // Emerald-700 - Excellent
   if (score >= 70) return '#10b981' // Emerald-500 - Good
   if (score >= 50) return '#fbbf24' // Yellow-400 - Fair
