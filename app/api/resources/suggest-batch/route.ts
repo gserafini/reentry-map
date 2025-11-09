@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { env } from '@/lib/env'
 
 /**
  * POST /api/resources/suggest-batch
@@ -15,7 +16,11 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    // Use service role client to bypass RLS for public API
+    const supabase = createClient(
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    )
 
     const body = (await request.json()) as {
       resources: unknown[]
@@ -37,6 +42,7 @@ export async function POST(request: NextRequest) {
       submitted: 0,
       skipped_duplicates: 0,
       errors: 0,
+      error_details: [] as string[],
       suggestions: [] as unknown[],
     }
 
@@ -119,9 +125,11 @@ Provenance: ${r.source?.discovered_by || submitter}
 Submitted: ${new Date().toISOString()}`
 
         // Create suggestion with simplified schema
+        // Set suggested_by to NULL for public API submissions (bypasses RLS auth requirement)
         const { data: suggestion, error } = await supabase
           .from('resource_suggestions')
           .insert({
+            suggested_by: null,
             name: r.name,
             address: r.address,
             phone: r.phone || null,
@@ -137,6 +145,7 @@ Submitted: ${new Date().toISOString()}`
         if (error) {
           console.error('Error creating suggestion:', error)
           results.errors++
+          results.error_details.push(`${r.name}: ${error.message || JSON.stringify(error)}`)
         } else {
           results.submitted++
           results.suggestions.push(suggestion)
@@ -144,6 +153,9 @@ Submitted: ${new Date().toISOString()}`
       } catch (error) {
         console.error('Error processing resource:', error)
         results.errors++
+        results.error_details.push(
+          `${r.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
       }
     }
 
@@ -156,6 +168,7 @@ Submitted: ${new Date().toISOString()}`
         skipped_duplicates: results.skipped_duplicates,
         errors: results.errors,
       },
+      error_details: results.errors > 0 ? results.error_details : undefined,
       suggestions: results.suggestions,
       next_steps: 'Resources will appear in the admin suggestions queue for review and approval',
     })
