@@ -6,6 +6,7 @@ import {
   Dashboard as DashboardIcon,
   Settings as SettingsIcon,
   ArrowBack as ArrowBackIcon,
+  Map as MapIcon,
 } from '@mui/icons-material'
 
 export function AdminNav() {
@@ -19,6 +20,9 @@ export function AdminNav() {
         </Typography>
         <Button startIcon={<DashboardIcon />} sx={{ mr: 2 }} onClick={() => router.push('/admin')}>
           Dashboard
+        </Button>
+        <Button startIcon={<MapIcon />} sx={{ mr: 2 }} onClick={() => router.push('/admin/coverage-map')}>
+          Coverage Map
         </Button>
         <Button
           startIcon={<SettingsIcon />}
