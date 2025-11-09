@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   Container,
   Typography,
@@ -35,6 +36,7 @@ import {
   Delete as DeleteIcon,
   Upload as UploadIcon,
   Search as SearchIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
@@ -44,6 +46,9 @@ interface Resource {
   name: string
   primary_category: string
   address: string
+  city: string | null
+  state: string | null
+  zip: string | null
   status: string
   verified: boolean
   created_at: string
@@ -225,6 +230,9 @@ export default function AdminResourcesPage() {
                   <TableCell>Name</TableCell>
                   <TableCell>Category</TableCell>
                   <TableCell>Address</TableCell>
+                  <TableCell>City</TableCell>
+                  <TableCell>State</TableCell>
+                  <TableCell>Zip</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Verified</TableCell>
                   <TableCell>Created</TableCell>
@@ -234,11 +242,31 @@ export default function AdminResourcesPage() {
               <TableBody>
                 {resources.map((resource) => (
                   <TableRow key={resource.id}>
-                    <TableCell>{resource.name}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/resources/${resource.id}`}
+                        style={{
+                          color: 'inherit',
+                          textDecoration: 'none',
+                          fontWeight: 500,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.textDecoration = 'underline'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.textDecoration = 'none'
+                        }}
+                      >
+                        {resource.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <Chip label={resource.primary_category} size="small" />
                     </TableCell>
                     <TableCell>{resource.address}</TableCell>
+                    <TableCell>{resource.city || '-'}</TableCell>
+                    <TableCell>{resource.state || '-'}</TableCell>
+                    <TableCell>{resource.zip || '-'}</TableCell>
                     <TableCell>
                       <Chip
                         label={resource.status}
@@ -263,7 +291,16 @@ export default function AdminResourcesPage() {
                     <TableCell align="right">
                       <IconButton
                         size="small"
+                        component={Link}
+                        href={`/resources/${resource.id}`}
+                        title="View public page"
+                      >
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
                         onClick={() => router.push(`/admin/resources/${resource.id}/edit`)}
+                        title="Edit resource"
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
@@ -274,6 +311,7 @@ export default function AdminResourcesPage() {
                           setDeletingResource(resource)
                           setDeleteDialogOpen(true)
                         }}
+                        title="Delete resource"
                       >
                         <DeleteIcon fontSize="small" />
                       </IconButton>

@@ -153,8 +153,10 @@ Submitted: ${new Date().toISOString()}`
       } catch (error) {
         console.error('Error processing resource:', error)
         results.errors++
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resourceName = (resource as any)?.name || 'Unknown resource'
         results.error_details.push(
-          `${r.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `${resourceName}: ${error instanceof Error ? error.message : 'Unknown error'}`
         )
       }
     }

@@ -50,6 +50,9 @@ export default function EditResourcePage() {
   const [name, setName] = useState('')
   const [primary_category, setPrimaryCategory] = useState('general_support')
   const [address, setAddress] = useState('')
+  const [city, setCity] = useState('')
+  const [state, setState] = useState('')
+  const [zip, setZip] = useState('')
   const [phone, setPhone] = useState('')
   const [description, setDescription] = useState('')
   const [website, setWebsite] = useState('')
@@ -107,6 +110,9 @@ export default function EditResourcePage() {
         setName(data.name || '')
         setPrimaryCategory(data.primary_category || 'general_support')
         setAddress(data.address || '')
+        setCity(data.city || '')
+        setState(data.state || '')
+        setZip(data.zip || '')
         setPhone(data.phone || '')
         setDescription(data.description || '')
         setWebsite(data.website || '')
@@ -167,7 +173,9 @@ export default function EditResourcePage() {
     setError(null)
 
     try {
-      const coords = await geocodeAddress(address)
+      // Build full address for better geocoding accuracy
+      const fullAddress = [address, city, state, zip].filter(Boolean).join(', ')
+      const coords = await geocodeAddress(fullAddress)
       if (coords) {
         setLatitude(coords.latitude)
         setLongitude(coords.longitude)
@@ -202,6 +210,9 @@ export default function EditResourcePage() {
         name: name.trim(),
         primary_category,
         address: address.trim(),
+        city: city.trim() || null,
+        state: state.trim() || null,
+        zip: zip.trim() || null,
         phone: phone.trim() || null,
         description: description.trim() || null,
         website: website.trim() || null,
@@ -339,14 +350,46 @@ export default function EditResourcePage() {
               </FormControl>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 9 }}>
+            <Grid size={12}>
               <TextField
-                label="Address"
+                label="Street Address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 required
                 fullWidth
-                placeholder="123 Main St, Oakland, CA 94601"
+                placeholder="123 Main St"
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 5 }}>
+              <TextField
+                label="City"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                fullWidth
+                placeholder="Oakland"
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 2 }}>
+              <TextField
+                label="State"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                fullWidth
+                placeholder="CA"
+                inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 2 }}>
+              <TextField
+                label="Zip Code"
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                fullWidth
+                placeholder="94601"
+                inputProps={{ maxLength: 10 }}
               />
             </Grid>
 
