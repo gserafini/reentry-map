@@ -779,6 +779,30 @@ When working on this project, refer to:
 - `DEPLOYMENT_GUIDE.md` - Deployment procedures
 - `API_DOCUMENTATION.md` - API endpoint specifications
 
+### Scaling & Performance Documentation
+
+**Critical for understanding production infrastructure and scaling strategy:**
+
+- **`docs/README.md`** - ⭐ **START HERE** - Documentation index with navigation guide
+- **`docs/SCALING_GUIDE_OVERVIEW.md`** - Strategic roadmap from MVP to nationwide scale
+- **`docs/REDIS_SETUP_GUIDE.md`** - 🚨 **Critical for launch** - Redis caching implementation (5-10x speedup)
+- **`docs/MIGRATION_GUIDE.md`** - Supabase → Self-hosted PostgreSQL migration guide
+- **`docs/PERFORMANCE_OPTIMIZATION_CHECKLIST.md`** - AI-verifiable performance checklist (100+ checks)
+- **`docs/COST_ESTIMATION_CALCULATOR.md`** - Cost analysis and ROI at different scales
+- **`scripts/verify-performance.sh`** - Automated performance verification (25 tests)
+
+**Key Insights**:
+- Single server can handle **100k resources + 1M users/month** with proper optimization
+- **Redis caching is critical for launch** (80-90% DB query reduction, 5-10x speedup)
+- Estimated **75,000-100,000 resource pages** at 100% nationwide coverage
+- Stay on managed services until costs >$100/mo, then migrate database first
+- Next.js + PostgreSQL + PostGIS is the **correct architecture** (validated vs WordPress)
+
+**Before Launch**:
+1. Implement Redis caching (follow `docs/REDIS_SETUP_GUIDE.md`)
+2. Create database indexes (see scaling guides)
+3. Run `./scripts/verify-performance.sh` to verify optimization
+
 ## User Profile & Avatars
 
 **Strategy**: Hybrid approach with Gravatar + Supabase Storage (see ADR-011)
