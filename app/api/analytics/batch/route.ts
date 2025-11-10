@@ -22,6 +22,7 @@ interface AnalyticsEvent {
   session_id: string
   user_id?: string | null
   anonymous_id: string
+  is_admin?: boolean
   page_path: string
   referrer?: string
   viewport: {
@@ -90,6 +91,7 @@ async function processEventsAsync(
     country,
     city,
     region,
+    is_admin: event.is_admin || false, // Default to false if not provided
     // Don't store full IP address for privacy
     ip_address: null,
   }))
@@ -117,6 +119,7 @@ async function processPageViewEvents(events: any[], supabase: any) {
       session_id: e.session_id,
       user_id: e.user_id,
       anonymous_id: e.anonymous_id,
+      is_admin: e.is_admin,
       page_path: e.page_path,
       page_title: e.properties?.page_title,
       referrer: e.referrer,
@@ -137,6 +140,7 @@ async function processSearchEvents(events: any[], supabase: any) {
       session_id: e.session_id,
       user_id: e.user_id,
       anonymous_id: e.anonymous_id,
+      is_admin: e.is_admin,
       search_query: e.properties?.query,
       filters: e.properties?.filters,
       results_count: e.properties?.results_count,
@@ -166,6 +170,7 @@ async function processResourceEvents(events: any[], supabase: any) {
       session_id: e.session_id,
       user_id: e.user_id,
       anonymous_id: e.anonymous_id,
+      is_admin: e.is_admin,
       resource_id: e.properties?.resource_id,
       event_type: e.event.replace('resource_', ''),
       time_spent_seconds: e.properties?.time_spent_seconds,
@@ -188,6 +193,7 @@ async function processMapEvents(events: any[], supabase: any) {
       session_id: e.session_id,
       user_id: e.user_id,
       anonymous_id: e.anonymous_id,
+      is_admin: e.is_admin,
       event_type: e.event.replace('map_', ''),
       center_lat: e.properties?.center_lat,
       center_lng: e.properties?.center_lng,
@@ -207,6 +213,7 @@ async function processFeatureEvents(events: any[], supabase: any) {
       session_id: e.session_id,
       user_id: e.user_id,
       anonymous_id: e.anonymous_id,
+      is_admin: e.is_admin,
       feature_name: e.event.replace('feature_', ''),
       event_type: e.properties?.event_type || 'use',
       metadata: e.properties,
@@ -226,6 +233,7 @@ async function processPerformanceEvents(events: any[], supabase: any) {
       session_id: e.session_id,
       user_id: e.user_id,
       anonymous_id: e.anonymous_id,
+      is_admin: e.is_admin,
       event_type: e.event,
       page_path: e.page_path,
       metric_name: e.properties?.metric_name,
@@ -247,6 +255,7 @@ async function updateSessionMetadata(events: any[], supabase: any) {
         session_id: event.session_id,
         user_id: event.user_id,
         anonymous_id: event.anonymous_id,
+        is_admin: event.is_admin,
         device_type: event.device?.type,
         browser: event.device?.browser,
         os: event.device?.os,
@@ -265,6 +274,7 @@ async function updateSessionMetadata(events: any[], supabase: any) {
       session_id: s.session_id,
       user_id: s.user_id,
       anonymous_id: s.anonymous_id,
+      is_admin: s.is_admin,
       device_type: s.device_type,
       browser: s.browser,
       os: s.os,

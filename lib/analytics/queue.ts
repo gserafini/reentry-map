@@ -19,6 +19,7 @@ interface AnalyticsEvent {
   session_id?: string
   user_id?: string | null
   anonymous_id?: string
+  is_admin?: boolean
   page_path?: string
   referrer?: string
   viewport?: {
@@ -70,6 +71,7 @@ class AnalyticsQueue {
       session_id: this.getSessionId(),
       anonymous_id: this.getAnonymousId(),
       user_id: this.getUserId(),
+      is_admin: this.isAdminUser(), // Mark admin users
       page_path: window.location.pathname,
       referrer: document.referrer || undefined,
       viewport: {
@@ -204,6 +206,15 @@ class AnalyticsQueue {
     // This will be set by the app when user signs in
     if (typeof window === 'undefined') return null
     return localStorage.getItem('analytics_user_id')
+  }
+
+  /**
+   * Check if current user is an admin
+   * Admin events are excluded from public analytics
+   */
+  private isAdminUser(): boolean {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('analytics_user_role') === 'admin'
   }
 
   /**

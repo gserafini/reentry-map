@@ -2121,6 +2121,277 @@ export async function GET() {
 - Content gaps: High impressions, low clicks = improve meta
 - Behavior mismatch: User searches X in Google, lands, then searches Y internally = update landing page
 
+#### Google Search Console API Setup
+
+**Prerequisites**:
+- Google account with access to Search Console for your domain
+- Verified ownership of `https://reentry-map.com` in GSC
+
+**Step 1: Create Google Cloud Project**
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Click "Select a project" → "New Project"
+3. Name: "Reentry Map Analytics"
+4. Click "Create"
+
+**Step 2: Enable Search Console API**
+
+1. In your project, go to "APIs & Services" → "Library"
+2. Search for "Google Search Console API"
+3. Click "Enable"
+
+**Step 3: Create Service Account**
+
+1. Go to "APIs & Services" → "Credentials"
+2. Click "Create Credentials" → "Service Account"
+3. Service account name: "analytics-gsc-sync"
+4. Description: "Daily GSC data sync for analytics"
+5. Click "Create and Continue"
+6. Grant role: "Viewer" (or custom role with `webmasters.readonly`)
+7. Click "Done"
+
+**Step 4: Create Service Account Key**
+
+1. Click on the service account you just created
+2. Go to "Keys" tab
+3. Click "Add Key" → "Create new key"
+4. Choose "JSON" format
+5. Click "Create" - **JSON file will download**
+6. **Store this file securely** - it contains credentials
+
+**Step 5: Add Service Account to Search Console**
+
+1. Go to [Google Search Console](https://search.google.com/search-console)
+2. Select your property (`https://reentry-map.com`)
+3. Click "Settings" (gear icon)
+4. Click "Users and permissions"
+5. Click "Add user"
+6. Enter the service account email (looks like: `analytics-gsc-sync@reentry-map-analytics.iam.gserviceaccount.com`)
+7. Permission level: "Full" (or "Restricted" with at least "View all data")
+8. Click "Add"
+
+**Step 6: Configure Environment Variables**
+
+Add to `.env.local`:
+
+```bash
+# Google Search Console API
+GOOGLE_CLIENT_EMAIL="analytics-gsc-sync@reentry-map-analytics.iam.gserviceaccount.com"
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYourPrivateKeyHere\n-----END PRIVATE KEY-----"
+GSC_SITE_URL="https://reentry-map.com"
+```
+
+**Extract from JSON file**:
+```json
+{
+  "type": "service_account",
+  "project_id": "reentry-map-analytics",
+  "private_key_id": "...",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...",  // <-- This one
+  "client_email": "analytics-gsc-sync@...",           // <-- And this one
+  ...
+}
+```
+
+**Step 7: Create Sync Endpoint**
+
+File: `app/api/analytics/gsc/sync/route.ts`
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { google } from 'googleapis'
+import { createClient } from '@/lib/supabase/server'
+
+export const maxDuration = 60 // Allow up to 60 seconds
+
+export async function GET(request: NextRequest) {
+  // Verify cron secret to prevent unauthorized access
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    // Configure Google Auth
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],
+    })
+
+    const searchconsole = google.searchconsole({ version: 'v1', auth })
+    const supabase = createClient()
+
+    // Fetch last 28 days
+    const endDate = new Date()
+    const startDate = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000)
+
+    const response = await searchconsole.searchanalytics.query({
+      siteUrl: process.env.GSC_SITE_URL,
+      requestBody: {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        dimensions: ['query', 'page', 'date', 'device'],
+        rowLimit: 25000,
+      },
+    })
+
+    // Transform and insert
+    const rows =
+      response.data.rows?.map((row: any) => ({
+        date: row.keys![2],
+        query: row.keys![0],
+        page_url: row.keys![1],
+        device: row.keys![3],
+        impressions: row.impressions,
+        clicks: row.clicks,
+        ctr: row.ctr,
+        position: row.position,
+      })) || []
+
+    // Upsert into database
+    const { error } = await supabase
+      .from('analytics_gsc_keywords')
+      .upsert(rows, {
+        onConflict: 'date,query,page_url,country,device',
+      })
+
+    if (error) throw error
+
+    // Update aggregated performance
+    await supabase.rpc('refresh_gsc_performance')
+
+    return NextResponse.json({
+      success: true,
+      rows_synced: rows.length,
+      date_range: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+    })
+  } catch (error: any) {
+    console.error('GSC sync failed:', error)
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    )
+  }
+}
+```
+
+**Step 8: Add Aggregation Function**
+
+Add to your migration file:
+
+```sql
+CREATE OR REPLACE FUNCTION refresh_gsc_performance()
+RETURNS void AS $$
+BEGIN
+  INSERT INTO analytics_gsc_performance (
+    query,
+    total_impressions,
+    total_clicks,
+    avg_ctr,
+    avg_position,
+    trend_7d,
+    best_performing_page,
+    last_updated
+  )
+  SELECT
+    query,
+    SUM(impressions) as total_impressions,
+    SUM(clicks) as total_clicks,
+    ROUND(AVG(ctr) * 100, 2) as avg_ctr,
+    ROUND(AVG(position), 1) as avg_position,
+    -- 7-day trend
+    ROUND(
+      100.0 * (
+        SUM(clicks) FILTER (WHERE date >= CURRENT_DATE - INTERVAL '7 days') -
+        SUM(clicks) FILTER (WHERE date >= CURRENT_DATE - INTERVAL '14 days' AND date < CURRENT_DATE - INTERVAL '7 days')
+      ) / NULLIF(SUM(clicks) FILTER (WHERE date >= CURRENT_DATE - INTERVAL '14 days' AND date < CURRENT_DATE - INTERVAL '7 days'), 0),
+      1
+    ) as trend_7d,
+    (
+      SELECT page_url
+      FROM analytics_gsc_keywords k2
+      WHERE k2.query = k1.query
+        AND k2.date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY page_url
+      ORDER BY SUM(clicks) DESC
+      LIMIT 1
+    ) as best_performing_page,
+    NOW() as last_updated
+  FROM analytics_gsc_keywords k1
+  WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+  GROUP BY query
+  ON CONFLICT (query) DO UPDATE SET
+    total_impressions = EXCLUDED.total_impressions,
+    total_clicks = EXCLUDED.total_clicks,
+    avg_ctr = EXCLUDED.avg_ctr,
+    avg_position = EXCLUDED.avg_position,
+    trend_7d = EXCLUDED.trend_7d,
+    best_performing_page = EXCLUDED.best_performing_page,
+    last_updated = EXCLUDED.last_updated;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Step 9: Configure Vercel Cron**
+
+Create/update `vercel.json`:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/analytics/gsc/sync",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
+```
+
+This runs daily at 2 AM UTC.
+
+**Step 10: Set Cron Secret**
+
+In Vercel dashboard:
+1. Go to your project settings
+2. Navigate to "Environment Variables"
+3. Add: `CRON_SECRET` = `<generate-random-secret>` (use: `openssl rand -hex 32`)
+
+**Step 11: Test the Integration**
+
+```bash
+# Local test
+curl http://localhost:3000/api/analytics/gsc/sync \
+  -H "Authorization: Bearer your-cron-secret"
+
+# Production test (after deployment)
+curl https://reentry-map.com/api/analytics/gsc/sync \
+  -H "Authorization: Bearer your-cron-secret"
+```
+
+**Expected Response**:
+```json
+{
+  "success": true,
+  "rows_synced": 1247,
+  "date_range": "2025-01-01 to 2025-01-29"
+}
+```
+
+**Troubleshooting**:
+
+| Error | Solution |
+|-------|----------|
+| "API not enabled" | Go to Google Cloud Console → Enable Search Console API |
+| "Forbidden" | Add service account email to Search Console users |
+| "Invalid credentials" | Check `GOOGLE_CLIENT_EMAIL` and `GOOGLE_PRIVATE_KEY` in env vars |
+| "Site not found" | Verify `GSC_SITE_URL` matches exactly (https vs http, trailing slash) |
+| "Quota exceeded" | GSC API has 1,200 requests/day limit - reduce sync frequency |
+
+**Cost**: $0/month (within Google Cloud free tier)
+
 ---
 
 ### 3. Alerts & Notifications
@@ -5814,6 +6085,635 @@ $$ LANGUAGE plpgsql;
 ✅ **Best Practices** - Built-in guardrails
 
 **Together**: Measure user journeys (funnels) + optimize them (A/B tests) = Data-driven UX! 🎯
+
+---
+
+## Integration Guidelines for Developers
+
+> **Purpose**: This section provides clear guidelines for Claude Code sessions and human developers on how to integrate analytics tracking into new and existing features.
+
+### 1. Quick Start: Adding Analytics to New Features
+
+**Three-Step Process**:
+
+1. **Import the tracking client**:
+   ```typescript
+   import { trackFeatureUse, trackPageView, trackSearch } from '@/lib/analytics/client'
+   ```
+
+2. **Add tracking calls** at key interaction points:
+   ```typescript
+   // Example: New button feature
+   const handleClick = () => {
+     trackFeatureUse('quick_apply', { resource_id: resource.id })
+     // ... rest of click handler
+   }
+   ```
+
+3. **Test locally** (see Testing section below)
+
+**That's it!** The async queue handles batching, retries, and delivery automatically.
+
+---
+
+### 2. When to Track What
+
+| User Action | Use This Function | Example |
+|------------|------------------|---------|
+| **Page load** | `trackPageView()` | Homepage, resource detail, search results |
+| **Search** | `trackSearch()` | User searches for "housing oakland" |
+| **View resource** | `trackResourceView()` | User clicks into resource detail |
+| **Click action button** | `trackResourceAction()` | Call, directions, website, favorite |
+| **Move map** | `trackMapMove()` | User pans/zooms map |
+| **Use new feature** | `trackFeatureUse()` | Any new feature you build |
+| **Error occurs** | `trackError()` | API failure, validation error |
+| **Performance metric** | `trackPerformance()` | Custom timing metrics |
+
+---
+
+### 3. Common Integration Patterns
+
+#### Pattern 1: Track Page Views
+
+**In Server Components** (automatic metadata):
+```typescript
+// app/resources/page.tsx
+import { Suspense } from 'react'
+import { PageViewTracker } from '@/components/analytics/PageViewTracker'
+
+export default function ResourcesPage() {
+  return (
+    <>
+      <PageViewTracker pageTitle="Browse Resources" />
+      {/* ... page content */}
+    </>
+  )
+}
+```
+
+**Create** `components/analytics/PageViewTracker.tsx`:
+```typescript
+'use client'
+
+import { useEffect } from 'react'
+import { trackPageView } from '@/lib/analytics/client'
+
+export function PageViewTracker({ pageTitle }: { pageTitle: string }) {
+  useEffect(() => {
+    const startTime = performance.now()
+
+    return () => {
+      const loadTime = performance.now() - startTime
+      trackPageView(pageTitle, Math.round(loadTime))
+    }
+  }, [pageTitle])
+
+  return null
+}
+```
+
+#### Pattern 2: Track Search with Debouncing
+
+```typescript
+'use client'
+
+import { useState, useEffect } from 'react'
+import { trackSearch } from '@/lib/analytics/client'
+import { useDebouncedCallback } from 'use-debounce'
+
+export function SearchBar() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [filters, setFilters] = useState({})
+
+  const trackSearchDebounced = useDebouncedCallback(
+    (searchQuery: string, searchFilters: any, resultsCount: number) => {
+      // Only track if user actually searched (not empty)
+      if (searchQuery.trim().length > 0) {
+        trackSearch(searchQuery, searchFilters, resultsCount)
+      }
+    },
+    1000 // Wait 1 second after user stops typing
+  )
+
+  useEffect(() => {
+    // ... perform search
+    const searchResults = performSearch(query, filters)
+    setResults(searchResults)
+
+    // Track the search
+    trackSearchDebounced(query, filters, searchResults.length)
+  }, [query, filters])
+
+  return (
+    <input
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Search resources..."
+    />
+  )
+}
+```
+
+#### Pattern 3: Track Button Clicks
+
+**Simple click**:
+```typescript
+<Button
+  onClick={() => {
+    trackFeatureUse('export_favorites')
+    handleExportFavorites()
+  }}
+>
+  Export Favorites
+</Button>
+```
+
+**Click with metadata**:
+```typescript
+<Button
+  onClick={() => {
+    trackResourceAction(resource.id, 'call')
+    window.location.href = `tel:${resource.phone}`
+  }}
+>
+  Call Now
+</Button>
+```
+
+#### Pattern 4: Track Form Submissions
+
+```typescript
+'use client'
+
+import { useState } from 'react'
+import { trackFeatureUse } from '@/lib/analytics/client'
+
+export function SuggestResourceForm() {
+  const handleSubmit = async (formData: FormData) => {
+    try {
+      const response = await fetch('/api/resource-suggestions', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        trackFeatureUse('suggest_resource', {
+          status: 'success',
+          category: formData.get('category'),
+        })
+      } else {
+        trackFeatureUse('suggest_resource', {
+          status: 'failed',
+          error: response.statusText,
+        })
+      }
+    } catch (error) {
+      trackError('Form submission failed', error.stack)
+    }
+  }
+
+  return <form onSubmit={handleSubmit}>{/* ... */}</form>
+}
+```
+
+#### Pattern 5: Track Map Interactions (Throttled)
+
+```typescript
+'use client'
+
+import { useEffect, useRef } from 'react'
+import { trackMapMove } from '@/lib/analytics/client'
+import throttle from 'lodash/throttle'
+
+export function ResourceMap() {
+  const mapRef = useRef<google.maps.Map>()
+
+  useEffect(() => {
+    if (!mapRef.current) return
+
+    // Throttle to max 1 event per 5 seconds
+    const handleMapMove = throttle(() => {
+      const center = mapRef.current.getCenter()
+      const zoom = mapRef.current.getZoom()
+      const visibleMarkers = countVisibleMarkers()
+
+      trackMapMove(
+        center.lat(),
+        center.lng(),
+        zoom,
+        visibleMarkers
+      )
+    }, 5000)
+
+    mapRef.current.addListener('idle', handleMapMove)
+  }, [])
+
+  return <div ref={(el) => initMap(el, mapRef)} />
+}
+```
+
+#### Pattern 6: Track Errors Globally
+
+**Setup once in root layout**:
+```typescript
+// app/layout.tsx
+import { setupErrorTracking } from '@/lib/analytics/client'
+
+export default function RootLayout({ children }) {
+  useEffect(() => {
+    setupErrorTracking() // Automatic error tracking
+  }, [])
+
+  return <html>{children}</html>
+}
+```
+
+---
+
+### 4. Event Naming Best Practices
+
+**Follow these conventions**:
+
+✅ **DO**:
+- Use snake_case: `search_completed`, `resource_view`
+- Be specific: `favorite_add` not just `favorite`
+- Use verb_noun: `button_click`, `form_submit`
+- Group related events: `resource_view`, `resource_call`, `resource_directions`
+
+❌ **DON'T**:
+- Use camelCase: `searchCompleted` ❌
+- Be vague: `action`, `event`, `click` ❌
+- Use spaces: `search completed` ❌
+- Mix conventions: `resourceView` and `resource_call` ❌
+
+**Prefix conventions**:
+- `page_` - Page views: `page_view`, `page_exit`
+- `resource_` - Resource actions: `resource_view`, `resource_call`
+- `search_` - Search events: `search_query`, `search_filter`
+- `feature_` - Feature usage: `feature_export`, `feature_share`
+- `map_` - Map events: `map_move`, `map_zoom`
+
+---
+
+### 5. Testing Analytics Locally
+
+**Step 1: Start dev server**:
+```bash
+npm run dev
+```
+
+**Step 2: Open browser console** and filter for analytics:
+```javascript
+// In browser console, monitor analytics events
+localStorage.setItem('debug_analytics', 'true')
+```
+
+**Step 3: Trigger the feature** you're testing
+
+**Step 4: Check the network tab**:
+- Look for POST to `/api/analytics/batch`
+- Should be batched (multiple events in one request)
+- Should show 202 Accepted response
+
+**Step 5: Verify in Supabase**:
+```sql
+-- Check recent events
+SELECT * FROM analytics_page_views
+ORDER BY timestamp DESC
+LIMIT 10;
+
+-- Check feature events
+SELECT * FROM analytics_feature_events
+WHERE feature_name = 'your_feature_name'
+ORDER BY timestamp DESC
+LIMIT 10;
+```
+
+**Troubleshooting**:
+- If events not appearing: Check browser console for errors
+- If 400 response: Check event payload structure matches interface
+- If events not in database: Check Supabase RLS policies
+
+---
+
+### 6. Adding New Event Types
+
+**When to add a new event type**:
+- You have a completely new category of user action
+- Existing functions don't fit your use case
+- You need custom properties not in existing schemas
+
+**Steps**:
+
+1. **Add table** to `supabase/migrations/20250110000000_analytics_schema.sql`:
+   ```sql
+   CREATE TABLE analytics_custom_events (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     session_id TEXT NOT NULL,
+     user_id UUID,
+     anonymous_id TEXT NOT NULL,
+     event_name TEXT NOT NULL,
+     properties JSONB,
+     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+     is_bot BOOLEAN DEFAULT false,
+     is_admin BOOLEAN DEFAULT false
+   );
+
+   CREATE INDEX idx_custom_events_timestamp ON analytics_custom_events(timestamp);
+   CREATE INDEX idx_custom_events_event_name ON analytics_custom_events(event_name);
+   ```
+
+2. **Add processing** to `app/api/analytics/batch/route.ts`:
+   ```typescript
+   async function processCustomEvents(events: any[], supabase: any) {
+     const customEvents = events.filter((e) => e.event === 'your_event_type')
+     if (customEvents.length === 0) return
+
+     await supabase.from('analytics_custom_events').insert(
+       customEvents.map((e) => ({
+         session_id: e.session_id,
+         user_id: e.user_id,
+         anonymous_id: e.anonymous_id,
+         event_name: e.event,
+         properties: e.properties,
+         timestamp: e.timestamp,
+       }))
+     )
+   }
+
+   // Add to processEventsAsync Promise.all:
+   await Promise.all([
+     // ... existing processors
+     processCustomEvents(enrichedEvents, supabase),
+   ])
+   ```
+
+3. **Add client function** to `lib/analytics/client.ts`:
+   ```typescript
+   export function trackCustomEvent(
+     eventName: string,
+     properties?: Record<string, any>
+   ) {
+     track(`custom_${eventName}`, properties)
+   }
+   ```
+
+4. **Document it** in this file!
+
+---
+
+### 7. Privacy & Admin User Filtering
+
+**IMPORTANT**: Admin users should NOT be included in analytics statistics.
+
+**How it works**:
+1. Admin users are identified via `users.is_admin = true` in database
+2. Client-side tracking checks localStorage for `analytics_user_role`
+3. Events from admins are filtered at query time
+
+**Setting admin flag** (when user signs in):
+```typescript
+// In your auth callback after successful sign-in
+const { data: user } = await supabase
+  .from('users')
+  .select('is_admin')
+  .eq('id', session.user.id)
+  .single()
+
+if (user?.is_admin) {
+  localStorage.setItem('analytics_user_role', 'admin')
+} else {
+  localStorage.removeItem('analytics_user_role')
+}
+```
+
+**Filtering in queries**:
+```sql
+-- Always exclude admin users from metrics
+SELECT COUNT(DISTINCT session_id) as total_users
+FROM analytics_sessions
+WHERE started_at > NOW() - INTERVAL '30 days'
+  AND is_bot = false
+  AND is_admin = false;  -- ✅ Exclude admins
+```
+
+---
+
+### 8. Conversion Funnel Integration
+
+**Adding steps to existing funnels**:
+
+```typescript
+// When user completes a funnel step
+import { track } from '@/lib/analytics/queue'
+
+const handleSearchSubmit = (query: string) => {
+  // Track funnel step
+  track('funnel_step', {
+    funnel_id: 'search-to-action',
+    step_name: 'search',
+    metadata: { query },
+  })
+
+  // ... rest of handler
+}
+```
+
+**Creating new funnels** (via UI or AI agent):
+
+```sql
+-- Insert funnel definition
+INSERT INTO analytics_funnel_definitions (name, description, steps, expected_completion_rate, target_completion_time_seconds)
+VALUES (
+  'Resource Application Funnel',
+  'Tracks users from resource view to application submission',
+  '[
+    {"step": 1, "name": "view_resource", "display_name": "View Resource"},
+    {"step": 2, "name": "click_apply", "display_name": "Click Apply"},
+    {"step": 3, "name": "fill_form", "display_name": "Fill Application"},
+    {"step": 4, "name": "submit_application", "display_name": "Submit"}
+  ]'::jsonb,
+  15.0,  -- Expected 15% complete the funnel
+  300    -- Expected to complete in 5 minutes
+);
+```
+
+---
+
+### 9. A/B Test Integration
+
+**Using existing experiments**:
+
+```typescript
+'use client'
+
+import { useExperiment } from '@/lib/analytics/hooks/useExperiment'
+
+export function MyComponent() {
+  const { variant, loading } = useExperiment('button-color-test')
+
+  if (loading) return <Skeleton />
+
+  return (
+    <Button
+      color={variant === 'variant_a' ? 'primary' : 'secondary'}
+      onClick={handleClick}
+    >
+      {variant === 'variant_a' ? 'Get Started' : 'Start Now'}
+    </Button>
+  )
+}
+```
+
+**Creating new experiments**:
+
+```sql
+INSERT INTO analytics_experiments (
+  name,
+  description,
+  variants,
+  traffic_allocation,
+  status
+)
+VALUES (
+  'search-filter-layout',
+  'Test horizontal vs vertical filter layout',
+  '{
+    "variants": [
+      {"name": "control", "display_name": "Horizontal Filters (Current)", "percentage": 50},
+      {"name": "variant_a", "display_name": "Vertical Filters", "percentage": 50}
+    ],
+    "conversion_event": "search_with_filters"
+  }'::jsonb,
+  100,  -- 100% of users in test
+  'active'
+);
+```
+
+---
+
+### 10. Checklist for New Features
+
+Before marking your feature as complete, verify:
+
+- [ ] **Tracking added** - All user interactions tracked
+- [ ] **Event names** - Follow naming conventions (snake_case, verb_noun)
+- [ ] **Privacy** - No PII in event properties (names, emails, addresses)
+- [ ] **Admin filtering** - Admin users excluded from stats
+- [ ] **Performance** - Tracking calls are async (don't block UI)
+- [ ] **Testing** - Verified events appear in Supabase
+- [ ] **Documentation** - Updated ANALYTICS_STRATEGY.md if needed
+- [ ] **Funnel steps** - Added to relevant funnels if applicable
+- [ ] **Error tracking** - Errors tracked via `trackError()`
+
+---
+
+### 11. Quick Reference: All Tracking Functions
+
+```typescript
+// Page tracking
+trackPageView(pageTitle?: string, loadTimeMs?: number)
+
+// Search tracking
+trackSearch(query: string, filters: Record<string, any>, resultsCount: number)
+
+// Resource tracking
+trackResourceView(resourceId: string, source: 'search' | 'map' | 'category' | 'favorite' | 'direct')
+trackResourceAction(resourceId: string, action: 'call' | 'directions' | 'website' | 'favorite_add' | 'favorite_remove')
+
+// Map tracking
+trackMapMove(centerLat: number, centerLng: number, zoomLevel: number, visibleMarkers: number)
+
+// Feature tracking
+trackFeatureUse(featureName: string, metadata?: Record<string, any>)
+
+// Error tracking
+trackError(errorMessage: string, errorStack?: string, metadata?: Record<string, any>)
+setupErrorTracking() // Setup once in root layout
+
+// Performance tracking
+trackPerformance(metricName: string, metricValue: number)
+setupPerformanceTracking() // Setup once in root layout
+
+// User identification
+identifyUser(userId: string) // When user signs in
+clearUser() // When user signs out
+```
+
+---
+
+### 12. Common Mistakes to Avoid
+
+❌ **DON'T track synchronously**:
+```typescript
+// BAD - blocks UI
+await fetch('/api/analytics', { ... })
+```
+
+✅ **DO use the queue**:
+```typescript
+// GOOD - async, non-blocking
+trackFeatureUse('feature_name', { ... })
+```
+
+❌ **DON'T track PII**:
+```typescript
+// BAD - contains personal info
+trackSearch(query, { user_email: 'john@example.com' })
+```
+
+✅ **DO anonymize data**:
+```typescript
+// GOOD - no personal info
+trackSearch(query, { user_id: hashedUserId })
+```
+
+❌ **DON'T track every interaction**:
+```typescript
+// BAD - too noisy
+onMouseMove={() => trackFeatureUse('mouse_move')}
+```
+
+✅ **DO track meaningful actions**:
+```typescript
+// GOOD - valuable insights
+onClick={() => trackFeatureUse('cta_click', { button_text })}
+```
+
+---
+
+### 13. Getting Help
+
+**If analytics aren't working**:
+
+1. Check browser console for errors
+2. Verify `/api/analytics/batch` returns 202
+3. Check Supabase logs for database errors
+4. Verify RLS policies allow inserts
+5. Ask in #dev-help channel
+
+**If you need new tracking capabilities**:
+
+1. Check if existing functions can be extended
+2. Review this integration guide
+3. Create ADR for new event types
+4. Update migration file and API route
+5. Document in this guide
+
+---
+
+### Summary: Integration Guidelines
+
+✅ **Easy integration** - Import, call, done
+✅ **Common patterns** - Page views, searches, clicks, forms
+✅ **Best practices** - Naming, privacy, performance
+✅ **Testing guide** - Verify locally before pushing
+✅ **Admin filtering** - Exclude admins from stats
+✅ **Checklist** - Don't forget anything
+✅ **Quick reference** - All functions documented
+
+**Next time you build a feature**: Add analytics tracking from the start. Future you (and your data team) will thank you! 📊
 
 ---
 
