@@ -1960,6 +1960,626 @@ ORDER BY 2 DESC;
 
 ---
 
+## Advanced Analytics Features
+
+### 1. Asynchronous Tracking (Zero Performance Impact)
+
+**Challenge**: Analytics must NEVER block user interactions
+
+**Solution**: Client-side queue + fire-and-forget API + background processing
+
+#### Performance Guarantees
+
+| Operation | Time | User Impact |
+|-----------|------|-------------|
+| `track()` call | <1ms | Zero - just array push |
+| Flush to server | Async | Zero - runs in idle time |
+| API response | <50ms | Zero - returns before processing |
+| DB write | Async | Zero - happens after response |
+
+#### Client-Side Queue
+
+```typescript
+// lib/analytics/queue.ts (already created)
+import { analytics } from '@/lib/analytics/queue'
+
+// Returns instantly (<1ms)
+analytics.track('button_click', { button_id: 'submit' })
+```
+
+**How it works**:
+1. `track()` pushes event to array (synchronous, <1ms)
+2. Queue flushes every 5 seconds OR when 50 events queued
+3. Uses `requestIdleCallback` to only flush when browser is idle
+4. Uses `sendBeacon` API for fire-and-forget (survives page navigation)
+5. Fallback to `fetch` with `keepalive: true`
+
+#### API Endpoint
+
+```typescript
+// app/api/analytics/batch/route.ts (already created)
+export async function POST(request: NextRequest) {
+  const events = await request.json()
+
+  // IMMEDIATELY return 202 Accepted
+  const response = NextResponse.json({ status: 'accepted' }, { status: 202 })
+
+  // Process asynchronously (doesn't block response)
+  processEventsAsync(events).catch(console.error)
+
+  return response
+}
+```
+
+#### Usage Examples
+
+```typescript
+// Automatic page view tracking
+'use client'
+import { trackPageView } from '@/lib/analytics/client'
+
+export function AnalyticsProvider({ children }) {
+  useEffect(() => {
+    trackPageView()
+  }, [])
+
+  return children
+}
+
+// Track user actions
+import { trackResourceAction } from '@/lib/analytics/client'
+
+<Button onClick={() => {
+  trackResourceAction(resource.id, 'call') // <1ms
+  window.location.href = `tel:${resource.phone}` // Instant
+}}>
+  Call
+</Button>
+```
+
+---
+
+### 2. Google Search Console Integration
+
+**Challenge**: SEO metrics live in GSC, behavior metrics in our DB - hard to correlate
+
+**Solution**: Daily sync of GSC data + correlation with internal behavior
+
+#### What We Track
+
+```sql
+-- GSC keyword performance (synced daily)
+CREATE TABLE analytics_gsc_keywords (
+  date DATE,
+  query TEXT,                    -- "housing assistance oakland"
+  page_url TEXT,                 -- Landing page
+  impressions INTEGER,
+  clicks INTEGER,
+  ctr NUMERIC,
+  position NUMERIC               -- Average ranking
+);
+
+-- Correlation with internal behavior
+CREATE TABLE analytics_gsc_internal_correlation (
+  gsc_query TEXT,
+  internal_search_query TEXT,
+  correlation_count INTEGER,
+  conversion_rate NUMERIC
+);
+```
+
+#### Implementation
+
+**Daily sync cron** (runs at 2 AM):
+
+```typescript
+// app/api/analytics/gsc/sync/route.ts
+import { google } from 'googleapis'
+
+export async function GET() {
+  const searchconsole = google.searchconsole({ version: 'v1', auth })
+
+  const response = await searchconsole.searchanalytics.query({
+    siteUrl: 'https://reentry-map.com',
+    requestBody: {
+      startDate: '2025-01-01',
+      endDate: '2025-01-30',
+      dimensions: ['query', 'page', 'date', 'device']
+    }
+  })
+
+  // Insert into analytics_gsc_keywords
+  await supabase.from('analytics_gsc_keywords').upsert(rows)
+}
+```
+
+#### Dashboard View
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  SEO Performance (Past 30 Days)                              │
+├─────────────────────────────────────────────────────────────┤
+│  Query                          Impr    Clicks  CTR    Pos   │
+│  ─────────────────────────────  ─────   ─────   ────   ───  │
+│  housing assistance oakland     1,247   47      3.8%   3.2   │
+│    → 68% search "housing" internally                         │
+│    → 12% convert (call/directions)                           │
+│    → Best landing: /resources?category=housing               │
+│                                                              │
+│  reentry services near me       2,341   156     6.7%   2.1   │
+│    → 23% search again (mismatch?)                            │
+│    → 31% convert ✅                                          │
+│                                                              │
+│  expungement help california    543     89      16.4%  1.8   │
+│    → 91% search "expungement" or "legal"                     │
+│    → 4% convert ⚠️ LOW - add more resources                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Insights**:
+- Which keywords drive conversions (not just traffic)
+- Content gaps: High impressions, low clicks = improve meta
+- Behavior mismatch: User searches X in Google, lands, then searches Y internally = update landing page
+
+---
+
+### 3. Alerts & Notifications
+
+**Challenge**: Waiting for weekly reports means missing critical issues
+
+**Solution**: Proactive alerts when metrics cross thresholds
+
+#### Alert Types
+
+| Threshold Type | Example |
+|----------------|---------|
+| **Absolute** | "Alert when DAU < 1,000" |
+| **Percentage Change** | "Alert when conversion rate drops >20% vs last week" |
+| **Standard Deviation** | "Alert when error rate is 3σ above baseline" |
+
+#### Database Schema
+
+```sql
+CREATE TABLE analytics_alerts (
+  name TEXT,
+  metric_name TEXT,                  -- 'dau', 'conversion_rate', 'error_rate'
+  threshold_type TEXT,                -- 'absolute', 'percentage_change', 'std_deviation'
+  threshold_value NUMERIC,
+  comparison_period INTERVAL,         -- Compare to '7 days' ago
+  check_frequency INTERVAL,           -- Check every '5 minutes'
+  notification_channels JSONB         -- ['email', 'slack', 'webhook']
+);
+
+CREATE TABLE analytics_alert_triggers (
+  alert_id UUID,
+  triggered_at TIMESTAMPTZ,
+  metric_value NUMERIC,
+  threshold_value NUMERIC,
+  message TEXT,
+  acknowledged_at TIMESTAMPTZ
+);
+```
+
+#### Example Alerts
+
+**1. DAU Drop Alert**:
+```sql
+INSERT INTO analytics_alerts (name, metric_name, threshold_type, threshold_value, comparison_period, check_frequency)
+VALUES (
+  'DAU Dropped Significantly',
+  'dau',
+  'percentage_change',
+  -20,                      -- Alert if drops >20%
+  '7 days'::interval,       -- Compare to last week
+  '1 hour'::interval        -- Check hourly
+);
+```
+
+**2. Error Spike Alert**:
+```sql
+INSERT INTO analytics_alerts (name, metric_name, threshold_type, threshold_value, check_frequency)
+VALUES (
+  'Error Rate Spike',
+  'error_rate',
+  'absolute',
+  50,                       -- Alert if >50 errors/minute
+  '5 minutes'::interval
+);
+```
+
+**3. Conversion Rate Drop**:
+```sql
+INSERT INTO analytics_alerts (name, metric_name, threshold_type, threshold_value, comparison_period, check_frequency)
+VALUES (
+  'Conversion Rate Below Target',
+  'conversion_rate',
+  'absolute',
+  0.15,                     -- Alert if <15%
+  NULL,
+  '1 day'::interval
+);
+```
+
+#### Alert Check Function
+
+```typescript
+// app/api/analytics/alerts/check/route.ts
+export async function GET() {
+  const supabase = createClient()
+
+  // Get active alerts
+  const { data: alerts } = await supabase
+    .from('analytics_alerts')
+    .select('*')
+    .eq('is_active', true)
+
+  for (const alert of alerts) {
+    const currentValue = await getMetricValue(alert.metric_name)
+    const comparisonValue = alert.comparison_period
+      ? await getMetricValue(alert.metric_name, alert.comparison_period)
+      : null
+
+    const shouldTrigger = checkThreshold(
+      alert.threshold_type,
+      currentValue,
+      alert.threshold_value,
+      comparisonValue
+    )
+
+    if (shouldTrigger) {
+      await triggerAlert(alert, currentValue, comparisonValue)
+    }
+  }
+
+  return Response.json({ checked: alerts.length })
+}
+```
+
+**Cron**: Run every 5 minutes via Vercel Cron
+
+---
+
+### 4. User Lookup & Session History
+
+**Challenge**: User reports "search isn't working" - what did they actually do?
+
+**Solution**: Query-based user/session inspector
+
+#### Usage
+
+**Admin enters**: `user@email.com` or `session_abc123`
+
+**Returns**:
+```
+User: user@email.com
+Last seen: 2 hours ago
+Device: iPhone (iOS 17) • Location: Oakland, CA
+Total sessions: 23
+
+Current Session (2 hours ago):
+├─ 14:23 - Landed on /resources (from google.com)
+├─ 14:24 - Searched "housing assistance oakland"
+├─ 14:24 - ⚠️ Search returned 0 results
+├─ 14:25 - Searched "housing"
+├─ 14:25 - Viewed resource "Oakland Housing Authority"
+├─ 14:26 - Clicked call button
+└─ 14:27 - Session ended
+
+Previous Sessions: [View All 22]
+```
+
+#### Implementation
+
+```sql
+-- Query to reconstruct session timeline
+WITH session_events AS (
+  SELECT 'page_view' as event_type, timestamp, page_path as detail
+  FROM analytics_page_views WHERE session_id = $1
+
+  UNION ALL
+
+  SELECT 'search', timestamp, search_query || ' (' || results_count || ' results)'
+  FROM analytics_search_events WHERE session_id = $1
+
+  UNION ALL
+
+  SELECT 'resource_' || event_type, timestamp, resource_id
+  FROM analytics_resource_events WHERE session_id = $1
+
+  UNION ALL
+
+  SELECT 'error', timestamp, error_message
+  FROM analytics_performance_events WHERE session_id = $1 AND event_type = 'error'
+)
+SELECT * FROM session_events
+ORDER BY timestamp;
+```
+
+---
+
+### 5. UTM Attribution & Campaign Tracking
+
+**Challenge**: Which marketing campaigns actually drive conversions?
+
+**Solution**: First-touch + Last-touch + Full journey attribution
+
+#### What We Track
+
+```sql
+CREATE TABLE analytics_attribution (
+  user_id UUID,
+
+  -- First touch (how they discovered us)
+  first_touch_source TEXT,        -- 'google', 'facebook', '211'
+  first_touch_medium TEXT,         -- 'organic', 'cpc', 'referral'
+  first_touch_campaign TEXT,
+  first_touch_timestamp TIMESTAMPTZ,
+
+  -- Last touch (what converted them)
+  last_touch_source TEXT,
+  last_touch_medium TEXT,
+  last_touch_campaign TEXT,
+  last_touch_timestamp TIMESTAMPTZ,
+
+  -- Conversion
+  converted_at TIMESTAMPTZ,
+  conversion_type TEXT,            -- 'sign_up', 'first_action'
+
+  -- Full journey
+  touchpoints JSONB                -- Array of all touchpoints
+);
+```
+
+#### Dashboard
+
+```
+Campaign Performance (Past 30 Days)
+
+Campaign           Sessions  Sign-ups  Conv%  Cost/Acq
+─────────────────  ────────  ────────  ─────  ────────
+facebook-jan       1,247     187       15.0%  $12.50
+google-ads-housing  845       93       11.0%  $18.20
+email-newsletter    432       89       20.6%  $2.10
+211-partnership    1,583     312      19.7%  $0.00 🎉
+
+Attribution Model: [Last Touch ▼]
+
+Top Referrers:
+1. 211.org - 1,583 sessions, 312 conversions (19.7%)
+2. google.com - 2,341 sessions, 156 conversions (6.7%)
+3. facebook.com - 1,247 sessions, 187 conversions (15.0%)
+```
+
+**Insights**:
+- 211 partnership drives most conversions at $0 CAC
+- Email has highest conversion rate (20.6%)
+- Google organic underperforms paid (6.7% vs 11%)
+
+---
+
+### 6. Retention Curves & Cohort Analysis
+
+**Challenge**: Are users coming back? Which cohorts are sticky?
+
+**Solution**: Pre-calculated retention rates by signup cohort
+
+#### Schema
+
+```sql
+CREATE TABLE analytics_user_cohorts (
+  user_id UUID PRIMARY KEY,
+  cohort_week DATE,              -- Week they signed up
+  cohort_month DATE,             -- Month they signed up
+  first_session_at TIMESTAMPTZ
+);
+
+CREATE TABLE analytics_retention_metrics (
+  cohort_date DATE,
+  cohort_type TEXT,              -- 'weekly' or 'monthly'
+  cohort_size INTEGER,
+  day_1_retained INTEGER,
+  day_7_retained INTEGER,
+  day_30_retained INTEGER,
+  day_90_retained INTEGER,
+  day_1_rate NUMERIC,
+  day_7_rate NUMERIC,
+  day_30_rate NUMERIC,
+  day_90_rate NUMERIC
+);
+```
+
+#### Retention Curve Visualization
+
+```
+100% ┤●
+     │ ●
+ 80% ┤  ●
+     │   ●
+ 60% ┤    ●───●───●───●───●  ← Jan 2026 cohort (current)
+     │     ●───●───●───●───● ← Dec 2025 cohort
+ 40% ┤      ●───●───●───●   ← Nov 2025 cohort
+     │
+ 20% ┤
+     │
+  0% ┴────┴────┴────┴────┴────
+     D0   D1   D7   D30  D90
+
+Insight: Jan cohort has 15% better D7 retention (64% vs 49%)
+Likely due to improved onboarding launched Jan 3
+```
+
+#### Calculation Function
+
+```sql
+CREATE OR REPLACE FUNCTION calculate_retention_metrics()
+RETURNS void AS $$
+BEGIN
+  INSERT INTO analytics_retention_metrics (cohort_date, cohort_type, cohort_size, day_7_retained, day_7_rate)
+  SELECT
+    cohort_week,
+    'weekly',
+    COUNT(DISTINCT user_id) as cohort_size,
+    COUNT(DISTINCT s.user_id) FILTER (
+      WHERE s.started_at BETWEEN cohort_week + INTERVAL '7 days' AND cohort_week + INTERVAL '8 days'
+    ) as day_7_retained,
+    ROUND(100.0 * COUNT(DISTINCT s.user_id) FILTER (...) / COUNT(DISTINCT user_id), 2) as day_7_rate
+  FROM analytics_user_cohorts c
+  LEFT JOIN analytics_sessions s ON s.user_id = c.user_id
+  WHERE cohort_week >= CURRENT_DATE - INTERVAL '90 days'
+  GROUP BY cohort_week
+  ON CONFLICT (cohort_date, cohort_type) DO UPDATE SET
+    day_7_retained = EXCLUDED.day_7_retained,
+    day_7_rate = EXCLUDED.day_7_rate;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+### 7. Feature Adoption Tracking
+
+**Challenge**: Did users discover our new feature?
+
+**Solution**: Track first use + adoption rate over time
+
+#### Schema
+
+```sql
+CREATE TABLE analytics_feature_definitions (
+  feature_name TEXT PRIMARY KEY,
+  display_name TEXT,
+  launch_date DATE,
+  target_adoption_rate NUMERIC,   -- e.g., 0.80 for 80%
+  target_weeks INTEGER             -- Weeks to reach target
+);
+
+CREATE TABLE analytics_feature_adoption (
+  user_id UUID,
+  feature_name TEXT,
+  first_used_at TIMESTAMPTZ,
+  usage_count INTEGER,
+  last_used_at TIMESTAMPTZ,
+  PRIMARY KEY (user_id, feature_name)
+);
+
+CREATE TABLE analytics_feature_adoption_metrics (
+  feature_name TEXT,
+  date DATE,
+  weeks_since_launch INTEGER,
+  total_users INTEGER,
+  adopted_users INTEGER,
+  adoption_rate NUMERIC
+);
+```
+
+#### Dashboard
+
+```
+Feature Adoption: "Advanced Search Filters"
+Launched: Jan 10, 2026
+
+Week 1:  342 users (18% of active users)
+Week 2:  891 users (41% of active users) ⬆ +23pp
+Week 3:  1,247 users (58% of active users) ⬆ +17pp
+Week 4:  1,583 users (68% of active users) ⬆ +10pp
+
+Target: 80% adoption by Week 8
+Status: On track ✅ (need +12pp in 4 weeks)
+
+Adoption Curve:
+70% ┤                                      ╭─●
+    │                                ╭────╯
+50% ┤                          ╭────╯
+    │                    ╭────╯
+30% ┤              ╭────╯
+    │        ╭────╯
+10% ┤   ●──╯
+    ┴────┴────┴────┴────┴────┴────┴────┴────
+     W1   W2   W3   W4   W5   W6   W7   W8
+```
+
+#### Usage
+
+```typescript
+// Track feature first use
+import { trackFeatureUse } from '@/lib/analytics/client'
+
+export function AdvancedSearchFilters() {
+  const handleFilterApply = () => {
+    trackFeatureUse('advanced_search_filters', {
+      filters_applied: selectedFilters.length
+    })
+  }
+
+  return <FilterPanel onApply={handleFilterApply} />
+}
+```
+
+---
+
+### 8. User Segmentation
+
+**Challenge**: Power users behave differently from casual users
+
+**Solution**: Pre-calculated segments updated daily
+
+#### Segments
+
+```sql
+CREATE TABLE analytics_user_segments (
+  user_id UUID PRIMARY KEY,
+
+  -- Engagement level
+  engagement_level TEXT,          -- 'power', 'regular', 'casual', 'dormant'
+  sessions_last_7d INTEGER,
+  sessions_last_30d INTEGER,
+  actions_last_7d INTEGER,
+  actions_last_30d INTEGER,
+
+  -- Behavioral
+  primary_category TEXT,          -- Most-searched category
+  preferred_device TEXT,          -- 'mobile', 'desktop', 'tablet'
+
+  -- Value
+  has_reviewed BOOLEAN,
+  has_favorited BOOLEAN,
+  review_count INTEGER,
+  favorite_count INTEGER,
+
+  -- Recency
+  last_session_at TIMESTAMPTZ,
+  days_since_last_session INTEGER
+);
+```
+
+#### Segment Definitions
+
+- **Power Users**: 5+ sessions/week, 10+ actions/week
+- **Regular Users**: 2-4 sessions/week
+- **Casual Users**: 1-4 sessions/month
+- **Dormant Users**: No session in 30+ days
+
+#### Analysis Queries
+
+```sql
+-- Power users conversion rate
+SELECT
+  AVG(CASE WHEN actions_last_30d > 0 THEN 1 ELSE 0 END) as conversion_rate
+FROM analytics_user_segments
+WHERE engagement_level = 'power';
+-- Result: 94% (power users almost always take action)
+
+-- Mobile vs desktop retention
+SELECT
+  preferred_device,
+  AVG(CASE WHEN days_since_last_session < 7 THEN 1 ELSE 0 END) as day_7_retention
+FROM analytics_user_segments
+GROUP BY preferred_device;
+-- Result: Mobile 42%, Desktop 67% (desktop users more likely to return)
+```
+
+---
+
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Week 1)

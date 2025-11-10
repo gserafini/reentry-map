@@ -685,6 +685,295 @@ CREATE INDEX idx_annotations_tags ON analytics_annotations USING GIN(tags);
 CREATE INDEX idx_annotations_severity ON analytics_annotations(severity) WHERE severity IN ('warning', 'critical');
 
 -- =====================================================
+-- GOOGLE SEARCH CONSOLE INTEGRATION
+-- =====================================================
+
+-- GSC keyword performance (synced daily)
+CREATE TABLE analytics_gsc_keywords (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date DATE NOT NULL,
+  query TEXT NOT NULL,                       -- "housing assistance oakland"
+  page_url TEXT NOT NULL,                    -- Landing page
+  impressions INTEGER NOT NULL,
+  clicks INTEGER NOT NULL,
+  ctr NUMERIC,                               -- Click-through rate
+  position NUMERIC,                          -- Average ranking position
+  country TEXT DEFAULT 'USA',
+  device TEXT,                               -- 'mobile', 'desktop', 'tablet'
+  fetched_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(date, query, page_url, country, device)
+);
+
+CREATE INDEX idx_gsc_keywords_query ON analytics_gsc_keywords(query, date DESC);
+CREATE INDEX idx_gsc_keywords_date ON analytics_gsc_keywords(date DESC);
+CREATE INDEX idx_gsc_keywords_page ON analytics_gsc_keywords(page_url, date DESC);
+CREATE INDEX idx_gsc_keywords_clicks ON analytics_gsc_keywords(clicks DESC);
+
+-- Aggregated GSC performance (updated daily)
+CREATE TABLE analytics_gsc_performance (
+  query TEXT PRIMARY KEY,
+  total_impressions INTEGER DEFAULT 0,
+  total_clicks INTEGER DEFAULT 0,
+  avg_ctr NUMERIC,
+  avg_position NUMERIC,
+  trend_7d NUMERIC,                          -- % change vs previous 7 days
+  trend_30d NUMERIC,
+  best_performing_page TEXT,
+  last_updated TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_gsc_perf_clicks ON analytics_gsc_performance(total_clicks DESC);
+CREATE INDEX idx_gsc_perf_trend ON analytics_gsc_performance(trend_7d DESC);
+
+-- Correlation: GSC keyword → Internal search behavior
+CREATE TABLE analytics_gsc_internal_correlation (
+  gsc_query TEXT NOT NULL,
+  internal_search_query TEXT NOT NULL,
+  correlation_count INTEGER DEFAULT 1,
+  avg_time_to_internal_search INTERVAL,
+  conversion_rate NUMERIC,
+  last_seen TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (gsc_query, internal_search_query)
+);
+
+CREATE INDEX idx_gsc_correlation_query ON analytics_gsc_internal_correlation(gsc_query);
+
+-- =====================================================
+-- ALERTS & NOTIFICATIONS
+-- =====================================================
+
+-- Alert definitions
+CREATE TABLE analytics_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  metric_name TEXT NOT NULL,                 -- 'dau', 'conversion_rate', 'error_rate', etc.
+  threshold_type TEXT NOT NULL,              -- 'absolute', 'percentage_change', 'std_deviation'
+  threshold_value NUMERIC NOT NULL,
+  comparison_period INTERVAL,                -- Compare to '7 days' ago, '1 day' ago
+  check_frequency INTERVAL NOT NULL,         -- How often to check (5min, 1hour, 1day)
+  notification_channels JSONB,               -- ['email', 'slack', 'webhook']
+  notification_config JSONB,                 -- Email addresses, Slack webhook URLs, etc.
+  is_active BOOLEAN DEFAULT true,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_alerts_active ON analytics_alerts(is_active, check_frequency);
+CREATE INDEX idx_alerts_metric ON analytics_alerts(metric_name);
+
+-- Alert trigger history
+CREATE TABLE analytics_alert_triggers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  alert_id UUID REFERENCES analytics_alerts(id) ON DELETE CASCADE,
+  triggered_at TIMESTAMPTZ DEFAULT NOW(),
+  metric_value NUMERIC NOT NULL,
+  threshold_value NUMERIC NOT NULL,
+  comparison_value NUMERIC,                  -- Value from comparison period
+  message TEXT NOT NULL,
+  severity TEXT DEFAULT 'warning',           -- 'info', 'warning', 'critical'
+  acknowledged_at TIMESTAMPTZ,
+  acknowledged_by UUID REFERENCES users(id),
+  acknowledgment_note TEXT,
+  resolved_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_alert_triggers_alert ON analytics_alert_triggers(alert_id, triggered_at DESC);
+CREATE INDEX idx_alert_triggers_unack ON analytics_alert_triggers(triggered_at DESC) WHERE acknowledged_at IS NULL;
+
+-- =====================================================
+-- UTM ATTRIBUTION & CAMPAIGN TRACKING
+-- =====================================================
+
+-- User attribution (first touch & last touch)
+CREATE TABLE analytics_attribution (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  anonymous_id TEXT,
+
+  -- First touch (how they discovered us)
+  first_touch_timestamp TIMESTAMPTZ,
+  first_touch_source TEXT,                   -- 'google', 'facebook', 'direct', '211'
+  first_touch_medium TEXT,                   -- 'organic', 'cpc', 'email', 'referral'
+  first_touch_campaign TEXT,
+  first_touch_content TEXT,
+  first_touch_term TEXT,
+  first_touch_referrer TEXT,
+  first_touch_landing_page TEXT,
+
+  -- Last touch (what converted them)
+  last_touch_timestamp TIMESTAMPTZ,
+  last_touch_source TEXT,
+  last_touch_medium TEXT,
+  last_touch_campaign TEXT,
+  last_touch_content TEXT,
+  last_touch_term TEXT,
+  last_touch_referrer TEXT,
+  last_touch_landing_page TEXT,
+
+  -- Conversion
+  converted_at TIMESTAMPTZ,
+  conversion_type TEXT,                      -- 'sign_up', 'first_action', 'first_review'
+
+  -- Full journey (for multi-touch attribution)
+  touchpoints JSONB,                         -- Array of all touchpoints with timestamps
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(user_id),
+  UNIQUE(anonymous_id)
+);
+
+CREATE INDEX idx_attribution_user ON analytics_attribution(user_id);
+CREATE INDEX idx_attribution_anon ON analytics_attribution(anonymous_id);
+CREATE INDEX idx_attribution_first_source ON analytics_attribution(first_touch_source, first_touch_medium);
+CREATE INDEX idx_attribution_converted ON analytics_attribution(converted_at) WHERE converted_at IS NOT NULL;
+
+-- Campaign performance rollup
+CREATE TABLE analytics_campaign_performance (
+  campaign_key TEXT PRIMARY KEY,             -- 'source|medium|campaign' e.g., 'facebook|cpc|jan-housing'
+  source TEXT NOT NULL,
+  medium TEXT NOT NULL,
+  campaign TEXT,
+  sessions INTEGER DEFAULT 0,
+  new_users INTEGER DEFAULT 0,
+  conversions INTEGER DEFAULT 0,
+  conversion_rate NUMERIC,
+  bounce_rate NUMERIC,
+  avg_session_duration INTERVAL,
+  last_updated TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_campaign_perf_source ON analytics_campaign_performance(source, medium);
+CREATE INDEX idx_campaign_perf_conversions ON analytics_campaign_performance(conversions DESC);
+
+-- =====================================================
+-- RETENTION & COHORT ANALYSIS
+-- =====================================================
+
+-- User cohorts (grouped by signup week/month)
+CREATE TABLE analytics_user_cohorts (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  cohort_week DATE NOT NULL,                 -- Week they signed up (Monday)
+  cohort_month DATE NOT NULL,                -- Month they signed up (1st)
+  first_session_at TIMESTAMPTZ NOT NULL,
+  first_action_type TEXT,                    -- What was their first meaningful action?
+  first_action_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_cohorts_week ON analytics_user_cohorts(cohort_week);
+CREATE INDEX idx_user_cohorts_month ON analytics_user_cohorts(cohort_month);
+
+-- Pre-calculated retention rates by cohort
+CREATE TABLE analytics_retention_metrics (
+  cohort_date DATE NOT NULL,
+  cohort_type TEXT NOT NULL,                 -- 'weekly', 'monthly'
+  cohort_size INTEGER NOT NULL,
+  day_1_retained INTEGER DEFAULT 0,
+  day_7_retained INTEGER DEFAULT 0,
+  day_30_retained INTEGER DEFAULT 0,
+  day_90_retained INTEGER DEFAULT 0,
+  day_1_rate NUMERIC,
+  day_7_rate NUMERIC,
+  day_30_rate NUMERIC,
+  day_90_rate NUMERIC,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (cohort_date, cohort_type)
+);
+
+CREATE INDEX idx_retention_date ON analytics_retention_metrics(cohort_date DESC);
+
+-- =====================================================
+-- FEATURE ADOPTION TRACKING
+-- =====================================================
+
+-- Feature definitions (for tracking)
+CREATE TABLE analytics_feature_definitions (
+  feature_name TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  description TEXT,
+  launch_date DATE NOT NULL,
+  category TEXT,                             -- 'search', 'map', 'social', 'discovery'
+  is_core_feature BOOLEAN DEFAULT false,
+  target_adoption_rate NUMERIC,              -- e.g., 0.80 for 80% adoption
+  target_weeks INTEGER,                      -- Weeks to reach target
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Track when users first use each feature
+CREATE TABLE analytics_feature_adoption (
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  feature_name TEXT REFERENCES analytics_feature_definitions(feature_name),
+  first_used_at TIMESTAMPTZ NOT NULL,
+  usage_count INTEGER DEFAULT 1,
+  last_used_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (user_id, feature_name)
+);
+
+CREATE INDEX idx_feature_adoption_feature ON analytics_feature_adoption(feature_name, first_used_at);
+CREATE INDEX idx_feature_adoption_user ON analytics_feature_adoption(user_id);
+
+-- Feature adoption metrics (updated daily)
+CREATE TABLE analytics_feature_adoption_metrics (
+  feature_name TEXT REFERENCES analytics_feature_definitions(feature_name),
+  date DATE NOT NULL,
+  weeks_since_launch INTEGER NOT NULL,
+  total_users INTEGER NOT NULL,              -- Total active users
+  adopted_users INTEGER NOT NULL,            -- Users who used feature
+  adoption_rate NUMERIC NOT NULL,
+  new_adopters INTEGER DEFAULT 0,            -- New users who adopted today
+  PRIMARY KEY (feature_name, date)
+);
+
+CREATE INDEX idx_feature_metrics_feature ON analytics_feature_adoption_metrics(feature_name, date DESC);
+
+-- =====================================================
+-- USER SEGMENTATION
+-- =====================================================
+
+-- Pre-calculated user segments (updated daily)
+CREATE TABLE analytics_user_segments (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  -- Engagement segments
+  engagement_level TEXT,                     -- 'power', 'regular', 'casual', 'dormant'
+  sessions_last_7d INTEGER DEFAULT 0,
+  sessions_last_30d INTEGER DEFAULT 0,
+  actions_last_7d INTEGER DEFAULT 0,
+  actions_last_30d INTEGER DEFAULT 0,
+
+  -- Behavioral segments
+  primary_category TEXT,                     -- Most-searched category
+  preferred_device TEXT,                     -- 'mobile', 'desktop', 'tablet'
+  preferred_time_of_day TEXT,                -- 'morning', 'afternoon', 'evening', 'night'
+
+  -- Value segments
+  has_reviewed BOOLEAN DEFAULT false,
+  has_favorited BOOLEAN DEFAULT false,
+  review_count INTEGER DEFAULT 0,
+  favorite_count INTEGER DEFAULT 0,
+
+  -- Recency
+  last_session_at TIMESTAMPTZ,
+  days_since_last_session INTEGER,
+
+  -- Lifetime value indicators
+  lifetime_sessions INTEGER DEFAULT 0,
+  lifetime_actions INTEGER DEFAULT 0,
+  days_since_signup INTEGER,
+
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_segments_engagement ON analytics_user_segments(engagement_level);
+CREATE INDEX idx_user_segments_category ON analytics_user_segments(primary_category);
+CREATE INDEX idx_user_segments_device ON analytics_user_segments(preferred_device);
+CREATE INDEX idx_user_segments_recency ON analytics_user_segments(days_since_last_session);
+
+-- =====================================================
 -- AGGREGATE FUNCTIONS
 -- =====================================================
 
@@ -742,3 +1031,16 @@ COMMENT ON TABLE analytics_experiment_assignments IS 'A/B test variant assignmen
 COMMENT ON TABLE analytics_experiment_conversions IS 'A/B test conversion tracking';
 COMMENT ON TABLE analytics_admin_events IS 'Admin action tracking';
 COMMENT ON TABLE analytics_annotations IS 'Timeline annotations for all events affecting metrics (deployments, press, partnerships, incidents, holidays, etc.)';
+COMMENT ON TABLE analytics_gsc_keywords IS 'Google Search Console keyword performance data (synced daily)';
+COMMENT ON TABLE analytics_gsc_performance IS 'Aggregated GSC performance metrics per query';
+COMMENT ON TABLE analytics_gsc_internal_correlation IS 'Correlation between GSC keywords and internal search behavior';
+COMMENT ON TABLE analytics_alerts IS 'Alert definitions for proactive monitoring';
+COMMENT ON TABLE analytics_alert_triggers IS 'Alert trigger history and acknowledgments';
+COMMENT ON TABLE analytics_attribution IS 'User attribution tracking (first touch, last touch, full journey)';
+COMMENT ON TABLE analytics_campaign_performance IS 'Campaign performance rollup for marketing ROI';
+COMMENT ON TABLE analytics_user_cohorts IS 'User cohorts grouped by signup date';
+COMMENT ON TABLE analytics_retention_metrics IS 'Pre-calculated retention rates by cohort';
+COMMENT ON TABLE analytics_feature_definitions IS 'Feature definitions for adoption tracking';
+COMMENT ON TABLE analytics_feature_adoption IS 'User-level feature adoption tracking';
+COMMENT ON TABLE analytics_feature_adoption_metrics IS 'Daily feature adoption metrics';
+COMMENT ON TABLE analytics_user_segments IS 'Pre-calculated user segmentation (engagement, behavior, value)';
