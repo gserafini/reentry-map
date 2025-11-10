@@ -2826,6 +2826,601 @@ useEffect(() => {
 
 ---
 
+## Bot Detection & Filtering
+
+### Challenge: Separating Humans from Bots
+
+**Problem**: Bots, crawlers, and automated traffic can significantly skew analytics metrics, making it hard to understand real human behavior.
+
+**Solution**: Multi-layered bot detection with separate tracking
+
+---
+
+### 1. Bot Detection Strategy
+
+**Three-Tier Approach**:
+
+1. **Immediate Filter** - Known bot user-agents (Google, Bing, etc.)
+2. **Behavioral Analysis** - Detect bot-like patterns (speed, navigation)
+3. **Challenge-Response** - Optional CAPTCHA for suspicious activity
+
+---
+
+### 2. Database Schema: Bot Tracking
+
+```sql
+-- Add is_bot flag to all analytics tables
+ALTER TABLE analytics_sessions ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_sessions ADD COLUMN bot_type TEXT; -- 'search-engine', 'monitor', 'scraper', 'unknown'
+ALTER TABLE analytics_sessions ADD COLUMN user_agent TEXT;
+
+-- Add indexes for filtering
+CREATE INDEX idx_sessions_is_bot ON analytics_sessions(is_bot, started_at DESC);
+CREATE INDEX idx_sessions_bot_type ON analytics_sessions(bot_type) WHERE bot_type IS NOT NULL;
+
+-- Add to all event tables
+ALTER TABLE analytics_page_views ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_search_events ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_resource_events ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_map_events ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_funnel_events ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_feature_events ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_performance_events ADD COLUMN is_bot BOOLEAN DEFAULT false;
+ALTER TABLE analytics_active_sessions ADD COLUMN is_bot BOOLEAN DEFAULT false;
+
+-- Separate table for detailed bot analysis (optional)
+CREATE TABLE analytics_bot_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id TEXT UNIQUE NOT NULL,
+  bot_type TEXT NOT NULL,              -- 'googlebot', 'bingbot', 'monitor', 'scraper', etc.
+  user_agent TEXT NOT NULL,
+  ip_address INET,                     -- Store IP for bot analysis
+  page_views INTEGER DEFAULT 0,
+  pages_visited TEXT[],                -- Track bot crawl paths
+  detected_at TIMESTAMPTZ DEFAULT NOW(),
+  last_activity TIMESTAMPTZ DEFAULT NOW(),
+  detection_method TEXT                -- 'user-agent', 'behavior', 'challenge-failed'
+);
+
+CREATE INDEX idx_bot_sessions_type ON analytics_bot_sessions(bot_type, detected_at DESC);
+CREATE INDEX idx_bot_sessions_ip ON analytics_bot_sessions(ip_address);
+```
+
+---
+
+### 3. User-Agent Detection (Immediate Filter)
+
+**Implementation** (`lib/utils/analytics-bot-detector.ts`):
+
+```typescript
+// Known bot user-agent patterns
+const BOT_PATTERNS = [
+  // Search Engine Crawlers
+  { pattern: /googlebot/i, type: 'googlebot', category: 'search-engine' },
+  { pattern: /bingbot/i, type: 'bingbot', category: 'search-engine' },
+  { pattern: /slurp/i, type: 'yahoo', category: 'search-engine' },
+  { pattern: /duckduckbot/i, type: 'duckduckgo', category: 'search-engine' },
+  { pattern: /baiduspider/i, type: 'baidu', category: 'search-engine' },
+  { pattern: /yandexbot/i, type: 'yandex', category: 'search-engine' },
+
+  // Social Media Crawlers
+  { pattern: /facebookexternalhit/i, type: 'facebook', category: 'social' },
+  { pattern: /twitterbot/i, type: 'twitter', category: 'social' },
+  { pattern: /linkedinbot/i, type: 'linkedin', category: 'social' },
+  { pattern: /whatsapp/i, type: 'whatsapp', category: 'social' },
+
+  // Monitoring Services
+  { pattern: /pingdom/i, type: 'pingdom', category: 'monitor' },
+  { pattern: /uptimerobot/i, type: 'uptimerobot', category: 'monitor' },
+  { pattern: /statuscake/i, type: 'statuscake', category: 'monitor' },
+  { pattern: /newrelic/i, type: 'newrelic', category: 'monitor' },
+
+  // Scrapers & Tools
+  { pattern: /ahrefsbot/i, type: 'ahrefs', category: 'seo-tool' },
+  { pattern: /semrushbot/i, type: 'semrush', category: 'seo-tool' },
+  { pattern: /mj12bot/i, type: 'majestic', category: 'seo-tool' },
+  { pattern: /dotbot/i, type: 'moz', category: 'seo-tool' },
+  { pattern: /screaming frog/i, type: 'screaming-frog', category: 'seo-tool' },
+
+  // Generic Bot Indicators
+  { pattern: /bot/i, type: 'generic-bot', category: 'unknown' },
+  { pattern: /crawler/i, type: 'generic-crawler', category: 'unknown' },
+  { pattern: /spider/i, type: 'generic-spider', category: 'unknown' },
+  { pattern: /scraper/i, type: 'generic-scraper', category: 'unknown' },
+
+  // Headless Browsers (often used by bots)
+  { pattern: /headlesschrome/i, type: 'headless-chrome', category: 'automation' },
+  { pattern: /phantomjs/i, type: 'phantomjs', category: 'automation' },
+  { pattern: /selenium/i, type: 'selenium', category: 'automation' },
+  { pattern: /puppeteer/i, type: 'puppeteer', category: 'automation' },
+]
+
+interface BotDetectionResult {
+  isBot: boolean
+  botType?: string
+  category?: string
+  confidence: number // 0-1 (1 = definitely bot)
+}
+
+export function detectBotFromUserAgent(userAgent: string): BotDetectionResult {
+  if (!userAgent) {
+    return { isBot: false, confidence: 0 }
+  }
+
+  // Check against known patterns
+  for (const bot of BOT_PATTERNS) {
+    if (bot.pattern.test(userAgent)) {
+      return {
+        isBot: true,
+        botType: bot.type,
+        category: bot.category,
+        confidence: 1.0,
+      }
+    }
+  }
+
+  // Additional heuristics
+  const suspiciousIndicators = [
+    userAgent.length < 20, // Very short user agents
+    !userAgent.includes('Mozilla'), // Missing Mozilla identifier
+    userAgent.includes('curl'),
+    userAgent.includes('wget'),
+    userAgent.includes('python'),
+    userAgent.includes('java'),
+  ]
+
+  const suspiciousCount = suspiciousIndicators.filter(Boolean).length
+
+  if (suspiciousCount >= 2) {
+    return {
+      isBot: true,
+      botType: 'suspicious',
+      category: 'unknown',
+      confidence: suspiciousCount / suspiciousIndicators.length,
+    }
+  }
+
+  return { isBot: false, confidence: 0 }
+}
+```
+
+---
+
+### 4. Behavioral Bot Detection
+
+**Detect bot-like patterns** in user behavior:
+
+```typescript
+// lib/utils/analytics-behavior-detector.ts
+
+interface BehaviorSignals {
+  averagePageViewDuration: number // Milliseconds
+  pagesPerSecond: number
+  distinctPagesVisited: number
+  mouseMovements: number
+  clickEvents: number
+  scrollEvents: number
+  keyboardEvents: number
+  timeSinceFirstPage: number
+}
+
+export function detectBotFromBehavior(signals: BehaviorSignals): BotDetectionResult {
+  const botScores: number[] = []
+
+  // Bot Indicator 1: Extremely fast page views (< 500ms average)
+  if (signals.averagePageViewDuration < 500) {
+    botScores.push(0.8)
+  }
+
+  // Bot Indicator 2: Very high pages per second (> 2 pages/sec)
+  if (signals.pagesPerSecond > 2) {
+    botScores.push(0.9)
+  }
+
+  // Bot Indicator 3: No mouse movements
+  if (signals.mouseMovements === 0 && signals.distinctPagesVisited > 2) {
+    botScores.push(0.7)
+  }
+
+  // Bot Indicator 4: No interactions (clicks, scrolls, keyboard)
+  const totalInteractions = signals.clickEvents + signals.scrollEvents + signals.keyboardEvents
+  if (totalInteractions === 0 && signals.distinctPagesVisited > 3) {
+    botScores.push(0.8)
+  }
+
+  // Bot Indicator 5: Linear navigation pattern (visiting pages in perfect order)
+  // This would require more complex analysis of page visit patterns
+
+  // Calculate overall bot score
+  const avgBotScore = botScores.length > 0
+    ? botScores.reduce((sum, score) => sum + score, 0) / botScores.length
+    : 0
+
+  return {
+    isBot: avgBotScore > 0.6,
+    botType: avgBotScore > 0.6 ? 'behavior-detected' : undefined,
+    category: 'suspicious',
+    confidence: avgBotScore,
+  }
+}
+
+// Track user interactions for behavioral analysis
+export function trackUserInteraction(type: 'mouse' | 'click' | 'scroll' | 'keyboard') {
+  const sessionKey = 'analytics-interaction-counts'
+
+  try {
+    const counts = JSON.parse(localStorage.getItem(sessionKey) || '{}')
+    counts[type] = (counts[type] || 0) + 1
+    counts.lastInteraction = Date.now()
+    localStorage.setItem(sessionKey, JSON.stringify(counts))
+  } catch (error) {
+    // Ignore localStorage errors
+  }
+}
+
+// Install global listeners for interaction tracking
+export function installInteractionTrackers() {
+  if (typeof window === 'undefined') return
+
+  let mouseMovements = 0
+  let clicks = 0
+  let scrolls = 0
+  let keyPresses = 0
+
+  // Mouse movement (debounced)
+  let mouseMoveTimeout: NodeJS.Timeout
+  window.addEventListener('mousemove', () => {
+    clearTimeout(mouseMoveTimeout)
+    mouseMoveTimeout = setTimeout(() => {
+      mouseMovements++
+      trackUserInteraction('mouse')
+    }, 100)
+  }, { passive: true })
+
+  // Clicks
+  window.addEventListener('click', () => {
+    clicks++
+    trackUserInteraction('click')
+  }, { passive: true })
+
+  // Scrolls (debounced)
+  let scrollTimeout: NodeJS.Timeout
+  window.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout)
+    scrollTimeout = setTimeout(() => {
+      scrolls++
+      trackUserInteraction('scroll')
+    }, 100)
+  }, { passive: true })
+
+  // Keyboard
+  window.addEventListener('keydown', () => {
+    keyPresses++
+    trackUserInteraction('keyboard')
+  }, { passive: true })
+}
+```
+
+---
+
+### 5. Integration: Auto-Flag Bots on Event Tracking
+
+**Update analytics tracker** to auto-detect and flag bots:
+
+```typescript
+// lib/utils/analytics.ts (updated)
+import { detectBotFromUserAgent } from './analytics-bot-detector'
+import { getInteractionCounts } from './analytics-behavior-detector'
+
+export async function trackEvent(
+  eventType: string,
+  metadata?: object,
+  userAgent?: string
+) {
+  // Detect bot from user-agent
+  const botDetection = detectBotFromUserAgent(
+    userAgent || navigator.userAgent
+  )
+
+  // Get interaction counts for behavioral analysis
+  const interactions = getInteractionCounts()
+
+  // Determine if this is likely a bot
+  const isBot = botDetection.isBot
+  const botType = botDetection.botType
+
+  // Send to appropriate table
+  if (isBot) {
+    // Track bot separately
+    await trackBotEvent(eventType, metadata, botType, userAgent)
+  } else {
+    // Track human user normally
+    await trackHumanEvent(eventType, metadata)
+  }
+}
+
+async function trackHumanEvent(eventType: string, metadata?: object) {
+  // Normal analytics tracking (is_bot = false)
+  await supabase.from('analytics_page_views').insert({
+    event_type: eventType,
+    is_bot: false,
+    metadata,
+    // ... other fields
+  })
+}
+
+async function trackBotEvent(
+  eventType: string,
+  metadata?: object,
+  botType?: string,
+  userAgent?: string
+) {
+  // Track to bot sessions table
+  await supabase.from('analytics_bot_sessions').insert({
+    event_type: eventType,
+    bot_type: botType,
+    user_agent: userAgent,
+    metadata,
+    // ... other fields
+  })
+
+  // Also mark in regular analytics with is_bot flag
+  await supabase.from('analytics_page_views').insert({
+    event_type: eventType,
+    is_bot: true,
+    metadata,
+    // ... other fields
+  })
+}
+```
+
+---
+
+### 6. Querying: Human-Only Analytics
+
+**Filter bots from all queries**:
+
+```sql
+-- Daily Active Users (HUMANS ONLY)
+SELECT
+  DATE(timestamp) as date,
+  COUNT(DISTINCT COALESCE(user_id, anonymous_id)) as unique_human_users
+FROM analytics_page_views
+WHERE timestamp > NOW() - INTERVAL '30 days'
+  AND is_bot = false  -- ✅ Filter out bots
+GROUP BY 1
+ORDER BY 1 DESC;
+
+-- Top resources viewed (HUMANS ONLY)
+SELECT
+  r.name,
+  r.primary_category,
+  COUNT(DISTINCT e.session_id) as unique_human_views
+FROM analytics_resource_events e
+JOIN resources r ON r.id = e.resource_id
+WHERE e.timestamp > NOW() - INTERVAL '7 days'
+  AND e.is_bot = false  -- ✅ Filter out bots
+  AND e.event_type = 'view'
+GROUP BY r.id, r.name, r.primary_category
+ORDER BY unique_human_views DESC
+LIMIT 10;
+
+-- Search queries (HUMANS ONLY)
+SELECT
+  search_query,
+  COUNT(*) as search_count,
+  AVG(results_count) as avg_results
+FROM analytics_search_events
+WHERE timestamp > NOW() - INTERVAL '7 days'
+  AND is_bot = false  -- ✅ Filter out bots
+GROUP BY search_query
+ORDER BY search_count DESC
+LIMIT 20;
+```
+
+---
+
+### 7. Bot Analytics Dashboard
+
+**Separate dashboard for bot activity**:
+
+```sql
+-- Bot activity by type
+SELECT
+  bot_type,
+  COUNT(*) as total_sessions,
+  COUNT(DISTINCT DATE(detected_at)) as active_days,
+  AVG(page_views) as avg_pages_per_session,
+  MAX(last_activity) as last_seen
+FROM analytics_bot_sessions
+WHERE detected_at > NOW() - INTERVAL '30 days'
+GROUP BY bot_type
+ORDER BY total_sessions DESC;
+
+-- Bot crawl patterns (which pages do bots visit?)
+SELECT
+  UNNEST(pages_visited) as page,
+  COUNT(*) as bot_visits,
+  COUNT(DISTINCT session_id) as unique_bots
+FROM analytics_bot_sessions
+WHERE detected_at > NOW() - INTERVAL '7 days'
+GROUP BY page
+ORDER BY bot_visits DESC
+LIMIT 20;
+
+-- Bot activity by category
+SELECT
+  CASE
+    WHEN bot_type LIKE '%google%' OR bot_type LIKE '%bing%' THEN 'search-engine'
+    WHEN bot_type LIKE '%facebook%' OR bot_type LIKE '%twitter%' THEN 'social'
+    WHEN bot_type LIKE '%pingdom%' OR bot_type LIKE '%uptime%' THEN 'monitor'
+    WHEN bot_type LIKE '%ahrefs%' OR bot_type LIKE '%semrush%' THEN 'seo-tool'
+    ELSE 'other'
+  END as category,
+  COUNT(*) as total_sessions,
+  SUM(page_views) as total_page_views
+FROM analytics_bot_sessions
+WHERE detected_at > NOW() - INTERVAL '30 days'
+GROUP BY category
+ORDER BY total_sessions DESC;
+```
+
+---
+
+### 8. Admin UI: Bot vs Human Toggle
+
+**Component** (`components/admin/AnalyticsFilter.tsx`):
+
+```typescript
+'use client'
+
+import { useState } from 'react'
+import { ToggleButton, ToggleButtonGroup } from '@mui/material'
+
+export function AnalyticsFilter({ onChange }: { onChange: (filter: string) => void }) {
+  const [filter, setFilter] = useState('humans-only')
+
+  const handleChange = (newFilter: string) => {
+    if (newFilter !== null) {
+      setFilter(newFilter)
+      onChange(newFilter)
+    }
+  }
+
+  return (
+    <div className="mb-4">
+      <ToggleButtonGroup
+        value={filter}
+        exclusive
+        onChange={(e, value) => handleChange(value)}
+        aria-label="analytics filter"
+      >
+        <ToggleButton value="humans-only">
+          Humans Only
+        </ToggleButton>
+        <ToggleButton value="bots-only">
+          Bots Only
+        </ToggleButton>
+        <ToggleButton value="all">
+          All Traffic
+        </ToggleButton>
+      </ToggleButtonGroup>
+    </div>
+  )
+}
+```
+
+**Usage in Dashboard**:
+
+```typescript
+// app/admin/analytics/page.tsx
+export default function AnalyticsDashboard() {
+  const [filter, setFilter] = useState('humans-only')
+
+  const whereClause = filter === 'humans-only'
+    ? 'is_bot = false'
+    : filter === 'bots-only'
+    ? 'is_bot = true'
+    : '1=1' // all traffic
+
+  // Use whereClause in all queries
+  const { data: stats } = await supabase
+    .from('analytics_page_views')
+    .select('*')
+    .filter(whereClause)
+
+  return (
+    <div>
+      <AnalyticsFilter onChange={setFilter} />
+      {/* Dashboard content */}
+    </div>
+  )
+}
+```
+
+---
+
+### 9. Challenge-Response (Optional)
+
+**For highly suspicious sessions**, optionally challenge with CAPTCHA:
+
+```typescript
+// lib/utils/analytics-challenge.ts
+
+export async function challengeSuspiciousSession(sessionId: string) {
+  // Get behavioral signals
+  const signals = getBehaviorSignals(sessionId)
+  const detection = detectBotFromBehavior(signals)
+
+  // If confidence > 0.8, challenge with CAPTCHA
+  if (detection.confidence > 0.8) {
+    // Show CAPTCHA (hCaptcha, reCAPTCHA, Turnstile)
+    const captchaResult = await showCaptcha()
+
+    if (!captchaResult.success) {
+      // Mark as bot
+      await markSessionAsBot(sessionId, 'challenge-failed')
+
+      // Optional: Block or limit access
+      return { allowed: false, reason: 'Bot detected' }
+    }
+  }
+
+  return { allowed: true }
+}
+```
+
+---
+
+### 10. Bot Detection Best Practices
+
+**Do's**:
+- ✅ **Allow search engine bots** (Google, Bing) - they help SEO
+- ✅ **Allow monitoring bots** (Pingdom, UptimeRobot) - they check uptime
+- ✅ **Track bots separately** - don't delete, analyze
+- ✅ **Use multiple signals** - user-agent + behavior
+- ✅ **Be conservative** - false positives hurt real users
+
+**Don'ts**:
+- ❌ **Don't block all bots** - some are beneficial
+- ❌ **Don't rely only on user-agent** - bots can fake it
+- ❌ **Don't delete bot data** - useful for security analysis
+- ❌ **Don't challenge every user** - UX harm
+
+---
+
+### 11. Performance Impact
+
+**Overhead of bot detection**:
+- User-agent check: **~1ms** (string matching)
+- Behavioral analysis: **~5ms** (localStorage reads)
+- Challenge-response: **0ms** (only when triggered)
+
+**Total impact**: **< 10ms** per event (negligible)
+
+---
+
+### 12. Summary: Bot Detection Strategy
+
+| Method | Accuracy | Performance | When to Use |
+|--------|----------|-------------|-------------|
+| **User-Agent** | 95% for known bots | Very fast (~1ms) | Always (first line of defense) |
+| **Behavioral** | 70-80% for unknown bots | Fast (~5ms) | Secondary check |
+| **Challenge-Response** | 99% accuracy | Slow (user interaction) | High-risk sessions only |
+
+**Recommended Approach**:
+1. **User-agent check** on every event (automatic)
+2. **Behavioral analysis** after 3+ page views
+3. **Challenge-response** only if confidence > 80%
+
+**Result**:
+- Accurate human vs bot separation
+- Minimal performance impact
+- Separate analytics for each
+- SEO-friendly (allows search engines)
+
+---
+
 ## Next Steps
 
 1. **Review this document** with team/stakeholders
