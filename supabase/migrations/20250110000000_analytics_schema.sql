@@ -224,6 +224,20 @@ CREATE TABLE analytics_daily_metrics (
 
 CREATE INDEX idx_daily_metrics ON analytics_daily_metrics(metric_date DESC, metric_name);
 
+-- Monthly aggregate metrics (lifelong growth tracking)
+CREATE TABLE analytics_monthly_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  metric_month DATE NOT NULL,                -- First day of month (2025-01-01)
+  metric_name TEXT NOT NULL,                 -- 'total_users', 'active_users', 'new_users', etc.
+  metric_value NUMERIC NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(metric_month, metric_name)
+);
+
+CREATE INDEX idx_monthly_metrics_month ON analytics_monthly_metrics(metric_month DESC);
+CREATE INDEX idx_monthly_metrics_name ON analytics_monthly_metrics(metric_name);
+
 -- =====================================================
 -- A/B TESTING TABLES
 -- =====================================================
@@ -573,21 +587,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function: Cleanup old analytics (90-day retention)
+-- Function: Cleanup old analytics (180-day retention for event-level detail)
 CREATE OR REPLACE FUNCTION cleanup_old_analytics()
 RETURNS void AS $$
 BEGIN
-  DELETE FROM analytics_page_views WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_search_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_resource_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_map_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_funnel_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_feature_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_performance_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_sessions WHERE started_at < NOW() - INTERVAL '90 days';
+  -- Event-level data: 180 days (allows seasonal analysis)
+  DELETE FROM analytics_page_views WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_search_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_resource_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_map_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_funnel_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_feature_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_performance_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_sessions WHERE started_at < NOW() - INTERVAL '180 days';
 
-  -- Keep daily metrics for 2 years
-  DELETE FROM analytics_daily_metrics WHERE metric_date < CURRENT_DATE - INTERVAL '2 years';
+  -- Daily metrics: Keep forever for lifelong growth tracking (minimal storage cost)
+  -- Monthly aggregates: Keep forever for long-term trend analysis
+  -- Only clean up if storage becomes an issue (not expected for years)
 END;
 $$ LANGUAGE plpgsql;
 
@@ -631,6 +647,70 @@ ORDER BY search_count DESC;
 CREATE UNIQUE INDEX idx_search_gaps_7d ON analytics_search_gaps_7d(search_query);
 
 -- =====================================================
+-- DEPLOYMENT TRACKING
+-- =====================================================
+
+-- Deployment tracking for change attribution
+CREATE TABLE analytics_deployments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deployed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  git_commit_hash TEXT,                      -- Short hash: '3a4f5c2'
+  git_branch TEXT,                           -- 'main', 'feat/new-search'
+  git_commit_message TEXT,                   -- Full commit message
+  version_tag TEXT,                          -- 'v1.2.3' (if tagged release)
+  deployed_by TEXT,                          -- 'github-actions' or email
+  vercel_deployment_id TEXT,                 -- Vercel deployment URL
+  description TEXT,                          -- Human-readable description
+  deployment_type TEXT DEFAULT 'production', -- 'production', 'staging', 'preview'
+  is_rollback BOOLEAN DEFAULT false,
+  rolled_back_at TIMESTAMPTZ,
+  metadata JSONB,                            -- CI/CD info, PR number, etc.
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_deployments_time ON analytics_deployments(deployed_at DESC);
+CREATE INDEX idx_deployments_branch ON analytics_deployments(git_branch);
+CREATE INDEX idx_deployments_type ON analytics_deployments(deployment_type);
+
+-- =====================================================
+-- AGGREGATE FUNCTIONS
+-- =====================================================
+
+-- Function: Rollup monthly metrics from daily metrics
+CREATE OR REPLACE FUNCTION rollup_monthly_metrics()
+RETURNS void AS $$
+DECLARE
+  last_month DATE := DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month');
+BEGIN
+  -- Roll up summed metrics from daily metrics
+  INSERT INTO analytics_monthly_metrics (metric_month, metric_name, metric_value)
+  SELECT
+    last_month,
+    metric_name,
+    SUM(metric_value) as total
+  FROM analytics_daily_metrics
+  WHERE metric_date >= last_month
+    AND metric_date < DATE_TRUNC('month', CURRENT_DATE)
+  GROUP BY metric_name
+  ON CONFLICT (metric_month, metric_name) DO UPDATE
+    SET metric_value = EXCLUDED.metric_value;
+
+  -- Cumulative metrics (not summed, but latest snapshot)
+  INSERT INTO analytics_monthly_metrics (metric_month, metric_name, metric_value)
+  VALUES
+    (last_month, 'total_users', (SELECT COUNT(*) FROM users WHERE created_at < DATE_TRUNC('month', CURRENT_DATE))),
+    (last_month, 'total_resources', (SELECT COUNT(*) FROM resources WHERE created_at < DATE_TRUNC('month', CURRENT_DATE))),
+    (last_month, 'total_reviews', (SELECT COUNT(*) FROM resource_reviews WHERE created_at < DATE_TRUNC('month', CURRENT_DATE)))
+  ON CONFLICT (metric_month, metric_name) DO UPDATE
+    SET metric_value = EXCLUDED.metric_value;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Note: Schedule this function to run on the 1st of each month
+-- Example with pg_cron extension:
+-- SELECT cron.schedule('rollup-monthly-metrics', '0 2 1 * *', 'SELECT rollup_monthly_metrics()');
+
+-- =====================================================
 -- COMMENTS
 -- =====================================================
 
@@ -644,7 +724,9 @@ COMMENT ON TABLE analytics_feature_events IS 'Feature usage tracking';
 COMMENT ON TABLE analytics_performance_events IS 'Performance and error monitoring';
 COMMENT ON TABLE analytics_active_sessions IS 'Real-time active sessions (ephemeral, 5min TTL)';
 COMMENT ON TABLE analytics_daily_metrics IS 'Pre-aggregated daily metrics for fast queries';
+COMMENT ON TABLE analytics_monthly_metrics IS 'Monthly aggregate metrics for lifelong growth tracking';
 COMMENT ON TABLE analytics_experiments IS 'A/B test experiments';
 COMMENT ON TABLE analytics_experiment_assignments IS 'A/B test variant assignments';
 COMMENT ON TABLE analytics_experiment_conversions IS 'A/B test conversion tracking';
 COMMENT ON TABLE analytics_admin_events IS 'Admin action tracking';
+COMMENT ON TABLE analytics_deployments IS 'Deployment tracking for change attribution and regression detection';

@@ -919,21 +919,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Auto-cleanup old events (retain 90 days)
+-- Auto-cleanup old events (retain 180 days for event-level detail, forever for aggregates)
 CREATE OR REPLACE FUNCTION cleanup_old_analytics()
 RETURNS void AS $$
 BEGIN
-  DELETE FROM analytics_page_views WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_search_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_resource_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_map_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_funnel_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_feature_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_performance_events WHERE timestamp < NOW() - INTERVAL '90 days';
-  DELETE FROM analytics_sessions WHERE started_at < NOW() - INTERVAL '90 days';
+  -- Event-level data: 180 days (allows seasonal analysis)
+  DELETE FROM analytics_page_views WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_search_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_resource_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_map_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_funnel_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_feature_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_performance_events WHERE timestamp < NOW() - INTERVAL '180 days';
+  DELETE FROM analytics_sessions WHERE started_at < NOW() - INTERVAL '180 days';
 
-  -- Keep daily metrics for 2 years
-  DELETE FROM analytics_daily_metrics WHERE metric_date < CURRENT_DATE - INTERVAL '2 years';
+  -- Daily metrics: Keep forever for lifelong growth tracking (minimal storage cost)
+  -- Monthly aggregates: Keep forever for long-term trend analysis
+  -- Only clean up if storage becomes an issue (not expected for years)
 END;
 $$ LANGUAGE plpgsql;
 ```
@@ -949,7 +951,7 @@ $$ LANGUAGE plpgsql;
 3. **No PII in Analytics**: Hash/sanitize queries, never store phone numbers, emails, addresses
 4. **User Control**: Clear opt-out mechanism
 5. **Transparency**: Privacy policy explains what's tracked
-6. **Retention Limits**: 90 days for raw events, 2 years for aggregates
+6. **Retention Limits**: 180 days for event-level detail (seasonal analysis), forever for daily/monthly aggregates (lifelong growth tracking)
 
 ### GDPR/CCPA Compliance
 
@@ -987,6 +989,533 @@ Our approach uses:
 - **Server-side tracking only** (no client-side cookies)
 
 **Result**: Cleaner UX, no annoying consent banner!
+
+---
+
+## Lifelong Statistics & Growth Tracking
+
+### Challenge: Balancing Detail vs Long-Term Trends
+
+**Problem**: Event-level data is expensive to store forever, but we need historical trends to understand growth.
+
+**Solution**: Multi-tiered retention strategy with daily/monthly aggregates kept indefinitely.
+
+---
+
+### 1. Retention Strategy (Revised)
+
+**Event-Level Data (180 days)**:
+- Full detail for recent debugging and analysis
+- Allows seasonal comparisons (Q4 2024 vs Q4 2025)
+- Enables cohort analysis over 6 months
+- Storage cost: ~$5-10/mo at 10k users (Supabase free tier covers this)
+
+**Daily Aggregates (Forever)**:
+- Pre-calculated metrics stored in `analytics_daily_metrics`
+- Minimal storage (<1MB/year even at scale)
+- Essential for growth charts: DAU, MAU, conversion rates, etc.
+- **Enables**: Year-over-year comparisons, long-term trend analysis
+
+**Monthly Aggregates (Forever)**:
+- New table: `analytics_monthly_metrics`
+- Rolled up from daily metrics
+- Ultimate long-term view: "How did January 2025 compare to January 2026?"
+
+**Why 180 Days (Not 90)?**
+- ✅ Seasonal analysis (winter vs summer resource needs)
+- ✅ Quarterly comparisons (Q1 vs Q2)
+- ✅ Marketing campaign attribution (90 days too short for user lifecycle)
+- ✅ A/B test follow-up analysis (long-term impact)
+- ⚠️ Still cost-effective (2x storage but only ~$10-20/mo)
+
+---
+
+### 2. Monthly Aggregates Table
+
+**New Database Table**:
+
+```sql
+CREATE TABLE analytics_monthly_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  metric_month DATE NOT NULL,          -- First day of month (2025-01-01)
+  metric_name TEXT NOT NULL,
+  metric_value NUMERIC,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(metric_month, metric_name)
+);
+
+CREATE INDEX idx_monthly_metrics_month ON analytics_monthly_metrics(metric_month DESC);
+CREATE INDEX idx_monthly_metrics_name ON analytics_monthly_metrics(metric_name);
+```
+
+**Metrics to Track Monthly**:
+- `total_users` - Cumulative registered users
+- `active_users` - MAU (monthly active users)
+- `new_users` - User growth
+- `total_searches` - Search volume
+- `total_resource_views` - Content engagement
+- `total_actions` - Calls + directions + favorites
+- `conversion_rate` - % searches → action
+- `avg_session_duration` - Engagement depth
+- `resource_count` - Resource directory growth
+- `review_count` - Community content growth
+
+**Automated Rollup Function**:
+
+```sql
+CREATE OR REPLACE FUNCTION rollup_monthly_metrics()
+RETURNS void AS $$
+DECLARE
+  last_month DATE := DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month');
+BEGIN
+  -- Roll up from daily metrics
+  INSERT INTO analytics_monthly_metrics (metric_month, metric_name, metric_value)
+  SELECT
+    last_month,
+    metric_name,
+    SUM(metric_value) as total
+  FROM analytics_daily_metrics
+  WHERE metric_date >= last_month
+    AND metric_date < DATE_TRUNC('month', CURRENT_DATE)
+  GROUP BY metric_name
+  ON CONFLICT (metric_month, metric_name) DO UPDATE
+    SET metric_value = EXCLUDED.metric_value;
+
+  -- Cumulative metrics (not summed, but latest value)
+  INSERT INTO analytics_monthly_metrics (metric_month, metric_name, metric_value)
+  VALUES
+    (last_month, 'total_users', (SELECT COUNT(*) FROM users WHERE created_at < DATE_TRUNC('month', CURRENT_DATE))),
+    (last_month, 'total_resources', (SELECT COUNT(*) FROM resources WHERE created_at < DATE_TRUNC('month', CURRENT_DATE))),
+    (last_month, 'total_reviews', (SELECT COUNT(*) FROM resource_reviews WHERE created_at < DATE_TRUNC('month', CURRENT_DATE)))
+  ON CONFLICT (metric_month, metric_name) DO UPDATE
+    SET metric_value = EXCLUDED.metric_value;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule: Run on 1st of each month
+SELECT cron.schedule('rollup-monthly-metrics', '0 2 1 * *', 'SELECT rollup_monthly_metrics()');
+```
+
+---
+
+### 3. Growth Tracking Queries
+
+**Year-over-Year Growth**:
+
+```sql
+-- Compare 2025 vs 2026 metrics
+SELECT
+  m1.metric_name,
+  m1.metric_value as value_2025,
+  m2.metric_value as value_2026,
+  ROUND(100.0 * (m2.metric_value - m1.metric_value) / m1.metric_value, 1) as growth_percentage
+FROM analytics_monthly_metrics m1
+JOIN analytics_monthly_metrics m2 ON
+  m2.metric_name = m1.metric_name AND
+  m2.metric_month = m1.metric_month + INTERVAL '1 year'
+WHERE m1.metric_month = '2025-01-01'
+ORDER BY growth_percentage DESC;
+```
+
+**Monthly Active Users Trend (Past 2 Years)**:
+
+```sql
+SELECT
+  TO_CHAR(metric_month, 'YYYY-MM') as month,
+  metric_value as mau
+FROM analytics_monthly_metrics
+WHERE metric_name = 'active_users'
+  AND metric_month >= CURRENT_DATE - INTERVAL '2 years'
+ORDER BY metric_month DESC;
+```
+
+**Cumulative Growth Chart**:
+
+```sql
+-- Show total users over time
+SELECT
+  metric_month,
+  metric_value as total_users,
+  LAG(metric_value) OVER (ORDER BY metric_month) as prev_month_users,
+  metric_value - LAG(metric_value) OVER (ORDER BY metric_month) as net_new_users
+FROM analytics_monthly_metrics
+WHERE metric_name = 'total_users'
+ORDER BY metric_month DESC;
+```
+
+---
+
+### 4. Lifelong Statistics Dashboard
+
+**Admin View** (`/admin/analytics/growth`):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Lifelong Growth Metrics                                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Total Users (All Time)          MAU (This Month)           │
+│  ───────────────────────         ──────────────────         │
+│    12,543                          1,847                     │
+│    ↑ 23% YoY                       ↑ 15% vs last month      │
+│                                                              │
+│  Total Resources                 Total Reviews               │
+│  ───────────────                 ────────────────            │
+│    247                             3,891                     │
+│    ↑ 8% YoY                        ↑ 42% YoY                │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Monthly Active Users (Past 24 Months)              │  │
+│  │                                                       │  │
+│  │  2000 ┤                                        ╭─    │  │
+│  │       │                                   ╭────╯     │  │
+│  │  1500 ┤                             ╭─────╯          │  │
+│  │       │                        ╭────╯                │  │
+│  │  1000 ┤                   ╭────╯                     │  │
+│  │       │              ╭────╯                          │  │
+│  │   500 ┤         ╭────╯                               │  │
+│  │       │    ╭────╯                                    │  │
+│  │     0 ┴────┴────┴────┴────┴────┴────┴────┴────┴────  │  │
+│  │       Jan  Apr  Jul  Oct  Jan  Apr  Jul  Oct  Jan   │  │
+│  │       '24  '24  '24  '24  '25  '25  '25  '25  '26   │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                              │
+│  Key Milestones                                              │
+│  ───────────────                                             │
+│  ✓ 10k users reached: Oct 15, 2025                          │
+│  ✓ 200 resources: Aug 3, 2025                               │
+│  ✓ 1k reviews: Jun 12, 2025                                 │
+│  ⏳ Next: 20k users (projected: Mar 2026)                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Deployment Tracking & Change Attribution
+
+### Challenge: Correlating Behavior Changes with Code Changes
+
+**Problem**: Metrics change suddenly. Was it a bug? A feature? A marketing campaign? Hard to know without deployment history.
+
+**Solution**: Lightweight deployment log with timestamp-based correlation (not session-level coupling).
+
+---
+
+### 1. Why Track Deployments?
+
+**Use Cases**:
+- ✅ **Regression Detection**: "Conversion rate dropped 15% after yesterday's deployment"
+- ✅ **Feature Impact**: "New search filters increased engagement by 8%"
+- ✅ **Performance Monitoring**: "Page load time spiked after v2.3.1"
+- ✅ **A/B Test Attribution**: "Experiment started during a deployment, invalidating early results"
+- ✅ **Rollback Decisions**: "Should we revert? Let's check metrics 3 hours pre/post deployment"
+
+**Anti-Patterns to Avoid**:
+- ❌ **Don't**: Store deployment_id on every session (bloats data, tight coupling)
+- ❌ **Don't**: Tie metrics to Vercel deployment IDs (creates external dependency)
+- ✅ **Do**: Simple timestamp-based log that can be overlaid on metric charts
+
+---
+
+### 2. Deployment Tracking Table
+
+**Database Schema**:
+
+```sql
+CREATE TABLE analytics_deployments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deployed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  git_commit_hash TEXT,                -- '3a4f5c2'
+  git_branch TEXT,                      -- 'main' or 'feat/new-search'
+  git_commit_message TEXT,              -- 'fix: resolve map marker clustering'
+  version_tag TEXT,                     -- 'v1.2.3' (if tagged release)
+  deployed_by TEXT,                     -- 'github-actions' or 'gserafini@gmail.com'
+  vercel_deployment_id TEXT,            -- Optional: Vercel's deployment URL
+  description TEXT,                     -- Human-readable: "Holiday homepage redesign"
+  deployment_type TEXT DEFAULT 'production', -- 'production', 'staging', 'preview'
+  is_rollback BOOLEAN DEFAULT false,
+  rolled_back_at TIMESTAMPTZ,           -- If deployment was later rolled back
+  metadata JSONB,                       -- Flexible: CI/CD info, PR number, etc.
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_deployments_time ON analytics_deployments(deployed_at DESC);
+CREATE INDEX idx_deployments_branch ON analytics_deployments(git_branch);
+
+-- Enable RLS (admin-only)
+ALTER TABLE analytics_deployments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can view deployments"
+  ON analytics_deployments FOR SELECT
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+
+CREATE POLICY "Admins can log deployments"
+  ON analytics_deployments FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+```
+
+---
+
+### 3. How to Log Deployments
+
+**Option A: Automated via CI/CD (Recommended)**
+
+Add to GitHub Actions workflow (`.github/workflows/deploy.yml`):
+
+```yaml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2  # Get previous commit for diff
+
+      - name: Deploy to Vercel
+        id: vercel
+        run: |
+          vercel deploy --prod > deployment-url.txt
+          echo "url=$(cat deployment-url.txt)" >> $GITHUB_OUTPUT
+
+      - name: Log deployment to analytics
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -X POST "${SUPABASE_URL}/rest/v1/analytics_deployments" \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "deployed_at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
+              "git_commit_hash": "'"$(git rev-parse --short HEAD)"'",
+              "git_branch": "'"${{ github.ref_name }}"'",
+              "git_commit_message": "'"$(git log -1 --pretty=%s)"'",
+              "version_tag": "'"$(git describe --tags --abbrev=0 2>/dev/null || echo null)"'",
+              "deployed_by": "github-actions",
+              "vercel_deployment_id": "'"${{ steps.vercel.outputs.url }}"'",
+              "deployment_type": "production"
+            }'
+```
+
+**Option B: Manual Logging (Quick Start)**
+
+Admin page (`/admin/analytics/deployments/new`):
+
+```typescript
+// Simple form to log deployments manually
+export function LogDeploymentForm() {
+  async function handleSubmit(formData: FormData) {
+    const supabase = createClient()
+
+    await supabase.from('analytics_deployments').insert({
+      deployed_at: new Date().toISOString(),
+      git_commit_hash: formData.get('commit_hash'),
+      description: formData.get('description'),
+      deployed_by: user.email,
+    })
+  }
+
+  return (
+    <form action={handleSubmit}>
+      <input name="commit_hash" placeholder="Git commit hash (optional)" />
+      <textarea name="description" placeholder="What changed? (e.g., 'Fixed search bug')" />
+      <button type="submit">Log Deployment</button>
+    </form>
+  )
+}
+```
+
+**Option C: API Endpoint (Most Flexible)**
+
+```typescript
+// app/api/analytics/deployments/route.ts
+export async function POST(request: Request) {
+  const { commit_hash, description, vercel_deployment_id } = await request.json()
+  const supabase = createClient()
+
+  // Verify admin (could also use a secret token for CI/CD)
+  const { data: user } = await supabase.auth.getUser()
+  if (!user?.is_admin) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  const { error } = await supabase.from('analytics_deployments').insert({
+    git_commit_hash: commit_hash,
+    description,
+    vercel_deployment_id,
+    deployed_by: user.email,
+  })
+
+  if (error) throw error
+  return Response.json({ success: true })
+}
+```
+
+---
+
+### 4. Deployment Correlation Queries
+
+**Metrics Before/After Deployment**:
+
+```sql
+-- Compare metrics 24 hours before/after a specific deployment
+WITH deployment_time AS (
+  SELECT deployed_at FROM analytics_deployments WHERE id = '...'
+),
+before_metrics AS (
+  SELECT
+    'before' as period,
+    COUNT(DISTINCT session_id) as sessions,
+    COUNT(*) FILTER (WHERE event_type IN ('click_call', 'favorite_add')) as actions,
+    ROUND(AVG(load_time_ms), 0) as avg_load_time
+  FROM analytics_page_views
+  WHERE timestamp >= (SELECT deployed_at FROM deployment_time) - INTERVAL '24 hours'
+    AND timestamp < (SELECT deployed_at FROM deployment_time)
+),
+after_metrics AS (
+  SELECT
+    'after' as period,
+    COUNT(DISTINCT session_id) as sessions,
+    COUNT(*) FILTER (WHERE event_type IN ('click_call', 'favorite_add')) as actions,
+    ROUND(AVG(load_time_ms), 0) as avg_load_time
+  FROM analytics_page_views
+  WHERE timestamp >= (SELECT deployed_at FROM deployment_time)
+    AND timestamp < (SELECT deployed_at FROM deployment_time) + INTERVAL '24 hours'
+)
+SELECT * FROM before_metrics
+UNION ALL
+SELECT * FROM after_metrics;
+```
+
+**Find Deployments During Anomalies**:
+
+```sql
+-- If conversion rate dropped on Oct 15, which deployments happened that day?
+SELECT
+  deployed_at,
+  git_commit_message,
+  description
+FROM analytics_deployments
+WHERE deployed_at::DATE = '2025-10-15'
+ORDER BY deployed_at;
+```
+
+**Overlay Deployments on Time-Series Chart**:
+
+```typescript
+// Fetch deployment markers for a chart
+const { data: deployments } = await supabase
+  .from('analytics_deployments')
+  .select('deployed_at, description')
+  .gte('deployed_at', startDate)
+  .lte('deployed_at', endDate)
+  .order('deployed_at')
+
+// Render as vertical lines on chart with tooltips
+```
+
+---
+
+### 5. Deployment Dashboard
+
+**Admin View** (`/admin/analytics/deployments`):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Recent Deployments                           [+ Log New]   │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ✅ Jan 10, 2026 14:23 UTC                                  │
+│     3a4f5c2 • main • Fix: Resolve search timeout             │
+│     Deployed by: github-actions                              │
+│     [View Metrics Impact] [Rollback]                         │
+│                                                              │
+│  ✅ Jan 9, 2026 09:15 UTC                                   │
+│     7b2e1d9 • main • Feat: Add filter by hours open         │
+│     Deployed by: gserafini@gmail.com                         │
+│     Impact: +12% search engagement ⬆                         │
+│     [View Metrics Impact]                                    │
+│                                                              │
+│  ⚠️ Jan 8, 2026 16:45 UTC                                   │
+│     9f3c5a1 • main • Refactor: Update map clustering         │
+│     Deployed by: github-actions                              │
+│     ⚠️ Rolled back at Jan 8, 18:22 UTC                       │
+│     Reason: 403 errors on map load                           │
+│     [View Rollback Details]                                  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Metrics Impact View** (click into a deployment):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Deployment: 3a4f5c2 - Fix: Resolve search timeout          │
+│  Deployed: Jan 10, 2026 14:23 UTC                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  24 Hours Before → After                                     │
+│  ───────────────────────────                                 │
+│                                                              │
+│  Sessions:         1,243 → 1,289  (↑ 3.7%)                  │
+│  Searches:           847 → 921   (↑ 8.7%) ✅                │
+│  Search Timeouts:     34 → 2     (↓ 94%) 🎉                 │
+│  Conversion Rate:   18.2% → 19.1% (↑ 0.9pp)                  │
+│  Avg Load Time:     2.1s → 1.8s  (↓ 14%) ✅                 │
+│                                                              │
+│  ✅ Successful deployment - metrics improved                 │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 6. Best Practices
+
+**Do's**:
+- ✅ **Log every production deployment** (even if "just a hotfix")
+- ✅ **Include commit message** (helps future debugging)
+- ✅ **Check metrics 24h after** major changes
+- ✅ **Mark rollbacks explicitly** (don't just deploy previous version)
+- ✅ **Tag releases** (v1.0.0, v1.1.0) for milestone tracking
+
+**Don'ts**:
+- ❌ **Don't tie sessions to deployments** (adds complexity, rarely needed)
+- ❌ **Don't overreact to noise** (wait 24h for statistical significance)
+- ❌ **Don't blame deployments exclusively** (marketing, seasonality also affect metrics)
+- ❌ **Don't log staging/preview deployments** (unless specifically debugging)
+
+**Decision Framework**:
+
+```
+Metric changed significantly?
+  ↓ YES
+Check: Was there a deployment in past 24h?
+  ↓ YES
+Run before/after query → Large difference?
+  ↓ YES
+Review git diff for that commit → Likely cause?
+  ↓ YES
+Options:
+  - Rollback if breaking
+  - Hotfix if minor
+  - Monitor if unsure
+  ↓ NO
+Check other factors:
+  - Marketing campaign?
+  - Holiday/weekend?
+  - External outage?
+  - Seasonal trend?
+```
 
 ---
 
