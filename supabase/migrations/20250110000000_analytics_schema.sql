@@ -647,30 +647,42 @@ ORDER BY search_count DESC;
 CREATE UNIQUE INDEX idx_search_gaps_7d ON analytics_search_gaps_7d(search_query);
 
 -- =====================================================
--- DEPLOYMENT TRACKING
+-- ANALYTICS TIMELINE ANNOTATIONS
 -- =====================================================
 
--- Deployment tracking for change attribution
-CREATE TABLE analytics_deployments (
+-- Flexible annotation system for tracking events that affect metrics
+-- Supports deployments, press mentions, partnerships, incidents, holidays, etc.
+CREATE TABLE analytics_annotations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  deployed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  git_commit_hash TEXT,                      -- Short hash: '3a4f5c2'
-  git_branch TEXT,                           -- 'main', 'feat/new-search'
-  git_commit_message TEXT,                   -- Full commit message
-  version_tag TEXT,                          -- 'v1.2.3' (if tagged release)
-  deployed_by TEXT,                          -- 'github-actions' or email
-  vercel_deployment_id TEXT,                 -- Vercel deployment URL
-  description TEXT,                          -- Human-readable description
-  deployment_type TEXT DEFAULT 'production', -- 'production', 'staging', 'preview'
-  is_rollback BOOLEAN DEFAULT false,
-  rolled_back_at TIMESTAMPTZ,
-  metadata JSONB,                            -- CI/CD info, PR number, etc.
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  event_type TEXT NOT NULL,                  -- 'deployment', 'press', 'partnership', 'incident', 'holiday', 'marketing', 'policy_change', 'milestone'
+  title TEXT NOT NULL,                       -- Short description: "Deploy v1.2.3" or "TechCrunch article"
+  description TEXT,                          -- Longer context
+
+  -- Clickable links for easy investigation
+  url TEXT,                                  -- Primary URL (GitHub commit, article, Vercel deployment, etc.)
+  secondary_urls JSONB,                      -- Array of related URLs: ["https://...", "https://..."]
+
+  -- Searchable metadata
+  tags TEXT[],                               -- ['bug', 'critical'] or ['marketing', 'email-campaign']
+  severity TEXT DEFAULT 'info',              -- 'info', 'warning', 'critical' (for incidents)
+  impact_assessment TEXT DEFAULT 'unknown',  -- 'positive', 'negative', 'neutral', 'unknown'
+
+  -- Attribution
+  created_by UUID REFERENCES users(id),      -- Who logged it (NULL if automated)
+  source TEXT NOT NULL,                      -- 'manual', 'github-actions', 'ai-agent', 'monitoring-alert'
+
+  -- Flexible metadata for any event type
+  metadata JSONB,                            -- Type-specific data
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_deployments_time ON analytics_deployments(deployed_at DESC);
-CREATE INDEX idx_deployments_branch ON analytics_deployments(git_branch);
-CREATE INDEX idx_deployments_type ON analytics_deployments(deployment_type);
+CREATE INDEX idx_annotations_time ON analytics_annotations(timestamp DESC);
+CREATE INDEX idx_annotations_type ON analytics_annotations(event_type);
+CREATE INDEX idx_annotations_tags ON analytics_annotations USING GIN(tags);
+CREATE INDEX idx_annotations_severity ON analytics_annotations(severity) WHERE severity IN ('warning', 'critical');
 
 -- =====================================================
 -- AGGREGATE FUNCTIONS
@@ -729,4 +741,4 @@ COMMENT ON TABLE analytics_experiments IS 'A/B test experiments';
 COMMENT ON TABLE analytics_experiment_assignments IS 'A/B test variant assignments';
 COMMENT ON TABLE analytics_experiment_conversions IS 'A/B test conversion tracking';
 COMMENT ON TABLE analytics_admin_events IS 'Admin action tracking';
-COMMENT ON TABLE analytics_deployments IS 'Deployment tracking for change attribution and regression detection';
+COMMENT ON TABLE analytics_annotations IS 'Timeline annotations for all events affecting metrics (deployments, press, partnerships, incidents, holidays, etc.)';

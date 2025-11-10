@@ -1193,183 +1193,524 @@ ORDER BY metric_month DESC;
 
 ---
 
-## Deployment Tracking & Change Attribution
+## Analytics Timeline Annotations
 
-### Challenge: Correlating Behavior Changes with Code Changes
+### Challenge: Understanding Why Metrics Change
 
-**Problem**: Metrics change suddenly. Was it a bug? A feature? A marketing campaign? Hard to know without deployment history.
+**Problem**: Metrics change suddenly. Was it a deployment? A press mention? A bug? A marketing campaign? A holiday? Hard to diagnose without context.
 
-**Solution**: Lightweight deployment log with timestamp-based correlation (not session-level coupling).
+**Solution**: Flexible annotation system where both humans and AI agents can mark significant events on the analytics timeline.
 
 ---
 
-### 1. Why Track Deployments?
+### 1. What Are Annotations?
+
+**Concept**: Annotations are markers on your analytics timeline that explain **why** metrics changed.
+
+**Example Timeline with Annotations**:
+
+```
+Conversion Rate Chart (Past 30 Days)
+
+25% ┤                        🔵 Press mention
+    │                      ╱╲
+20% ┤    🟢 Deploy v1.2  ╱  ╲  🔴 Bug discovered
+    │                  ╱    ╲╱
+15% ┤  ╱╲            ╱
+    │╱  ╲          ╱
+10% ┴────┴────┴────┴────┴────┴────┴────┴────
+    Jan 1    8   15   22   29  Feb 5   12
+
+🟢 = Deployment (auto-annotated)
+🔵 = External event (manual)
+🔴 = Incident (auto-detected by AI)
+```
 
 **Use Cases**:
 - ✅ **Regression Detection**: "Conversion rate dropped 15% after yesterday's deployment"
 - ✅ **Feature Impact**: "New search filters increased engagement by 8%"
-- ✅ **Performance Monitoring**: "Page load time spiked after v2.3.1"
-- ✅ **A/B Test Attribution**: "Experiment started during a deployment, invalidating early results"
-- ✅ **Rollback Decisions**: "Should we revert? Let's check metrics 3 hours pre/post deployment"
+- ✅ **External Attribution**: "Traffic spike from TechCrunch article"
+- ✅ **Incident Tracking**: "Search timeouts from Supabase outage"
+- ✅ **Seasonal Context**: "Holiday weekend - lower engagement expected"
+- ✅ **Partnership Launch**: "211.org started referring users today"
 
-**Anti-Patterns to Avoid**:
-- ❌ **Don't**: Store deployment_id on every session (bloats data, tight coupling)
-- ❌ **Don't**: Tie metrics to Vercel deployment IDs (creates external dependency)
-- ✅ **Do**: Simple timestamp-based log that can be overlaid on metric charts
+**Key Insight**: Most metric changes are NOT from deployments - they're from external factors, bugs, seasonality, or partnerships. Annotations capture all of these.
 
 ---
 
-### 2. Deployment Tracking Table
+### 2. Annotation Database Schema
 
-**Database Schema**:
+**Flexible, generic table for all timeline events**:
 
 ```sql
-CREATE TABLE analytics_deployments (
+CREATE TABLE analytics_annotations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  deployed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  git_commit_hash TEXT,                -- '3a4f5c2'
-  git_branch TEXT,                      -- 'main' or 'feat/new-search'
-  git_commit_message TEXT,              -- 'fix: resolve map marker clustering'
-  version_tag TEXT,                     -- 'v1.2.3' (if tagged release)
-  deployed_by TEXT,                     -- 'github-actions' or 'gserafini@gmail.com'
-  vercel_deployment_id TEXT,            -- Optional: Vercel's deployment URL
-  description TEXT,                     -- Human-readable: "Holiday homepage redesign"
-  deployment_type TEXT DEFAULT 'production', -- 'production', 'staging', 'preview'
-  is_rollback BOOLEAN DEFAULT false,
-  rolled_back_at TIMESTAMPTZ,           -- If deployment was later rolled back
-  metadata JSONB,                       -- Flexible: CI/CD info, PR number, etc.
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  event_type TEXT NOT NULL,              -- 'deployment', 'press', 'partnership', 'incident', 'holiday', 'marketing', 'policy_change', 'milestone'
+  title TEXT NOT NULL,                   -- Short description: "Deploy v1.2.3" or "TechCrunch article"
+  description TEXT,                      -- Longer context
+
+  -- Clickable links for easy investigation
+  url TEXT,                              -- Primary URL (GitHub commit, article, Vercel deployment, etc.)
+  secondary_urls JSONB,                  -- Array of related URLs: ["https://...", "https://..."]
+
+  -- Searchable metadata
+  tags TEXT[],                           -- ['bug', 'critical'] or ['marketing', 'email-campaign']
+  severity TEXT,                         -- 'info', 'warning', 'critical' (for incidents)
+  impact_assessment TEXT,                -- 'positive', 'negative', 'neutral', 'unknown'
+
+  -- Attribution
+  created_by UUID REFERENCES users(id),  -- Who logged it (NULL if automated)
+  source TEXT,                           -- 'manual', 'github-actions', 'ai-agent', 'monitoring-alert'
+
+  -- Flexible metadata for any event type
+  metadata JSONB,                        -- Type-specific data
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_deployments_time ON analytics_deployments(deployed_at DESC);
-CREATE INDEX idx_deployments_branch ON analytics_deployments(git_branch);
+CREATE INDEX idx_annotations_time ON analytics_annotations(timestamp DESC);
+CREATE INDEX idx_annotations_type ON analytics_annotations(event_type);
+CREATE INDEX idx_annotations_tags ON analytics_annotations USING GIN(tags);
+CREATE INDEX idx_annotations_severity ON analytics_annotations(severity) WHERE severity IN ('warning', 'critical');
 
--- Enable RLS (admin-only)
-ALTER TABLE analytics_deployments ENABLE ROW LEVEL SECURITY;
+-- Enable RLS (admin-only writes, public reads for transparency)
+ALTER TABLE analytics_annotations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Admins can view deployments"
-  ON analytics_deployments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Anyone can view annotations"
+  ON analytics_annotations FOR SELECT
+  USING (true);
 
-CREATE POLICY "Admins can log deployments"
-  ON analytics_deployments FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins and agents can create annotations"
+  ON analytics_annotations FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true)
+    OR source = 'ai-agent'  -- AI agents can auto-annotate
+  );
 ```
+
+**Why this structure is better**:
+- ✅ **One table for everything** (not separate deployment/press/incident tables)
+- ✅ **Clickable URLs** make investigation instant
+- ✅ **Tags enable filtering** ("Show me all 'bug' annotations")
+- ✅ **Severity highlights critical events** in red on timeline
+- ✅ **Impact assessment** helps correlate with metrics
+- ✅ **Flexible metadata** via JSONB for event-specific data
 
 ---
 
-### 3. How to Log Deployments
+### 3. Annotation Examples with Clickable URLs
 
-**Option A: Automated via CI/CD (Recommended)**
+**Example 1: Deployment (Auto-annotated)**
 
-Add to GitHub Actions workflow (`.github/workflows/deploy.yml`):
-
-```yaml
-name: Deploy to Production
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 2  # Get previous commit for diff
-
-      - name: Deploy to Vercel
-        id: vercel
-        run: |
-          vercel deploy --prod > deployment-url.txt
-          echo "url=$(cat deployment-url.txt)" >> $GITHUB_OUTPUT
-
-      - name: Log deployment to analytics
-        env:
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          curl -X POST "${SUPABASE_URL}/rest/v1/analytics_deployments" \
-            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "deployed_at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
-              "git_commit_hash": "'"$(git rev-parse --short HEAD)"'",
-              "git_branch": "'"${{ github.ref_name }}"'",
-              "git_commit_message": "'"$(git log -1 --pretty=%s)"'",
-              "version_tag": "'"$(git describe --tags --abbrev=0 2>/dev/null || echo null)"'",
-              "deployed_by": "github-actions",
-              "vercel_deployment_id": "'"${{ steps.vercel.outputs.url }}"'",
-              "deployment_type": "production"
-            }'
+```json
+{
+  "event_type": "deployment",
+  "title": "Deploy v1.2.3 - Fix search timeout bug",
+  "description": "Deployed fix for search timeout issue affecting 5% of users",
+  "url": "https://github.com/gserafini/reentry-map/commit/3a4f5c2",
+  "secondary_urls": [
+    "https://reentry-map.vercel.app/deployments/abc123",
+    "https://github.com/gserafini/reentry-map/pull/42"
+  ],
+  "tags": ["deployment", "bug-fix", "search"],
+  "severity": "info",
+  "impact_assessment": "positive",
+  "source": "github-actions",
+  "metadata": {
+    "git_hash": "3a4f5c2",
+    "git_branch": "main",
+    "pr_number": 42,
+    "files_changed": 3,
+    "tests_passed": true
+  }
+}
 ```
 
-**Option B: Manual Logging (Quick Start)**
+**Example 2: Press Mention (Manual)**
 
-Admin page (`/admin/analytics/deployments/new`):
+```json
+{
+  "event_type": "press",
+  "title": "Featured in TechCrunch article",
+  "description": "Article about reentry resources in Oakland mentioned our app",
+  "url": "https://techcrunch.com/2025/01/15/reentry-resources",
+  "secondary_urls": [
+    "https://twitter.com/TechCrunch/status/123456",
+    "https://news.ycombinator.com/item?id=789"
+  ],
+  "tags": ["press", "traffic-spike", "marketing"],
+  "severity": "info",
+  "impact_assessment": "positive",
+  "source": "manual",
+  "created_by": "user_uuid_here",
+  "metadata": {
+    "outlet": "TechCrunch",
+    "estimated_reach": 500000,
+    "social_shares": 1247
+  }
+}
+```
+
+**Example 3: Bug/Incident (AI-detected)**
+
+```json
+{
+  "event_type": "incident",
+  "title": "Supabase API timeout spike",
+  "description": "Search queries timing out after 5 seconds, affecting 45% of searches for 23 minutes",
+  "url": "https://status.supabase.com/incidents/2025-01-10",
+  "secondary_urls": [
+    "https://sentry.io/issues/987654321/"
+  ],
+  "tags": ["outage", "supabase", "search"],
+  "severity": "critical",
+  "impact_assessment": "negative",
+  "source": "ai-agent",
+  "metadata": {
+    "error_count": 342,
+    "affected_users": 127,
+    "duration_minutes": 23,
+    "resolved_at": "2025-01-10T14:45:00Z"
+  }
+}
+```
+
+**Example 4: Partnership Launch (Manual)**
+
+```json
+{
+  "event_type": "partnership",
+  "title": "211.org started referring users",
+  "description": "Oakland 211 directory now links to our app for reentry resources",
+  "url": "https://211oakland.org/reentry",
+  "tags": ["partnership", "referral", "211"],
+  "severity": "info",
+  "impact_assessment": "positive",
+  "source": "manual",
+  "created_by": "user_uuid_here",
+  "metadata": {
+    "partner_name": "211 Oakland",
+    "expected_referrals_per_month": 500,
+    "contract_signed_date": "2025-01-08"
+  }
+}
+```
+
+**Example 5: Holiday/Seasonal (Scheduled auto-annotation)**
+
+```json
+{
+  "event_type": "holiday",
+  "title": "Martin Luther King Jr. Day (holiday weekend)",
+  "description": "3-day weekend. Expect 30-40% lower weekday traffic patterns.",
+  "url": "https://www.timeanddate.com/holidays/us/mlk-day",
+  "tags": ["holiday", "seasonal", "expected-drop"],
+  "severity": "info",
+  "impact_assessment": "neutral",
+  "source": "ai-agent",
+  "metadata": {
+    "holiday_name": "MLK Day",
+    "days_affected": 3,
+    "expected_traffic_change": -0.35
+  }
+}
+```
+
+**Key Design Principle**: Always include the **primary URL** so reviewers can click through to investigate with zero friction.
+
+---
+
+### 4. Automation Strategy: When to Auto-Annotate vs Manual
+
+**Decision Framework**:
+
+| Event Type | Automation Level | Rationale |
+|------------|------------------|-----------|
+| **Deployments (production only)** | ✅ Fully automated | GitHub Actions webhook - zero-effort, always accurate |
+| **Preview deployments** | ❌ Don't annotate | Too noisy, not relevant to production metrics |
+| **Error spikes (5x baseline)** | ✅ Fully automated | AI agent monitors error logs, auto-creates incident annotation |
+| **Performance degradation (>2s slowdown)** | ✅ Fully automated | AI agent detects via analytics_performance_events |
+| **Traffic spikes (3x normal)** | ⚠️ Semi-automated | AI creates draft annotation, human adds context (press? campaign?) |
+| **Press mentions** | 🟡 Manual | Human adds article link, estimated reach, social shares |
+| **Partnerships** | 🟡 Manual | Human adds partner details, expected impact |
+| **Holidays** | ✅ Fully automated | Pre-scheduled based on calendar (MLK Day, Thanksgiving, etc.) |
+| **Policy changes** | 🟡 Manual | Human documents context and expected impact |
+| **Milestones** | 🟡 Manual | "Hit 10k users", "200 resources", etc. |
+
+**Key Principles**:
+1. **Automate deterministic events** (deployments, holidays, error spikes)
+2. **Manual for context-heavy events** (press, partnerships, policy)
+3. **AI drafts for ambiguous events** (traffic spikes need human context)
+4. **Always include clickable URLs** (GitHub commits, articles, status pages)
+
+---
+
+### 5. How to Implement Annotations
+
+**Option A: Automated Deployment Annotations (GitHub Actions)**
+
+Add to `.github/workflows/deploy.yml`:
+
+```yaml
+- name: Log deployment annotation
+  if: success()
+  env:
+    SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+    SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  run: |
+    curl -X POST "${SUPABASE_URL}/rest/v1/analytics_annotations" \
+      -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+      -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
+        "event_type": "deployment",
+        "title": "Deploy '"${{ github.sha }}"' - '"$(git log -1 --pretty=%s)"'",
+        "description": "Deployed to production from branch '"${{ github.ref_name }}"'",
+        "url": "https://github.com/'"${{ github.repository }}"'/commit/'"${{ github.sha }}"'",
+        "secondary_urls": ["https://github.com/'"${{ github.repository }}"'/actions/runs/'"${{ github.run_id }}"'"],
+        "tags": ["deployment", "production"],
+        "severity": "info",
+        "impact_assessment": "unknown",
+        "source": "github-actions",
+        "metadata": {
+          "git_hash": "'"$(git rev-parse --short HEAD)"'",
+          "git_branch": "'"${{ github.ref_name }}"'",
+          "workflow_run_id": "'"${{ github.run_id }}"'",
+          "actor": "'"${{ github.actor }}"'"
+        }
+      }'
+```
+
+**Option B: Manual Annotation UI**
+
+Admin page component (`/admin/analytics/annotations/new`):
 
 ```typescript
-// Simple form to log deployments manually
-export function LogDeploymentForm() {
-  async function handleSubmit(formData: FormData) {
-    const supabase = createClient()
+'use client'
 
-    await supabase.from('analytics_deployments').insert({
-      deployed_at: new Date().toISOString(),
-      git_commit_hash: formData.get('commit_hash'),
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+export function AnnotationForm() {
+  const supabase = createClient()
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+
+    await supabase.from('analytics_annotations').insert({
+      event_type: formData.get('event_type'),
+      title: formData.get('title'),
       description: formData.get('description'),
-      deployed_by: user.email,
+      url: formData.get('url'),
+      tags: formData.get('tags')?.split(',').map(t => t.trim()),
+      severity: formData.get('severity'),
+      impact_assessment: formData.get('impact_assessment'),
+      source: 'manual',
     })
   }
 
   return (
-    <form action={handleSubmit}>
-      <input name="commit_hash" placeholder="Git commit hash (optional)" />
-      <textarea name="description" placeholder="What changed? (e.g., 'Fixed search bug')" />
-      <button type="submit">Log Deployment</button>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <select name="event_type" required>
+        <option value="">Select event type...</option>
+        <option value="press">Press / Media</option>
+        <option value="partnership">Partnership</option>
+        <option value="incident">Bug / Incident</option>
+        <option value="marketing">Marketing Campaign</option>
+        <option value="policy_change">Policy Change</option>
+        <option value="milestone">Milestone</option>
+        <option value="other">Other</option>
+      </select>
+
+      <input
+        name="title"
+        placeholder="Short title (e.g., 'Featured in TechCrunch')"
+        required
+      />
+
+      <textarea
+        name="description"
+        placeholder="Additional context..."
+        rows={3}
+      />
+
+      <input
+        name="url"
+        type="url"
+        placeholder="Primary URL (article link, status page, etc.)"
+      />
+
+      <input
+        name="tags"
+        placeholder="Tags (comma-separated: press, traffic-spike)"
+      />
+
+      <select name="severity">
+        <option value="info">Info</option>
+        <option value="warning">Warning</option>
+        <option value="critical">Critical</option>
+      </select>
+
+      <select name="impact_assessment">
+        <option value="unknown">Unknown (default)</option>
+        <option value="positive">Positive</option>
+        <option value="neutral">Neutral</option>
+        <option value="negative">Negative</option>
+      </select>
+
+      <button type="submit">Add Annotation</button>
     </form>
   )
 }
 ```
 
-**Option C: API Endpoint (Most Flexible)**
+**Option C: AI Agent Auto-Annotations**
+
+Example: AI agent detects error spike and auto-creates annotation:
 
 ```typescript
-// app/api/analytics/deployments/route.ts
-export async function POST(request: Request) {
-  const { commit_hash, description, vercel_deployment_id } = await request.json()
+// lib/ai-agents/monitoring-agent.ts
+export async function monitorErrorSpikes() {
   const supabase = createClient()
 
-  // Verify admin (could also use a secret token for CI/CD)
-  const { data: user } = await supabase.auth.getUser()
-  if (!user?.is_admin) {
-    return new Response('Unauthorized', { status: 401 })
+  // Check error rate in past hour
+  const { data: errors } = await supabase
+    .from('analytics_performance_events')
+    .select('*')
+    .gte('timestamp', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    .eq('event_type', 'error')
+
+  const errorRate = errors.length / 60 // Errors per minute
+  const baseline = await getBaselineErrorRate() // Historical average
+
+  if (errorRate > baseline * 5) {
+    // 5x spike - create annotation
+    await supabase.from('analytics_annotations').insert({
+      event_type: 'incident',
+      title: `Error spike detected: ${errorRate.toFixed(1)}/min (5x baseline)`,
+      description: `Automated detection of error rate spike. Baseline: ${baseline.toFixed(1)}/min, Current: ${errorRate.toFixed(1)}/min`,
+      url: '/admin/analytics/errors', // Link to error dashboard
+      secondary_urls: [
+        'https://sentry.io/issues/', // If using Sentry
+      ],
+      tags: ['incident', 'errors', 'auto-detected'],
+      severity: 'critical',
+      impact_assessment: 'negative',
+      source: 'ai-agent',
+      metadata: {
+        error_rate: errorRate,
+        baseline_rate: baseline,
+        spike_multiplier: errorRate / baseline,
+        affected_period_start: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      },
+    })
   }
-
-  const { error } = await supabase.from('analytics_deployments').insert({
-    git_commit_hash: commit_hash,
-    description,
-    vercel_deployment_id,
-    deployed_by: user.email,
-  })
-
-  if (error) throw error
-  return Response.json({ success: true })
 }
 ```
 
 ---
 
-### 4. Deployment Correlation Queries
+### 6. Annotation Timeline Dashboard
 
-**Metrics Before/After Deployment**:
+**Admin View** (`/admin/analytics/timeline`):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Analytics Timeline                      [+ Add Annotation] │
+├─────────────────────────────────────────────────────────────┤
+│  Filter: [All Types ▼] [All Severity ▼] [Past 30 Days ▼]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  🔴 Jan 10, 2026 14:45 UTC • CRITICAL                       │
+│     Supabase API timeout spike                              │
+│     45% of searches failing for 23 minutes                  │
+│     🔗 https://status.supabase.com/incidents/2025-01-10     │
+│     Tags: outage, supabase, search                          │
+│     Source: AI Agent (auto-detected)                        │
+│     [View Impact Analysis]                                  │
+│                                                              │
+│  🟢 Jan 10, 2026 14:23 UTC • INFO                           │
+│     Deploy v1.2.3 - Fix search timeout bug                  │
+│     🔗 https://github.com/.../commit/3a4f5c2                │
+│     🔗 https://github.com/.../pull/42                       │
+│     Tags: deployment, bug-fix, search                       │
+│     Source: GitHub Actions                                  │
+│     Impact: +8.7% search volume ⬆                           │
+│     [View Metrics]                                          │
+│                                                              │
+│  🔵 Jan 9, 2026 11:30 UTC • INFO                            │
+│     Featured in TechCrunch article                          │
+│     "Oakland's Reentry Resource App Helps..."               │
+│     🔗 https://techcrunch.com/2025/01/09/reentry-resources  │
+│     🔗 https://twitter.com/TechCrunch/status/123456         │
+│     Tags: press, traffic-spike, marketing                   │
+│     Source: Manual (gserafini@gmail.com)                    │
+│     Impact: +342% traffic spike ⬆                           │
+│     [View Traffic Graph]                                    │
+│                                                              │
+│  🟡 Jan 8, 2026 09:00 UTC • INFO                            │
+│     Partnership: 211.org started referring users            │
+│     🔗 https://211oakland.org/reentry                       │
+│     Tags: partnership, referral, 211                        │
+│     Source: Manual                                          │
+│     Expected: +500 referrals/month                          │
+│                                                              │
+│  🟠 Jan 1, 2026 00:00 UTC • INFO                            │
+│     New Year's Day (holiday)                                │
+│     Expect 30-40% lower traffic than typical weekday        │
+│     🔗 https://www.timeanddate.com/holidays/us/new-year     │
+│     Tags: holiday, seasonal                                 │
+│     Source: AI Agent (scheduled)                            │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Features**:
+- ✅ **Clickable URLs** on every annotation (one-click investigation)
+- ✅ **Color-coded severity** (red=critical, yellow=warning, green/blue=info)
+- ✅ **Impact indicators** show metric changes (+342% traffic, +8.7% searches)
+- ✅ **Filter by type/severity/date** to focus on relevant events
+- ✅ **Source attribution** shows if human, AI, or automated
+
+**Overlay on Metric Charts**:
+
+```typescript
+// Fetch annotations for date range
+const { data: annotations } = await supabase
+  .from('analytics_annotations')
+  .select('*')
+  .gte('timestamp', startDate)
+  .lte('timestamp', endDate)
+  .order('timestamp')
+
+// Render as vertical markers on chart
+<Chart>
+  <Line data={metrics} />
+  {annotations.map(a => (
+    <VerticalLine
+      x={a.timestamp}
+      color={a.severity === 'critical' ? 'red' : 'blue'}
+      label={a.title}
+      onClick={() => showAnnotationDetails(a)}
+    />
+  ))}
+</Chart>
+```
+
+---
+
+### 7. Correlation Queries
+
+**Metrics Before/After Any Annotation**:
 
 ```sql
--- Compare metrics 24 hours before/after a specific deployment
-WITH deployment_time AS (
-  SELECT deployed_at FROM analytics_deployments WHERE id = '...'
+-- Compare metrics 24 hours before/after a specific event
+WITH event_time AS (
+  SELECT timestamp FROM analytics_annotations WHERE id = '...'
 ),
 before_metrics AS (
   SELECT
@@ -1378,8 +1719,8 @@ before_metrics AS (
     COUNT(*) FILTER (WHERE event_type IN ('click_call', 'favorite_add')) as actions,
     ROUND(AVG(load_time_ms), 0) as avg_load_time
   FROM analytics_page_views
-  WHERE timestamp >= (SELECT deployed_at FROM deployment_time) - INTERVAL '24 hours'
-    AND timestamp < (SELECT deployed_at FROM deployment_time)
+  WHERE timestamp >= (SELECT timestamp FROM event_time) - INTERVAL '24 hours'
+    AND timestamp < (SELECT timestamp FROM event_time)
 ),
 after_metrics AS (
   SELECT
@@ -1388,133 +1729,81 @@ after_metrics AS (
     COUNT(*) FILTER (WHERE event_type IN ('click_call', 'favorite_add')) as actions,
     ROUND(AVG(load_time_ms), 0) as avg_load_time
   FROM analytics_page_views
-  WHERE timestamp >= (SELECT deployed_at FROM deployment_time)
-    AND timestamp < (SELECT deployed_at FROM deployment_time) + INTERVAL '24 hours'
+  WHERE timestamp >= (SELECT timestamp FROM event_time)
+    AND timestamp < (SELECT timestamp FROM event_time) + INTERVAL '24 hours'
 )
 SELECT * FROM before_metrics
 UNION ALL
 SELECT * FROM after_metrics;
 ```
 
-**Find Deployments During Anomalies**:
+**Find Annotations During Anomalies**:
 
 ```sql
--- If conversion rate dropped on Oct 15, which deployments happened that day?
+-- If conversion rate dropped on Oct 15, what events happened?
 SELECT
-  deployed_at,
-  git_commit_message,
-  description
-FROM analytics_deployments
-WHERE deployed_at::DATE = '2025-10-15'
-ORDER BY deployed_at;
-```
-
-**Overlay Deployments on Time-Series Chart**:
-
-```typescript
-// Fetch deployment markers for a chart
-const { data: deployments } = await supabase
-  .from('analytics_deployments')
-  .select('deployed_at, description')
-  .gte('deployed_at', startDate)
-  .lte('deployed_at', endDate)
-  .order('deployed_at')
-
-// Render as vertical lines on chart with tooltips
+  event_type,
+  title,
+  url,
+  severity,
+  impact_assessment,
+  tags
+FROM analytics_annotations
+WHERE timestamp::DATE = '2025-10-15'
+ORDER BY timestamp;
 ```
 
 ---
 
-### 5. Deployment Dashboard
-
-**Admin View** (`/admin/analytics/deployments`):
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Recent Deployments                           [+ Log New]   │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ✅ Jan 10, 2026 14:23 UTC                                  │
-│     3a4f5c2 • main • Fix: Resolve search timeout             │
-│     Deployed by: github-actions                              │
-│     [View Metrics Impact] [Rollback]                         │
-│                                                              │
-│  ✅ Jan 9, 2026 09:15 UTC                                   │
-│     7b2e1d9 • main • Feat: Add filter by hours open         │
-│     Deployed by: gserafini@gmail.com                         │
-│     Impact: +12% search engagement ⬆                         │
-│     [View Metrics Impact]                                    │
-│                                                              │
-│  ⚠️ Jan 8, 2026 16:45 UTC                                   │
-│     9f3c5a1 • main • Refactor: Update map clustering         │
-│     Deployed by: github-actions                              │
-│     ⚠️ Rolled back at Jan 8, 18:22 UTC                       │
-│     Reason: 403 errors on map load                           │
-│     [View Rollback Details]                                  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Metrics Impact View** (click into a deployment):
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Deployment: 3a4f5c2 - Fix: Resolve search timeout          │
-│  Deployed: Jan 10, 2026 14:23 UTC                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  24 Hours Before → After                                     │
-│  ───────────────────────────                                 │
-│                                                              │
-│  Sessions:         1,243 → 1,289  (↑ 3.7%)                  │
-│  Searches:           847 → 921   (↑ 8.7%) ✅                │
-│  Search Timeouts:     34 → 2     (↓ 94%) 🎉                 │
-│  Conversion Rate:   18.2% → 19.1% (↑ 0.9pp)                  │
-│  Avg Load Time:     2.1s → 1.8s  (↓ 14%) ✅                 │
-│                                                              │
-│  ✅ Successful deployment - metrics improved                 │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 6. Best Practices
+### 8. Best Practices
 
 **Do's**:
-- ✅ **Log every production deployment** (even if "just a hotfix")
-- ✅ **Include commit message** (helps future debugging)
-- ✅ **Check metrics 24h after** major changes
-- ✅ **Mark rollbacks explicitly** (don't just deploy previous version)
-- ✅ **Tag releases** (v1.0.0, v1.1.0) for milestone tracking
+- ✅ **Always include clickable URLs** (GitHub commits, articles, status pages)
+- ✅ **Automate deterministic events** (deployments, holidays, error spikes)
+- ✅ **Add context to manual annotations** (why does this matter? what was the expected impact?)
+- ✅ **Use tags liberally** (easier filtering in timeline view)
+- ✅ **Set severity appropriately** (critical = immediate action needed, info = FYI)
+- ✅ **Check timeline before blaming code** (most metric changes aren't deployments!)
 
 **Don'ts**:
-- ❌ **Don't tie sessions to deployments** (adds complexity, rarely needed)
-- ❌ **Don't overreact to noise** (wait 24h for statistical significance)
-- ❌ **Don't blame deployments exclusively** (marketing, seasonality also affect metrics)
-- ❌ **Don't log staging/preview deployments** (unless specifically debugging)
+- ❌ **Don't over-annotate** (only significant events, not every tiny deploy)
+- ❌ **Don't forget secondary URLs** (PR link, Vercel deployment, social media)
+- ❌ **Don't annotate preview deployments** (too noisy, not relevant)
+- ❌ **Don't leave impact_assessment as "unknown" forever** (update after 24h once impact is clear)
+- ❌ **Don't write vague titles** ("Deployed code" → "Deploy v1.2.3 - Fix search timeout")
 
-**Decision Framework**:
+**Decision Framework for Diagnosing Metric Changes**:
 
 ```
 Metric changed significantly?
   ↓ YES
-Check: Was there a deployment in past 24h?
-  ↓ YES
-Run before/after query → Large difference?
-  ↓ YES
-Review git diff for that commit → Likely cause?
-  ↓ YES
-Options:
-  - Rollback if breaking
-  - Hotfix if minor
-  - Monitor if unsure
-  ↓ NO
-Check other factors:
-  - Marketing campaign?
-  - Holiday/weekend?
-  - External outage?
-  - Seasonal trend?
+Check annotations timeline → Any events in past 24h?
+  ↓ YES (Deployment)
+  |   → Run before/after metrics query
+  |   → Review git diff for that commit
+  |   → Likely code-related
+  |
+  ├ YES (Press mention or partnership)
+  |   → Expected traffic spike
+  |   → Validate with referrer data
+  |   → Likely external factor
+  |
+  ├ YES (Incident/error spike)
+  |   → Check error logs
+  |   → Investigate root cause
+  |   → Likely infrastructure issue
+  |
+  └ YES (Holiday)
+      → Expected seasonal pattern
+      → Compare to previous year
+      → Likely seasonal variation
+
+  ↓ NO (No annotations)
+  Check other factors:
+    - Day of week pattern? (weekends differ)
+    - Time of day? (evening vs morning)
+    - Gradual trend vs sudden spike?
+    - Consider adding annotation to explain it
 ```
 
 ---
