@@ -3421,6 +3421,964 @@ export async function challengeSuspiciousSession(sessionId: string) {
 
 ---
 
+## Conversion Funnel Management System
+
+### Challenge: Defining & Tracking User Journeys
+
+**Problem**: Conversion funnels are typically hardcoded, making it difficult to add new funnels, modify steps, or experiment with different user journeys.
+
+**Solution**: Visual funnel builder with database-driven configuration - no code changes needed!
+
+---
+
+### 1. Funnel Definition Schema
+
+**Database Table** (already created in analytics schema):
+
+```sql
+-- Funnels are stored in analytics_experiments table
+-- Steps are tracked in analytics_funnel_events table
+-- This allows dynamic funnel creation without code changes
+
+CREATE TABLE analytics_funnel_definitions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,              -- 'search-to-action'
+  display_name TEXT NOT NULL,             -- 'Search to Action Funnel'
+  description TEXT,
+  steps JSONB NOT NULL,                   -- Array of step definitions
+  success_event TEXT NOT NULL,            -- Final step name
+  is_active BOOLEAN DEFAULT true,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_funnel_defs_active ON analytics_funnel_definitions(is_active);
+
+-- Enable RLS
+ALTER TABLE analytics_funnel_definitions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can manage funnel definitions"
+  ON analytics_funnel_definitions FOR ALL
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+```
+
+---
+
+### 2. Three Sample Conversion Funnels
+
+#### Sample Funnel 1: Search → Action
+
+**Goal**: Measure how many users who search actually take action on a resource
+
+**Business Value**: Optimize search relevance and resource presentation to increase calls/directions
+
+**Steps**:
+1. **Search Performed** - User enters search query (with results >0)
+2. **Resource Opened** - User clicks on a resource detail page
+3. **Action Taken** - User calls, gets directions, or favorites
+
+**SQL to Create**:
+
+```sql
+INSERT INTO analytics_funnel_definitions (name, display_name, description, steps, success_event)
+VALUES (
+  'search-to-action',
+  'Search to Action Funnel',
+  'Tracks users from search to taking action on a resource (call, directions, favorite)',
+  '{
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "search_performed",
+        "display_name": "Performed Search",
+        "description": "User searched and got results",
+        "event_table": "analytics_search_events",
+        "event_conditions": [
+          { "field": "results_count", "operator": ">", "value": 0 }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 5
+      },
+      {
+        "step_number": 2,
+        "step_name": "resource_opened",
+        "display_name": "Opened Resource",
+        "description": "User clicked on a resource",
+        "event_table": "analytics_resource_events",
+        "event_conditions": [
+          { "field": "event_type", "operator": "equals", "value": "view" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 10
+      },
+      {
+        "step_number": 3,
+        "step_name": "action_taken",
+        "display_name": "Took Action",
+        "description": "User called, got directions, or favorited",
+        "event_table": "analytics_resource_events",
+        "event_conditions": [
+          {
+            "field": "event_type",
+            "operator": "in",
+            "value": ["click_call", "click_directions", "favorite_add"]
+          }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": null
+      }
+    ]
+  }',
+  'action_taken'
+);
+```
+
+**Expected Benchmarks**:
+- Search → Resource: 60-75%
+- Resource → Action: 20-30%
+- **Overall: 15-25%** (search to action)
+
+---
+
+#### Sample Funnel 2: Sign-Up Flow
+
+**Goal**: Measure drop-off during user registration and identify friction points
+
+**Business Value**: Optimize onboarding to increase user activation
+
+**Steps**:
+1. **Clicked Sign-In** - User clicks sign-in/sign-up button
+2. **Submitted Auth** - User submitted phone/email
+3. **Verified Account** - User completed OTP/email verification
+4. **First Action** - User favorites or reviews within 24 hours
+
+**SQL to Create**:
+
+```sql
+INSERT INTO analytics_funnel_definitions (name, display_name, description, steps, success_event)
+VALUES (
+  'signup-flow',
+  'Sign-Up Activation Funnel',
+  'Tracks users through registration from sign-in click to first meaningful action',
+  '{
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "clicked_signin",
+        "display_name": "Clicked Sign-In",
+        "description": "User clicked sign-in button",
+        "event_table": "analytics_feature_events",
+        "event_conditions": [
+          { "field": "feature_name", "operator": "equals", "value": "auth_modal_open" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 3
+      },
+      {
+        "step_number": 2,
+        "step_name": "submitted_auth",
+        "display_name": "Submitted Auth",
+        "description": "User submitted phone/email",
+        "event_table": "analytics_feature_events",
+        "event_conditions": [
+          { "field": "feature_name", "operator": "equals", "value": "auth_submit" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 5
+      },
+      {
+        "step_number": 3,
+        "step_name": "verified_account",
+        "display_name": "Verified Account",
+        "description": "User completed verification",
+        "event_table": "analytics_feature_events",
+        "event_conditions": [
+          { "field": "feature_name", "operator": "equals", "value": "auth_verified" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 1440
+      },
+      {
+        "step_number": 4,
+        "step_name": "first_action",
+        "display_name": "First Action",
+        "description": "User favorited or reviewed",
+        "event_table": "analytics_resource_events",
+        "event_conditions": [
+          {
+            "field": "event_type",
+            "operator": "in",
+            "value": ["favorite_add", "review_submit"]
+          }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": null
+      }
+    ]
+  }',
+  'first_action'
+);
+```
+
+**Expected Benchmarks**:
+- Click → Submit: 50-70%
+- Submit → Verify: 80-90%
+- Verify → First Action: 30-50%
+- **Overall: 12-30%** (click to activation)
+
+---
+
+#### Sample Funnel 3: Review Writing
+
+**Goal**: Increase user-generated content by reducing friction in review flow
+
+**Business Value**: More reviews = better resource quality signals and community engagement
+
+**Steps**:
+1. **Resource Viewed** - User opens resource detail page
+2. **Clicked Write Review** - User clicks "Write Review" button
+3. **Started Typing** - User types in review text field
+4. **Submitted Review** - User successfully submits review
+
+**SQL to Create**:
+
+```sql
+INSERT INTO analytics_funnel_definitions (name, display_name, description, steps, success_event)
+VALUES (
+  'review-writing',
+  'Review Writing Funnel',
+  'Tracks users from viewing a resource to successfully submitting a review',
+  '{
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "resource_viewed",
+        "display_name": "Viewed Resource",
+        "description": "User opened resource detail page",
+        "event_table": "analytics_resource_events",
+        "event_conditions": [
+          { "field": "event_type", "operator": "equals", "value": "view" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 5
+      },
+      {
+        "step_number": 2,
+        "step_name": "clicked_write_review",
+        "display_name": "Clicked Write Review",
+        "description": "User clicked write review button",
+        "event_table": "analytics_feature_events",
+        "event_conditions": [
+          { "field": "feature_name", "operator": "equals", "value": "write_review_click" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": 3
+      },
+      {
+        "step_number": 3,
+        "step_name": "started_typing",
+        "display_name": "Started Typing",
+        "description": "User started typing review",
+        "event_table": "analytics_feature_events",
+        "event_conditions": [
+          { "field": "feature_name", "operator": "equals", "value": "review_text_input" }
+        ],
+        "required": false,
+        "max_time_to_next_step_minutes": 10
+      },
+      {
+        "step_number": 4,
+        "step_name": "submitted_review",
+        "display_name": "Submitted Review",
+        "description": "User successfully submitted review",
+        "event_table": "analytics_feature_events",
+        "event_conditions": [
+          { "field": "feature_name", "operator": "equals", "value": "review_submit" }
+        ],
+        "required": true,
+        "max_time_to_next_step_minutes": null
+      }
+    ]
+  }',
+  'submitted_review'
+);
+```
+
+**Expected Benchmarks**:
+- View → Click Review: 3-8%
+- Click → Start Typing: 60-80%
+- Start → Submit: 70-85%
+- **Overall: 2-5%** (view to submission)
+
+---
+
+### 3. Visual Funnel Builder UI
+
+**Admin page for creating/editing funnels without code**:
+
+**Location**: `/admin/analytics/funnels`
+
+**Features**:
+- ✅ Drag-and-drop step ordering
+- ✅ Visual step editor (no JSON editing needed)
+- ✅ Event type dropdown (page_view, search, resource, feature)
+- ✅ Condition builder (field, operator, value)
+- ✅ Time constraint configuration
+- ✅ Preview funnel analytics before saving
+
+**Screenshot Mockup**:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Create New Funnel                             [X]  │
+├─────────────────────────────────────────────────────┤
+│  Funnel Name:  [search-to-action             ]     │
+│  Display Name: [Search to Action Funnel      ]     │
+│  Description:  [Tracks users from search to   ]     │
+│                [taking action on resources    ]     │
+│                                                      │
+│  ┌────────────────────────────────────────────┐    │
+│  │  Funnel Steps                    [+ Add]   │    │
+│  ├────────────────────────────────────────────┤    │
+│  │  ≡  1. Performed Search                [×] │    │
+│  │      Event: analytics_search_events         │    │
+│  │      Condition: results_count > 0           │    │
+│  │      Max Time: 5 minutes                    │    │
+│  │                                              │    │
+│  │  ≡  2. Opened Resource                 [×] │    │
+│  │      Event: analytics_resource_events       │    │
+│  │      Condition: event_type = 'view'         │    │
+│  │      Max Time: 10 minutes                   │    │
+│  │                                              │    │
+│  │  ≡  3. Took Action                     [×] │    │
+│  │      Event: analytics_resource_events       │    │
+│  │      Condition: event_type IN (call,        │    │
+│  │                 directions, favorite)       │    │
+│  │      Max Time: None                         │    │
+│  └────────────────────────────────────────────┘    │
+│                                                      │
+│                    [Cancel]  [Save Funnel]          │
+└─────────────────────────────────────────────────────┘
+```
+
+**Implementation** is too long to include here, but see the comprehensive UI code in the full document section above.
+
+---
+
+### 4. AI Agent Integration
+
+**AI agents can create funnels from natural language**:
+
+```typescript
+// Example: AI creates funnel from prompt
+const prompt = "Create a funnel to track users who search for housing resources and then call a provider"
+
+const response = await fetch('/api/ai/create-funnel', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ prompt })
+})
+
+// AI will:
+// 1. Parse intent ("search for housing" → "call provider")
+// 2. Map to event tables (analytics_search_events, analytics_resource_events)
+// 3. Define steps with appropriate conditions
+// 4. Generate funnel definition
+// 5. Insert into database
+
+// Result:
+{
+  "name": "housing-search-to-call",
+  "display_name": "Housing Search → Call Funnel",
+  "steps": [
+    {
+      "step_number": 1,
+      "step_name": "searched_housing",
+      "event_table": "analytics_search_events",
+      "event_conditions": [
+        { "field": "filters->category", "operator": "equals", "value": "housing" }
+      ]
+    },
+    {
+      "step_number": 2,
+      "step_name": "called_provider",
+      "event_table": "analytics_resource_events",
+      "event_conditions": [
+        { "field": "event_type", "operator": "equals", "value": "click_call" }
+      ]
+    }
+  ]
+}
+```
+
+**AI agent can also answer questions**:
+
+```typescript
+// "Which funnel has the worst drop-off?"
+const analysis = await analyzeAllFunnels()
+// Returns: "Sign-Up Funnel has 73% drop-off at 'Submit Auth' step"
+
+// "How can we improve the review writing funnel?"
+const suggestions = await suggestFunnelOptimizations('review-writing')
+// Returns: "Move 'Write Review' button above fold. Current position requires scrolling, causing 45% drop-off"
+```
+
+---
+
+## A/B Testing System
+
+### Challenge: Making Data-Driven UX Decisions
+
+**Problem**: Guessing which design/copy/flow works best leads to suboptimal UX
+
+**Solution**: Built-in A/B testing framework with statistical significance
+
+---
+
+### 1. How A/B Testing Works
+
+**Concept**: Show different versions to different users, measure which performs better
+
+**Example**: Should the "Call" button be green or blue?
+- **Control (A)**: Green button (current)
+- **Treatment (B)**: Blue button (new)
+- **Metric**: Click-through rate
+- **Winner**: Whichever has statistically significant higher clicks
+
+---
+
+### 2. Database Schema (Already Created)
+
+```sql
+-- Experiments table
+CREATE TABLE analytics_experiments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  hypothesis TEXT,                      -- "Blue buttons will increase clicks by 15%"
+  variants JSONB NOT NULL,              -- [{"name": "control", "weight": 0.5}, {"name": "blue_button", "weight": 0.5}]
+  success_metric TEXT NOT NULL,         -- 'click_call_button'
+  status TEXT DEFAULT 'draft',          -- 'draft', 'running', 'paused', 'completed'
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  winner TEXT,                          -- Variant name
+  confidence_level NUMERIC,             -- Statistical confidence (0-1)
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Assignments (which users see which variant)
+CREATE TABLE analytics_experiment_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  experiment_id UUID REFERENCES analytics_experiments(id),
+  session_id TEXT NOT NULL,
+  user_id UUID REFERENCES users(id),
+  variant TEXT NOT NULL,
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(experiment_id, session_id)
+);
+
+-- Conversions (which users completed the success metric)
+CREATE TABLE analytics_experiment_conversions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  experiment_id UUID REFERENCES analytics_experiments(id),
+  assignment_id UUID REFERENCES analytics_experiment_assignments(id),
+  session_id TEXT NOT NULL,
+  converted_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### 3. Three Sample A/B Tests
+
+#### Sample Test 1: Call Button Color
+
+**Hypothesis**: Blue "Call" button will increase click-through rate by 15%
+
+**Variants**:
+- **Control**: Green button (current, #10b981)
+- **Treatment**: Blue button (#3b82f6)
+
+**Success Metric**: `click_call_button` (analytics_resource_events where event_type = 'click_call')
+
+**SQL to Create**:
+
+```sql
+INSERT INTO analytics_experiments (name, hypothesis, variants, success_metric, status)
+VALUES (
+  'call-button-color',
+  'Blue call button will increase CTR by 15% due to higher contrast and traditional "action" color association',
+  '{
+    "variants": [
+      {
+        "name": "control",
+        "display_name": "Green Button (Current)",
+        "weight": 0.5,
+        "config": { "color": "#10b981", "label": "Call" }
+      },
+      {
+        "name": "blue_button",
+        "display_name": "Blue Button",
+        "weight": 0.5,
+        "config": { "color": "#3b82f6", "label": "Call" }
+      }
+    ]
+  }',
+  'click_call_button',
+  'draft'
+);
+```
+
+**How to Use in Code**:
+
+```typescript
+// In ResourceCard component
+import { useExperiment } from '@/lib/utils/ab-testing'
+
+export function ResourceCard({ resource }) {
+  const { variant, trackConversion } = useExperiment('call-button-color')
+
+  const buttonColor = variant?.config?.color || '#10b981' // Default to green
+
+  return (
+    <Button
+      style={{ backgroundColor: buttonColor }}
+      href={`tel:${resource.phone}`}
+      onClick={() => trackConversion()}
+      data-analytics="click_call"
+    >
+      Call
+    </Button>
+  )
+}
+```
+
+**Expected Duration**: 2 weeks (need ~500 conversions per variant for significance)
+
+---
+
+#### Sample Test 2: Favorite Button Placement
+
+**Hypothesis**: Favorite button on resource cards (vs only on detail page) will increase favorites by 25%
+
+**Variants**:
+- **Control**: Favorite button only on detail page
+- **Treatment**: Favorite button on both card and detail page
+
+**Success Metric**: `favorite_add` (analytics_resource_events where event_type = 'favorite_add')
+
+**SQL to Create**:
+
+```sql
+INSERT INTO analytics_experiments (name, hypothesis, variants, success_metric, status)
+VALUES (
+  'favorite-button-placement',
+  'Showing favorite button on resource cards (in addition to detail page) will increase favorites by 25% due to reduced friction',
+  '{
+    "variants": [
+      {
+        "name": "control",
+        "display_name": "Detail Page Only",
+        "weight": 0.5,
+        "config": { "show_on_card": false, "show_on_detail": true }
+      },
+      {
+        "name": "both_locations",
+        "display_name": "Card + Detail Page",
+        "weight": 0.5,
+        "config": { "show_on_card": true, "show_on_detail": true }
+      }
+    ]
+  }',
+  'favorite_add',
+  'draft'
+);
+```
+
+**How to Use in Code**:
+
+```typescript
+// In ResourceCard component
+export function ResourceCard({ resource }) {
+  const { variant } = useExperiment('favorite-button-placement')
+
+  const showFavoriteOnCard = variant?.config?.show_on_card ?? false
+
+  return (
+    <Card>
+      <h3>{resource.name}</h3>
+      {showFavoriteOnCard && (
+        <FavoriteButton resourceId={resource.id} />
+      )}
+    </Card>
+  )
+}
+```
+
+**Expected Duration**: 3 weeks (favorites are rarer than views)
+
+---
+
+#### Sample Test 3: Search Results Sort Order Default
+
+**Hypothesis**: Sorting by "Most Helpful" (rating + review count) will increase resource engagement by 20% vs "Nearest"
+
+**Variants**:
+- **Control**: Default sort = "Nearest" (distance from user)
+- **Treatment**: Default sort = "Most Helpful" (rating_average DESC, review_count DESC)
+
+**Success Metric**: `resource_view` + `action_taken` within 5 minutes
+
+**SQL to Create**:
+
+```sql
+INSERT INTO analytics_experiments (name, hypothesis, variants, success_metric, status)
+VALUES (
+  'search-sort-default',
+  'Defaulting to "Most Helpful" sort will increase resource engagement by 20% because users value quality over proximity',
+  '{
+    "variants": [
+      {
+        "name": "control",
+        "display_name": "Nearest (Distance)",
+        "weight": 0.5,
+        "config": { "default_sort": "distance", "label": "Nearest to you" }
+      },
+      {
+        "name": "most_helpful",
+        "display_name": "Most Helpful (Rating)",
+        "weight": 0.5,
+        "config": { "default_sort": "rating", "label": "Highest rated" }
+      }
+    ]
+  }',
+  'resource_engagement',
+  'draft'
+);
+```
+
+**How to Use in Code**:
+
+```typescript
+// In SearchPage component
+export function SearchPage() {
+  const { variant } = useExperiment('search-sort-default')
+
+  const defaultSort = variant?.config?.default_sort || 'distance'
+  const [sortBy, setSortBy] = useState(defaultSort)
+
+  // Use sortBy for query
+}
+```
+
+**Expected Duration**: 2 weeks
+
+---
+
+### 4. A/B Testing Utility Hook
+
+**Client-side hook** for easy integration:
+
+```typescript
+// lib/utils/ab-testing.ts
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { getSessionId } from './analytics-session'
+
+interface Variant {
+  name: string
+  display_name: string
+  weight: number
+  config: Record<string, any>
+}
+
+interface UseExperimentResult {
+  variant: Variant | null
+  isLoading: boolean
+  trackConversion: () => Promise<void>
+}
+
+export function useExperiment(experimentName: string): UseExperimentResult {
+  const [variant, setVariant] = useState<Variant | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [assignmentId, setAssignmentId] = useState<string | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    assignVariant()
+  }, [experimentName])
+
+  async function assignVariant() {
+    const sessionId = getSessionId()
+
+    // Check if already assigned
+    const { data: existing } = await supabase
+      .from('analytics_experiment_assignments')
+      .select('*, analytics_experiments!inner(variants)')
+      .eq('session_id', sessionId)
+      .eq('analytics_experiments.name', experimentName)
+      .eq('analytics_experiments.status', 'running')
+      .single()
+
+    if (existing) {
+      // Use existing assignment
+      const variants = existing.analytics_experiments.variants.variants
+      const assignedVariant = variants.find((v: Variant) => v.name === existing.variant)
+      setVariant(assignedVariant || null)
+      setAssignmentId(existing.id)
+      setIsLoading(false)
+      return
+    }
+
+    // Get experiment
+    const { data: experiment } = await supabase
+      .from('analytics_experiments')
+      .select('*')
+      .eq('name', experimentName)
+      .eq('status', 'running')
+      .single()
+
+    if (!experiment) {
+      setIsLoading(false)
+      return // Experiment not running
+    }
+
+    // Assign variant based on weights
+    const variants = experiment.variants.variants
+    const selectedVariant = selectVariantByWeight(variants)
+
+    // Save assignment
+    const { data: assignment } = await supabase
+      .from('analytics_experiment_assignments')
+      .insert({
+        experiment_id: experiment.id,
+        session_id: sessionId,
+        variant: selectedVariant.name,
+      })
+      .select()
+      .single()
+
+    setVariant(selectedVariant)
+    setAssignmentId(assignment?.id || null)
+    setIsLoading(false)
+  }
+
+  async function trackConversion() {
+    if (!assignmentId) return
+
+    await supabase
+      .from('analytics_experiment_conversions')
+      .insert({
+        experiment_id: variant?.experiment_id,
+        assignment_id: assignmentId,
+        session_id: getSessionId(),
+      })
+  }
+
+  return { variant, isLoading, trackConversion }
+}
+
+function selectVariantByWeight(variants: Variant[]): Variant {
+  const random = Math.random()
+  let cumulativeWeight = 0
+
+  for (const variant of variants) {
+    cumulativeWeight += variant.weight
+    if (random < cumulativeWeight) {
+      return variant
+    }
+  }
+
+  return variants[0] // Fallback
+}
+```
+
+---
+
+### 5. A/B Test Results Dashboard
+
+**Admin page** to view experiment results:
+
+```typescript
+// app/admin/analytics/experiments/[id]/page.tsx
+export default async function ExperimentResultsPage({ params }: { params: { id: string } }) {
+  const supabase = createClient()
+
+  // Get experiment
+  const { data: experiment } = await supabase
+    .from('analytics_experiments')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+
+  // Calculate stats per variant
+  const stats = await supabase.rpc('calculate_experiment_stats', {
+    experiment_id: params.id
+  })
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">{experiment.name}</h1>
+      <p className="text-gray-600 mb-8">{experiment.hypothesis}</p>
+
+      <div className="grid grid-cols-2 gap-4">
+        {stats.map((variant) => (
+          <Card key={variant.variant_name} className="p-6">
+            <h3 className="text-lg font-semibold mb-4">{variant.variant_display_name}</h3>
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm text-gray-600">Users Assigned</div>
+                <div className="text-3xl font-bold">{variant.total_users.toLocaleString()}</div>
+              </div>
+
+              <div>
+                <div className="text-sm text-gray-600">Conversions</div>
+                <div className="text-3xl font-bold text-green-600">
+                  {variant.conversions.toLocaleString()}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm text-gray-600">Conversion Rate</div>
+                <div className="text-3xl font-bold">
+                  {variant.conversion_rate.toFixed(2)}%
+                </div>
+              </div>
+
+              {variant.is_winner && (
+                <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded">
+                  <div className="font-bold text-green-800">🏆 Winner!</div>
+                  <div className="text-sm text-green-700">
+                    {variant.improvement_percentage.toFixed(1)}% improvement
+                  </div>
+                  <div className="text-xs text-green-600">
+                    {variant.confidence_level.toFixed(1)}% confidence
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {stats.is_significant && (
+        <div className="mt-6 p-4 bg-blue-100 border border-blue-300 rounded">
+          <strong>Statistical Significance Reached!</strong>
+          <p className="text-sm mt-1">
+            You can confidently ship the winning variant.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+---
+
+### 6. Statistical Significance Calculation
+
+**Database function** to calculate significance:
+
+```sql
+CREATE OR REPLACE FUNCTION calculate_experiment_stats(experiment_id UUID)
+RETURNS TABLE (
+  variant_name TEXT,
+  variant_display_name TEXT,
+  total_users BIGINT,
+  conversions BIGINT,
+  conversion_rate NUMERIC,
+  is_winner BOOLEAN,
+  improvement_percentage NUMERIC,
+  confidence_level NUMERIC
+) AS $$
+DECLARE
+  control_rate NUMERIC;
+  control_users BIGINT;
+BEGIN
+  -- Get control variant conversion rate
+  SELECT
+    100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id),
+    COUNT(DISTINCT a.session_id)
+  INTO control_rate, control_users
+  FROM analytics_experiment_assignments a
+  LEFT JOIN analytics_experiment_conversions c ON c.assignment_id = a.id
+  WHERE a.experiment_id = calculate_experiment_stats.experiment_id
+    AND a.variant = 'control';
+
+  -- Calculate stats for all variants
+  RETURN QUERY
+  SELECT
+    a.variant as variant_name,
+    v->>'display_name' as variant_display_name,
+    COUNT(DISTINCT a.session_id) as total_users,
+    COUNT(DISTINCT c.session_id) as conversions,
+    ROUND(100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id), 2) as conversion_rate,
+    (100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id)) > control_rate as is_winner,
+    ROUND(((100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id)) - control_rate) / control_rate * 100, 1) as improvement_percentage,
+    -- Z-score for statistical significance
+    ROUND(
+      ABS((
+        (100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id)) - control_rate
+      ) / SQRT(
+        control_rate * (100 - control_rate) / control_users +
+        (100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id)) * (100 - (100.0 * COUNT(DISTINCT c.session_id) / COUNT(DISTINCT a.session_id))) / COUNT(DISTINCT a.session_id)
+      )) * 100, 1
+    ) as confidence_level
+  FROM analytics_experiment_assignments a
+  LEFT JOIN analytics_experiment_conversions c ON c.assignment_id = a.id
+  LEFT JOIN analytics_experiments e ON e.id = a.experiment_id
+  CROSS JOIN LATERAL jsonb_array_elements(e.variants->'variants') AS v
+  WHERE a.experiment_id = calculate_experiment_stats.experiment_id
+    AND a.variant = v->>'name'
+  GROUP BY a.variant, v->>'display_name'
+  ORDER BY conversion_rate DESC;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+### 7. Best Practices for A/B Testing
+
+**Do's**:
+- ✅ **Test one variable** at a time (button color OR placement, not both)
+- ✅ **Run until significance** (95% confidence = z-score > 1.96)
+- ✅ **Set minimum sample size** (500+ conversions per variant)
+- ✅ **Consider seasonality** (don't run during holidays)
+- ✅ **Document hypothesis** before testing (avoid confirmation bias)
+
+**Don'ts**:
+- ❌ **Don't stop early** (even if winning variant looks obvious)
+- ❌ **Don't test too many variants** (stick to 2-3 max)
+- ❌ **Don't ignore small effects** (5% improvement = big impact at scale)
+- ❌ **Don't test everything** (focus on high-impact changes)
+
+---
+
+### 8. Summary: Funnel & A/B Testing
+
+**Conversion Funnels**:
+✅ **3 Sample Funnels** - Search→Action, Sign-Up, Review Writing
+✅ **Visual Builder** - No code needed to create funnels
+✅ **Database-Driven** - Dynamic configuration via JSON
+✅ **AI Agent Compatible** - Create from natural language
+✅ **Analytics Dashboard** - Per-step conversion rates
+
+**A/B Testing**:
+✅ **3 Sample Tests** - Button color, placement, sort order
+✅ **Easy Integration** - `useExperiment()` hook
+✅ **Statistical Significance** - Automatic calculation
+✅ **Results Dashboard** - Visual comparison of variants
+✅ **Best Practices** - Built-in guardrails
+
+**Together**: Measure user journeys (funnels) + optimize them (A/B tests) = Data-driven UX! 🎯
+
+---
+
 ## Next Steps
 
 1. **Review this document** with team/stakeholders
