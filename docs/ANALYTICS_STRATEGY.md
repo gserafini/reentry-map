@@ -1904,6 +1904,928 @@ export function ResourceCard({ resource }: { resource: Resource }) {
 
 ---
 
+---
+
+## Unique User Tracking
+
+### Challenge: Identifying Unique Users Across Sessions
+
+**Problem**: How do we count unique users when they're anonymous and may visit multiple times?
+
+**Solution**: Multi-layered identification strategy
+
+---
+
+### 1. Identification Hierarchy
+
+**Priority Order** (most to least reliable):
+
+1. **Authenticated User ID** (logged-in users)
+   - Most accurate, persistent across devices
+   - Respects privacy (user consented by signing up)
+
+2. **Persistent Anonymous ID** (localStorage)
+   - Browser-specific, survives page refreshes
+   - Cleared when user clears browser data
+   - Privacy-friendly (no cookies)
+
+3. **Session ID** (current session only)
+   - Fallback if localStorage unavailable
+   - Cleared on browser close
+
+---
+
+### 2. Implementation: Anonymous User ID
+
+**localStorage-based persistent ID** (`lib/utils/analytics-user-id.ts`):
+
+```typescript
+'use client'
+
+import { v4 as uuidv4 } from 'uuid'
+
+const STORAGE_KEY = 'reentry-map-user-id'
+
+/**
+ * Get or create persistent anonymous user ID
+ * Survives page refreshes but respects privacy (no cookies, no fingerprinting)
+ */
+export function getAnonymousUserId(): string {
+  try {
+    // Check if ID already exists
+    let userId = localStorage.getItem(STORAGE_KEY)
+
+    if (!userId) {
+      // Generate new UUID
+      userId = uuidv4()
+      localStorage.setItem(STORAGE_KEY, userId)
+    }
+
+    return userId
+  } catch (error) {
+    // localStorage unavailable (private browsing, storage full, etc.)
+    // Generate temporary ID for this session only
+    if (!globalThis.__tempUserId) {
+      globalThis.__tempUserId = uuidv4()
+    }
+    return globalThis.__tempUserId
+  }
+}
+
+/**
+ * Get user ID (authenticated user_id or anonymous ID)
+ */
+export function getUserId(authenticatedUserId?: string): string {
+  if (authenticatedUserId) {
+    return authenticatedUserId
+  }
+  return getAnonymousUserId()
+}
+
+/**
+ * Clear anonymous ID (e.g., user signs out or requests data deletion)
+ */
+export function clearAnonymousUserId(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    delete globalThis.__tempUserId
+  } catch (error) {
+    // Ignore errors
+  }
+}
+```
+
+**Usage in Analytics Tracker**:
+
+```typescript
+// lib/utils/analytics.ts
+import { getAnonymousUserId, getUserId } from './analytics-user-id'
+import { useAuth } from './auth' // Your auth hook
+
+export function trackEvent(eventName: string, metadata?: object) {
+  const { user } = useAuth() // Get authenticated user if signed in
+  const userId = getUserId(user?.id)
+  const anonymousId = user?.id ? null : getAnonymousUserId()
+
+  // Send event to database
+  supabase.from('analytics_events').insert({
+    event_name: eventName,
+    user_id: userId,
+    anonymous_id: anonymousId,
+    metadata,
+    timestamp: new Date().toISOString(),
+  })
+}
+```
+
+---
+
+### 3. Database Schema Updates
+
+Add `anonymous_id` to track persistent anonymous users:
+
+```sql
+-- Add anonymous_id to sessions table
+ALTER TABLE analytics_sessions
+ADD COLUMN anonymous_id TEXT;
+
+CREATE INDEX idx_sessions_anonymous ON analytics_sessions(anonymous_id, started_at DESC);
+
+-- Add to all event tables
+ALTER TABLE analytics_page_views ADD COLUMN anonymous_id TEXT;
+ALTER TABLE analytics_search_events ADD COLUMN anonymous_id TEXT;
+ALTER TABLE analytics_resource_events ADD COLUMN anonymous_id TEXT;
+ALTER TABLE analytics_map_events ADD COLUMN anonymous_id TEXT;
+ALTER TABLE analytics_funnel_events ADD COLUMN anonymous_id TEXT;
+ALTER TABLE analytics_feature_events ADD COLUMN anonymous_id TEXT;
+```
+
+---
+
+### 4. Unique User Queries
+
+**Daily/Weekly/Monthly Unique Users**:
+
+```sql
+-- Daily Active Users (DAU)
+SELECT
+  DATE(timestamp) as date,
+  COUNT(DISTINCT COALESCE(user_id, anonymous_id)) as unique_users
+FROM analytics_page_views
+WHERE timestamp > NOW() - INTERVAL '30 days'
+GROUP BY 1
+ORDER BY 1 DESC;
+
+-- Weekly Active Users (WAU)
+SELECT
+  DATE_TRUNC('week', timestamp) as week,
+  COUNT(DISTINCT COALESCE(user_id, anonymous_id)) as unique_users
+FROM analytics_page_views
+WHERE timestamp > NOW() - INTERVAL '12 weeks'
+GROUP BY 1
+ORDER BY 1 DESC;
+
+-- Monthly Active Users (MAU)
+SELECT
+  DATE_TRUNC('month', timestamp) as month,
+  COUNT(DISTINCT COALESCE(user_id, anonymous_id)) as unique_users
+FROM analytics_page_views
+WHERE timestamp > NOW() - INTERVAL '12 months'
+GROUP BY 1
+ORDER BY 1 DESC;
+```
+
+**New vs Returning Users**:
+
+```sql
+WITH first_visit AS (
+  SELECT
+    COALESCE(user_id, anonymous_id) as unique_id,
+    MIN(timestamp) as first_seen
+  FROM analytics_sessions
+  GROUP BY 1
+)
+SELECT
+  DATE(s.started_at) as date,
+  COUNT(DISTINCT s.session_id) FILTER (
+    WHERE DATE(f.first_seen) = DATE(s.started_at)
+  ) as new_users,
+  COUNT(DISTINCT s.session_id) FILTER (
+    WHERE DATE(f.first_seen) < DATE(s.started_at)
+  ) as returning_users
+FROM analytics_sessions s
+JOIN first_visit f ON f.unique_id = COALESCE(s.user_id, s.anonymous_id)
+WHERE s.started_at > NOW() - INTERVAL '30 days'
+GROUP BY 1
+ORDER BY 1 DESC;
+```
+
+---
+
+### 5. Handling User Sign-In/Sign-Out
+
+**Merge Anonymous → Authenticated**:
+
+When a user signs in, link their anonymous session history to their user account:
+
+```typescript
+// lib/utils/analytics-merge.ts
+export async function mergeAnonymousToAuthenticated(
+  authenticatedUserId: string
+) {
+  const anonymousId = getAnonymousUserId()
+
+  if (!anonymousId) return
+
+  // Update all analytics tables to link anonymous_id to user_id
+  await supabase.rpc('merge_anonymous_user', {
+    anonymous_id: anonymousId,
+    authenticated_user_id: authenticatedUserId,
+  })
+
+  // Clear anonymous ID (now using authenticated user_id)
+  clearAnonymousUserId()
+}
+```
+
+**Database Function**:
+
+```sql
+CREATE OR REPLACE FUNCTION merge_anonymous_user(
+  anonymous_id TEXT,
+  authenticated_user_id UUID
+)
+RETURNS void AS $$
+BEGIN
+  -- Update sessions
+  UPDATE analytics_sessions
+  SET user_id = authenticated_user_id
+  WHERE anonymous_id = merge_anonymous_user.anonymous_id;
+
+  -- Update all event tables
+  UPDATE analytics_page_views
+  SET user_id = authenticated_user_id
+  WHERE anonymous_id = merge_anonymous_user.anonymous_id;
+
+  UPDATE analytics_search_events
+  SET user_id = authenticated_user_id
+  WHERE anonymous_id = merge_anonymous_user.anonymous_id;
+
+  UPDATE analytics_resource_events
+  SET user_id = authenticated_user_id
+  WHERE anonymous_id = merge_anonymous_user.anonymous_id;
+
+  -- (Repeat for other event tables)
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+**Call on Sign-In**:
+
+```typescript
+// After successful authentication
+async function handleSignIn(user: User) {
+  // Merge anonymous history to authenticated user
+  await mergeAnonymousToAuthenticated(user.id)
+
+  // Continue with normal sign-in flow
+}
+```
+
+---
+
+### 6. Privacy Considerations
+
+**Advantages of localStorage over Cookies**:
+- ✅ No cookie consent banner needed (not a tracking cookie)
+- ✅ Not sent with every HTTP request (better performance)
+- ✅ Easier to clear (user can clear site data)
+- ✅ Not shared across domains (more private)
+
+**User Control**:
+- Clear explanation in privacy policy
+- "Delete my data" button in settings
+- Respect "Do Not Track" browser setting
+- Private browsing mode: generate temporary ID only
+
+```typescript
+// Respect Do Not Track
+export function shouldTrackAnalytics(): boolean {
+  if (navigator.doNotTrack === '1') {
+    return false // Respect DNT
+  }
+  return true
+}
+```
+
+---
+
+## Real-Time Visitor Map
+
+### Goal: Show Active Users on Map (Like Google Analytics)
+
+**Features**:
+- See how many users are online right now
+- Geographic distribution (city-level)
+- Current page they're viewing
+- Real-time updates (WebSocket)
+- Auto-expire after 5 minutes of inactivity
+
+---
+
+### 1. Database Schema: Active Sessions
+
+```sql
+-- Table for currently active sessions (ephemeral, cleared frequently)
+CREATE TABLE analytics_active_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id TEXT UNIQUE NOT NULL,
+  user_id UUID REFERENCES users(id),
+  anonymous_id TEXT,
+  current_page TEXT NOT NULL,
+  city TEXT,
+  state TEXT,
+  country TEXT,
+  lat DECIMAL(9,2),  -- Rounded to ~1km precision
+  lng DECIMAL(9,2),
+  device_type TEXT,
+  last_activity TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_active_sessions_last_activity ON analytics_active_sessions(last_activity DESC);
+CREATE INDEX idx_active_sessions_location ON analytics_active_sessions(lat, lng) WHERE lat IS NOT NULL;
+
+-- Enable Row Level Security
+ALTER TABLE analytics_active_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Only admins can view active sessions
+CREATE POLICY "Admins can view active sessions"
+  ON analytics_active_sessions FOR SELECT
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+
+-- Function to clean up stale sessions (inactive > 5 minutes)
+CREATE OR REPLACE FUNCTION cleanup_stale_active_sessions()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM analytics_active_sessions
+  WHERE last_activity < NOW() - INTERVAL '5 minutes';
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+### 2. Client-Side: Heartbeat Tracking
+
+**Send heartbeat every 30 seconds** to mark session as active:
+
+```typescript
+// lib/utils/analytics-heartbeat.ts
+'use client'
+
+import { useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
+import { getSessionId } from './analytics-session'
+import { getUserId } from './analytics-user-id'
+import { getLocationData } from './analytics-location'
+
+const HEARTBEAT_INTERVAL = 30000 // 30 seconds
+
+export function AnalyticsHeartbeat() {
+  const pathname = usePathname()
+  const intervalRef = useRef<NodeJS.Timeout>()
+
+  useEffect(() => {
+    // Send initial heartbeat
+    sendHeartbeat(pathname)
+
+    // Set up interval
+    intervalRef.current = setInterval(() => {
+      sendHeartbeat(pathname)
+    }, HEARTBEAT_INTERVAL)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [pathname])
+
+  return null
+}
+
+async function sendHeartbeat(currentPage: string) {
+  const sessionId = getSessionId()
+  const userId = getUserId()
+  const location = await getLocationData()
+
+  // Upsert to analytics_active_sessions
+  await fetch('/api/analytics/heartbeat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: sessionId,
+      user_id: userId,
+      current_page: currentPage,
+      city: location.city,
+      state: location.state,
+      country: location.country,
+      lat: location.lat,
+      lng: location.lng,
+      device_type: getDeviceType(),
+    }),
+  })
+}
+
+function getDeviceType(): string {
+  const width = window.innerWidth
+  if (width < 768) return 'mobile'
+  if (width < 1024) return 'tablet'
+  return 'desktop'
+}
+```
+
+**Add to Layout**:
+
+```typescript
+// app/layout.tsx
+import { AnalyticsHeartbeat } from '@/lib/utils/analytics-heartbeat'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <AnalyticsHeartbeat />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+---
+
+### 3. API Endpoint: Heartbeat
+
+```typescript
+// app/api/analytics/heartbeat/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const supabase = createClient()
+
+    // Upsert active session (update if exists, insert if new)
+    await supabase
+      .from('analytics_active_sessions')
+      .upsert(
+        {
+          session_id: body.session_id,
+          user_id: body.user_id || null,
+          anonymous_id: body.anonymous_id || null,
+          current_page: body.current_page,
+          city: body.city,
+          state: body.state,
+          country: body.country,
+          lat: body.lat,
+          lng: body.lng,
+          device_type: body.device_type,
+          last_activity: new Date().toISOString(),
+        },
+        {
+          onConflict: 'session_id',
+        }
+      )
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Heartbeat error:', error)
+    return NextResponse.json({ error: 'Failed to record heartbeat' }, { status: 500 })
+  }
+}
+```
+
+---
+
+### 4. Admin Dashboard: Real-Time Map
+
+**Component** (`components/admin/RealTimeMap.tsx`):
+
+```typescript
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api'
+
+interface ActiveSession {
+  id: string
+  session_id: string
+  current_page: string
+  city: string
+  state: string
+  lat: number
+  lng: number
+  device_type: string
+  last_activity: string
+}
+
+export function RealTimeMap() {
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
+  const [selectedMarker, setSelectedMarker] = useState<ActiveSession | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    // Initial fetch
+    fetchActiveSessions()
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('active-sessions')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'analytics_active_sessions',
+        },
+        () => {
+          // Refetch when any change occurs
+          fetchActiveSessions()
+        }
+      )
+      .subscribe()
+
+    // Refresh every 30 seconds (in case real-time fails)
+    const interval = setInterval(fetchActiveSessions, 30000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [])
+
+  async function fetchActiveSessions() {
+    const { data, error } = await supabase
+      .from('analytics_active_sessions')
+      .select('*')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .gte('last_activity', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Active in last 5 min
+
+    if (data) {
+      setActiveSessions(data)
+    }
+  }
+
+  const mapCenter = {
+    lat: 37.8044, // Oakland, CA (default)
+    lng: -122.2711,
+  }
+
+  return (
+    <div className="h-screen w-full">
+      <div className="bg-white p-4 shadow">
+        <h2 className="text-xl font-bold">Real-Time Visitors</h2>
+        <p className="text-gray-600">
+          <span className="text-2xl font-bold text-green-600">
+            {activeSessions.length}
+          </span>{' '}
+          active users right now
+        </p>
+      </div>
+
+      <GoogleMap
+        mapContainerStyle={{ width: '100%', height: 'calc(100% - 80px)' }}
+        center={mapCenter}
+        zoom={8}
+      >
+        {activeSessions.map((session) => (
+          <Marker
+            key={session.id}
+            position={{ lat: session.lat, lng: session.lng }}
+            onClick={() => setSelectedMarker(session)}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#10b981', // Green
+              fillOpacity: 0.8,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            }}
+          />
+        ))}
+
+        {selectedMarker && (
+          <InfoWindow
+            position={{ lat: selectedMarker.lat, lng: selectedMarker.lng }}
+            onCloseClick={() => setSelectedMarker(null)}
+          >
+            <div className="p-2">
+              <p className="font-bold">{selectedMarker.city}, {selectedMarker.state}</p>
+              <p className="text-sm text-gray-600">
+                Page: {selectedMarker.current_page}
+              </p>
+              <p className="text-sm text-gray-600">
+                Device: {selectedMarker.device_type}
+              </p>
+              <p className="text-xs text-gray-400">
+                Last active: {new Date(selectedMarker.last_activity).toLocaleTimeString()}
+              </p>
+            </div>
+          </InfoWindow>
+        )}
+      </GoogleMap>
+    </div>
+  )
+}
+```
+
+**Admin Page** (`app/admin/analytics/realtime/page.tsx`):
+
+```typescript
+import { RealTimeMap } from '@/components/admin/RealTimeMap'
+import { requireAdmin } from '@/lib/utils/admin'
+
+export default async function RealTimeAnalyticsPage() {
+  await requireAdmin() // Ensure only admins can access
+
+  return (
+    <div className="h-screen">
+      <RealTimeMap />
+    </div>
+  )
+}
+```
+
+---
+
+### 5. Geographic Data: IP Geolocation
+
+**Option 1: Vercel IP Geolocation** (Built-in, Free)
+
+```typescript
+// lib/utils/analytics-location.ts
+import { NextRequest } from 'next/server'
+
+export function getLocationFromRequest(request: NextRequest) {
+  // Vercel automatically adds geo headers
+  const city = request.geo?.city || null
+  const state = request.geo?.region || null
+  const country = request.geo?.country || null
+  const lat = request.geo?.latitude || null
+  const lng = request.geo?.longitude || null
+
+  // Round coordinates to ~1km precision for privacy
+  return {
+    city,
+    state,
+    country,
+    lat: lat ? Math.round(lat * 100) / 100 : null,
+    lng: lng ? Math.round(lng * 100) / 100 : null,
+  }
+}
+```
+
+**Option 2: MaxMind GeoLite2** (More accurate, requires setup)
+
+```typescript
+import maxmind, { CityResponse } from 'maxmind'
+
+let geoLookup: maxmind.Reader<CityResponse> | null = null
+
+async function getGeoLookup() {
+  if (!geoLookup) {
+    geoLookup = await maxmind.open<CityResponse>('./data/GeoLite2-City.mmdb')
+  }
+  return geoLookup
+}
+
+export async function getLocationFromIP(ip: string) {
+  const lookup = await getGeoLookup()
+  const result = lookup.get(ip)
+
+  if (!result) return null
+
+  return {
+    city: result.city?.names.en || null,
+    state: result.subdivisions?.[0]?.names.en || null,
+    country: result.country?.names.en || null,
+    lat: result.location?.latitude || null,
+    lng: result.location?.longitude || null,
+  }
+}
+```
+
+---
+
+### 6. Real-Time Stats Widget
+
+**Simple stats without map**:
+
+```typescript
+// components/admin/RealTimeStats.tsx
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+export function RealTimeStats() {
+  const [stats, setStats] = useState({
+    activeUsers: 0,
+    topPages: [],
+    deviceBreakdown: { mobile: 0, tablet: 0, desktop: 0 },
+  })
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchStats()
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('active-sessions-stats')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'analytics_active_sessions',
+        },
+        fetchStats
+      )
+      .subscribe()
+
+    const interval = setInterval(fetchStats, 15000) // Refresh every 15s
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [])
+
+  async function fetchStats() {
+    // Get active sessions (last 5 minutes)
+    const { data: sessions } = await supabase
+      .from('analytics_active_sessions')
+      .select('*')
+      .gte('last_activity', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+
+    if (!sessions) return
+
+    // Calculate stats
+    const activeUsers = sessions.length
+    const topPages = getTopPages(sessions)
+    const deviceBreakdown = getDeviceBreakdown(sessions)
+
+    setStats({ activeUsers, topPages, deviceBreakdown })
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-sm text-gray-600">Active Users</h3>
+        <p className="text-3xl font-bold text-green-600">{stats.activeUsers}</p>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-sm text-gray-600">Top Page</h3>
+        <p className="text-lg font-semibold truncate">
+          {stats.topPages[0]?.page || 'N/A'}
+        </p>
+        <p className="text-sm text-gray-500">
+          {stats.topPages[0]?.count || 0} viewers
+        </p>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-sm text-gray-600">Device Breakdown</h3>
+        <div className="flex gap-2 mt-2">
+          <div className="text-center">
+            <p className="text-sm">Mobile</p>
+            <p className="font-bold">{stats.deviceBreakdown.mobile}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm">Tablet</p>
+            <p className="font-bold">{stats.deviceBreakdown.tablet}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm">Desktop</p>
+            <p className="font-bold">{stats.deviceBreakdown.desktop}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+### 7. Cleanup: Auto-Expire Stale Sessions
+
+**Supabase Edge Function** (runs every minute):
+
+```sql
+-- Create cron job (requires pg_cron extension)
+SELECT cron.schedule(
+  'cleanup-active-sessions',
+  '* * * * *', -- Every minute
+  $$SELECT cleanup_stale_active_sessions()$$
+);
+```
+
+**Or via Next.js API route + external cron** (e.g., Vercel Cron):
+
+```typescript
+// app/api/cron/cleanup-sessions/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+export async function GET(request: NextRequest) {
+  // Verify cron secret
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const supabase = createClient()
+
+  // Delete sessions inactive for > 5 minutes
+  await supabase
+    .from('analytics_active_sessions')
+    .delete()
+    .lt('last_activity', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+
+  return NextResponse.json({ success: true })
+}
+```
+
+---
+
+### 8. Privacy Considerations
+
+**Real-Time Map Privacy**:
+- ✅ Admin-only access (RLS policy)
+- ✅ City-level location only (no exact address)
+- ✅ No personally identifiable information shown
+- ✅ Coordinates rounded to ~1km
+- ✅ Auto-expire after 5 minutes
+- ✅ No session history stored (ephemeral table)
+
+**User Transparency**:
+- Privacy policy mentions real-time tracking for admin purposes
+- No user-facing implications (data not shared)
+- Can opt-out via "Do Not Track"
+
+---
+
+### 9. Performance Optimization
+
+**Reduce Database Load**:
+1. Use upsert (not insert) to avoid duplicate sessions
+2. Index on `last_activity` for fast cleanup
+3. Limit map to show max 1000 active sessions (cluster if more)
+4. Cache location data (don't re-lookup IP every heartbeat)
+
+**Reduce Client Load**:
+1. Send heartbeat every 30s (not every second)
+2. Debounce page changes (don't send if user rapidly switches tabs)
+3. Stop heartbeat if tab not visible (Page Visibility API)
+
+```typescript
+// Stop heartbeat when tab hidden
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      // Clear interval when tab hidden
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    } else {
+      // Resume heartbeat when tab visible
+      sendHeartbeat(pathname)
+      intervalRef.current = setInterval(() => sendHeartbeat(pathname), HEARTBEAT_INTERVAL)
+    }
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+}, [pathname])
+```
+
+---
+
+## Summary: Unique Users + Real-Time Map
+
+### Unique User Tracking
+✅ **localStorage persistent ID** for anonymous users
+✅ **Merge to authenticated user** on sign-in
+✅ **DAU/WAU/MAU queries** included
+✅ **New vs returning users** analysis
+✅ **Privacy-friendly** (no cookies, no fingerprinting)
+
+### Real-Time Visitor Map
+✅ **Live updates** via Supabase Realtime
+✅ **Geographic visualization** on Google Maps
+✅ **Active user count** (last 5 minutes)
+✅ **Device breakdown** (mobile/tablet/desktop)
+✅ **Top pages** currently viewed
+✅ **Auto-expire** stale sessions
+✅ **Privacy-first** (city-level only, admin-only access)
+
+### Cost Impact
+- **Storage**: ~1MB for 10k active sessions/day (negligible)
+- **Realtime**: Included in Supabase free tier (2M messages/month)
+- **Compute**: Minimal (heartbeat is lightweight)
+
+**Total Additional Cost**: **$0/month** (within existing Supabase limits)
+
+---
+
 ## Next Steps
 
 1. **Review this document** with team/stakeholders
