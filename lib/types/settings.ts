@@ -9,6 +9,13 @@ export interface AppSettings {
   sms_auth_enabled: boolean
   sms_provider_configured: boolean
 
+  // AI System Control Switches
+  ai_master_enabled: boolean
+  ai_verification_enabled: boolean
+  ai_discovery_enabled: boolean
+  ai_enrichment_enabled: boolean
+  ai_realtime_monitoring_enabled: boolean
+
   // Contact Info
   support_email?: string
   support_phone?: string
@@ -21,6 +28,23 @@ export interface AppSettings {
 export interface FeatureFlags {
   smsAuth: boolean
   smsProviderConfigured: boolean
+  aiMasterEnabled: boolean
+  aiVerificationEnabled: boolean
+  aiDiscoveryEnabled: boolean
+  aiEnrichmentEnabled: boolean
+  aiRealtimeMonitoringEnabled: boolean
+}
+
+export interface AISystemStatus {
+  masterEnabled: boolean
+  verificationEnabled: boolean
+  discoveryEnabled: boolean
+  enrichmentEnabled: boolean
+  realtimeMonitoringEnabled: boolean
+  // Derived flags for easy checking
+  isVerificationActive: boolean // master AND verification
+  isDiscoveryActive: boolean // master AND discovery
+  isEnrichmentActive: boolean // master AND enrichment
 }
 
 // SMS Provider Configuration Status
