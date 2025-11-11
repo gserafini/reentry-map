@@ -26,6 +26,7 @@ import {
   type VerificationChecks,
   type FieldConflict,
 } from '@/lib/utils/verification'
+import { emitVerificationEvent, emitProgress } from '@/lib/ai-agents/verification-events'
 import type { ResourceSuggestion as BaseResourceSuggestion } from '@/lib/types/database'
 
 // Extended type with fields added by verification_system migration
@@ -88,6 +89,18 @@ export class VerificationAgent {
 
     console.log(`\n🔍 Starting ${verificationType} verification for: ${suggestion.name}`)
 
+    // Emit started event for real-time monitoring
+    await emitVerificationEvent({
+      suggestion_id: suggestion.id,
+      event_type: 'started',
+      event_data: {
+        name: suggestion.name,
+        city: suggestion.city,
+        state: suggestion.state,
+        verification_type: verificationType,
+      },
+    }).catch((err) => console.error('Failed to emit started event:', err))
+
     // Initialize checks object
     const checks: Partial<VerificationChecks> = {}
     const conflicts: FieldConflict[] = []
@@ -100,6 +113,10 @@ export class VerificationAgent {
 
     // Check URL reachability (with auto-fix)
     if (suggestion.website) {
+      await emitProgress(suggestion.id, '🌐 Checking website URL', 'running').catch((err) =>
+        console.error('Failed to emit progress:', err)
+      )
+
       checks.url_reachable = await checkUrlReachable(suggestion.website)
       console.log(
         `    ${checks.url_reachable.pass ? '✅' : '❌'} URL reachable: ${suggestion.website}`
@@ -108,6 +125,11 @@ export class VerificationAgent {
       // Auto-fix broken URLs
       if (!checks.url_reachable.pass) {
         console.log(`    🔧 Attempting to auto-fix URL with AI...`)
+
+        await emitProgress(suggestion.id, '🔧 Auto-fixing broken URL with AI', 'running').catch(
+          (err) => console.error('Failed to emit progress:', err)
+        )
+
         const fixedUrl = await autoFixUrl(
           suggestion.name,
           suggestion.website,
@@ -131,20 +153,48 @@ export class VerificationAgent {
           console.log(`    ✅ Fixed URL: ${fixedUrl.new_url}`)
           suggestion.website = fixedUrl.new_url
           checks.url_reachable = await checkUrlReachable(fixedUrl.new_url)
+
+          await emitProgress(suggestion.id, 'URL auto-fix successful', 'completed', {
+            old_url: suggestion.website,
+            new_url: fixedUrl.new_url,
+          }).catch((err) => console.error('Failed to emit progress:', err))
         } else {
           console.log(`    ❌ Could not auto-fix URL`)
+
+          await emitProgress(suggestion.id, 'URL auto-fix failed', 'failed', {
+            url: suggestion.website,
+          }).catch((err) => console.error('Failed to emit progress:', err))
         }
+      } else {
+        await emitProgress(suggestion.id, 'Website URL reachable', 'completed', {
+          url: suggestion.website,
+        }).catch((err) => console.error('Failed to emit progress:', err))
       }
     }
 
     // Validate phone number
     if (suggestion.phone) {
+      await emitProgress(suggestion.id, '📞 Validating phone number', 'running').catch((err) =>
+        console.error('Failed to emit progress:', err)
+      )
+
       checks.phone_valid = validatePhoneNumber(suggestion.phone)
       console.log(`    ${checks.phone_valid.pass ? '✅' : '❌'} Phone valid: ${suggestion.phone}`)
+
+      await emitProgress(
+        suggestion.id,
+        `Phone validation ${checks.phone_valid.pass ? 'passed' : 'failed'}`,
+        checks.phone_valid.pass ? 'completed' : 'failed',
+        { phone: suggestion.phone, format: checks.phone_valid.format }
+      ).catch((err) => console.error('Failed to emit progress:', err))
     }
 
     // Validate address geocoding (with auto-fix)
     if (suggestion.address) {
+      await emitProgress(suggestion.id, '📍 Geocoding address', 'running').catch((err) =>
+        console.error('Failed to emit progress:', err)
+      )
+
       // First try: Enrich address with city/state/zip context
       const enrichedAddress = enrichAddress(
         suggestion.address,
@@ -166,6 +216,17 @@ export class VerificationAgent {
       console.log(
         `    ${checks.address_geocodable.pass ? '✅' : '❌'} Address geocodable: ${enrichedAddress.full_address}`
       )
+
+      await emitProgress(
+        suggestion.id,
+        `Address geocoding ${checks.address_geocodable.pass ? 'passed' : 'failed'}`,
+        checks.address_geocodable.pass ? 'completed' : 'failed',
+        {
+          address: enrichedAddress.full_address,
+          latitude: checks.address_geocodable.coords?.lat,
+          longitude: checks.address_geocodable.coords?.lng,
+        }
+      ).catch((err) => console.error('Failed to emit progress:', err))
     }
 
     // ========================================================================
@@ -175,6 +236,10 @@ export class VerificationAgent {
     console.log('  🤖 Level 2: AI content verification...')
 
     if (suggestion.website) {
+      await emitProgress(suggestion.id, '🤖 Running AI content verification', 'running').catch(
+        (err) => console.error('Failed to emit progress:', err)
+      )
+
       const websiteContent = await extractWebsiteContent(suggestion.website)
 
       if (websiteContent) {
@@ -202,8 +267,21 @@ export class VerificationAgent {
           console.log(
             `    💰 Claude API: ${verification.input_tokens} in + ${verification.output_tokens} out = $${verification.cost_usd.toFixed(4)}`
           )
+
+          await emitProgress(
+            suggestion.id,
+            `AI content verification ${verification.pass ? 'passed' : 'failed'}`,
+            verification.pass ? 'completed' : 'failed',
+            {
+              confidence: (verification.confidence * 100).toFixed(0) + '%',
+              evidence: verification.evidence,
+            }
+          ).catch((err) => console.error('Failed to emit progress:', err))
         } catch (error) {
           console.error('    ❌ AI verification failed:', error)
+          await emitProgress(suggestion.id, 'AI content verification failed', 'failed', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }).catch((err) => console.error('Failed to emit progress:', err))
         }
       }
     }
@@ -213,6 +291,12 @@ export class VerificationAgent {
     // ========================================================================
 
     console.log('  🔗 Level 3: Cross-referencing external sources...')
+
+    await emitProgress(
+      suggestion.id,
+      '🔗 Cross-referencing with external sources',
+      'running'
+    ).catch((err) => console.error('Failed to emit progress:', err))
 
     const crossRefSources: Array<{ name: string; url?: string; match_score: number }> = []
 
@@ -273,6 +357,12 @@ export class VerificationAgent {
     )
     console.log(`    ${conflicts.length === 0 ? '✅' : '⚠️'} Conflicts: ${conflicts.length}`)
 
+    await emitProgress(suggestion.id, 'Cross-referencing completed', 'completed', {
+      sources_found: crossRefSources.length,
+      conflicts_found: conflicts.length,
+      sources: crossRefSources.map((s) => s.name),
+    }).catch((err) => console.error('Failed to emit progress:', err))
+
     // ========================================================================
     // SCORING AND DECISION
     // ========================================================================
@@ -286,6 +376,20 @@ export class VerificationAgent {
     console.log(`  🎯 Decision: ${decision.decision}`)
     console.log(`  ⏱️  Duration: ${duration_ms}ms`)
     console.log(`  💰 Estimated Cost: $${this.totalCost.toFixed(4)}`)
+
+    // Emit completed event for real-time monitoring
+    await emitVerificationEvent({
+      suggestion_id: suggestion.id,
+      event_type: 'completed',
+      event_data: {
+        decision: decision.decision,
+        score: overall_score,
+        duration_ms,
+        total_cost_usd: this.totalCost,
+        conflicts_found: conflicts.length,
+        sources_verified: checks.cross_referenced?.sources.length || 0,
+      },
+    }).catch((err) => console.error('Failed to emit completed event:', err))
 
     return {
       overall_score,
