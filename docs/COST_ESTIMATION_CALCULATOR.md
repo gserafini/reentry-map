@@ -14,13 +14,13 @@ Last Updated: 2025-11-10
 
 Enter your current or projected metrics:
 
-| Metric | Value | Unit |
-|--------|-------|------|
-| Total resources in database | _____ | count |
-| Monthly active users | _____ | users |
-| Monthly page views | _____ | views |
-| Database size | _____ | GB |
-| SMS/phone OTP sent per month | _____ | messages |
+| Metric                       | Value  | Unit     |
+| ---------------------------- | ------ | -------- |
+| Total resources in database  | **\_** | count    |
+| Monthly active users         | **\_** | users    |
+| Monthly page views           | **\_** | views    |
+| Database size                | **\_** | GB       |
+| SMS/phone OTP sent per month | **\_** | messages |
 
 ### Monthly Cost Comparison
 
@@ -34,14 +34,15 @@ Based on your metrics above, estimate costs:
 
 #### Supabase Pricing
 
-| Tier | Database Size | Price/Month | Included Features |
-|------|--------------|-------------|-------------------|
-| **Free** | <500MB | $0 | 500MB database, 2GB bandwidth, 50k auth users |
-| **Pro** | <8GB | $25 | 8GB database, 50GB bandwidth, 100k auth users |
-| **Team** | <100GB | $599 | 100GB database, 250GB bandwidth, unlimited auth |
-| **Enterprise** | Unlimited | Custom | Custom limits, SLA, support |
+| Tier           | Database Size | Price/Month | Included Features                               |
+| -------------- | ------------- | ----------- | ----------------------------------------------- |
+| **Free**       | <500MB        | $0          | 500MB database, 2GB bandwidth, 50k auth users   |
+| **Pro**        | <8GB          | $25         | 8GB database, 50GB bandwidth, 100k auth users   |
+| **Team**       | <100GB        | $599        | 100GB database, 250GB bandwidth, unlimited auth |
+| **Enterprise** | Unlimited     | Custom      | Custom limits, SLA, support                     |
 
 **Formula:**
+
 ```
 Supabase Cost =
   IF database < 0.5GB AND users < 10k: $0
@@ -51,25 +52,28 @@ Supabase Cost =
 ```
 
 **Your estimate:**
-- Database size: _____ GB
-- Monthly users: _____
-- **Supabase tier:** _____
-- **Supabase cost:** $_____
+
+- Database size: **\_** GB
+- Monthly users: **\_**
+- **Supabase tier:** **\_**
+- **Supabase cost:** $**\_**
 
 #### Vercel Pricing
 
-| Tier | Bandwidth | Function Invocations | Price/Month |
-|------|-----------|---------------------|-------------|
-| **Hobby** | 100GB | 100 hours | $0 |
-| **Pro** | 1TB | 1000 hours | $20 |
-| **Team** | Custom | Custom | $20/member + overages |
-| **Enterprise** | Custom | Custom | Custom pricing |
+| Tier           | Bandwidth | Function Invocations | Price/Month           |
+| -------------- | --------- | -------------------- | --------------------- |
+| **Hobby**      | 100GB     | 100 hours            | $0                    |
+| **Pro**        | 1TB       | 1000 hours           | $20                   |
+| **Team**       | Custom    | Custom               | $20/member + overages |
+| **Enterprise** | Custom    | Custom               | Custom pricing        |
 
 **Overages (Pro tier):**
+
 - Bandwidth: $40 per 100GB
 - Function execution: $40 per 100 hours
 
 **Formula:**
+
 ```
 Vercel Base = $20 (Pro tier)
 Bandwidth Overage = MAX(0, (Bandwidth GB - 1000) / 100) × $40
@@ -79,6 +83,7 @@ Vercel Total = Vercel Base + Bandwidth Overage + Function Overage
 ```
 
 **Bandwidth estimation:**
+
 ```
 Bandwidth (GB) = Page Views × Average Page Size (MB)
 
@@ -94,6 +99,7 @@ Bandwidth (GB) = Page Views × 0.4 MB / 1000
 ```
 
 **Function execution estimation:**
+
 ```
 Function Hours = (API Requests × Average Duration) / 3600
 
@@ -106,27 +112,29 @@ Function Hours = Page Views × 4 × 0.2 / 3600
 ```
 
 **Your estimate:**
-- Monthly page views: _____
-- Bandwidth: _____ GB
-- Function hours: _____ hours
-- Bandwidth overages: $_____ (if > 1TB)
-- Function overages: $_____ (if > 1000 hrs)
-- **Vercel total:** $_____
+
+- Monthly page views: **\_**
+- Bandwidth: **\_** GB
+- Function hours: **\_** hours
+- Bandwidth overages: $**\_** (if > 1TB)
+- Function overages: $**\_** (if > 1000 hrs)
+- **Vercel total:** $**\_**
 
 #### Other Managed Service Costs
 
-| Service | Purpose | Cost/Month |
-|---------|---------|-----------|
-| **Google Maps** | Maps, geocoding | $0-200 (typically <$50) |
-| **OpenAI** | AI agents | $10-100 (sporadic use) |
+| Service               | Purpose                         | Cost/Month                          |
+| --------------------- | ------------------------------- | ----------------------------------- |
+| **Google Maps**       | Maps, geocoding                 | $0-200 (typically <$50)             |
+| **OpenAI**            | AI agents                       | $10-100 (sporadic use)              |
 | **Twilio (optional)** | SMS OTP (if not using Supabase) | Included in Supabase or $0.0079/SMS |
-| **Sentry** | Error tracking | $0 (free tier: 5k errors/mo) |
-| **Uptime monitoring** | UptimeRobot | $0 (free tier: 50 monitors) |
+| **Sentry**            | Error tracking                  | $0 (free tier: 5k errors/mo)        |
+| **Uptime monitoring** | UptimeRobot                     | $0 (free tier: 50 monitors)         |
 
 **Your estimate:**
-- Google Maps: $_____
-- OpenAI: $_____
-- Other: $_____
+
+- Google Maps: $**\_**
+- OpenAI: $**\_**
+- Other: $**\_**
 
 #### Total Managed Services Cost
 
@@ -134,7 +142,7 @@ Function Hours = Page Views × 4 × 0.2 / 3600
 Total Managed = Supabase + Vercel + Google Maps + OpenAI + Other
 ```
 
-**Your total:** $_____
+**Your total:** $**\_**
 
 ---
 
@@ -142,18 +150,19 @@ Total Managed = Supabase + Vercel + Google Maps + OpenAI + Other
 
 #### Fixed Costs
 
-| Item | Cost/Month | Notes |
-|------|-----------|-------|
-| **Dedicated server** | $0 - $200 | You already have one. Additional servers at scale: ~$200/ea |
-| **Twilio SMS** | Variable | $0.0079 per SMS |
-| **Backblaze B2 backups** | Variable | $5 per TB/month |
-| **Cloudflare** | $0 - $20 | Free tier sufficient, Pro at $20 optional |
-| **Domain** | $10 | Annual cost amortized |
-| **Monitoring (optional)** | $0 - $100 | Prometheus free, DataDog $15/host |
+| Item                      | Cost/Month | Notes                                                       |
+| ------------------------- | ---------- | ----------------------------------------------------------- |
+| **Dedicated server**      | $0 - $200  | You already have one. Additional servers at scale: ~$200/ea |
+| **Twilio SMS**            | Variable   | $0.0079 per SMS                                             |
+| **Backblaze B2 backups**  | Variable   | $5 per TB/month                                             |
+| **Cloudflare**            | $0 - $20   | Free tier sufficient, Pro at $20 optional                   |
+| **Domain**                | $10        | Annual cost amortized                                       |
+| **Monitoring (optional)** | $0 - $100  | Prometheus free, DataDog $15/host                           |
 
 #### Twilio SMS Cost
 
 **Formula:**
+
 ```
 Twilio Cost = OTP Messages × $0.0079
 
@@ -171,13 +180,15 @@ Twilio Cost = Monthly Users × 0.25 × $0.0079
 ```
 
 **Your estimate:**
-- Monthly users: _____
-- OTP messages: _____ (users × 0.25)
-- **Twilio cost:** $_____ (messages × $0.0079)
+
+- Monthly users: **\_**
+- OTP messages: **\_** (users × 0.25)
+- **Twilio cost:** $**\_** (messages × $0.0079)
 
 #### Backblaze B2 Backup Cost
 
 **Formula:**
+
 ```
 Backup Cost = Database Size × Retention Factor × $5/TB
 
@@ -192,20 +203,21 @@ Backup Cost (GB) = Database Size × 1.2 × $5 / 1000
 ```
 
 **Your estimate:**
-- Database size: _____ GB
-- Retention: _____ days
-- Total backup storage: _____ GB (DB × 1.2)
-- **Backup cost:** $_____ (storage GB × $5 / 1000)
+
+- Database size: **\_** GB
+- Retention: **\_** days
+- Total backup storage: **\_** GB (DB × 1.2)
+- **Backup cost:** $**\_** (storage GB × $5 / 1000)
 
 #### Cloudflare Cost
 
-| Tier | Price/Month | Features |
-|------|-------------|----------|
-| **Free** | $0 | Unlimited bandwidth, basic CDN, SSL |
-| **Pro** | $20 | Image optimization, mobile optimization, better caching |
-| **Business** | $200 | Custom caching rules, load balancing |
+| Tier         | Price/Month | Features                                                |
+| ------------ | ----------- | ------------------------------------------------------- |
+| **Free**     | $0          | Unlimited bandwidth, basic CDN, SSL                     |
+| **Pro**      | $20         | Image optimization, mobile optimization, better caching |
+| **Business** | $200        | Custom caching rules, load balancing                    |
 
-**Your estimate:** $_____
+**Your estimate:** $**\_**
 
 #### Total Self-Hosted Cost
 
@@ -213,7 +225,7 @@ Backup Cost (GB) = Database Size × 1.2 × $5 / 1000
 Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 ```
 
-**Your total:** $_____
+**Your total:** $**\_**
 
 ---
 
@@ -221,21 +233,23 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 
 ### Scale 1: MVP (500 resources, 1k users/mo)
 
-| Metric | Value |
-|--------|-------|
-| Resources | 500 |
-| Monthly users | 1,000 |
-| Page views | 5,000 |
+| Metric        | Value  |
+| ------------- | ------ |
+| Resources     | 500    |
+| Monthly users | 1,000  |
+| Page views    | 5,000  |
 | Database size | 500 MB |
-| OTP messages | 250 |
+| OTP messages  | 250    |
 
 **Managed Services:**
+
 - Supabase Free: $0
 - Vercel Pro: $20
 - Google Maps: $5
 - **Total: $25/mo** ($300/year)
 
 **Self-Hosted:**
+
 - Server: $0
 - Twilio: $2
 - Backups: $0 (<1GB)
@@ -248,21 +262,23 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 
 ### Scale 2: Oakland Launch (2k resources, 5k users/mo)
 
-| Metric | Value |
-|--------|-------|
-| Resources | 2,000 |
-| Monthly users | 5,000 |
-| Page views | 25,000 |
-| Database size | 2 GB |
-| OTP messages | 1,250 |
+| Metric        | Value  |
+| ------------- | ------ |
+| Resources     | 2,000  |
+| Monthly users | 5,000  |
+| Page views    | 25,000 |
+| Database size | 2 GB   |
+| OTP messages  | 1,250  |
 
 **Managed Services:**
+
 - Supabase Pro: $25
 - Vercel Pro: $20
 - Google Maps: $10
 - **Total: $55/mo** ($660/year)
 
 **Self-Hosted:**
+
 - Server: $0
 - Twilio: $10
 - Backups: $5
@@ -275,15 +291,16 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 
 ### Scale 3: Bay Area (5k resources, 10k users/mo)
 
-| Metric | Value |
-|--------|-------|
-| Resources | 5,000 |
-| Monthly users | 10,000 |
-| Page views | 100,000 |
-| Database size | 5 GB |
-| OTP messages | 2,500 |
+| Metric        | Value   |
+| ------------- | ------- |
+| Resources     | 5,000   |
+| Monthly users | 10,000  |
+| Page views    | 100,000 |
+| Database size | 5 GB    |
+| OTP messages  | 2,500   |
 
 **Managed Services:**
+
 - Supabase Pro: $25
 - Vercel Pro: $20 + $50 overages = $70
 - Google Maps: $20
@@ -291,6 +308,7 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 - **Total: $125/mo** ($1,500/year)
 
 **Self-Hosted:**
+
 - Server: $0
 - Twilio: $20
 - Backups: $5
@@ -303,15 +321,16 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 
 ### Scale 4: California (20k resources, 50k users/mo)
 
-| Metric | Value |
-|--------|-------|
-| Resources | 20,000 |
-| Monthly users | 50,000 |
-| Page views | 500,000 |
-| Database size | 20 GB |
-| OTP messages | 12,500 |
+| Metric        | Value   |
+| ------------- | ------- |
+| Resources     | 20,000  |
+| Monthly users | 50,000  |
+| Page views    | 500,000 |
+| Database size | 20 GB   |
+| OTP messages  | 12,500  |
 
 **Managed Services:**
+
 - Supabase Pro: $25 (still under 8GB) or Team $599
 - Vercel Pro: $20 + $200 overages = $220
 - Google Maps: $50
@@ -319,6 +338,7 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 - **Total (Pro): $325/mo** or **(Team): $900/mo**
 
 **Self-Hosted:**
+
 - Server: $0
 - Twilio: $100
 - Backups: $10
@@ -331,15 +351,16 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 
 ### Scale 5: Multi-State (40k resources, 100k users/mo)
 
-| Metric | Value |
-|--------|-------|
-| Resources | 40,000 |
-| Monthly users | 100,000 |
-| Page views | 1,000,000 |
-| Database size | 40 GB |
-| OTP messages | 25,000 |
+| Metric        | Value     |
+| ------------- | --------- |
+| Resources     | 40,000    |
+| Monthly users | 100,000   |
+| Page views    | 1,000,000 |
+| Database size | 40 GB     |
+| OTP messages  | 25,000    |
 
 **Managed Services:**
+
 - Supabase Team: $599
 - Vercel Pro: $20 + $400 overages = $420
 - Google Maps: $100
@@ -347,6 +368,7 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 - **Total: $1,169/mo** ($14,028/year)
 
 **Self-Hosted:**
+
 - Server: $0-200 (may need second server)
 - Twilio: $200
 - Backups: $20
@@ -360,15 +382,16 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 
 ### Scale 6: National (100k resources, 500k users/mo)
 
-| Metric | Value |
-|--------|-------|
-| Resources | 100,000 |
-| Monthly users | 500,000 |
-| Page views | 5,000,000 |
-| Database size | 75 GB |
-| OTP messages | 125,000 |
+| Metric        | Value     |
+| ------------- | --------- |
+| Resources     | 100,000   |
+| Monthly users | 500,000   |
+| Page views    | 5,000,000 |
+| Database size | 75 GB     |
+| OTP messages  | 125,000   |
 
 **Managed Services:**
+
 - Supabase Team/Enterprise: $599-1,500
 - Vercel Enterprise: $500-2,000
 - Google Maps: $200
@@ -376,6 +399,7 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 - **Total: $1,400-3,800/mo** ($16,800-45,600/year)
 
 **Self-Hosted:**
+
 - Servers (3): $600 (primary + 2 replicas)
 - Twilio: $1,000
 - Backups: $50
@@ -394,27 +418,30 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 ### When Does Migration Pay Off?
 
 **Migration effort:**
+
 - Phase 2 (Database only): 80 hours dev time
 - Phase 3 (Fully self-hosted): 120 hours dev time
 
-**Your dev time value:** $_____ /hour (typical: $50-150/hr)
+**Your dev time value:** $**\_** /hour (typical: $50-150/hr)
 
 **Migration cost:**
-- Phase 2: 80 hrs × $/hr = $_____
-- Phase 3: 120 hrs × $/hr = $_____
+
+- Phase 2: 80 hrs × $/hr = $**\_**
+- Phase 3: 120 hrs × $/hr = $**\_**
 
 **Monthly savings at different scales:**
 
-| Scale | Users/mo | Savings/mo | Months to ROI (Phase 2) | Months to ROI (Phase 3) |
-|-------|----------|-----------|-------------------------|-------------------------|
-| 1k | $40 | 200 months (16 years) | 300 months (25 years) |
-| 5k | $100 | 80 months (6.7 years) | 120 months (10 years) |
-| 10k | $120 | 67 months (5.6 years) | 100 months (8.3 years) |
-| 50k | $650 | 12 months | 18 months |
-| 100k | $1,200 | 7 months | 10 months |
-| 500k | $2,000 | 4 months | 6 months |
+| Scale | Users/mo | Savings/mo            | Months to ROI (Phase 2) | Months to ROI (Phase 3) |
+| ----- | -------- | --------------------- | ----------------------- | ----------------------- |
+| 1k    | $40      | 200 months (16 years) | 300 months (25 years)   |
+| 5k    | $100     | 80 months (6.7 years) | 120 months (10 years)   |
+| 10k   | $120     | 67 months (5.6 years) | 100 months (8.3 years)  |
+| 50k   | $650     | 12 months             | 18 months               |
+| 100k  | $1,200   | 7 months              | 10 months               |
+| 500k  | $2,000   | 4 months              | 6 months                |
 
 **Rule of thumb:**
+
 - Migrate Phase 2 when monthly savings > $300 (ROI in 1-2 years)
 - Migrate Phase 3 when monthly savings > $700 (ROI in 1 year)
 
@@ -427,35 +454,40 @@ Total Self-Hosted = Server + Twilio + Backups + Cloudflare + Monitoring + Domain
 Fill in your projected metrics:
 
 **Projected Scale:**
-- Resources: _____
-- Monthly users: _____
-- Page views: _____
-- Database size: _____ GB
+
+- Resources: **\_**
+- Monthly users: **\_**
+- Page views: **\_**
+- Database size: **\_** GB
 
 **Managed Services Cost:**
-1. Supabase tier: _____ → $_____/mo
+
+1. Supabase tier: **\_** → $**\_**/mo
 2. Vercel cost:
-   - Bandwidth: _____ GB × ($40/100GB) = $_____
-   - Functions: _____ hrs × ($40/100hrs) = $_____
-   - Total Vercel: $20 + $_____ + $_____ = $_____
-3. Other services: $_____
-4. **Total managed:** $_____/mo
+   - Bandwidth: **\_** GB × ($40/100GB) = $**\_**
+   - Functions: **\_** hrs × ($40/100hrs) = $**\_**
+   - Total Vercel: $20 + $**\_** + $**\_** = $**\_**
+3. Other services: $**\_**
+4. **Total managed:** $**\_**/mo
 
 **Self-Hosted Cost:**
-1. Server: $_____/mo
-2. Twilio: (users × 0.002) = $_____/mo
-3. Backups: (DB GB × 1.2 × $5 / 1000) = $_____/mo
-4. Cloudflare: $_____/mo
-5. Other: $_____/mo
-6. **Total self-hosted:** $_____/mo
+
+1. Server: $**\_**/mo
+2. Twilio: (users × 0.002) = $**\_**/mo
+3. Backups: (DB GB × 1.2 × $5 / 1000) = $**\_**/mo
+4. Cloudflare: $**\_**/mo
+5. Other: $**\_**/mo
+6. **Total self-hosted:** $**\_**/mo
 
 **Analysis:**
-- **Monthly savings:** $_____ (Managed - Self-hosted)
-- **Annual savings:** $_____ × 12 = $_____
-- **Migration cost:** $_____ (80-120 hrs × $/hr)
-- **Months to ROI:** Migration cost / Monthly savings = _____ months
+
+- **Monthly savings:** $**\_** (Managed - Self-hosted)
+- **Annual savings:** $**\_** × 12 = $**\_**
+- **Migration cost:** $**\_** (80-120 hrs × $/hr)
+- **Months to ROI:** Migration cost / Monthly savings = **\_** months
 
 **Decision:**
+
 - If ROI < 12 months → ✅ **Migrate now**
 - If ROI 12-24 months → ⚠️ **Consider migrating**
 - If ROI > 24 months → ❌ **Stay on managed services**
@@ -467,11 +499,13 @@ Fill in your projected metrics:
 ### Managed Services Hidden Costs
 
 **Pros:**
+
 - ✅ No ops time (worth $0-2,000/mo depending on your time value)
 - ✅ Automatic scaling (no planning required)
 - ✅ Built-in backups, monitoring, security
 
 **Cons:**
+
 - ❌ Vendor lock-in (migration effort if you outgrow)
 - ❌ Limited customization (can't optimize specific bottlenecks)
 - ❌ Unpredictable overages (bandwidth, functions)
@@ -479,11 +513,13 @@ Fill in your projected metrics:
 ### Self-Hosted Hidden Costs
 
 **Pros:**
+
 - ✅ Full control (optimize exactly what you need)
 - ✅ Predictable costs (fixed server cost)
 - ✅ No vendor lock-in
 
 **Cons:**
+
 - ❌ Ops time (monitoring, updates, troubleshooting)
   - Estimate: 5-10 hrs/month at Phase 2
   - Estimate: 10-20 hrs/month at Phase 3
@@ -492,6 +528,7 @@ Fill in your projected metrics:
 - ❌ Security responsibility (must stay on top of patches)
 
 **Adjusted self-hosted cost:**
+
 ```
 True Self-Hosted Cost = Infrastructure + (Ops Hours × $/hr)
 
@@ -514,6 +551,7 @@ Vs managed at $900/mo → Managed is cheaper!
 **Recommendation:** ✅ **Stay on managed services (Supabase + Vercel)**
 
 **Why:**
+
 - Cost difference minimal ($40-100/mo savings)
 - Your time better spent on product/growth
 - Automatic scaling handles unexpected traffic
@@ -528,12 +566,14 @@ Vs managed at $900/mo → Managed is cheaper!
 **Recommendation:** ⚠️ **Consider Phase 2 migration (Database only)**
 
 **Why:**
+
 - Savings: $1,200-5,000/year
 - ROI: 1-2 years
 - You have predictable traffic (can plan migration)
 - Your time less critical (product-market fit established)
 
 **Evaluation criteria:**
+
 1. Is monthly cost >$100? → Migrate
 2. Is traffic predictable (not 10x month-over-month)? → Migrate
 3. Do you have 2-3 weeks for project? → Migrate
@@ -548,6 +588,7 @@ Vs managed at $900/mo → Managed is cheaper!
 **Recommendation:** ✅ **Definitely migrate Phase 2, consider Phase 3**
 
 **Why:**
+
 - Savings: $5,000-15,000/year
 - ROI: 6-12 months
 - Managed services getting expensive
@@ -562,6 +603,7 @@ Vs managed at $900/mo → Managed is cheaper!
 **Recommendation:** ✅ **Migrate to Phase 3 (Fully self-hosted)**
 
 **Why:**
+
 - Savings: $15,000-30,000/year
 - ROI: 4-6 months
 - Enterprise pricing very expensive
@@ -600,18 +642,21 @@ START: What is your monthly cost?
 ## Summary
 
 **Use this calculator to:**
+
 1. Estimate current and projected infrastructure costs
 2. Compare managed vs self-hosted at your scale
 3. Calculate ROI for migration
 4. Make data-driven decisions
 
 **Key insights:**
+
 - Managed services optimal for <10k users
 - Self-hosted database pays off at >10k users
 - Fully self-hosted makes sense at >50k users
 - Factor in your time value (ops overhead)
 
 **Next steps:**
+
 1. Fill in your metrics above
 2. Calculate costs for both options
 3. Determine ROI timeline
@@ -623,6 +668,7 @@ START: What is your monthly cost?
 **Last Updated:** 2025-11-10
 
 **Related Documentation:**
+
 - [SCALING_GUIDE_OVERVIEW.md](SCALING_GUIDE_OVERVIEW.md) - Strategic roadmap
 - [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) - Step-by-step migration
 - [REDIS_SETUP_GUIDE.md](REDIS_SETUP_GUIDE.md) - Caching setup

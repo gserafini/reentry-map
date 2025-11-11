@@ -87,3 +87,7 @@ next-env.d.ts
 # Local documentation
 www.heroui.com/
 
+# Data imports (keep directory structure but ignore JSON files)
+data-imports/*.json
+data-imports/archived/*.json
+

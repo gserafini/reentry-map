@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Providers } from './providers'
 import { ClientAppBar } from '@/components/layout/ClientAppBar'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { Footer } from '@/components/layout/Footer'
 import { AuthButton } from '@/components/auth-button'
 import '../styles/tailwind.css'
 
@@ -123,6 +124,7 @@ export default async function RootLayout({
             >
               {children}
             </Box>
+            <Footer />
             <BottomNav />
           </Box>
         </Providers>

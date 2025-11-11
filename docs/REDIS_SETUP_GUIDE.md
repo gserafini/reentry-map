@@ -26,12 +26,14 @@
 ### The Problem
 
 **Without caching:**
+
 - Every search query hits PostgreSQL
 - Map loads query all resources within viewport (expensive spatial query)
 - Category counts recalculated on every request
 - Database handles 100-500 queries per minute
 
 **At 100k resources:**
+
 - Search query: 200-500ms (PostgreSQL full-text search + spatial)
 - Map viewport query: 300-800ms (PostGIS spatial + JSON serialization)
 - Category counts: 100-200ms (aggregate query across all resources)
@@ -40,12 +42,14 @@
 ### The Solution
 
 **With Redis caching:**
+
 - Search results cached for 5 minutes (hit rate: ~80%)
 - Map viewport data cached by bounding box (hit rate: ~70%)
 - Category counts cached for 15 minutes (hit rate: ~95%)
 - Database queries reduced by 80-90%
 
 **Performance improvement:**
+
 - Search query: **50ms** (10x faster)
 - Map viewport query: **80ms** (6x faster)
 - Category counts: **10ms** (20x faster)
@@ -53,12 +57,12 @@
 
 ### Redis vs Database Query Performance
 
-| Operation | PostgreSQL | Redis | Speedup |
-|-----------|-----------|-------|---------|
-| Simple GET | 20-50ms | 1-3ms | 10-20x |
-| Search results (20 items) | 200-500ms | 10-20ms | 20-40x |
-| Aggregate count | 100-200ms | 5-10ms | 20x |
-| Spatial query (map) | 300-800ms | 50-100ms | 6-8x |
+| Operation                 | PostgreSQL | Redis    | Speedup |
+| ------------------------- | ---------- | -------- | ------- |
+| Simple GET                | 20-50ms    | 1-3ms    | 10-20x  |
+| Search results (20 items) | 200-500ms  | 10-20ms  | 20-40x  |
+| Aggregate count           | 100-200ms  | 5-10ms   | 20x     |
+| Spatial query (map)       | 300-800ms  | 50-100ms | 6-8x    |
 
 ---
 
@@ -90,12 +94,14 @@ systemctl status redis-server
 ### Option 2: Managed Redis (Easier, Paid)
 
 **Upstash (Serverless Redis):**
+
 - Free tier: 10k commands/day
 - Paid: $0.2 per 100k commands (~$10-50/mo for your scale)
 - Global edge caching
 - Zero config
 
 **Redis Cloud:**
+
 - Free tier: 30MB, 30 connections
 - Paid: $7-50/mo
 - Managed backups
@@ -221,6 +227,7 @@ npm install @types/ioredis --save-dev
 ```
 
 **Why ioredis?**
+
 - Full TypeScript support
 - Cluster support (future scaling)
 - Promise-based API (async/await)
@@ -447,15 +454,15 @@ export async function cached<T>(
 
 ### 4.1 What to Cache
 
-| Data Type | TTL | Invalidation Strategy |
-|-----------|-----|----------------------|
-| **Search results** | 5 min | Invalidate on resource create/update/delete |
-| **Map viewport data** | 10 min | Invalidate on resource location change |
-| **Category counts** | 15 min | Invalidate on resource create/delete/category change |
-| **Resource detail page** | 1 hour | Invalidate on resource update |
-| **Coverage metrics** | 1 day | Invalidate on coverage recalculation |
-| **User sessions** | Until logout | Invalidate on logout |
-| **Static data** (categories config) | 7 days | Manual invalidation only |
+| Data Type                           | TTL          | Invalidation Strategy                                |
+| ----------------------------------- | ------------ | ---------------------------------------------------- |
+| **Search results**                  | 5 min        | Invalidate on resource create/update/delete          |
+| **Map viewport data**               | 10 min       | Invalidate on resource location change               |
+| **Category counts**                 | 15 min       | Invalidate on resource create/delete/category change |
+| **Resource detail page**            | 1 hour       | Invalidate on resource update                        |
+| **Coverage metrics**                | 1 day        | Invalidate on coverage recalculation                 |
+| **User sessions**                   | Until logout | Invalidate on logout                                 |
+| **Static data** (categories config) | 7 days       | Manual invalidation only                             |
 
 ### 4.2 Cache Key Naming Convention
 
@@ -490,6 +497,7 @@ user:reviews:{user_id}
 ```
 
 **Example keys:**
+
 - `resources:search:housing:categories=employment,housing:page=1`
 - `map:viewport:37.8:-122.3:37.9:-122.2`
 - `counts:categories`
@@ -497,13 +505,13 @@ user:reviews:{user_id}
 
 ### 4.3 Cache Hit Rate Targets
 
-| Cache Type | Target Hit Rate |
-|------------|----------------|
-| Category counts | 95%+ |
-| Static pages | 90%+ |
-| Search results | 70-80% |
-| Map viewports | 60-70% |
-| Resource details | 80-90% |
+| Cache Type       | Target Hit Rate |
+| ---------------- | --------------- |
+| Category counts  | 95%+            |
+| Static pages     | 90%+            |
+| Search results   | 70-80%          |
+| Map viewports    | 60-70%          |
+| Resource details | 80-90%          |
 
 **Monitoring:** Track hit rates and adjust TTLs accordingly.
 
@@ -537,10 +545,7 @@ export async function getResources(
       // Cache miss - query database
       const supabase = createClient()
 
-      let query = supabase
-        .from('resources')
-        .select('*', { count: 'exact' })
-        .eq('status', 'active')
+      let query = supabase.from('resources').select('*', { count: 'exact' }).eq('status', 'active')
 
       // Apply filters
       if (filters.search) {
@@ -623,9 +628,7 @@ export async function getResourcesInViewport(
 **File: `lib/api/resources.ts`**
 
 ```typescript
-export async function getCategoryCounts(): Promise<
-  Array<{ category: string; count: number }>
-> {
+export async function getCategoryCounts(): Promise<Array<{ category: string; count: number }>> {
   const cacheKey = 'counts:categories'
 
   return await cached(
@@ -760,6 +763,7 @@ export default async function ResourcesPage({
 ```
 
 **Performance:**
+
 - **Without cache**: 200-500ms (2-3 database queries)
 - **With cache**: 20-50ms (Redis lookups) ✓
 
@@ -776,10 +780,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { invalidateByTag } from '@/lib/redis/cache'
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
     const body = await request.json()
@@ -810,10 +811,7 @@ export async function PATCH(
     return NextResponse.json(data)
   } catch (error) {
     console.error('Update resource error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update resource' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update resource' }, { status: 500 })
   }
 }
 ```
@@ -829,11 +827,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Create resource
-    const { data, error } = await supabase
-      .from('resources')
-      .insert(body)
-      .select()
-      .single()
+    const { data, error } = await supabase.from('resources').insert(body).select().single()
 
     if (error) throw error
 
@@ -845,10 +839,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Create resource error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create resource' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 })
   }
 }
 ```
@@ -892,10 +883,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Cache clear error:', error)
-    return NextResponse.json(
-      { error: 'Failed to clear cache' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to clear cache' }, { status: 500 })
   }
 }
 ```
@@ -1028,6 +1016,7 @@ redis-cli -a YOUR_PASSWORD slowlog get 10
 ```
 
 **Output:**
+
 ```
 1) 1) (integer) 14  # Log entry ID
    2) (integer) 1667890123  # Timestamp
@@ -1131,11 +1120,13 @@ redis-cli -a YOUR_PASSWORD info memory
 ```
 
 **Key metrics:**
+
 - `used_memory_human`: Current memory usage
 - `used_memory_peak_human`: Peak memory usage
 - `maxmemory_human`: Configured max memory
 
 **If nearing limit:**
+
 1. Increase `maxmemory` in redis.conf
 2. Reduce TTLs (more aggressive eviction)
 3. Review cache key patterns (are you caching too much?)
@@ -1145,11 +1136,13 @@ redis-cli -a YOUR_PASSWORD info memory
 Redis supports two persistence modes:
 
 **RDB (Snapshots):**
+
 - Saves periodic snapshots to disk
 - Fast recovery
 - May lose data between snapshots
 
 **AOF (Append-Only File):**
+
 - Logs every write operation
 - More durable (can lose <1 sec of data)
 - Slower, larger disk usage
@@ -1299,6 +1292,7 @@ Cache hit rate:                   78%
 ## Summary Checklist
 
 ### Installation
+
 - [ ] Redis installed and running
 - [ ] Redis secured with password
 - [ ] Firewall configured (localhost only)
@@ -1306,12 +1300,14 @@ Cache hit rate:                   78%
 - [ ] Persistence enabled (RDB + AOF)
 
 ### Integration
+
 - [ ] ioredis installed
 - [ ] Redis client singleton created
 - [ ] Environment variables configured
 - [ ] Caching utilities implemented
 
 ### Implementation
+
 - [ ] Search results cached (5 min TTL)
 - [ ] Map viewport data cached (10 min TTL)
 - [ ] Category counts cached (15 min TTL)
@@ -1319,17 +1315,20 @@ Cache hit rate:                   78%
 - [ ] Coverage metrics cached (1 day TTL)
 
 ### Invalidation
+
 - [ ] Invalidation on resource create/update/delete
 - [ ] Tag-based invalidation implemented
 - [ ] Manual cache clear admin UI
 
 ### Monitoring
+
 - [ ] Cache stats endpoint created
 - [ ] Hit rate tracking configured
 - [ ] Slow query logging enabled
 - [ ] Memory usage alerts set up
 
 ### Production
+
 - [ ] Backups scheduled (daily)
 - [ ] Error handling (graceful fallback to DB)
 - [ ] Connection pooling configured
@@ -1338,6 +1337,7 @@ Cache hit rate:                   78%
 ---
 
 **Next Steps:**
+
 1. Implement Redis caching following this guide
 2. Run performance tests (before/after benchmarks)
 3. Monitor cache hit rates and tune TTLs

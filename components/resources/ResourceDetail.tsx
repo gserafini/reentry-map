@@ -39,10 +39,16 @@ import { RatingStars } from '@/components/user/RatingStars'
 import { ReviewsList } from '@/components/user/ReviewsList'
 import { ReviewForm } from '@/components/user/ReviewForm'
 import { ReportProblemModal } from '@/components/user/ReportProblemModal'
+import { AdminResourceMetadata } from '@/components/admin/AdminResourceMetadata'
 import { useState, useEffect } from 'react'
 import { Flag as FlagIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
+import {
+  generateCategoryInCityUrl,
+  generateTagInCityUrl,
+  generateNationalTagUrl,
+} from '@/lib/utils/urls'
 
 interface ResourceDetailProps {
   resource: Resource
@@ -553,7 +559,15 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </Typography>
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           <Link
-            href={`/resources/category/${resource.primary_category}`}
+            href={
+              resource.city && resource.state
+                ? generateCategoryInCityUrl(
+                    resource.city,
+                    resource.state,
+                    resource.primary_category as ResourceCategory
+                  )
+                : `/category/${resource.primary_category}`
+            }
             style={{ textDecoration: 'none' }}
           >
             <Chip
@@ -587,7 +601,15 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                 return (
                   <Link
                     key={category}
-                    href={`/resources/category/${category}`}
+                    href={
+                      resource.city && resource.state
+                        ? generateCategoryInCityUrl(
+                            resource.city,
+                            resource.state,
+                            category as ResourceCategory
+                          )
+                        : `/category/${category}`
+                    }
                     style={{ textDecoration: 'none' }}
                   >
                     <Chip
@@ -623,7 +645,11 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             {resource.tags.map((tag) => (
               <Link
                 key={tag}
-                href={`/resources/tag/${tag}?search=${encodeURIComponent(tag)}`}
+                href={
+                  resource.city && resource.state
+                    ? generateTagInCityUrl(resource.city, resource.state, tag)
+                    : generateNationalTagUrl(tag)
+                }
                 style={{ textDecoration: 'none' }}
               >
                 <Chip label={tag} size="small" variant="outlined" clickable />
@@ -647,6 +673,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         )}
         <ReviewsList resourceId={resource.id} onWriteReviewClick={() => setShowReviewForm(true)} />
       </Box>
+
+      {/* Admin-Only Metadata Section */}
+      {isAdmin && <AdminResourceMetadata resource={resource} />}
     </Box>
   )
 }

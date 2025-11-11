@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@mui/material'
 import { DistanceFilter } from './DistanceFilter'
 import { useUserLocation } from '@/lib/context/LocationContext'
@@ -19,12 +20,18 @@ interface LocationFilterSidebarProps {
  */
 export function LocationFilterSidebar({ children }: LocationFilterSidebarProps) {
   const { coordinates } = useUserLocation()
+  const [isMounted, setIsMounted] = useState(false)
   const hasLocation = Boolean(coordinates)
+
+  // Prevent hydration mismatch by only rendering location-dependent UI after mount
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   return (
     <>
       {/* Location/Distance Filter */}
-      {hasLocation && (
+      {isMounted && hasLocation && (
         <Card sx={{ mb: 3 }}>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
             <DistanceFilter hasLocation={hasLocation} defaultDistance={25} />

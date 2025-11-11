@@ -19,9 +19,15 @@ export function NearMeButton() {
   const [hasRequested, setHasRequested] = useState(false)
 
   const handleNearMe = () => {
-    // If we already have coordinates, just update sort immediately
+    // If we already have coordinates, update URL with location params
     if (coordinates) {
       const params = new URLSearchParams(searchParams.toString())
+      params.set('lat', coordinates.latitude.toString())
+      params.set('lng', coordinates.longitude.toString())
+      // Set distance if not already set
+      if (!params.has('distance')) {
+        params.set('distance', '25')
+      }
       params.set('sort', 'distance-asc')
       router.push(`${pathname}?${params.toString()}`)
       return
@@ -40,8 +46,14 @@ export function NearMeButton() {
       setShowError(true)
       setHasRequested(false)
     } else if (coordinates && !loading) {
-      // Location was just received, update URL to sort by distance
+      // Location was just received, update URL with location params
       const params = new URLSearchParams(searchParams.toString())
+      params.set('lat', coordinates.latitude.toString())
+      params.set('lng', coordinates.longitude.toString())
+      // Set distance if not already set
+      if (!params.has('distance')) {
+        params.set('distance', '25')
+      }
       params.set('sort', 'distance-asc')
       router.push(`${pathname}?${params.toString()}`)
       setHasRequested(false)

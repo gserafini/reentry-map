@@ -11,13 +11,21 @@ export const env = createEnv({
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 
     // AI API keys
-    OPENAI_API_KEY: z.string().min(1).optional(),
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    OPENAI_API_KEY: z.string().min(1).optional(), // Legacy - not currently used
+
+    // AI model configuration (easily updatable as models change)
+    ANTHROPIC_VERIFICATION_MODEL: z.string().default('claude-sonnet-4-20250514'), // For URL auto-fix with web search
+    ANTHROPIC_ENRICHMENT_MODEL: z.string().default('claude-haiku-4-5-20250514'), // For content verification
 
     // Google Maps server-side key (for geocoding, etc.)
     GOOGLE_MAPS_KEY: z.string().min(1).optional(),
 
     // Admin contact for system alerts and monitoring
     ADMIN_EMAIL: z.string().email().optional(),
+
+    // Admin API key for machine-to-machine authentication (Claude Code, scripts)
+    ADMIN_API_KEY: z.string().min(32).optional(),
 
     // GeoIP: Use external IP lookup in development for testing (set to 'true' to enable)
     // When enabled, fetches your actual external IP for GeoIP instead of using localhost
@@ -56,9 +64,13 @@ export const env = createEnv({
   runtimeEnv: {
     // Server-only
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    ANTHROPIC_VERIFICATION_MODEL: process.env.ANTHROPIC_VERIFICATION_MODEL,
+    ANTHROPIC_ENRICHMENT_MODEL: process.env.ANTHROPIC_ENRICHMENT_MODEL,
     GOOGLE_MAPS_KEY: process.env.GOOGLE_MAPS_KEY,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    ADMIN_API_KEY: process.env.ADMIN_API_KEY,
     USE_EXTERNAL_IP_IN_DEV: process.env.USE_EXTERNAL_IP_IN_DEV,
 
     // Client-side

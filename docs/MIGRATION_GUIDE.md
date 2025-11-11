@@ -38,6 +38,7 @@
 - [ ] **Rollback plan**: Ability to revert to Supabase quickly
 
 **Estimated Costs After Migration:**
+
 - Server: $0 (already owned)
 - Twilio (phone OTP): $10-50/mo
 - Backups (Backblaze B2): $5-10/mo
@@ -90,6 +91,7 @@ ufw status
 ```
 
 **Important**: If using Vercel, you'll need to whitelist their IP ranges:
+
 - Get IPs: https://vercel.com/docs/concepts/edge-network/overview#firewall-rules
 - Or use connection pooler with public endpoint + SSL
 
@@ -588,10 +590,7 @@ npm install @types/twilio --save-dev
 ```typescript
 import twilio from 'twilio'
 
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-)
+const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!)
 
 // Generate 6-digit OTP
 export function generateOTP(): string {
@@ -684,10 +683,7 @@ export async function POST(request: NextRequest) {
 
     // Validate phone number
     if (!isValidPhoneNumber(phone)) {
-      return NextResponse.json(
-        { error: 'Invalid phone number format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 })
     }
 
     const formattedPhone = formatPhoneE164(phone)
@@ -697,39 +693,28 @@ export async function POST(request: NextRequest) {
 
     // Store OTP in database
     const supabase = createClient()
-    const { error } = await supabase
-      .from('phone_otps')
-      .insert({
-        phone: formattedPhone,
-        code,
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 min
-      })
+    const { error } = await supabase.from('phone_otps').insert({
+      phone: formattedPhone,
+      code,
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 min
+    })
 
     if (error) {
       console.error('Failed to store OTP:', error)
-      return NextResponse.json(
-        { error: 'Failed to send verification code' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to send verification code' }, { status: 500 })
     }
 
     // Send OTP via Twilio
     const sent = await sendOTP(formattedPhone, code)
 
     if (!sent) {
-      return NextResponse.json(
-        { error: 'Failed to send verification code' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to send verification code' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Send OTP error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 ```
@@ -761,17 +746,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !data) {
-      return NextResponse.json(
-        { error: 'Invalid or expired verification code' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid or expired verification code' }, { status: 400 })
     }
 
     // Mark OTP as verified
-    await supabase
-      .from('phone_otps')
-      .update({ verified: true })
-      .eq('id', data.id)
+    await supabase.from('phone_otps').update({ verified: true }).eq('id', data.id)
 
     // Create or get user
     let { data: user, error: userError } = await supabase
@@ -789,19 +768,13 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (createError) {
-        return NextResponse.json(
-          { error: 'Failed to create user' },
-          { status: 500 }
-        )
+        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
       }
 
       user = newUser
     } else {
       // Update phone_verified
-      await supabase
-        .from('users')
-        .update({ phone_verified: true })
-        .eq('id', user.id)
+      await supabase.from('users').update({ phone_verified: true }).eq('id', user.id)
     }
 
     // Create session (implement your session logic here)
@@ -809,10 +782,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ user })
   } catch (error) {
     console.error('Verify OTP error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 ```
@@ -1051,12 +1021,14 @@ k6 run load-test.js
 **Recommended time**: Sunday 2-6 AM (lowest traffic)
 
 **Hour 1: Freeze & Export**
+
 - [ ] 2:00 AM: Put Supabase in read-only mode (disable writes via RLS)
 - [ ] 2:05 AM: Export final database dump
 - [ ] 2:15 AM: Transfer dump to server
 - [ ] 2:20 AM: Verify dump integrity
 
 **Hour 2: Restore & Verify**
+
 - [ ] 2:30 AM: Restore to self-hosted PostgreSQL
 - [ ] 2:45 AM: Verify row counts match
 - [ ] 2:50 AM: Test critical queries (search, map, detail pages)
@@ -1064,6 +1036,7 @@ k6 run load-test.js
 - [ ] 3:05 AM: Update Vercel environment variables
 
 **Hour 3: Testing**
+
 - [ ] 3:10 AM: Deploy updated Next.js app to Vercel
 - [ ] 3:15 AM: Smoke test production:
   - Homepage loads
@@ -1075,6 +1048,7 @@ k6 run load-test.js
 - [ ] 3:45 AM: Test from multiple locations (VPN, mobile)
 
 **Hour 4: Monitoring & Rollback Prep**
+
 - [ ] 4:00 AM: If all tests pass, announce migration complete
 - [ ] 4:15 AM: Monitor error rates (Vercel, PostgreSQL logs)
 - [ ] 4:30 AM: If errors > 5%, initiate rollback (see below)
@@ -1212,6 +1186,7 @@ systemctl start grafana-server
 ```
 
 **Import PostgreSQL Dashboard:**
+
 1. Go to Dashboards → Import
 2. Use ID: 9628 (PostgreSQL Database)
 3. Select Prometheus data source
@@ -1226,12 +1201,14 @@ systemctl start grafana-server
 ### 11.2 Set Up Alerts
 
 **Critical Alerts (PagerDuty, Email, SMS):**
+
 - Database down (can't connect)
 - Disk usage > 90%
 - Connection pool exhausted
 - Replication lag > 10 seconds (if using replicas)
 
 **Warning Alerts (Email):**
+
 - Slow queries > 1 second
 - Connection pool > 80% full
 - Disk usage > 80%
@@ -1305,6 +1282,7 @@ dropdb reentry_map_test
 ## Migration Checklist Summary
 
 ### Pre-Migration
+
 - [ ] Server provisioned and configured
 - [ ] PostgreSQL 16 installed
 - [ ] PostGIS extension enabled
@@ -1315,6 +1293,7 @@ dropdb reentry_map_test
 - [ ] Backup downloaded from Supabase
 
 ### Migration Day
+
 - [ ] Supabase in read-only mode
 - [ ] Final export completed
 - [ ] Data restored to self-hosted
@@ -1327,6 +1306,7 @@ dropdb reentry_map_test
 - [ ] Smoke tests passed
 
 ### Post-Migration
+
 - [ ] Monitoring configured
 - [ ] Alerts set up
 - [ ] Backups scheduled
@@ -1339,13 +1319,13 @@ dropdb reentry_map_test
 
 ## Cost Savings Summary
 
-| Item | Supabase (Year 1) | Self-Hosted (Year 1) | Savings |
-|------|-------------------|----------------------|---------|
-| Database | $1,200 | $0 | $1,200 |
-| Hosting | $0 | $0 | $0 |
-| SMS (Twilio) | $600 | $600 | $0 |
-| Backups | $0 | $120 | -$120 |
-| **Total** | **$1,800** | **$720** | **$1,080** |
+| Item         | Supabase (Year 1) | Self-Hosted (Year 1) | Savings    |
+| ------------ | ----------------- | -------------------- | ---------- |
+| Database     | $1,200            | $0                   | $1,200     |
+| Hosting      | $0                | $0                   | $0         |
+| SMS (Twilio) | $600              | $600                 | $0         |
+| Backups      | $0                | $120                 | -$120      |
+| **Total**    | **$1,800**        | **$720**             | **$1,080** |
 
 **ROI**: Migration effort (~80 hours) pays for itself in 6 months of cost savings.
 

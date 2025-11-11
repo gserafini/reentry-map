@@ -81,15 +81,30 @@ export const CATEGORIES = (Object.keys(CATEGORY_CONFIG) as ResourceCategory[]).m
 }))
 
 /**
+ * Normalize category name to handle both hyphen and underscore formats
+ * Examples: "general_support" -> "general-support", "mental_health" -> "mental-health"
+ */
+function normalizeCategoryName(category: string): ResourceCategory {
+  // Replace underscores with hyphens
+  const normalized = category.replace(/_/g, '-') as ResourceCategory
+  // Return normalized if it exists in config, otherwise return original
+  return CATEGORY_CONFIG[normalized] ? normalized : (category as ResourceCategory)
+}
+
+/**
  * Get category display label
+ * Handles both hyphen and underscore formats (e.g., "general-support" and "general_support")
  */
 export function getCategoryLabel(category: ResourceCategory): string {
-  return CATEGORY_CONFIG[category]?.label || category
+  const normalized = normalizeCategoryName(category)
+  return CATEGORY_CONFIG[normalized]?.label || category
 }
 
 /**
  * Get category description
+ * Handles both hyphen and underscore formats (e.g., "general-support" and "general_support")
  */
 export function getCategoryDescription(category: ResourceCategory): string {
-  return CATEGORY_CONFIG[category]?.description || ''
+  const normalized = normalizeCategoryName(category)
+  return CATEGORY_CONFIG[normalized]?.description || ''
 }

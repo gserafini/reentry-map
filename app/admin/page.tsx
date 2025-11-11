@@ -129,6 +129,136 @@ export default function AdminDashboardPage() {
     }
   }, [isAdmin, checkingAdmin])
 
+  // Set up Realtime subscriptions for live updates
+  useEffect(() => {
+    if (!isAdmin) return
+
+    const supabase = createClient()
+
+    // Subscribe to resources table changes
+    const resourcesChannel = supabase
+      .channel('dashboard_resources_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'resources',
+        },
+        () => {
+          // Re-fetch counts when resources change
+          Promise.all([
+            supabase.from('resources').select('*', { count: 'exact', head: true }),
+            supabase
+              .from('resources')
+              .select('*', { count: 'exact', head: true })
+              .eq('status', 'active'),
+          ]).then(([resourcesCount, activeCount]) => {
+            setStats((prev) => ({
+              ...prev,
+              totalResources: resourcesCount.count || 0,
+              activeResources: activeCount.count || 0,
+            }))
+          })
+        }
+      )
+      .subscribe()
+
+    // Subscribe to resource_suggestions table changes
+    const suggestionsChannel = supabase
+      .channel('dashboard_suggestions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'resource_suggestions',
+        },
+        () => {
+          supabase
+            .from('resource_suggestions')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .then(({ count }) => {
+              setStats((prev) => ({ ...prev, pendingSuggestions: count || 0 }))
+            })
+        }
+      )
+      .subscribe()
+
+    // Subscribe to resource_updates table changes
+    const updatesChannel = supabase
+      .channel('dashboard_updates_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'resource_updates',
+        },
+        () => {
+          supabase
+            .from('resource_updates')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .then(({ count }) => {
+              setStats((prev) => ({ ...prev, pendingUpdates: count || 0 }))
+            })
+        }
+      )
+      .subscribe()
+
+    // Subscribe to resource_reviews table changes
+    const reviewsChannel = supabase
+      .channel('dashboard_reviews_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'resource_reviews',
+        },
+        () => {
+          supabase
+            .from('resource_reviews')
+            .select('*', { count: 'exact', head: true })
+            .then(({ count }) => {
+              setStats((prev) => ({ ...prev, totalReviews: count || 0 }))
+            })
+        }
+      )
+      .subscribe()
+
+    // Subscribe to users table changes
+    const usersChannel = supabase
+      .channel('dashboard_users_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+        },
+        () => {
+          supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .then(({ count }) => {
+              setStats((prev) => ({ ...prev, totalUsers: count || 0 }))
+            })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(resourcesChannel)
+      supabase.removeChannel(suggestionsChannel)
+      supabase.removeChannel(updatesChannel)
+      supabase.removeChannel(reviewsChannel)
+      supabase.removeChannel(usersChannel)
+    }
+  }, [isAdmin])
+
   if (authLoading || checkingAdmin) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>

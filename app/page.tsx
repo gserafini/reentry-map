@@ -13,6 +13,12 @@ import Link from 'next/link'
 import { getResources, getResourceCount } from '@/lib/api/resources'
 import { HeroSearch } from '@/components/search/HeroSearch'
 import { FeaturedResourcesList } from '@/components/resources/FeaturedResourcesList'
+import {
+  generateNationalCategoryUrl,
+  generateCityUrl,
+  generateCategoryInCityUrl,
+} from '@/lib/utils/urls'
+import type { ResourceCategory } from '@/lib/types/database'
 
 // Force dynamic rendering since we fetch data with Supabase server client
 export const dynamic = 'force-dynamic'
@@ -96,7 +102,7 @@ export default async function HomePage() {
             return (
               <Grid size={{ xs: 6, sm: 4, md: 3 }} key={category.slug}>
                 <Link
-                  href={`/resources/category/${category.slug}`}
+                  href={generateNationalCategoryUrl(category.slug as ResourceCategory)}
                   style={{ textDecoration: 'none', height: '100%', display: 'block' }}
                 >
                   <Card
@@ -190,34 +196,59 @@ export default async function HomePage() {
             Browse verified reentry resources in Bay Area cities
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Link href="/oakland-ca" style={{ textDecoration: 'none' }}>
+            <Link href={generateCityUrl('Oakland', 'CA')} style={{ textDecoration: 'none' }}>
               <Chip label="Oakland, CA" clickable color="primary" />
             </Link>
-            <Link href="/oakland-ca/employment" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl('Oakland', 'CA', 'employment' as ResourceCategory)}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Employment in Oakland" clickable />
             </Link>
-            <Link href="/oakland-ca/housing" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl('Oakland', 'CA', 'housing' as ResourceCategory)}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Housing in Oakland" clickable />
             </Link>
-            <Link href="/oakland-ca/food" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl('Oakland', 'CA', 'food' as ResourceCategory)}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Food in Oakland" clickable />
             </Link>
-            <Link href="/san-francisco-ca" style={{ textDecoration: 'none' }}>
+            <Link href={generateCityUrl('San Francisco', 'CA')} style={{ textDecoration: 'none' }}>
               <Chip label="San Francisco, CA" clickable />
             </Link>
-            <Link href="/san-francisco-ca/employment" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl(
+                'San Francisco',
+                'CA',
+                'employment' as ResourceCategory
+              )}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Employment in San Francisco" clickable />
             </Link>
-            <Link href="/berkeley-ca" style={{ textDecoration: 'none' }}>
+            <Link href={generateCityUrl('Berkeley', 'CA')} style={{ textDecoration: 'none' }}>
               <Chip label="Berkeley, CA" clickable />
             </Link>
-            <Link href="/berkeley-ca/housing" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl('Berkeley', 'CA', 'housing' as ResourceCategory)}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Housing in Berkeley" clickable />
             </Link>
-            <Link href="/oakland-ca/legal-aid" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl('Oakland', 'CA', 'legal-aid' as ResourceCategory)}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Legal Aid in Oakland" clickable />
             </Link>
-            <Link href="/oakland-ca/mental-health" style={{ textDecoration: 'none' }}>
+            <Link
+              href={generateCategoryInCityUrl('Oakland', 'CA', 'mental-health' as ResourceCategory)}
+              style={{ textDecoration: 'none' }}
+            >
               <Chip label="Mental Health in Oakland" clickable />
             </Link>
           </Box>
