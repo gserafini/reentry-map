@@ -31,6 +31,7 @@ import { createClient } from '@/lib/supabase/client'
 interface DashboardStats {
   totalResources: number
   pendingSuggestions: number
+  rejectedSuggestions: number
   pendingUpdates: number
   totalReviews: number
   totalUsers: number
@@ -45,6 +46,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     totalResources: 0,
     pendingSuggestions: 0,
+    rejectedSuggestions: 0,
     pendingUpdates: 0,
     totalReviews: 0,
     totalUsers: 0,
@@ -87,6 +89,7 @@ export default function AdminDashboardPage() {
         const [
           resourcesCount,
           suggestionsCount,
+          rejectedSuggestionsCount,
           updatesCount,
           reviewsCount,
           usersCount,
@@ -97,6 +100,10 @@ export default function AdminDashboardPage() {
             .from('resource_suggestions')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'pending'),
+          supabase
+            .from('resource_suggestions')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'rejected'),
           supabase
             .from('resource_updates')
             .select('*', { count: 'exact', head: true })
@@ -112,6 +119,7 @@ export default function AdminDashboardPage() {
         setStats({
           totalResources: resourcesCount.count || 0,
           pendingSuggestions: suggestionsCount.count || 0,
+          rejectedSuggestions: rejectedSuggestionsCount.count || 0,
           pendingUpdates: updatesCount.count || 0,
           totalReviews: reviewsCount.count || 0,
           totalUsers: usersCount.count || 0,
@@ -175,13 +183,22 @@ export default function AdminDashboardPage() {
           table: 'resource_suggestions',
         },
         () => {
-          supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-            .then(({ count }) => {
-              setStats((prev) => ({ ...prev, pendingSuggestions: count || 0 }))
-            })
+          Promise.all([
+            supabase
+              .from('resource_suggestions')
+              .select('*', { count: 'exact', head: true })
+              .eq('status', 'pending'),
+            supabase
+              .from('resource_suggestions')
+              .select('*', { count: 'exact', head: true })
+              .eq('status', 'rejected'),
+          ]).then(([pendingCount, rejectedCount]) => {
+            setStats((prev) => ({
+              ...prev,
+              pendingSuggestions: pendingCount.count || 0,
+              rejectedSuggestions: rejectedCount.count || 0,
+            }))
+          })
         }
       )
       .subscribe()
@@ -289,6 +306,14 @@ export default function AdminDashboardPage() {
       icon: <SuggestionsIcon sx={{ fontSize: 40 }} />,
       color: '#ed6c02',
       link: '/admin/suggestions',
+    },
+    {
+      title: 'Rejected Suggestions',
+      value: stats.rejectedSuggestions,
+      subtitle: 'Auto-rejected by AI',
+      icon: <SuggestionsIcon sx={{ fontSize: 40 }} />,
+      color: '#757575',
+      link: '/admin/suggestions?status=rejected',
     },
     {
       title: 'Pending Updates',
