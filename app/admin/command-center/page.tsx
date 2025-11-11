@@ -723,7 +723,7 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
             <Typography variant="subtitle2" fontWeight="bold">
               {aiSystemStatus.masterEnabled ? '✅ AI Systems Active' : '⚠️ AI Systems Disabled'}
             </Typography>
-            <Typography variant="body2" sx={{ mt: 0.5 }}>
+            <Box sx={{ mt: 0.5 }}>
               {aiSystemStatus.masterEnabled ? (
                 <>
                   {aiSystemStatus.isVerificationActive && (
@@ -768,9 +768,13 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
                   )}
                 </>
               ) : (
-                'All AI operations are currently inactive. All resource submissions will require manual admin review. Enable AI systems in settings to activate autonomous verification.'
+                <Typography variant="body2">
+                  All AI operations are currently inactive. All resource submissions will require
+                  manual admin review. Enable AI systems in settings to activate autonomous
+                  verification.
+                </Typography>
               )}
-            </Typography>
+            </Box>
           </Box>
         </Alert>
       )}
