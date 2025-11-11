@@ -68,6 +68,72 @@ npm run quality:full # Full: Above + E2E tests
 
 ---
 
+## Frontend UI Verification (MANDATORY)
+
+**⚠️ CRITICAL: `npm run quality` passing does NOT mean the UI works!**
+
+**Before claiming ANY frontend work is "complete", "done", or "production-ready":**
+
+### 1. Run Quality Checks First
+
+```bash
+npm run quality  # Must pass with 0 errors
+```
+
+### 2. Browse the UI Using Playwright MCP (MANDATORY)
+
+**For ANY frontend work** (new components, page changes, UI updates):
+
+```typescript
+// Use the Playwright MCP browser automation tools:
+mcp__playwright__browser_navigate({ url: 'http://localhost:3003/your-page' })
+mcp__playwright__browser_snapshot() // Get accessibility tree
+mcp__playwright__browser_console_messages({ onlyErrors: true }) // Check for errors
+mcp__playwright__browser_take_screenshot({ fullPage: true }) // Visual verification
+```
+
+**What to verify:**
+
+- ✅ Page loads without crashing
+- ✅ All components render correctly
+- ✅ No browser console errors (red errors in console)
+- ✅ No TypeErrors, ReferenceErrors, or other runtime errors
+- ✅ Interactive elements work (buttons, toggles, dropdowns)
+- ✅ Real-time updates work (if applicable)
+- ✅ No missing data or undefined values displayed
+
+**Example Checklist for Admin Dashboard Work:**
+
+1. Navigate to `/admin` page
+2. Take full-page screenshot
+3. Check browser console for errors
+4. Click on interactive elements (toggles, dropdowns, buttons)
+5. Verify collapsible panels expand/collapse
+6. Check that all data displays correctly (no "undefined", "NaN", or crashes)
+7. Only THEN claim work is complete
+
+### 3. If Errors Found
+
+**DO NOT claim "production-ready" or "complete":**
+
+- ❌ "All quality checks passed!" (if you haven't browsed the UI)
+- ❌ "Phase 4 complete!" (if you haven't visually verified)
+- ❌ "Ready for production!" (if you haven't tested interactivity)
+
+**INSTEAD:**
+
+- Fix the errors first
+- Re-test in browser
+- Only then present to user
+
+### Why This Matters
+
+**Past incident (2025-11-11)**: I ran `npm run quality` (passed ✅), marked admin dashboard as "production-ready", but **never browsed it**. User had to explicitly tell me to "USE FUCKING MCP SERVER". When I finally browsed, found critical crash bug (CoverageSnapshot.tsx TypeError). This was embarrassing and frustrated the user.
+
+**Lesson**: Automated tests don't catch runtime errors, missing null checks, API failures, or visual issues. **YOU MUST LOOK AT IT.**
+
+---
+
 ## Visual Design Review (Screenshots)
 
 **When doing frontend design work, use screenshots to review responsive design:**
