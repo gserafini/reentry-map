@@ -14,10 +14,22 @@ import {
   Alert,
   Button,
 } from '@mui/material'
-import { Visibility, Edit, CheckCircle, Pending, Search, ContentCopy } from '@mui/icons-material'
+import {
+  Visibility,
+  Edit,
+  CheckCircle,
+  Pending,
+  Search,
+  ContentCopy,
+  SmartToy,
+  Settings,
+  Warning,
+} from '@mui/icons-material'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { RealtimeVerificationViewer } from '@/components/admin/RealtimeVerificationViewer'
+import { getAISystemStatus } from '@/lib/api/settings'
+import type { AISystemStatus } from '@/lib/types/settings'
 
 interface ExpansionPriority {
   id: string
@@ -62,6 +74,7 @@ export default function CommandCenterPage() {
   const [nextExpansion, setNextExpansion] = useState<ExpansionPriority | null>(null)
   const [submittedResources, setSubmittedResources] = useState<ResourceSuggestion[]>([])
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([])
+  const [aiSystemStatus, setAiSystemStatus] = useState<AISystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [agentPrompt, setAgentPrompt] = useState<string>('')
   const [copySuccess, setCopySuccess] = useState(false)
@@ -519,6 +532,10 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
           setAgentSessions(sessions)
         }
 
+        // Fetch AI system status
+        const aiStatus = await getAISystemStatus()
+        setAiSystemStatus(aiStatus)
+
         // Check for pending import files
         await checkForImportFiles()
 
@@ -683,6 +700,80 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
           Real-time monitoring of research, verification, and expansion activities
         </Typography>
       </Box>
+
+      {/* AI System Status Indicator */}
+      {aiSystemStatus && (
+        <Alert
+          severity={aiSystemStatus.masterEnabled ? 'success' : 'warning'}
+          icon={aiSystemStatus.masterEnabled ? <SmartToy /> : <Warning />}
+          sx={{ mb: 3 }}
+          action={
+            <Button
+              component={Link}
+              href="/admin/settings"
+              size="small"
+              startIcon={<Settings />}
+              color="inherit"
+            >
+              Settings
+            </Button>
+          }
+        >
+          <Box>
+            <Typography variant="subtitle2" fontWeight="bold">
+              {aiSystemStatus.masterEnabled ? '✅ AI Systems Active' : '⚠️ AI Systems Disabled'}
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5 }}>
+              {aiSystemStatus.masterEnabled ? (
+                <>
+                  {aiSystemStatus.isVerificationActive && (
+                    <Chip
+                      label="Verification: Auto-Approving"
+                      size="small"
+                      color="success"
+                      sx={{ mr: 1, mb: 0.5 }}
+                    />
+                  )}
+                  {!aiSystemStatus.isVerificationActive && (
+                    <Chip
+                      label="Verification: Disabled"
+                      size="small"
+                      color="default"
+                      sx={{ mr: 1, mb: 0.5 }}
+                    />
+                  )}
+                  {aiSystemStatus.isDiscoveryActive && (
+                    <Chip
+                      label="Discovery: Active"
+                      size="small"
+                      color="success"
+                      sx={{ mr: 1, mb: 0.5 }}
+                    />
+                  )}
+                  {aiSystemStatus.isEnrichmentActive && (
+                    <Chip
+                      label="Enrichment: Active"
+                      size="small"
+                      color="success"
+                      sx={{ mr: 1, mb: 0.5 }}
+                    />
+                  )}
+                  {aiSystemStatus.realtimeMonitoringEnabled && (
+                    <Chip
+                      label="Monitoring: Live"
+                      size="small"
+                      color="info"
+                      sx={{ mr: 1, mb: 0.5 }}
+                    />
+                  )}
+                </>
+              ) : (
+                'All AI operations are currently inactive. All resource submissions will require manual admin review. Enable AI systems in settings to activate autonomous verification.'
+              )}
+            </Typography>
+          </Box>
+        </Alert>
+      )}
 
       {/* Agent Research Prompt */}
       {agentPrompt && (

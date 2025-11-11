@@ -1,8 +1,8 @@
 # Reentry Map - Development Progress
 
-**Last Updated**: 2025-11-11 (Real-Time Verification System Complete)
-**Current Phase**: Phase 10 Extended - AI Agent Real-Time Monitoring! 🔄
-**Overall Progress**: 97% (Phases 0-12: Complete, Real-Time Admin: Complete, Content & Launch: Pending)
+**Last Updated**: 2025-11-11 (AI System Controls Complete)
+**Current Phase**: Phase 10 Extended - AI System On/Off Controls! 🎛️
+**Overall Progress**: 98% (Phases 0-12: Complete, AI Controls: Complete, Content & Launch: Pending)
 
 ---
 
@@ -28,7 +28,133 @@
 
 ---
 
-## Current Session Progress (2025-11-11 - Real-Time Verification System)
+## Current Session Progress (2025-11-11 - AI System On/Off Controls)
+
+### 🎛️ AI System Control Infrastructure COMPLETE
+
+**Built comprehensive on/off switches for all AI systems with master control!**
+
+This session delivered a production-ready AI system control infrastructure that allows admins to enable/disable all autonomous AI operations through a master switch and individual system toggles, with real-time status indicators throughout the admin interface.
+
+**Key Achievement**: Full control over AI automation with cascading master/detail switch pattern and clear status messaging.
+
+---
+
+### ✅ AI System Control Components
+
+1. **Database Schema** ✅
+   - ✅ Created [supabase/migrations/20250111000000_ai_system_controls.sql](supabase/migrations/20250111000000_ai_system_controls.sql)
+   - ✅ Added 5 control columns to `app_settings` table
+   - ✅ Master switch + 4 individual system switches
+   - ✅ All default to FALSE except real-time monitoring (TRUE)
+
+2. **TypeScript Type Safety** ✅
+   - ✅ Extended [lib/types/settings.ts](lib/types/settings.ts) with AI control types
+   - ✅ Created `AISystemStatus` interface with derived flags
+   - ✅ Added [lib/api/settings.ts](lib/api/settings.ts) `getAISystemStatus()` function
+   - ✅ Derived flags: `isVerificationActive`, `isDiscoveryActive`, `isEnrichmentActive`
+
+3. **Admin Settings UI** ✅
+   - ✅ Updated [app/admin/settings/page.tsx](app/admin/settings/page.tsx)
+   - ✅ Master AI Control card with status chip (Enabled/Disabled)
+   - ✅ 4 individual system cards (Verification, Discovery, Enrichment, Monitoring)
+   - ✅ Color-coded status indicators (Active/Inactive)
+   - ✅ Contextual alerts and instructions
+   - ✅ Individual switches disabled when master OFF
+   - ✅ Real-time status updates after each toggle
+
+4. **API Integration** ✅
+   - ✅ Updated [app/api/resources/suggest-batch/route.ts](app/api/resources/suggest-batch/route.ts)
+   - ✅ Checks `getAISystemStatus()` at request start
+   - ✅ Skips verification when AI disabled
+   - ✅ Returns `ai_systems` status in API response
+   - ✅ Clear messaging about system state
+
+5. **Command Center Status** ✅
+   - ✅ Updated [app/admin/command-center/page.tsx](app/admin/command-center/page.tsx)
+   - ✅ Prominent Alert banner showing AI status
+   - ✅ Green "AI Systems Active" when enabled with system chips
+   - ✅ Orange "AI Systems Disabled" warning when disabled
+   - ✅ Link to settings page for easy access
+   - ✅ Individual system status chips
+
+6. **Testing & Documentation** ✅
+   - ✅ Created [docs/AI_SYSTEM_CONTROLS_TESTING.md](docs/AI_SYSTEM_CONTROLS_TESTING.md)
+   - ✅ Created [scripts/test-ai-system-api.mjs](scripts/test-ai-system-api.mjs)
+   - ✅ Created [scripts/check-admin-settings.mjs](scripts/check-admin-settings.mjs)
+   - ✅ Created [e2e/ai-system-controls.spec.ts](e2e/ai-system-controls.spec.ts)
+   - ✅ API tested with AI enabled/disabled - both working correctly
+
+### 🧪 Test Results
+
+**API with AI Disabled**:
+
+```json
+{
+  "ai_systems": {
+    "verification_enabled": false,
+    "status": "AI systems currently disabled - all submissions require manual review"
+  }
+}
+```
+
+**API with AI Enabled**:
+
+```json
+{
+  "ai_systems": {
+    "verification_enabled": true,
+    "status": "Ready for autonomous verification"
+  }
+}
+```
+
+**Status**: ✅ All core functionality verified and working
+
+### 📊 Implementation Highlights
+
+**Master/Detail Switch Pattern**:
+
+- Master switch (`ai_master_enabled`) controls all AI operations
+- Individual switches enable specific agents (verification, discovery, enrichment)
+- Derived flags require BOTH master AND individual to be TRUE
+- Clean cascading control logic
+
+**Key Features**:
+
+- ✅ Database migration applied successfully
+- ✅ TypeScript compilation passes (0 errors)
+- ✅ API correctly checks AI status before verification
+- ✅ Clear status messaging in all API responses
+- ✅ Admin UI with contextual alerts and instructions
+- ✅ Command Center shows prominent system status
+- ✅ Real-time status updates after toggles
+
+**Files Created**:
+
+- Database migration for AI controls
+- Comprehensive testing documentation
+- API test script (automated)
+- Admin settings check script (Playwright)
+- E2E test spec (requires auth implementation)
+
+**Files Modified**:
+
+- Settings types and API functions
+- Admin settings page with full UI
+- Batch suggestion endpoint with AI checks
+- Command Center with status banner
+
+**Next Steps** (Optional):
+
+- Manual UI testing (requires admin login)
+- Implement phone OTP auth in E2E tests for automation
+- Add audit logging for AI system toggles
+- Consider scheduled on/off times (business hours)
+
+---
+
+## Previous Session Progress (2025-11-11 - Real-Time Verification System)
 
 ### 🔄 Real-Time AI Agent Monitoring COMPLETE
 
