@@ -84,7 +84,9 @@ describe('NearMeButton', () => {
     await user.click(button)
 
     expect(mockRequestLocation).not.toHaveBeenCalled()
-    expect(getMockRouter().push).toHaveBeenCalledWith('/search?sort=distance-asc')
+    expect(getMockRouter().push).toHaveBeenCalledWith(
+      '/search?lat=37.8044&lng=-122.2712&distance=25&sort=distance-asc'
+    )
   })
 
   it('preserves existing search params when sorting by distance', async () => {
@@ -103,7 +105,7 @@ describe('NearMeButton', () => {
     await user.click(button)
 
     expect(getMockRouter().push).toHaveBeenCalledWith(
-      '/search?category=housing&search=help&sort=distance-asc'
+      '/search?category=housing&search=help&lat=37.8044&lng=-122.2712&distance=25&sort=distance-asc'
     )
   })
 
