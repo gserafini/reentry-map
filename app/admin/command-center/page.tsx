@@ -17,6 +17,7 @@ import {
 import { Visibility, Edit, CheckCircle, Pending, Search, ContentCopy } from '@mui/icons-material'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { RealtimeVerificationViewer } from '@/components/admin/RealtimeVerificationViewer'
 
 interface ExpansionPriority {
   id: string
@@ -798,6 +799,11 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
           )}
         </Alert>
       )}
+
+      {/* Real-Time Verification Viewer */}
+      <Box sx={{ mb: 4 }}>
+        <RealtimeVerificationViewer />
+      </Box>
 
       {/* Top Row: All 4 Panels */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

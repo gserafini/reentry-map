@@ -18,6 +18,7 @@
 import { geocodeAddress } from './geocoding'
 import Anthropic from '@anthropic-ai/sdk'
 import { env } from '@/lib/env'
+import { trackAICost, calculateAnthropicCost } from '@/lib/ai-agents/verification-events'
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -391,17 +392,36 @@ If you cannot find a verified working URL, return exactly: NOT_FOUND`
     const textContent = textBlock && textBlock.type === 'text' ? textBlock.text : ''
     const foundUrl = textContent.trim()
 
-    // Calculate cost: Claude Sonnet 4.5 pricing
-    // Input: $3.00 per 1M tokens, Output: $15.00 per 1M tokens
-    const inputCost = (response.usage.input_tokens / 1_000_000) * 3.0
-    const outputCost = (response.usage.output_tokens / 1_000_000) * 15.0
-    const totalCost = inputCost + outputCost
+    // Calculate cost using centralized pricing function
+    const { input_cost_usd, output_cost_usd } = calculateAnthropicCost(
+      env.ANTHROPIC_VERIFICATION_MODEL,
+      response.usage.input_tokens,
+      response.usage.output_tokens
+    )
+    const totalCost = input_cost_usd + output_cost_usd
 
     console.log(
       `    💰 Claude API cost: ${response.usage.input_tokens} in + ${response.usage.output_tokens} out = $${totalCost.toFixed(4)}`
     )
     console.log(`    🔍 Response content blocks:`, JSON.stringify(response.content, null, 2))
     console.log(`    📝 Claude returned: "${foundUrl}"`)
+
+    // Track cost to database (async, don't await to avoid slowing down verification)
+    trackAICost({
+      operation_type: 'url_autofix',
+      provider: 'anthropic',
+      model: env.ANTHROPIC_VERIFICATION_MODEL,
+      input_tokens: response.usage.input_tokens,
+      output_tokens: response.usage.output_tokens,
+      input_cost_usd,
+      output_cost_usd,
+      operation_context: {
+        organization_name: organizationName,
+        current_url: currentUrl,
+        city,
+        state,
+      },
+    }).catch((err) => console.error('Failed to track AI cost:', err))
 
     // Check if URL was found
     if (foundUrl === 'NOT_FOUND' || !foundUrl.startsWith('http')) {
