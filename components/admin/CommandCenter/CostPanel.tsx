@@ -22,6 +22,7 @@ import {
   TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
   ExpandMore,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material'
 import { createClient } from '@/lib/supabase/client'
 
@@ -355,16 +356,41 @@ export function CostPanel() {
               </>
             )}
 
-            <Button
-              variant="outlined"
-              size="small"
-              fullWidth
-              sx={{ mt: 2 }}
-              startIcon={<TrendingUpIcon />}
-              onClick={() => router.push('/admin/ai-usage')}
-            >
-              View Detailed Usage Report
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                startIcon={<TrendingUpIcon />}
+                onClick={() => router.push('/admin/ai-usage')}
+              >
+                Detailed Report
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                startIcon={<OpenInNewIcon />}
+                onClick={() => window.open('https://console.anthropic.com/usage', '_blank')}
+              >
+                Anthropic Console
+              </Button>
+            </Box>
+
+            <Alert severity="info" sx={{ mt: 2, fontSize: '0.75rem' }}>
+              <Typography variant="caption">
+                Database tracking may miss early API requests. Verify against{' '}
+                <a
+                  href="https://console.anthropic.com/usage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'inherit', textDecoration: 'underline' }}
+                >
+                  Anthropic Console
+                </a>{' '}
+                for accurate totals.
+              </Typography>
+            </Alert>
           </Box>
         </Collapse>
       </CardContent>

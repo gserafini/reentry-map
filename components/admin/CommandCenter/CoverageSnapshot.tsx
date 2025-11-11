@@ -160,7 +160,7 @@ export function CoverageSnapshot() {
                     primary={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Typography variant="body2">
-                          {priority.city_name}, {priority.state_code}
+                          {priority.city}, {priority.state}
                         </Typography>
                         {priority.research_status === 'in_progress' && (
                           <Chip
@@ -174,8 +174,8 @@ export function CoverageSnapshot() {
                     }
                     secondary={
                       <Typography variant="caption" color="text.secondary">
-                        Score: {priority.priority_score?.toFixed(1)} • {priority.current_resources}/
-                        {priority.target_resources} resources
+                        Score: {priority.priority_score?.toFixed(1)} •{' '}
+                        {priority.current_resource_count}/{priority.target_resource_count} resources
                       </Typography>
                     }
                   />

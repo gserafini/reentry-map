@@ -17,6 +17,7 @@ import {
   ListItemText,
   Divider,
   LinearProgress,
+  Switch,
 } from '@mui/material'
 import {
   Circle as CircleIcon,
@@ -30,13 +31,14 @@ import {
   LibraryBooks as ResourcesIcon,
   Logout as LogoutIcon,
   Person as PersonIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 import { createClient } from '@/lib/supabase/client'
-import { getAISystemStatus } from '@/lib/api/settings'
+import { getAISystemStatus, updateAppSettings } from '@/lib/api/settings'
 import type { AISystemStatus } from '@/lib/types/settings'
 
 interface StatusBarStats {
@@ -232,6 +234,49 @@ export function AdminStatusBar() {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  // Handle toggle AI systems
+  const handleToggleMasterAI = async (checked: boolean) => {
+    const result = await updateAppSettings({ ai_master_enabled: checked })
+    if (result.success) {
+      // Refresh AI status
+      const newStatus = await getAISystemStatus()
+      setAiStatus(newStatus)
+      setStats((prev) => ({ ...prev, systemStatus: checked ? 'online' : 'issues' }))
+    }
+  }
+
+  const handleToggleVerification = async (checked: boolean) => {
+    const result = await updateAppSettings({ ai_verification_enabled: checked })
+    if (result.success) {
+      const newStatus = await getAISystemStatus()
+      setAiStatus(newStatus)
+    }
+  }
+
+  const handleToggleDiscovery = async (checked: boolean) => {
+    const result = await updateAppSettings({ ai_discovery_enabled: checked })
+    if (result.success) {
+      const newStatus = await getAISystemStatus()
+      setAiStatus(newStatus)
+    }
+  }
+
+  const handleToggleEnrichment = async (checked: boolean) => {
+    const result = await updateAppSettings({ ai_enrichment_enabled: checked })
+    if (result.success) {
+      const newStatus = await getAISystemStatus()
+      setAiStatus(newStatus)
+    }
+  }
+
+  const handleToggleMonitoring = async (checked: boolean) => {
+    const result = await updateAppSettings({ ai_realtime_monitoring_enabled: checked })
+    if (result.success) {
+      const newStatus = await getAISystemStatus()
+      setAiStatus(newStatus)
+    }
   }
 
   // Don't render if not admin or still loading
@@ -449,49 +494,132 @@ export function AdminStatusBar() {
             System Status
           </Typography>
           <Box sx={{ mt: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            {/* Master AI Switch */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
               <Typography variant="caption">Master AI:</Typography>
-              <Typography variant="caption" fontWeight="bold">
-                {aiStatus?.masterEnabled ? 'ON' : 'OFF'}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="caption" fontWeight="bold">
+                  {aiStatus?.masterEnabled ? 'ON' : 'OFF'}
+                </Typography>
+                <Switch
+                  size="small"
+                  checked={aiStatus?.masterEnabled || false}
+                  onChange={(e) => handleToggleMasterAI(e.target.checked)}
+                />
+              </Box>
             </Box>
+
+            {/* Individual System Switches (only shown when Master is ON) */}
             {aiStatus?.masterEnabled && (
               <>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, pl: 2 }}>
+                {/* Verification */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 0.5,
+                    pl: 2,
+                  }}
+                >
                   <Typography variant="caption">Verification:</Typography>
-                  <Typography
-                    variant="caption"
-                    color={aiStatus.isVerificationActive ? 'success.main' : 'text.secondary'}
-                  >
-                    {aiStatus.isVerificationActive ? '✅ Active' : '⏸️  Inactive'}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      color={aiStatus.isVerificationActive ? 'success.main' : 'text.secondary'}
+                    >
+                      {aiStatus.isVerificationActive ? '✅ Active' : '⏸️ Paused'}
+                    </Typography>
+                    <Switch
+                      size="small"
+                      checked={aiStatus.verificationEnabled || false}
+                      onChange={(e) => handleToggleVerification(e.target.checked)}
+                    />
+                  </Box>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, pl: 2 }}>
+
+                {/* Monitoring */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 0.5,
+                    pl: 2,
+                  }}
+                >
                   <Typography variant="caption">Monitoring:</Typography>
-                  <Typography
-                    variant="caption"
-                    color={aiStatus.realtimeMonitoringEnabled ? 'info.main' : 'text.secondary'}
-                  >
-                    {aiStatus.realtimeMonitoringEnabled ? '🔄 Live' : '⏸️  Inactive'}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      color={aiStatus.realtimeMonitoringEnabled ? 'info.main' : 'text.secondary'}
+                    >
+                      {aiStatus.realtimeMonitoringEnabled ? '🔄 Live' : '⏸️ Paused'}
+                    </Typography>
+                    <Switch
+                      size="small"
+                      checked={aiStatus.realtimeMonitoringEnabled || false}
+                      onChange={(e) => handleToggleMonitoring(e.target.checked)}
+                    />
+                  </Box>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, pl: 2 }}>
+
+                {/* Discovery */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 0.5,
+                    pl: 2,
+                  }}
+                >
                   <Typography variant="caption">Discovery:</Typography>
-                  <Typography
-                    variant="caption"
-                    color={aiStatus.isDiscoveryActive ? 'success.main' : 'text.secondary'}
-                  >
-                    {aiStatus.isDiscoveryActive ? '✅ Active' : '⏸️  Paused'}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      color={aiStatus.isDiscoveryActive ? 'success.main' : 'text.secondary'}
+                    >
+                      {aiStatus.isDiscoveryActive ? '✅ Active' : '⏸️ Paused'}
+                    </Typography>
+                    <Switch
+                      size="small"
+                      checked={aiStatus.discoveryEnabled || false}
+                      onChange={(e) => handleToggleDiscovery(e.target.checked)}
+                    />
+                  </Box>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 2 }}>
+
+                {/* Enrichment */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    pl: 2,
+                  }}
+                >
                   <Typography variant="caption">Enrichment:</Typography>
-                  <Typography
-                    variant="caption"
-                    color={aiStatus.isEnrichmentActive ? 'success.main' : 'text.secondary'}
-                  >
-                    {aiStatus.isEnrichmentActive ? '✅ Active' : '⏸️  Paused'}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      color={aiStatus.isEnrichmentActive ? 'success.main' : 'text.secondary'}
+                    >
+                      {aiStatus.isEnrichmentActive ? '✅ Active' : '⏸️ Paused'}
+                    </Typography>
+                    <Switch
+                      size="small"
+                      checked={aiStatus.enrichmentEnabled || false}
+                      onChange={(e) => handleToggleEnrichment(e.target.checked)}
+                    />
+                  </Box>
                 </Box>
               </>
             )}
@@ -586,7 +714,18 @@ export function AdminStatusBar() {
             href="/admin/ai-usage"
             onClick={() => setBudgetMenuAnchor(null)}
           >
-            <ListItemText primary="View Cost Breakdown →" />
+            <ListItemText primary="View Cost Breakdown" />
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              window.open('https://console.anthropic.com/usage', '_blank')
+              setBudgetMenuAnchor(null)
+            }}
+          >
+            <ListItemIcon>
+              <OpenInNewIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="Anthropic Console" />
           </MenuItem>
         </Box>
       </Menu>

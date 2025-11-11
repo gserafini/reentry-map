@@ -108,8 +108,8 @@ export function ResearchMission() {
   }
 
   const progress = currentTarget.progress_percentage || 0
-  const resourceCount = currentTarget.current_resources || 0
-  const targetCount = currentTarget.target_resources || 50
+  const resourceCount = currentTarget.current_resource_count || 0
+  const targetCount = currentTarget.target_resource_count || 50
 
   return (
     <Card sx={{ mb: 3 }}>
@@ -153,7 +153,7 @@ export function ResearchMission() {
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="body2" fontWeight="bold">
-              {currentTarget.city_name}, {currentTarget.state_code}
+              {currentTarget.city}, {currentTarget.state}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {resourceCount}/{targetCount} resources ({progress.toFixed(0)}%)
@@ -209,7 +209,7 @@ export function ResearchMission() {
             </Typography>
 
             <Typography variant="body2" sx={{ mb: 2 }}>
-              Target: {currentTarget.target_resources} resources across all categories
+              Target: {currentTarget.target_resource_count} resources across all categories
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

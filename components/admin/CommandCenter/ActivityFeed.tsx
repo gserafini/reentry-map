@@ -20,7 +20,7 @@ import {
 } from '@mui/material'
 import {
   ExpandMore,
-  Activity as ActivityIcon,
+  Timeline as ActivityIcon,
   Add as AddIcon,
   Edit as EditIcon,
   CheckCircle as CheckIcon,
