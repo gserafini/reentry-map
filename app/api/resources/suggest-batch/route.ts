@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { env } from '@/lib/env'
 import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
+import { getAISystemStatus } from '@/lib/api/settings'
 import type { ResourceSuggestion } from '@/lib/types/database'
 
 /**
@@ -66,8 +67,12 @@ export async function POST(request: NextRequest) {
       }>,
     }
 
-    // Initialize Verification Agent
-    const verificationAgent = new VerificationAgent()
+    // Check AI system status
+    const aiStatus = await getAISystemStatus()
+    const verificationEnabled = aiStatus.isVerificationActive
+
+    // Initialize Verification Agent (only if enabled)
+    const verificationAgent = verificationEnabled ? new VerificationAgent() : null
 
     // Process each resource
     for (const resource of resources) {
@@ -192,6 +197,19 @@ export async function POST(request: NextRequest) {
         // AUTONOMOUS VERIFICATION
         // ====================================================================
 
+        // Skip verification if AI systems are disabled
+        if (!verificationEnabled || !verificationAgent) {
+          results.flagged_for_human++
+          results.verification_results.push({
+            name: r.name,
+            status: 'flagged',
+            suggestion_id: suggestion.id,
+            decision_reason:
+              'AI verification is currently disabled. All submissions require manual admin review. Enable AI systems in admin settings to activate autonomous verification.',
+          })
+          continue
+        }
+
         try {
           // Run verification
           const verificationResult = await verificationAgent.verify(
@@ -277,7 +295,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${results.submitted} resources: ${results.auto_approved} auto-approved, ${results.flagged_for_human} flagged for review, ${results.auto_rejected} rejected`,
+      message: verificationEnabled
+        ? `Processed ${results.submitted} resources: ${results.auto_approved} auto-approved, ${results.flagged_for_human} flagged for review, ${results.auto_rejected} rejected`
+        : `Processed ${results.submitted} resources: AI verification disabled, all flagged for manual review`,
+      ai_systems: {
+        verification_enabled: verificationEnabled,
+        status: verificationEnabled
+          ? 'Ready for autonomous verification'
+          : 'AI systems currently disabled - all submissions require manual review',
+      },
       stats: {
         total_received: resources.length,
         submitted: results.submitted,
@@ -289,10 +315,11 @@ export async function POST(request: NextRequest) {
       },
       error_details: results.errors > 0 ? results.error_details : undefined,
       verification_results: results.verification_results,
-      next_steps:
-        results.auto_approved > 0
+      next_steps: verificationEnabled
+        ? results.auto_approved > 0
           ? `${results.auto_approved} resources auto-approved and published. ${results.flagged_for_human} resources flagged for human review in admin panel.`
-          : 'All resources flagged for human review in admin panel.',
+          : 'All resources flagged for human review in admin panel.'
+        : 'AI verification is currently disabled. All submissions are pending manual admin review. Enable AI systems in /admin/settings to activate autonomous verification.',
     })
   } catch (error) {
     console.error('Error in batch suggest:', error)
