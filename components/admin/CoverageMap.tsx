@@ -77,9 +77,14 @@ export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMa
         setLoading(true)
         setError(null)
 
-        // Fetch coverage metrics
-        const metricsResponse = await fetch('/api/admin/coverage/metrics')
+        // Fetch coverage metrics and static GeoJSON in parallel for better performance
+        const [metricsResponse, geojsonResponse] = await Promise.all([
+          fetch('/api/admin/coverage/metrics'),
+          fetch('/data/us-counties.geojson'),
+        ])
+
         if (!metricsResponse.ok) throw new Error('Failed to load coverage metrics')
+        if (!geojsonResponse.ok) throw new Error('Failed to load county boundaries')
 
         const metricsData = (await metricsResponse.json()) as {
           summary: CoverageSummary
@@ -97,11 +102,41 @@ export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMa
 
         setMetrics(metricsLookup)
 
-        // TODO: Load actual county GeoJSON data
-        // For now, we'll use the metrics we have
-        // In production, this would load from a GeoJSON file with county boundaries
+        // Load static GeoJSON and convert to CountyData format
+        const geojson = (await geojsonResponse.json()) as {
+          type: string
+          features: Array<{
+            type: string
+            properties: {
+              fips_code: string
+              state_code: string
+              state_name: string
+              county_name: string
+              center_lat: number
+              center_lng: number
+            }
+            geometry: unknown
+          }>
+        }
 
-        setCounties([])
+        const countiesData: CountyData[] = geojson.features.map((feature) => ({
+          fips_code: feature.properties.fips_code,
+          state_fips: feature.properties.fips_code.substring(0, 2),
+          county_fips: feature.properties.fips_code.substring(2),
+          state_code: feature.properties.state_code,
+          state_name: feature.properties.state_name,
+          county_name: feature.properties.county_name,
+          total_population: null,
+          estimated_annual_releases: null,
+          priority_tier: null,
+          priority_weight: null,
+          priority_reason: null,
+          geometry: feature.geometry,
+          center_lat: feature.properties.center_lat,
+          center_lng: feature.properties.center_lng,
+        }))
+
+        setCounties(countiesData)
       } catch (err) {
         console.error('Error loading coverage data:', err)
         setError(err instanceof Error ? err.message : 'Failed to load coverage data')
@@ -200,24 +235,24 @@ export function CoverageMap({ onCountyClick, viewMode = 'coverage' }: CoverageMa
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <div className="h-4 w-8 rounded bg-emerald-700"></div>
+              <div className="h-4 w-8 rounded" style={{ backgroundColor: '#14532d' }}></div>
               <span className="text-sm">Excellent (90-100)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-4 w-8 rounded bg-emerald-500"></div>
+              <div className="h-4 w-8 rounded" style={{ backgroundColor: '#15803d' }}></div>
               <span className="text-sm">Good (70-89)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-4 w-8 rounded bg-yellow-400"></div>
+              <div className="h-4 w-8 rounded" style={{ backgroundColor: '#22c55e' }}></div>
               <span className="text-sm">Fair (50-69)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-4 w-8 rounded bg-orange-500"></div>
+              <div className="h-4 w-8 rounded" style={{ backgroundColor: '#4ade80' }}></div>
               <span className="text-sm">Poor (30-49)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-4 w-8 rounded bg-red-600"></div>
-              <span className="text-sm">None (0-29)</span>
+              <div className="h-4 w-8 rounded" style={{ backgroundColor: '#86efac' }}></div>
+              <span className="text-sm">Minimal (1-29)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-4 w-8 rounded border border-gray-300 bg-gray-100"></div>
