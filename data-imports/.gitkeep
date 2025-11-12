@@ -1,0 +1,2 @@
+# This directory is for importing resource data files
+# Place JSON files here and run: npm run import:resources

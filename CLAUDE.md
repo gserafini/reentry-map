@@ -68,6 +68,74 @@ npm run quality:full # Full: Above + E2E tests
 
 ---
 
+## Frontend UI Verification (MANDATORY)
+
+**⚠️ CRITICAL: `npm run quality` passing does NOT mean the UI works!**
+
+**📋 READ CHECKLIST FIRST**: [.claude/FRONTEND_VERIFICATION_REQUIRED.md](.claude/FRONTEND_VERIFICATION_REQUIRED.md)
+
+**Before claiming ANY frontend work is "complete", "done", or "production-ready":**
+
+### 1. Run Quality Checks First
+
+```bash
+npm run quality  # Must pass with 0 errors
+```
+
+### 2. Browse the UI Using Playwright MCP (MANDATORY)
+
+**For ANY frontend work** (new components, page changes, UI updates):
+
+```typescript
+// Use the Playwright MCP browser automation tools:
+mcp__playwright__browser_navigate({ url: 'http://localhost:3003/your-page' })
+mcp__playwright__browser_snapshot() // Get accessibility tree
+mcp__playwright__browser_console_messages({ onlyErrors: true }) // Check for errors
+mcp__playwright__browser_take_screenshot({ fullPage: true }) // Visual verification
+```
+
+**What to verify:**
+
+- ✅ Page loads without crashing
+- ✅ All components render correctly
+- ✅ No browser console errors (red errors in console)
+- ✅ No TypeErrors, ReferenceErrors, or other runtime errors
+- ✅ Interactive elements work (buttons, toggles, dropdowns)
+- ✅ Real-time updates work (if applicable)
+- ✅ No missing data or undefined values displayed
+
+**Example Checklist for Admin Dashboard Work:**
+
+1. Navigate to `/admin` page
+2. Take full-page screenshot
+3. Check browser console for errors
+4. Click on interactive elements (toggles, dropdowns, buttons)
+5. Verify collapsible panels expand/collapse
+6. Check that all data displays correctly (no "undefined", "NaN", or crashes)
+7. Only THEN claim work is complete
+
+### 3. If Errors Found
+
+**DO NOT claim "production-ready" or "complete":**
+
+- ❌ "All quality checks passed!" (if you haven't browsed the UI)
+- ❌ "Phase 4 complete!" (if you haven't visually verified)
+- ❌ "Ready for production!" (if you haven't tested interactivity)
+
+**INSTEAD:**
+
+- Fix the errors first
+- Re-test in browser
+- Only then present to user
+
+### Why This Matters
+
+**Past incident (2025-11-11)**: I ran `npm run quality` (passed ✅), marked admin dashboard as "production-ready", but **never browsed it**. User had to explicitly tell me to "USE FUCKING MCP SERVER". When I finally browsed, found critical crash bug (CoverageSnapshot.tsx TypeError). This was embarrassing and frustrated the user.
+
+**Lesson**: Automated tests don't catch runtime errors, missing null checks, API failures, or visual issues. **YOU MUST LOOK AT IT.**
+
+---
+
 ## Visual Design Review (Screenshots)
 
 **When doing frontend design work, use screenshots to review responsive design:**
@@ -94,6 +162,64 @@ npm run screenshots              # Capture all viewports
 - When testing responsive layouts
 
 **Best Practice:** Run screenshots before showing work to user to catch visual issues early.
+
+---
+
+## TypeScript Type Safety (CRITICAL)
+
+**IMPORTANT:** Almost nothing in this app should use `unknown` type unless we are dealing with truly unknown data. Always take the time to define proper types instead of taking shortcuts.
+
+**Principles:**
+
+- ❌ **BAD:** `const data = await response.json() as unknown`
+- ✅ **GOOD:** `const data = await response.json() as { field1: string, field2: number }`
+- ✅ **BETTER:** Define an interface and use it
+
+**When to use `unknown`:**
+
+- Parsing user-provided JSON that could be anything
+- Third-party API responses where we don't control the schema
+- Temporary debugging (must be fixed before commit)
+
+**Best Practices:**
+
+1. **Define interfaces for all API responses**
+
+   ```typescript
+   interface GoogleMapsGeocodingResponse {
+     status: 'OK' | 'ZERO_RESULTS' | ...
+     results: Array<{ geometry: { location: { lat: number, lng: number } } }>
+     error_message?: string
+   }
+   ```
+
+2. **Use proper type assertions**
+
+   ```typescript
+   const geocodeData = (await response.json()) as GoogleMapsGeocodingResponse
+   ```
+
+3. **Extend base types when needed**
+
+   ```typescript
+   interface ExtendedResource extends BaseResource {
+     city?: string | null
+     state?: string | null
+   }
+   ```
+
+4. **Never use double casts unless absolutely necessary**
+   - `as unknown as Type` should be rare
+   - Document why it's needed with a comment
+   - Consider refactoring to avoid it
+
+**Workflow:**
+
+1. See a type error
+2. Understand the actual data structure
+3. Define a proper interface
+4. Use the interface consistently
+5. Don't rush - get it right
 
 ---
 
@@ -715,12 +841,7 @@ npm run format:check         # Check if files need formatting
 npm run build                # Production build
 npm run build:analyze        # Build with bundle size analysis
 
-# Database
-# Run migrations in Supabase SQL Editor in order:
-# 1. supabase/migrations/20250101000000_initial_schema.sql
-# 2. supabase/migrations/20250101000001_rls_policies.sql
-# 3. supabase/migrations/20250101000002_functions_triggers.sql
-# 4. supabase/migrations/20250101000003_seed_data.sql
+# Database - See Supabase MCP section below for migration execution
 ```
 
 **Testing Philosophy:**
@@ -728,6 +849,103 @@ npm run build:analyze        # Build with bundle size analysis
 - **E2E tests run headless by default** - Use for troubleshooting and CI/CD
 - **Only show UI tests when demoing** - Avoid interrupting workflow
 - **Test before demo** - Verify everything works before showing to user
+
+---
+
+## Database Operations with Supabase MCP
+
+**We have Supabase MCP (Model Context Protocol) integration** for programmatic database operations. This allows direct execution of migrations and SQL commands without requiring manual copy-paste into Supabase SQL Editor.
+
+### Running Migrations
+
+**Preferred workflow:** Use MCP to execute migrations programmatically.
+
+When creating a database migration:
+
+1. **Create the migration file** in `supabase/migrations/` with a timestamped name
+2. **Suggest executing via MCP** - Tell the user: "I can run this migration using Supabase MCP"
+3. **Wait for user confirmation** before executing
+4. **Execute using MCP** after user approves
+
+**Example workflow:**
+
+```
+Assistant: I've created the migration file to fix the view column naming issue:
+  supabase/migrations/20250111000000_fix_expansion_view_column_name.sql
+
+I can run this migration using Supabase MCP. Should I execute it now?
+
+User: yes
+```
+
+Then execute: `mcp__supabase__execute_sql` with the migration SQL.
+
+### Available MCP Operations
+
+The Supabase MCP provides these tools:
+
+- **`mcp__supabase__list_projects`** - Get project ID (needed for all operations)
+- **`mcp__supabase__execute_sql`** - Execute SQL directly (DDL, queries, etc.)
+- **`mcp__supabase__apply_migration`** - Apply named migration (creates migration record)
+- **`mcp__supabase__list_tables`** - List all tables in schema(s)
+- **`mcp__supabase__list_extensions`** - List installed PostgreSQL extensions
+- **`mcp__supabase__list_migrations`** - List migration history
+
+### Executing Migrations with MCP
+
+**Method 1: Execute SQL directly** (faster, for quick fixes)
+
+```typescript
+// 1. Get project ID
+mcp__supabase__list_projects() // Returns project_id
+
+// 2. Execute the migration SQL
+mcp__supabase__execute_sql({
+  project_id: 'scvshbntarpyjvdexpmp',
+  query: 'DROP VIEW IF EXISTS ...; CREATE VIEW ...',
+})
+```
+
+**Method 2: Apply named migration** (preferred, tracks migration history)
+
+```typescript
+mcp__supabase__apply_migration({
+  project_id: 'scvshbntarpyjvdexpmp',
+  name: 'fix_expansion_view_column_name',
+  query: 'DROP VIEW IF EXISTS ...; CREATE VIEW ...',
+})
+```
+
+### When to Use MCP vs Manual
+
+**Use Supabase MCP when:**
+
+- ✅ Creating/executing migrations
+- ✅ Querying database structure (tables, views, extensions)
+- ✅ Verifying migration results
+- ✅ Testing SQL changes before committing
+
+**Don't use MCP for:**
+
+- ❌ DML operations that user should trigger manually (bulk data changes)
+- ❌ Production data modifications without explicit user approval
+- ❌ Destructive operations (DROP DATABASE, etc.) unless explicitly requested
+
+### Best Practices
+
+1. **Always suggest, then confirm** - "I can run this migration using Supabase MCP. Should I execute it?"
+2. **Verify after execution** - Query the database to confirm changes worked
+3. **Save migration files** - Always create migration file before executing
+4. **Use comments** - Add clear comments in migration SQL explaining what and why
+5. **Test queries first** - For complex migrations, test SELECT queries before executing DDL
+
+### Project ID
+
+Our Supabase project ID: `scvshbntarpyjvdexpmp`
+
+You can always retrieve it with `mcp__supabase__list_projects` if needed.
+
+---
 
 ## Authentication Flow
 
@@ -778,6 +996,32 @@ When working on this project, refer to:
 - `TESTING_STRATEGY.md` - Testing procedures
 - `DEPLOYMENT_GUIDE.md` - Deployment procedures
 - `API_DOCUMENTATION.md` - API endpoint specifications
+
+### Scaling & Performance Documentation
+
+**Critical for understanding production infrastructure and scaling strategy:**
+
+- **`docs/README.md`** - ⭐ **START HERE** - Documentation index with navigation guide
+- **`docs/SCALING_GUIDE_OVERVIEW.md`** - Strategic roadmap from MVP to nationwide scale
+- **`docs/REDIS_SETUP_GUIDE.md`** - 🚨 **Critical for launch** - Redis caching implementation (5-10x speedup)
+- **`docs/MIGRATION_GUIDE.md`** - Supabase → Self-hosted PostgreSQL migration guide
+- **`docs/PERFORMANCE_OPTIMIZATION_CHECKLIST.md`** - AI-verifiable performance checklist (100+ checks)
+- **`docs/COST_ESTIMATION_CALCULATOR.md`** - Cost analysis and ROI at different scales
+- **`scripts/verify-performance.sh`** - Automated performance verification (25 tests)
+
+**Key Insights**:
+
+- Single server can handle **100k resources + 1M users/month** with proper optimization
+- **Redis caching is critical for launch** (80-90% DB query reduction, 5-10x speedup)
+- Estimated **75,000-100,000 resource pages** at 100% nationwide coverage
+- Stay on managed services until costs >$100/mo, then migrate database first
+- Next.js + PostgreSQL + PostGIS is the **correct architecture** (validated vs WordPress)
+
+**Before Launch**:
+
+1. Implement Redis caching (follow `docs/REDIS_SETUP_GUIDE.md`)
+2. Create database indexes (see scaling guides)
+3. Run `./scripts/verify-performance.sh` to verify optimization
 
 ## User Profile & Avatars
 

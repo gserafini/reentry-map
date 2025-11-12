@@ -1,1 +1,32 @@
+#!/bin/sh
+
+# Check if frontend files were modified
+frontend_changes=$(git diff --cached --name-only | grep -E '(components/|app/.*\.(tsx|jsx)|pages/.*\.(tsx|jsx))')
+
+if [ -n "$frontend_changes" ]; then
+  echo ""
+  echo "⚠️  FRONTEND FILES CHANGED - UI Verification Required ⚠️"
+  echo ""
+  echo "Before committing frontend changes, you MUST verify:"
+  echo "  ✅ 1. Ran 'npm run quality' (all checks passed)"
+  echo "  ✅ 2. Browsed the UI using Playwright MCP or browser"
+  echo "  ✅ 3. Checked browser console for errors (no red errors)"
+  echo "  ✅ 4. Tested interactive elements (buttons, toggles, forms)"
+  echo "  ✅ 5. Verified no crashes, TypeErrors, or undefined values"
+  echo ""
+  echo "Files changed:"
+  echo "$frontend_changes" | sed 's/^/  - /'
+  echo ""
+  read -p "Have you completed ALL verification steps above? (y/n) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "❌ Commit blocked. Complete UI verification first."
+    echo ""
+    echo "See CLAUDE.md (line 71-129) for full verification protocol."
+    exit 1
+  fi
+fi
+
+# Run lint-staged
 npx lint-staged

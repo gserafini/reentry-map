@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { determineCounty } from '@/lib/utils/county'
+import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
 
 /**
  * GET /api/admin/resources
@@ -101,6 +103,17 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await request.json()) as any
 
+    // Automatically determine county (use provided county from geocoding or lookup from coordinates)
+    let countyData = null
+    if (body.county || body.latitude) {
+      countyData = await determineCounty(
+        body.county || null, // County name from geocoding
+        body.state || 'CA',
+        body.latitude || null,
+        body.longitude || null
+      )
+    }
+
     // Insert resource
     const { data, error } = await supabase
       .from('resources')
@@ -116,6 +129,8 @@ export async function POST(request: NextRequest) {
         zip: body.zip || null,
         latitude: body.latitude || null,
         longitude: body.longitude || null,
+        county: countyData?.county || null,
+        county_fips: countyData?.county_fips || null,
         phone: body.phone || null,
         email: body.email || null,
         website: body.website || null,
@@ -129,12 +144,38 @@ export async function POST(request: NextRequest) {
         status: body.status || 'active',
         verified: body.verified || false,
         source: 'admin',
+        // Geocoding metadata (from Google Maps Geocoding API)
+        google_place_id: body.placeId || null,
+        location_type: body.locationType || null,
+        neighborhood: body.neighborhood || null,
+        formatted_address: body.formattedAddress || null,
       })
       .select()
       .single()
 
     if (error) {
       throw error
+    }
+
+    // Capture website screenshot asynchronously (non-blocking)
+    if (data.website) {
+      captureWebsiteScreenshot(data.website, data.id)
+        .then(async (screenshotResult) => {
+          if (screenshotResult) {
+            // Update resource with screenshot URL
+            await supabase
+              .from('resources')
+              .update({
+                screenshot_url: screenshotResult.url,
+                screenshot_captured_at: screenshotResult.capturedAt.toISOString(),
+              })
+              .eq('id', data.id)
+            console.log(`Screenshot captured for resource ${data.id}`)
+          }
+        })
+        .catch((err) => {
+          console.error(`Failed to capture screenshot for resource ${data.id}:`, err)
+        })
     }
 
     return NextResponse.json({ data }, { status: 201 })

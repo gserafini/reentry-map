@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { AppSettings, FeatureFlags } from '@/lib/types/settings'
+import type { AppSettings, FeatureFlags, AISystemStatus } from '@/lib/types/settings'
 
 /**
  * Get application settings (feature flags, config)
@@ -32,6 +32,11 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
   return {
     smsAuth: settings?.sms_auth_enabled ?? false,
     smsProviderConfigured: settings?.sms_provider_configured ?? false,
+    aiMasterEnabled: settings?.ai_master_enabled ?? false,
+    aiVerificationEnabled: settings?.ai_verification_enabled ?? false,
+    aiDiscoveryEnabled: settings?.ai_discovery_enabled ?? false,
+    aiEnrichmentEnabled: settings?.ai_enrichment_enabled ?? false,
+    aiRealtimeMonitoringEnabled: settings?.ai_realtime_monitoring_enabled ?? true,
   }
 }
 
@@ -41,6 +46,32 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
 export async function isSMSAuthEnabled(): Promise<boolean> {
   const flags = await getFeatureFlags()
   return flags.smsAuth && flags.smsProviderConfigured
+}
+
+/**
+ * Get AI system status with derived flags
+ * Checks both master switch AND individual switches
+ */
+export async function getAISystemStatus(): Promise<AISystemStatus> {
+  const settings = await getAppSettings()
+
+  const masterEnabled = settings?.ai_master_enabled ?? false
+  const verificationEnabled = settings?.ai_verification_enabled ?? false
+  const discoveryEnabled = settings?.ai_discovery_enabled ?? false
+  const enrichmentEnabled = settings?.ai_enrichment_enabled ?? false
+  const realtimeMonitoringEnabled = settings?.ai_realtime_monitoring_enabled ?? true
+
+  return {
+    masterEnabled,
+    verificationEnabled,
+    discoveryEnabled,
+    enrichmentEnabled,
+    realtimeMonitoringEnabled,
+    // Derived flags - require BOTH master AND individual to be true
+    isVerificationActive: masterEnabled && verificationEnabled,
+    isDiscoveryActive: masterEnabled && discoveryEnabled,
+    isEnrichmentActive: masterEnabled && enrichmentEnabled,
+  }
 }
 
 /**

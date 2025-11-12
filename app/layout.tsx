@@ -6,7 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Providers } from './providers'
 import { ClientAppBar } from '@/components/layout/ClientAppBar'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { Footer } from '@/components/layout/Footer'
 import { AuthButton } from '@/components/auth-button'
+import { AdminStatusBar } from '@/components/admin/AdminStatusBar'
 import '../styles/tailwind.css'
 
 const defaultUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3003'
@@ -103,11 +105,13 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
         <Providers>
+          <AdminStatusBar />
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
               minHeight: '100vh',
+              pt: { xs: '32px', md: '32px' }, // Top padding for admin status bar (when visible)
             }}
           >
             <ClientAppBar
@@ -123,6 +127,7 @@ export default async function RootLayout({
             >
               {children}
             </Box>
+            <Footer />
             <BottomNav />
           </Box>
         </Providers>

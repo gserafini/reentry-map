@@ -55,15 +55,30 @@ export const CATEGORY_COLORS: Record<ResourceCategory, string> = {
 }
 
 /**
+ * Normalize category name to handle both hyphen and underscore formats
+ * Examples: "general_support" -> "general-support", "mental_health" -> "mental-health"
+ */
+function normalizeCategoryName(category: string): ResourceCategory {
+  // Replace underscores with hyphens
+  const normalized = category.replace(/_/g, '-') as ResourceCategory
+  // Return normalized if it exists in icons config, otherwise return original
+  return CATEGORY_ICONS[normalized] ? normalized : (category as ResourceCategory)
+}
+
+/**
  * Get the icon component for a given category
+ * Handles both hyphen and underscore formats (e.g., "general-support" and "general_support")
  */
 export function getCategoryIcon(category: ResourceCategory): React.ComponentType<SvgIconProps> {
-  return CATEGORY_ICONS[category] || GeneralSupportIcon
+  const normalized = normalizeCategoryName(category)
+  return CATEGORY_ICONS[normalized] || GeneralSupportIcon
 }
 
 /**
  * Get the brand color for a given category
+ * Handles both hyphen and underscore formats (e.g., "general-support" and "general_support")
  */
 export function getCategoryColor(category: ResourceCategory): string {
-  return CATEGORY_COLORS[category] || '#616161'
+  const normalized = normalizeCategoryName(category)
+  return CATEGORY_COLORS[normalized] || '#616161'
 }

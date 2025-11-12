@@ -40,6 +40,7 @@ import {
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
+import { getResourceUrl } from '@/lib/utils/resource-url'
 
 interface Resource {
   id: string
@@ -244,7 +245,7 @@ export default function AdminResourcesPage() {
                   <TableRow key={resource.id}>
                     <TableCell>
                       <Link
-                        href={`/resources/${resource.id}`}
+                        href={getResourceUrl(resource)}
                         style={{
                           color: 'inherit',
                           textDecoration: 'none',
@@ -292,7 +293,7 @@ export default function AdminResourcesPage() {
                       <IconButton
                         size="small"
                         component={Link}
-                        href={`/resources/${resource.id}`}
+                        href={getResourceUrl(resource)}
                         title="View public page"
                       >
                         <VisibilityIcon fontSize="small" />

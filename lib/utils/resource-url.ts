@@ -1,18 +1,30 @@
+import { generateResourceUrl, generateShortResourceUrl } from './urls'
+import type { Resource } from '@/lib/types/database'
+
 /**
  * Generate SEO-friendly URL for a resource
- * Returns /resources/{state}/{city}/{slug} if available, otherwise /resources/{id}
+ * New format: /{city-state}/{resource-slug}
+ * Example: /oakland-ca/oakland-job-center
+ *
+ * Falls back to short URL (/r/{id}) if resource lacks location data
  */
 export function getResourceUrl(resource: {
   id?: string
+  name?: string
   slug?: string | null
   state?: string | null
   city?: string | null
 }): string {
-  // Use SEO-friendly URL if slug, state, and city are available
-  if (resource.slug && resource.state && resource.city) {
-    return `/resources/${resource.state}/${resource.city}/${resource.slug}`
+  // Use new SEO-friendly URL if city, state, and name are available
+  if (resource.city && resource.state && resource.name) {
+    return generateResourceUrl(resource as Resource)
   }
 
-  // Fall back to UUID-based URL
-  return `/resources/${resource.id}`
+  // Fall back to short URL if no location data
+  if (resource.id) {
+    return generateShortResourceUrl(resource.id)
+  }
+
+  // Ultimate fallback (shouldn't happen)
+  return '/resources'
 }

@@ -187,7 +187,14 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
     setError(null)
 
     navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-      enableHighAccuracy: false, // Use false for faster, battery-friendly results
+      // enableHighAccuracy: false uses cell tower + WiFi triangulation instead of GPS
+      // This is intentional for our use case:
+      // - Faster results (1-3 seconds vs 10-30 seconds for GPS)
+      // - Lower battery drain on mobile devices
+      // - Sufficient accuracy (50-200m in urban areas) for "find resources near me"
+      // - Users are looking for services within miles, not precise turn-by-turn navigation
+      // Trade-off: Less accurate than GPS (5-10m) but better UX for resource discovery
+      enableHighAccuracy: false,
       timeout: 10000, // 10 second timeout
       maximumAge: 300000, // Cache location for 5 minutes
     })
@@ -312,7 +319,7 @@ export function useLocation(autoRequest: boolean = false): UseLocationResult {
           // Ignore errors on background refresh, keep using cached location
         },
         {
-          enableHighAccuracy: false,
+          enableHighAccuracy: false, // Same settings as initial request - see comment above
           timeout: 10000,
           maximumAge: 300000,
         }

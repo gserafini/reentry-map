@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getResourceById } from '@/lib/api/resources'
-import { generateSeoUrl } from '@/lib/utils/seo-url'
+import { generateResourceUrl } from '@/lib/utils/urls'
 
 interface ShortResourcePageProps {
   params: Promise<{
@@ -10,9 +10,15 @@ interface ShortResourcePageProps {
 
 /**
  * Short Resource URL
- * URL: /r/[id]
- * Redirects to the full SEO-friendly resource URL
- * This provides a short, shareable URL for resources
+ * URL: /r/{id}
+ * Example: /r/abc123
+ *
+ * Redirects to full SEO-friendly resource URL: /{city-state}/{resource-slug}
+ * Provides short, shareable URLs perfect for:
+ * - QR codes
+ * - SMS/text messages
+ * - Social media
+ * - Backward compatibility
  */
 export default async function ShortResourcePage({ params }: ShortResourcePageProps) {
   const { id } = await params
@@ -24,7 +30,7 @@ export default async function ShortResourcePage({ params }: ShortResourcePagePro
     redirect('/')
   }
 
-  // Generate SEO-friendly URL and redirect
-  const seoUrl = generateSeoUrl(resource)
+  // Generate new SEO-friendly URL and redirect (permanent 308)
+  const seoUrl = generateResourceUrl(resource)
   redirect(seoUrl)
 }

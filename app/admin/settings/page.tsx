@@ -26,12 +26,18 @@ import {
   Error as ErrorIcon,
   Info as InfoIcon,
   OpenInNew as OpenInNewIcon,
+  SmartToy as SmartToyIcon,
+  VerifiedUser as VerifiedUserIcon,
+  Search as SearchIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material'
-import { getAppSettings, updateAppSettings } from '@/lib/api/settings'
-import type { AppSettings } from '@/lib/types/settings'
+import { getAppSettings, updateAppSettings, getAISystemStatus } from '@/lib/api/settings'
+import type { AppSettings, AISystemStatus } from '@/lib/types/settings'
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [aiStatus, setAiStatus] = useState<AISystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +50,9 @@ export default function AdminSettingsPage() {
   async function loadSettings() {
     try {
       const data = await getAppSettings()
+      const aiData = await getAISystemStatus()
       setSettings(data)
+      setAiStatus(aiData)
     } catch (err) {
       setError('Failed to load settings')
       console.error(err)
@@ -68,6 +76,70 @@ export default function AdminSettingsPage() {
       if (result.success) {
         setSettings({ ...settings, sms_auth_enabled: enabled })
         setSuccess(`SMS authentication ${enabled ? 'enabled' : 'disabled'} successfully`)
+      } else {
+        setError(result.error || 'Failed to update settings')
+      }
+    } catch (err) {
+      setError('Failed to update settings')
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleToggleAIMaster(enabled: boolean) {
+    if (!settings) return
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await updateAppSettings({
+        ai_master_enabled: enabled,
+      })
+
+      if (result.success) {
+        setSettings({ ...settings, ai_master_enabled: enabled })
+        await loadSettings() // Reload to update derived status
+        setSuccess(
+          `AI systems ${enabled ? 'enabled' : 'disabled'} successfully. ${enabled ? 'Individual systems can now be configured.' : 'All AI operations are now inactive.'}`
+        )
+      } else {
+        setError(result.error || 'Failed to update settings')
+      }
+    } catch (err) {
+      setError('Failed to update settings')
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleToggleAISystem(
+    field:
+      | 'ai_verification_enabled'
+      | 'ai_discovery_enabled'
+      | 'ai_enrichment_enabled'
+      | 'ai_realtime_monitoring_enabled',
+    enabled: boolean,
+    systemName: string
+  ) {
+    if (!settings) return
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await updateAppSettings({
+        [field]: enabled,
+      })
+
+      if (result.success) {
+        setSettings({ ...settings, [field]: enabled })
+        await loadSettings() // Reload to update derived status
+        setSuccess(`${systemName} ${enabled ? 'enabled' : 'disabled'} successfully`)
       } else {
         setError(result.error || 'Failed to update settings')
       }
@@ -294,6 +366,336 @@ export default function AdminSettingsPage() {
             SMS authentication is enabled. Users can sign in with phone or email.
           </Alert>
         )}
+      </Paper>
+
+      {/* AI Systems Control Section */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <SmartToyIcon sx={{ mr: 1.5, fontSize: 28 }} />
+          <Typography variant="h6">AI Systems Control</Typography>
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" paragraph>
+          Manage autonomous AI agents and automated systems. Master switch controls all AI
+          operations.
+        </Typography>
+
+        {/* Master AI Switch */}
+        <Card variant="outlined" sx={{ mb: 3, bgcolor: 'background.default' }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+                Master AI Control
+              </Typography>
+              {aiStatus?.masterEnabled ? (
+                <Chip icon={<CheckCircleIcon />} label="Enabled" color="success" size="small" />
+              ) : (
+                <Chip icon={<ErrorIcon />} label="Disabled" color="error" size="small" />
+              )}
+            </Box>
+
+            <FormGroup>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={settings?.ai_master_enabled ?? false}
+                    onChange={(e) => handleToggleAIMaster(e.target.checked)}
+                    disabled={saving}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body1">Enable All AI Systems</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      When enabled, individual AI systems can be activated. When disabled, all AI
+                      operations are inactive.
+                    </Typography>
+                  </Box>
+                }
+              />
+            </FormGroup>
+
+            {!settings?.ai_master_enabled && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <AlertTitle>All AI Systems Disabled</AlertTitle>
+                AI operations are currently inactive. Enable the master switch to activate
+                individual systems.
+              </Alert>
+            )}
+
+            {settings?.ai_master_enabled && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                <AlertTitle>Ready for AI Operations</AlertTitle>
+                Master AI control is enabled. Configure individual systems below.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+          Individual AI Systems
+        </Typography>
+
+        {/* Verification Agent */}
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <VerifiedUserIcon
+                sx={{
+                  mr: 1,
+                  color: aiStatus?.isVerificationActive ? 'success.main' : 'text.disabled',
+                }}
+              />
+              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                Verification Agent
+              </Typography>
+              {aiStatus?.isVerificationActive ? (
+                <Chip icon={<CheckCircleIcon />} label="Active" color="success" size="small" />
+              ) : (
+                <Chip label="Inactive" color="default" size="small" />
+              )}
+            </Box>
+
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Autonomous verification of submitted resources. Validates phone numbers, URLs,
+              geocodes addresses, and performs AI content checks. Auto-approves high-quality
+              submissions.
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings?.ai_verification_enabled ?? false}
+                  onChange={(e) =>
+                    handleToggleAISystem(
+                      'ai_verification_enabled',
+                      e.target.checked,
+                      'Verification Agent'
+                    )
+                  }
+                  disabled={!settings?.ai_master_enabled || saving}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {settings?.ai_verification_enabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+              }
+            />
+
+            {!settings?.ai_master_enabled && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Enable master AI control first to activate this system.
+              </Alert>
+            )}
+
+            {settings?.ai_master_enabled && !settings?.ai_verification_enabled && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                System disabled. All resource submissions will require manual review.
+              </Alert>
+            )}
+
+            {aiStatus?.isVerificationActive && (
+              <Alert severity="success" sx={{ mt: 1 }}>
+                Ready for autonomous verification. High-quality submissions will be auto-approved.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Discovery Agent */}
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <SearchIcon
+                sx={{
+                  mr: 1,
+                  color: aiStatus?.isDiscoveryActive ? 'success.main' : 'text.disabled',
+                }}
+              />
+              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                Discovery Agent
+              </Typography>
+              {aiStatus?.isDiscoveryActive ? (
+                <Chip icon={<CheckCircleIcon />} label="Active" color="success" size="small" />
+              ) : (
+                <Chip label="Inactive" color="default" size="small" />
+              )}
+            </Box>
+
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Automatically discovers new resources from 211 directories, government sites, and
+              Google searches. Expands the resource database proactively.
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings?.ai_discovery_enabled ?? false}
+                  onChange={(e) =>
+                    handleToggleAISystem(
+                      'ai_discovery_enabled',
+                      e.target.checked,
+                      'Discovery Agent'
+                    )
+                  }
+                  disabled={!settings?.ai_master_enabled || saving}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {settings?.ai_discovery_enabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+              }
+            />
+
+            {!settings?.ai_master_enabled && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Enable master AI control first to activate this system.
+              </Alert>
+            )}
+
+            {settings?.ai_master_enabled && !settings?.ai_discovery_enabled && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                System disabled. Resource discovery will not run automatically.
+              </Alert>
+            )}
+
+            {aiStatus?.isDiscoveryActive && (
+              <Alert severity="success" sx={{ mt: 1 }}>
+                Ready for resource discovery. Agent will find new resources from external sources.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Enrichment Agent */}
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <AutoAwesomeIcon
+                sx={{
+                  mr: 1,
+                  color: aiStatus?.isEnrichmentActive ? 'success.main' : 'text.disabled',
+                }}
+              />
+              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                Enrichment Agent
+              </Typography>
+              {aiStatus?.isEnrichmentActive ? (
+                <Chip icon={<CheckCircleIcon />} label="Active" color="success" size="small" />
+              ) : (
+                <Chip label="Inactive" color="default" size="small" />
+              )}
+            </Box>
+
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Enhances existing resources by filling missing data fields via geocoding, website
+              scraping, and Google Maps photos. Improves data quality automatically.
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings?.ai_enrichment_enabled ?? false}
+                  onChange={(e) =>
+                    handleToggleAISystem(
+                      'ai_enrichment_enabled',
+                      e.target.checked,
+                      'Enrichment Agent'
+                    )
+                  }
+                  disabled={!settings?.ai_master_enabled || saving}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {settings?.ai_enrichment_enabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+              }
+            />
+
+            {!settings?.ai_master_enabled && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Enable master AI control first to activate this system.
+              </Alert>
+            )}
+
+            {settings?.ai_master_enabled && !settings?.ai_enrichment_enabled && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                System disabled. Resource data will not be enhanced automatically.
+              </Alert>
+            )}
+
+            {aiStatus?.isEnrichmentActive && (
+              <Alert severity="success" sx={{ mt: 1 }}>
+                Ready for data enrichment. Agent will enhance resources with missing information.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Real-time Monitoring */}
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <VisibilityIcon
+                sx={{
+                  mr: 1,
+                  color: settings?.ai_realtime_monitoring_enabled
+                    ? 'success.main'
+                    : 'text.disabled',
+                }}
+              />
+              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                Real-time Monitoring
+              </Typography>
+              {settings?.ai_realtime_monitoring_enabled ? (
+                <Chip icon={<CheckCircleIcon />} label="Active" color="success" size="small" />
+              ) : (
+                <Chip label="Inactive" color="default" size="small" />
+              )}
+            </Box>
+
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Live event streaming in Command Center for monitoring AI agent operations. Shows
+              real-time progress, costs, and verification results.
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings?.ai_realtime_monitoring_enabled ?? false}
+                  onChange={(e) =>
+                    handleToggleAISystem(
+                      'ai_realtime_monitoring_enabled',
+                      e.target.checked,
+                      'Real-time Monitoring'
+                    )
+                  }
+                  disabled={saving}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {settings?.ai_realtime_monitoring_enabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+              }
+            />
+
+            <Alert severity="info" sx={{ mt: 1 }}>
+              Real-time monitoring operates independently of other AI systems. It only controls UI
+              event streaming, not AI operations.
+            </Alert>
+          </CardContent>
+        </Card>
       </Paper>
 
       {/* Future Settings Sections */}
