@@ -39,20 +39,84 @@ class AnalyticsQueue {
   private maxBatchSize = 50
   private flushInterval = 5000 // 5 seconds
   private flushTimer: ReturnType<typeof setTimeout> | null = null
+  private enabled = true // Can be toggled at runtime
 
   constructor() {
     if (typeof window === 'undefined') return // Server-side guard
 
-    // Automatically flush periodically
-    this.flushTimer = setInterval(() => this.flush(), this.flushInterval)
+    // Check if analytics is enabled via environment variable or localStorage
+    this.enabled = this.isEnabled()
 
-    // Flush on page unload
-    window.addEventListener('beforeunload', () => this.flushSync())
-    window.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') {
-        this.flushSync()
-      }
-    })
+    // Automatically flush periodically (only if enabled)
+    if (this.enabled) {
+      this.flushTimer = setInterval(() => this.flush(), this.flushInterval)
+
+      // Flush on page unload
+      window.addEventListener('beforeunload', () => this.flushSync())
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          this.flushSync()
+        }
+      })
+    }
+  }
+
+  /**
+   * Check if analytics is enabled
+   * Priority: localStorage > environment variable > default (true)
+   */
+  private isEnabled(): boolean {
+    if (typeof window === 'undefined') return true
+
+    // Check localStorage override (for testing)
+    const localStorageOverride = localStorage.getItem('analytics_enabled')
+    if (localStorageOverride !== null) {
+      return localStorageOverride === 'true'
+    }
+
+    // Check environment variable (set at build time)
+    // @ts-ignore - process.env is available in Next.js
+    const envEnabled = process?.env?.NEXT_PUBLIC_ANALYTICS_ENABLED
+    if (envEnabled !== undefined) {
+      return envEnabled === 'true'
+    }
+
+    // Default: enabled
+    return true
+  }
+
+  /**
+   * Enable analytics at runtime (for testing)
+   */
+  public enable(): void {
+    this.enabled = true
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_enabled', 'true')
+    }
+
+    // Start flush timer if not already running
+    if (!this.flushTimer && typeof window !== 'undefined') {
+      this.flushTimer = setInterval(() => this.flush(), this.flushInterval)
+    }
+  }
+
+  /**
+   * Disable analytics at runtime (for testing)
+   */
+  public disable(): void {
+    this.enabled = false
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_enabled', 'false')
+    }
+
+    // Clear queue
+    this.queue = []
+
+    // Stop flush timer
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer)
+      this.flushTimer = null
+    }
   }
 
   /**
@@ -61,6 +125,7 @@ class AnalyticsQueue {
    */
   track(event: string, properties?: Record<string, any>): void {
     if (typeof window === 'undefined') return // Server-side guard
+    if (!this.enabled) return // Analytics disabled
 
     // Add to queue synchronously (just array push, <1ms)
     this.queue.push({
@@ -129,7 +194,8 @@ class AnalyticsQueue {
       }
     } catch (error) {
       // Silent failure - never let analytics break the app
-      if (process.env.NODE_ENV === 'development') {
+      // @ts-ignore - process.env is available in Next.js
+      if (process?.env?.NODE_ENV === 'development') {
         console.debug('Analytics flush failed:', error)
       }
     } finally {
@@ -289,4 +355,14 @@ export function clearUser(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('analytics_user_id')
   }
+}
+
+// Enable analytics (for testing)
+export function enableAnalytics(): void {
+  analytics.enable()
+}
+
+// Disable analytics (for testing)
+export function disableAnalytics(): void {
+  analytics.disable()
 }

@@ -6463,7 +6463,47 @@ LIMIT 10;
 
 ---
 
-### 7. Privacy & Admin User Filtering
+### 7. Enabling/Disabling Analytics
+
+**Analytics can be toggled on/off for testing and production use.**
+
+**Three ways to control analytics**:
+
+1. **Environment Variable** (Build-time):
+   ```bash
+   # In .env.local or .env.production
+   NEXT_PUBLIC_ANALYTICS_ENABLED=false
+   ```
+
+2. **Browser Console** (Runtime):
+   ```javascript
+   // Disable analytics temporarily
+   disableAnalytics()
+
+   // Re-enable analytics
+   enableAnalytics()
+   ```
+
+3. **localStorage** (Persists across sessions):
+   ```javascript
+   // Disable for this browser
+   localStorage.setItem('analytics_enabled', 'false')
+
+   // Re-enable
+   localStorage.setItem('analytics_enabled', 'true')
+   ```
+
+**Priority**: localStorage > environment variable > default (enabled)
+
+**Use cases**:
+- **Testing environments**: Set `NEXT_PUBLIC_ANALYTICS_ENABLED=false` in staging
+- **E2E tests**: Call `disableAnalytics()` before test runs
+- **QA verification**: Temporarily disable to verify no tracking occurs
+- **Production**: Default (enabled) or explicitly set to `true`
+
+---
+
+### 8. Privacy & Admin User Filtering
 
 **IMPORTANT**: Admin users should NOT be included in analytics statistics.
 
@@ -6500,7 +6540,7 @@ WHERE started_at > NOW() - INTERVAL '30 days'
 
 ---
 
-### 8. Conversion Funnel Integration
+### 9. Conversion Funnel Integration
 
 **Adding steps to existing funnels**:
 
@@ -6541,7 +6581,7 @@ VALUES (
 
 ---
 
-### 9. A/B Test Integration
+### 10. A/B Test Integration
 
 **Using existing experiments**:
 
@@ -6593,7 +6633,7 @@ VALUES (
 
 ---
 
-### 10. Checklist for New Features
+### 11. Checklist for New Features
 
 Before marking your feature as complete, verify:
 
@@ -6609,7 +6649,7 @@ Before marking your feature as complete, verify:
 
 ---
 
-### 11. Quick Reference: All Tracking Functions
+### 12. Quick Reference: All Tracking Functions
 
 ```typescript
 // Page tracking
@@ -6643,7 +6683,7 @@ clearUser() // When user signs out
 
 ---
 
-### 12. Common Mistakes to Avoid
+### 13. Common Mistakes to Avoid
 
 ❌ **DON'T track synchronously**:
 ```typescript
@@ -6683,7 +6723,7 @@ onClick={() => trackFeatureUse('cta_click', { button_text })}
 
 ---
 
-### 13. Getting Help
+### 14. Getting Help
 
 **If analytics aren't working**:
 
