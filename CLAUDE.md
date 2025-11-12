@@ -72,6 +72,8 @@ npm run quality:full # Full: Above + E2E tests
 
 **⚠️ CRITICAL: `npm run quality` passing does NOT mean the UI works!**
 
+**📋 READ CHECKLIST FIRST**: [.claude/FRONTEND_VERIFICATION_REQUIRED.md](.claude/FRONTEND_VERIFICATION_REQUIRED.md)
+
 **Before claiming ANY frontend work is "complete", "done", or "production-ready":**
 
 ### 1. Run Quality Checks First
