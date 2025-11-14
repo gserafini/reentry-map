@@ -10,30 +10,19 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import type { AnalyticsEvent } from '@/lib/analytics/queue'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const runtime = 'edge' // Fast cold starts
 export const maxDuration = 1 // Max 1 second (forces fast return)
 
-interface AnalyticsEvent {
-  event: string
-  properties?: Record<string, any>
-  timestamp: string
-  client_timestamp: number
-  session_id: string
-  user_id?: string | null
-  anonymous_id: string
-  is_admin?: boolean
-  page_path: string
-  referrer?: string
-  viewport: {
-    width: number
-    height: number
-  }
-  device: {
-    type: string
-    browser: string
-    os: string
-  }
+// Enriched event with server-side data
+interface EnrichedAnalyticsEvent extends AnalyticsEvent {
+  server_timestamp: string
+  country: string | null
+  city: string | null
+  region: string | null
+  ip_address: null // Privacy: we don't store IPs
 }
 
 export async function POST(request: NextRequest) {
@@ -85,7 +74,7 @@ async function processEventsAsync(
   const region = request.geo?.region || null
 
   // Enrich events with server-side data
-  const enrichedEvents = events.map((event) => ({
+  const enrichedEvents: EnrichedAnalyticsEvent[] = events.map((event) => ({
     ...event,
     server_timestamp: new Date().toISOString(),
     country,
@@ -110,7 +99,10 @@ async function processEventsAsync(
   await updateSessionMetadata(enrichedEvents, supabase)
 }
 
-async function processPageViewEvents(events: any[], supabase: any) {
+async function processPageViewEvents(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   const pageViews = events.filter((e) => e.event === 'page_view')
   if (pageViews.length === 0) return
 
@@ -131,7 +123,10 @@ async function processPageViewEvents(events: any[], supabase: any) {
   )
 }
 
-async function processSearchEvents(events: any[], supabase: any) {
+async function processSearchEvents(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   const searches = events.filter((e) => e.event === 'search')
   if (searches.length === 0) return
 
@@ -152,7 +147,10 @@ async function processSearchEvents(events: any[], supabase: any) {
   )
 }
 
-async function processResourceEvents(events: any[], supabase: any) {
+async function processResourceEvents(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   const resourceEvents = events.filter((e) =>
     [
       'resource_view',
@@ -182,7 +180,10 @@ async function processResourceEvents(events: any[], supabase: any) {
   )
 }
 
-async function processMapEvents(events: any[], supabase: any) {
+async function processMapEvents(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   const mapEvents = events.filter((e) =>
     ['map_move', 'map_zoom', 'map_marker_click'].includes(e.event)
   )
@@ -204,7 +205,10 @@ async function processMapEvents(events: any[], supabase: any) {
   )
 }
 
-async function processFeatureEvents(events: any[], supabase: any) {
+async function processFeatureEvents(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   const featureEvents = events.filter((e) => e.event.startsWith('feature_'))
   if (featureEvents.length === 0) return
 
@@ -222,7 +226,10 @@ async function processFeatureEvents(events: any[], supabase: any) {
   )
 }
 
-async function processPerformanceEvents(events: any[], supabase: any) {
+async function processPerformanceEvents(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   const perfEvents = events.filter((e) =>
     ['performance', 'error'].includes(e.event)
   )
@@ -245,9 +252,28 @@ async function processPerformanceEvents(events: any[], supabase: any) {
   )
 }
 
-async function updateSessionMetadata(events: any[], supabase: any) {
+async function updateSessionMetadata(
+  events: EnrichedAnalyticsEvent[],
+  supabase: SupabaseClient
+) {
   // Get unique sessions from this batch
-  const sessions = new Map<string, any>()
+  const sessions = new Map<
+    string,
+    {
+      session_id: string
+      user_id: string | null | undefined
+      anonymous_id: string
+      is_admin: boolean | undefined
+      device_type: string | undefined
+      browser: string | undefined
+      os: string | undefined
+      city: string | null
+      region: string | null
+      country: string | null
+      started_at: string
+      referrer: string | undefined
+    }
+  >()
 
   events.forEach((event) => {
     if (!sessions.has(event.session_id)) {

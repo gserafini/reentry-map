@@ -11,9 +11,46 @@
  *   analytics.track('button_click', { button_id: 'submit' })
  */
 
+// Event property types for type safety
+interface AnalyticsProperties {
+  // Page view properties
+  page_title?: string
+  load_time_ms?: number
+
+  // Search properties
+  query?: string
+  filters?: Record<string, string | number | boolean>
+  results_count?: number
+
+  // Resource properties
+  resource_id?: string
+  source?: 'search' | 'map' | 'category' | 'favorite' | 'direct'
+  action?: 'call' | 'directions' | 'website' | 'favorite_add' | 'favorite_remove'
+
+  // Map properties
+  center_lat?: number
+  center_lng?: number
+  zoom_level?: number
+  visible_markers?: number
+
+  // Feature properties
+  event_type?: string
+
+  // Performance properties
+  metric_name?: string
+  metric_value?: number
+
+  // Error properties
+  error_message?: string
+  error_stack?: string
+
+  // Generic metadata
+  [key: string]: string | number | boolean | Record<string, unknown> | undefined
+}
+
 interface AnalyticsEvent {
   event: string
-  properties?: Record<string, any>
+  properties?: AnalyticsProperties
   timestamp?: string
   client_timestamp?: number
   session_id?: string
@@ -123,7 +160,7 @@ class AnalyticsQueue {
    * Track event - returns IMMEDIATELY (<1ms)
    * Queues event for async processing
    */
-  track(event: string, properties?: Record<string, any>): void {
+  track(event: string, properties?: AnalyticsProperties): void {
     if (typeof window === 'undefined') return // Server-side guard
     if (!this.enabled) return // Analytics disabled
 
@@ -339,9 +376,12 @@ class AnalyticsQueue {
 export const analytics = new AnalyticsQueue()
 
 // Convenience function
-export function track(eventName: string, properties?: Record<string, any>): void {
+export function track(eventName: string, properties?: AnalyticsProperties): void {
   analytics.track(eventName, properties)
 }
+
+// Export types for use in other files
+export type { AnalyticsProperties, AnalyticsEvent }
 
 // Set user ID when user signs in
 export function identifyUser(userId: string): void {
