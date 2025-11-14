@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { AnalyticsEvent } from '@/lib/analytics/queue'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { analyticsEventBatchSchema } from '@/lib/analytics/schemas'
+import { ZodError } from 'zod'
 
 export const runtime = 'edge' // Fast cold starts
 export const maxDuration = 1 // Max 1 second (forces fast return)
@@ -27,16 +29,21 @@ interface EnrichedAnalyticsEvent extends AnalyticsEvent {
 
 export async function POST(request: NextRequest) {
   try {
-    const events: AnalyticsEvent[] = await request.json()
+    const rawEvents = await request.json()
 
-    // Validate batch size
-    if (!Array.isArray(events) || events.length === 0) {
-      return NextResponse.json({ status: 'invalid' }, { status: 400 })
+    // Validate events with Zod schema
+    const validationResult = analyticsEventBatchSchema.safeParse(rawEvents)
+
+    if (!validationResult.success) {
+      // Log validation errors for debugging (but still return 202 to not break UX)
+      console.error('Analytics validation error:', validationResult.error.format())
+      return NextResponse.json(
+        { status: 'validation_error', errors: validationResult.error.issues },
+        { status: 400 }
+      )
     }
 
-    if (events.length > 1000) {
-      return NextResponse.json({ status: 'batch_too_large' }, { status: 413 })
-    }
+    const events: AnalyticsEvent[] = validationResult.data
 
     // IMMEDIATELY return 202 Accepted (don't wait for processing)
     const response = NextResponse.json(

@@ -11,6 +11,8 @@
  *   analytics.track('button_click', { button_id: 'submit' })
  */
 
+import { env } from '@/lib/env'
+
 // Event property types for type safety
 interface AnalyticsProperties {
   // Page view properties
@@ -112,14 +114,8 @@ class AnalyticsQueue {
     }
 
     // Check environment variable (set at build time)
-    // @ts-ignore - process.env is available in Next.js
-    const envEnabled = process?.env?.NEXT_PUBLIC_ANALYTICS_ENABLED
-    if (envEnabled !== undefined) {
-      return envEnabled === 'true'
-    }
-
-    // Default: enabled
-    return true
+    // env.NEXT_PUBLIC_ANALYTICS_ENABLED is already transformed to boolean
+    return env.NEXT_PUBLIC_ANALYTICS_ENABLED
   }
 
   /**
@@ -231,8 +227,8 @@ class AnalyticsQueue {
       }
     } catch (error) {
       // Silent failure - never let analytics break the app
-      // @ts-ignore - process.env is available in Next.js
-      if (process?.env?.NODE_ENV === 'development') {
+      // Only log in development to avoid console noise in production
+      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
         console.debug('Analytics flush failed:', error)
       }
     } finally {
