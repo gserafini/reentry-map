@@ -18,9 +18,6 @@ ALTER TABLE analytics_feature_events ADD COLUMN IF NOT EXISTS is_admin BOOLEAN D
 ALTER TABLE analytics_performance_events ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
 ALTER TABLE analytics_active_sessions ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
 
--- Bot tracking table (also needs admin filtering)
-ALTER TABLE analytics_bot_sessions ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
-
 -- =====================================================
 -- 2. FIX COLUMN NAME MISMATCHES
 -- =====================================================

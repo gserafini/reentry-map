@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const validationResult = analyticsEventBatchSchema.safeParse(rawEvents)
 
     if (!validationResult.success) {
-      // Log validation errors for debugging (but still return 202 to not break UX)
+      // Log validation errors and return 400 to help debug client issues
       console.error('Analytics validation error:', validationResult.error.format())
       return NextResponse.json(
         { status: 'validation_error', errors: validationResult.error.issues },
