@@ -7,6 +7,7 @@ import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import { parseStateSlug, parseCitySlug, generateResourceSlug } from '@/lib/utils/urls'
 import { LocalBusiness } from '@/components/seo/StructuredData'
 import { SmartBreadcrumbs } from '@/components/navigation/SmartBreadcrumbs'
+import { ResourceViewTracker } from '@/components/analytics/ResourceViewTracker'
 
 interface ResourcePageProps {
   params: Promise<{
@@ -62,6 +63,9 @@ export default async function ResourcePage({ params }: ResourcePageProps) {
     <>
       {/* Structured Data for SEO */}
       <LocalBusiness resource={resource} />
+
+      {/* Analytics Tracking */}
+      <ResourceViewTracker resourceId={resource.id} resourceName={resource.name} />
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Smart Breadcrumbs - adapt based on how user got here */}

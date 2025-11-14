@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { identifyUser, clearUser } from '@/lib/analytics/queue'
+import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 
 export interface UseAuthResult {
   user: User | null
@@ -74,9 +76,29 @@ export function useAuth(): UseAuthResult {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const user = session?.user ?? null
+      setUser(user)
       setIsLoading(false)
+
+      // Handle analytics user identification
+      if (user) {
+        // User signed in - identify them in analytics
+        identifyUser(user.id)
+
+        // Check if user is admin and store in localStorage for analytics filtering
+        const isAdmin = await checkCurrentUserIsAdmin()
+        if (isAdmin) {
+          localStorage.setItem('analytics_user_role', 'admin')
+          console.log('[Analytics] Admin user identified - events will be marked as admin')
+        } else {
+          localStorage.removeItem('analytics_user_role')
+        }
+      } else {
+        // User signed out - clear analytics identification
+        clearUser()
+        localStorage.removeItem('analytics_user_role')
+      }
     })
 
     return () => {
@@ -91,6 +113,11 @@ export function useAuth(): UseAuthResult {
     try {
       await supabase.auth.signOut()
       setUser(null)
+
+      // Clear analytics user identification
+      clearUser()
+      localStorage.removeItem('analytics_user_role')
+
       router.refresh() // Refresh server components
       router.push('/') // Redirect to homepage
     } catch (error) {

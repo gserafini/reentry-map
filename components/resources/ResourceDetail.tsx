@@ -49,6 +49,7 @@ import {
   generateTagInCityUrl,
   generateNationalTagUrl,
 } from '@/lib/utils/urls'
+import { analytics } from '@/lib/analytics/queue'
 
 interface ResourceDetailProps {
   resource: Resource
@@ -75,8 +76,27 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
   }, [user?.id])
 
   const handleGetDirections = () => {
+    // Track analytics
+    analytics.track('resource_click_directions', {
+      resource_id: resource.id,
+    })
+
     const address = encodeURIComponent(resource.address)
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+  }
+
+  const handleCallClick = () => {
+    // Track analytics
+    analytics.track('resource_click_call', {
+      resource_id: resource.id,
+    })
+  }
+
+  const handleWebsiteClick = () => {
+    // Track analytics
+    analytics.track('resource_click_website', {
+      resource_id: resource.id,
+    })
   }
 
   const handleReviewSuccess = () => {
@@ -337,6 +357,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                   size="small"
                   startIcon={<PhoneIcon />}
                   title={`Call ${resource.phone}`}
+                  onClick={handleCallClick}
                   sx={{ flexShrink: 0 }}
                 >
                   Call
@@ -419,6 +440,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                   size="small"
                   startIcon={<WebsiteIcon />}
                   title={`Visit ${resource.website}`}
+                  onClick={handleWebsiteClick}
                   sx={{ flexShrink: 0 }}
                 >
                   Visit
