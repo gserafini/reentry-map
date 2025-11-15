@@ -559,9 +559,9 @@ export function AdminStatusBar() {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography
                       variant="caption"
-                      color={aiStatus.realtimeMonitoringEnabled ? 'info.main' : 'text.secondary'}
+                      color={aiStatus.realtimeMonitoringEnabled ? 'success.main' : 'text.secondary'}
                     >
-                      {aiStatus.realtimeMonitoringEnabled ? '🔄 Live' : '⏸️ Paused'}
+                      {aiStatus.realtimeMonitoringEnabled ? '✅ Active' : '⏸️ Paused'}
                     </Typography>
                     <Switch
                       size="small"

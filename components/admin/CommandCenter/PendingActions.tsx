@@ -15,12 +15,18 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Divider,
+  Switch,
+  FormControlLabel,
+  CircularProgress,
+  Alert,
 } from '@mui/material'
 import {
   Lightbulb as SuggestionsIcon,
   Flag as FlagIcon,
   ArrowForward as ArrowIcon,
   Schedule as ClockIcon,
+  Psychology as AIIcon,
+  PlayArrow as ProcessIcon,
 } from '@mui/icons-material'
 import { createClient } from '@/lib/supabase/client'
 
@@ -28,6 +34,35 @@ interface PendingStats {
   suggestions: number
   updates: number
   urgent: number
+}
+
+function AnimatedCounter({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(value)
+  const [isAnimating, setIsAnimating] = useState(false)
+
+  useEffect(() => {
+    if (displayValue !== value) {
+      setIsAnimating(true)
+      const timer = setTimeout(() => {
+        setDisplayValue(value)
+        setIsAnimating(false)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [value, displayValue])
+
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        transition: 'all 0.3s ease-in-out',
+        transform: isAnimating ? 'scale(1.2)' : 'scale(1)',
+        color: isAnimating ? '#1976d2' : 'inherit',
+      }}
+    >
+      {displayValue}
+    </span>
+  )
 }
 
 export function PendingActions() {
@@ -38,8 +73,55 @@ export function PendingActions() {
     urgent: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [autoVerifyEnabled, setAutoVerifyEnabled] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const [processResult, setProcessResult] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  // Handle auto-verification toggle
+  const handleToggleAutoVerify = () => {
+    setAutoVerifyEnabled(!autoVerifyEnabled)
+    setProcessResult(null)
+  }
+
+  // Process verification queue
+  const handleProcessQueue = async () => {
+    if (!autoVerifyEnabled || processing) return
+
+    setProcessing(true)
+    setProcessResult(null)
+
+    try {
+      const response = await fetch('/api/admin/verification/process-queue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          batchSize: 1, // Process 1 at a time for testing
+        }),
+      })
+
+      const result = (await response.json()) as {
+        success: boolean
+        message?: string
+        error?: string
+        totalCost?: number
+      }
+
+      if (result.success && result.message) {
+        setProcessResult(`✅ ${result.message} ($${(result.totalCost || 0).toFixed(4)} API cost)`)
+      } else {
+        setProcessResult(`❌ Error: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error processing queue:', error)
+      setProcessResult('❌ Failed to process queue')
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   // Initial fetch
   useEffect(() => {
@@ -169,12 +251,63 @@ export function PendingActions() {
   return (
     <Card sx={{ mb: 3 }}>
       <CardContent>
+        {/* AI Auto-Verification Toggle */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            mb: 2,
+            pb: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={autoVerifyEnabled}
+                onChange={handleToggleAutoVerify}
+                color="primary"
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AIIcon fontSize="small" />
+                <Typography variant="body2" fontWeight="medium">
+                  AI Auto-Verification
+                </Typography>
+              </Box>
+            }
+          />
+
+          {autoVerifyEnabled && stats.suggestions > 0 && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={processing ? <CircularProgress size={16} /> : <ProcessIcon />}
+              onClick={handleProcessQueue}
+              disabled={processing}
+            >
+              {processing ? 'Processing...' : 'Process Next (1)'}
+            </Button>
+          )}
+        </Box>
+
+        {/* Process Result Message */}
+        {processResult && (
+          <Alert severity={processResult.startsWith('✅') ? 'success' : 'error'} sx={{ mb: 2 }}>
+            {processResult}
+          </Alert>
+        )}
+
+        {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="h6">Pending Actions</Typography>
             {totalPending > 0 && (
               <Chip
-                label={totalPending}
+                label={<AnimatedCounter value={totalPending} />}
                 color={stats.urgent > 0 ? 'error' : totalPending > 50 ? 'warning' : 'default'}
                 size="small"
               />
@@ -212,7 +345,11 @@ export function PendingActions() {
                         {stats.urgent > 0 && (
                           <Chip
                             icon={<ClockIcon fontSize="small" />}
-                            label={`${stats.urgent} urgent`}
+                            label={
+                              <>
+                                <AnimatedCounter value={stats.urgent} /> urgent
+                              </>
+                            }
                             color="error"
                             size="small"
                             sx={{ height: 20 }}
@@ -220,7 +357,11 @@ export function PendingActions() {
                         )}
                       </Box>
                     }
-                    secondary={`${stats.suggestions} waiting for review`}
+                    secondary={
+                      <>
+                        <AnimatedCounter value={stats.suggestions} /> waiting for review
+                      </>
+                    }
                   />
                   <ListItemSecondaryAction>
                     <IconButton
@@ -246,7 +387,11 @@ export function PendingActions() {
                       Issue Reports
                     </Typography>
                   }
-                  secondary={`${stats.updates} flagged resources`}
+                  secondary={
+                    <>
+                      <AnimatedCounter value={stats.updates} /> flagged resources
+                    </>
+                  }
                 />
                 <ListItemSecondaryAction>
                   <IconButton edge="end" size="small" onClick={() => router.push('/admin/updates')}>
@@ -268,7 +413,7 @@ export function PendingActions() {
               onClick={() => router.push('/admin/suggestions')}
               disabled={stats.suggestions === 0}
             >
-              Review Suggestions ({stats.suggestions})
+              Review Suggestions (<AnimatedCounter value={stats.suggestions} />)
             </Button>
             <Button
               variant="outlined"
@@ -277,7 +422,7 @@ export function PendingActions() {
               onClick={() => router.push('/admin/updates')}
               disabled={stats.updates === 0}
             >
-              Review Reports ({stats.updates})
+              Review Reports (<AnimatedCounter value={stats.updates} />)
             </Button>
           </Box>
         )}

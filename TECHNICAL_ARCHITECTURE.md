@@ -338,97 +338,47 @@ const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe!
 
 ## Database Schema
 
-### Core Tables
+> **⚠️ CANONICAL SCHEMA REFERENCE**: For the complete, up-to-date database schema with all 76+ columns, see **[docs/DATABASE_SCHEMA_CANONICAL.md](docs/DATABASE_SCHEMA_CANONICAL.md)**
+>
+> This document provides a **high-level overview** only. The canonical schema document is the source of truth and is updated with every database migration.
 
-#### resources
+### Core Tables Overview
 
-Primary table for all reentry resources.
+#### resources (76 columns)
 
-```sql
-CREATE TABLE resources (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+Primary table for all reentry resources and services.
 
-  -- Basic Information
-  name TEXT NOT NULL,
-  description TEXT,
-  services_offered TEXT[],
+**Key field groups**:
 
-  -- Contact
-  phone TEXT,
-  phone_verified BOOLEAN DEFAULT false,
-  phone_last_verified TIMESTAMPTZ,
-  email TEXT,
-  website TEXT,
+- **Basic Info**: name, description, services_offered
+- **Contact**: phone, email, website (with verification tracking)
+- **Location**: address, city, state, zip, lat/lng, county (PostGIS indexed)
+- **Schedule**: hours (JSONB), timezone
+- **Categorization**: primary_category, categories[], tags[]
+- **Eligibility**: eligibility_requirements, accepts_records, appointment_required, **required_documents[]**, **fees**
+- **Accessibility**: languages[], **accessibility_features[]**
+- **Media**: photos[], logo_url, screenshot_url
+- **AI Metadata**: ai_discovered, ai_enriched, ai_verification_score, completeness_score
+- **Verification System**: verification_status, verification_confidence, last_verified_at, next_verification_at, provenance
+- **Community Stats**: rating_average, rating_count, review_count (auto-updated by triggers)
+- **Parent-Child**: parent_resource_id, org_name, location_name, is_parent
+- **Data Provenance**: source, external_211_id, external_govt_id, is_unique
+- **Timestamps**: created_at, updated_at (auto-updated)
 
-  -- Location
-  address TEXT NOT NULL,
-  city TEXT,
-  state TEXT,
-  zip TEXT,
-  latitude DOUBLE PRECISION NOT NULL,
-  longitude DOUBLE PRECISION NOT NULL,
+**Recent additions (2025-01-12)**:
 
-  -- Schedule
-  hours JSONB,
-  timezone TEXT DEFAULT 'America/Los_Angeles',
+- `fees` (text) - Cost information or "Free"
+- `required_documents` (text[]) - Documents needed to access service
+- `accessibility_features` (text[]) - Changed from TEXT to array for multiple features
 
-  -- Categorization
-  primary_category TEXT NOT NULL,
-  categories TEXT[],
-  tags TEXT[],
+**See [docs/DATABASE_SCHEMA_CANONICAL.md](docs/DATABASE_SCHEMA_CANONICAL.md) for complete column list, types, defaults, and constraints.**
 
-  -- Eligibility
-  eligibility_requirements TEXT,
-  accepts_records BOOLEAN DEFAULT true,
-  appointment_required BOOLEAN DEFAULT false,
+**Key indexes**:
 
-  -- Media
-  photos JSONB[],
-  logo_url TEXT,
-
-  -- AI Metadata
-  ai_discovered BOOLEAN DEFAULT false,
-  ai_enriched BOOLEAN DEFAULT false,
-  ai_last_verified TIMESTAMPTZ,
-  ai_verification_score DOUBLE PRECISION,
-  data_completeness_score DOUBLE PRECISION,
-
-  -- Verification
-  verified BOOLEAN DEFAULT false,
-  verified_by UUID REFERENCES auth.users(id),
-  verified_date TIMESTAMPTZ,
-
-  -- Community Stats
-  rating_average DOUBLE PRECISION DEFAULT 0,
-  rating_count INTEGER DEFAULT 0,
-  review_count INTEGER DEFAULT 0,
-  view_count INTEGER DEFAULT 0,
-
-  -- Status
-  status TEXT DEFAULT 'active',
-  status_reason TEXT,
-
-  -- Timestamps
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Enable PostGIS for location queries
-CREATE EXTENSION IF NOT EXISTS postgis;
-
--- Add spatial index
-CREATE INDEX idx_resources_location ON resources
-USING GIST (ST_MakePoint(longitude, latitude)::geography);
-
--- Add search index
-CREATE INDEX idx_resources_search ON resources
-USING GIN (to_tsvector('english', name || ' ' || COALESCE(description, '')));
-
--- Add category index
-CREATE INDEX idx_resources_category ON resources(primary_category);
-CREATE INDEX idx_resources_status ON resources(status) WHERE status = 'active';
-CREATE INDEX idx_resources_rating ON resources(rating_average DESC);
-```
+- PostGIS spatial index on lat/lng (efficient distance queries)
+- Full-text search on name + description
+- Category, tag, status filtering indexes
+- Verification scheduling indexes
 
 #### users
 

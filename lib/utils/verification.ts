@@ -746,3 +746,98 @@ export function calculateVerificationScore(checks: Partial<VerificationChecks>):
   // Normalize by total weight (handles partial checks)
   return totalWeight > 0 ? totalScore / totalWeight : 0
 }
+
+// ============================================================================
+// MAIN VERIFICATION FUNCTION
+// ============================================================================
+
+export interface ResourceData {
+  name: string
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  phone?: string | null
+  website?: string | null
+  description?: string | null
+}
+
+export interface VerificationResult {
+  decision: 'auto_approve' | 'flag_for_human' | 'auto_reject'
+  overallScore: number
+  checks: Partial<VerificationChecks>
+  flagReason?: string
+  estimatedCost: number
+  tokensUsed?: {
+    input: number
+    output: number
+  }
+}
+
+/**
+ * Main verification function that runs all checks on a resource
+ * Returns decision, score, and detailed check results
+ */
+export async function verifyResource(data: ResourceData): Promise<VerificationResult> {
+  const checks: Partial<VerificationChecks> = {}
+  let estimatedCost = 0
+
+  // LEVEL 1: Basic automated checks
+  try {
+    // Check URL if provided
+    if (data.website) {
+      checks.url_reachable = await checkUrlReachable(data.website)
+      estimatedCost += 0.001 // HTTP request cost
+    }
+
+    // Validate phone if provided
+    if (data.phone) {
+      checks.phone_valid = validatePhoneNumber(data.phone)
+    }
+
+    // Validate address if provided
+    if (data.address && data.city && data.state) {
+      checks.address_geocodable = await validateAddressGeocoding(
+        data.address,
+        data.city,
+        data.state,
+        data.zip || undefined
+      )
+      estimatedCost += 0.001 // Geocoding API cost
+    }
+  } catch (error) {
+    console.error('Error in Level 1 verification checks:', error)
+  }
+
+  // Calculate overall score
+  const overallScore = calculateVerificationScore(checks)
+
+  // Make decision based on score and critical fields
+  let decision: 'auto_approve' | 'flag_for_human' | 'auto_reject'
+  let flagReason: string | undefined
+
+  // Critical checks
+  const hasWorkingUrl = checks.url_reachable?.pass !== false
+  const hasValidPhone = checks.phone_valid?.pass !== false
+  const hasValidAddress = checks.address_geocodable?.pass !== false
+
+  if (overallScore >= 0.85 && hasWorkingUrl && hasValidPhone && hasValidAddress) {
+    decision = 'auto_approve'
+  } else if (overallScore < 0.5 || !hasWorkingUrl) {
+    decision = 'auto_reject'
+    flagReason = `Low verification score (${(overallScore * 100).toFixed(0)}%)${!hasWorkingUrl ? ', unreachable URL' : ''}`
+  } else {
+    decision = 'flag_for_human'
+    flagReason = `Medium confidence score (${(overallScore * 100).toFixed(0)}%)`
+    if (!hasValidPhone) flagReason += ', invalid phone'
+    if (!hasValidAddress) flagReason += ', invalid address'
+  }
+
+  return {
+    decision,
+    overallScore,
+    checks,
+    flagReason,
+    estimatedCost,
+  }
+}

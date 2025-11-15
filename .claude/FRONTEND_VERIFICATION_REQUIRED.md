@@ -5,6 +5,7 @@
 ## The Problem (2025-11-11 Incident)
 
 Claude claimed admin dashboard was "production-ready" after `npm run quality` passed, but **never browsed the UI**. When user finally looked:
+
 - **Critical crash bug**: TypeError in CoverageSnapshot.tsx
 - **Page wouldn't load**: metrics.coveragePercentage.toFixed() on undefined
 - **Multiple API 400 errors**: Components showing empty states
@@ -17,6 +18,7 @@ Claude claimed admin dashboard was "production-ready" after `npm run quality` pa
 ## MANDATORY Verification Steps
 
 ### ❌ WRONG Workflow (What I Did)
+
 ```
 1. Write code
 2. Run npm run quality ✅
@@ -25,6 +27,7 @@ Claude claimed admin dashboard was "production-ready" after `npm run quality` pa
 ```
 
 ### ✅ CORRECT Workflow (What I Should Have Done)
+
 ```
 1. Write code
 2. Run npm run quality ✅
@@ -43,15 +46,17 @@ Claude claimed admin dashboard was "production-ready" after `npm run quality` pa
 When working on **ANY** frontend code (components, pages, UI):
 
 ### Step 1: Automated Checks
+
 ```bash
 npm run quality  # Must pass with 0 errors
 ```
 
 ### Step 2: Visual Browser Testing (MANDATORY)
+
 ```typescript
 // Navigate to the page
 mcp__playwright__browser_navigate({
-  url: 'http://localhost:3003/your-page'
+  url: 'http://localhost:3003/your-page',
 })
 
 // Get page structure
@@ -78,6 +83,7 @@ mcp__playwright__browser_take_screenshot({ fullPage: true })
 ### Step 4: Test User Interactions
 
 **Click things!**
+
 - Buttons should trigger actions
 - Toggles should switch states
 - Dropdowns should expand/collapse
@@ -87,12 +93,14 @@ mcp__playwright__browser_take_screenshot({ fullPage: true })
 ### Step 5: Only THEN Say "Complete"
 
 **Forbidden phrases before verification:**
+
 - ❌ "All quality checks passed!"
 - ❌ "Production-ready!"
 - ❌ "Phase complete!"
 - ❌ "Ready to deploy!"
 
 **Correct phrasing after verification:**
+
 - ✅ "Quality checks passed ✓ AND browsed UI ✓"
 - ✅ "Verified in browser - page loads correctly"
 - ✅ "Tested interactive elements - all working"
@@ -102,6 +110,7 @@ mcp__playwright__browser_take_screenshot({ fullPage: true })
 ## Examples of What to Catch
 
 ### Example 1: CoverageSnapshot Crash (2025-11-11)
+
 ```typescript
 // ❌ BAD - Will crash if metrics.coveragePercentage is undefined
 <Typography>{metrics.coveragePercentage.toFixed(1)}%</Typography>
@@ -113,15 +122,17 @@ mcp__playwright__browser_take_screenshot({ fullPage: true })
 **How to catch**: Browse to `/admin`, see if it loads without errors.
 
 ### Example 2: API Failures Not Handled
+
 ```typescript
 // API returns 400 error, but component doesn't handle it
-const { data } = await fetch('/api/endpoint')  // Returns 400
-setMetrics(data)  // data is undefined or error object
+const { data } = await fetch('/api/endpoint') // Returns 400
+setMetrics(data) // data is undefined or error object
 ```
 
 **How to catch**: Check browser console for 400/500 errors.
 
 ### Example 3: Missing Null Checks
+
 ```typescript
 // ❌ BAD - Crashes if user.profile is null
 <Avatar src={user.profile.avatar} />
@@ -137,6 +148,7 @@ setMetrics(data)  // data is undefined or error object
 ## When This Applies
 
 **ANY time you modify:**
+
 - React components (`*.tsx`, `*.jsx`)
 - Page files (`app/**/page.tsx`)
 - Layout files (`app/**/layout.tsx`)
@@ -145,6 +157,7 @@ setMetrics(data)  // data is undefined or error object
 - Styling (Tailwind classes, CSS)
 
 **Even for "small changes":**
+
 - ✅ Still browse the UI
 - ✅ Still check console
 - ✅ Small bugs compound into big problems
@@ -154,6 +167,7 @@ setMetrics(data)  // data is undefined or error object
 ## Why Automated Tests Aren't Enough
 
 **What `npm run quality` checks:**
+
 - ✅ TypeScript compiles
 - ✅ ESLint rules pass
 - ✅ Unit tests pass
@@ -162,6 +176,7 @@ setMetrics(data)  // data is undefined or error object
 - ✅ Console check (basic pages only)
 
 **What it DOESN'T check:**
+
 - ❌ Does the UI actually load in a browser?
 - ❌ Are there runtime errors (TypeError, etc.)?
 - ❌ Do API calls succeed/fail gracefully?
@@ -176,18 +191,23 @@ setMetrics(data)  // data is undefined or error object
 ## FAQ
 
 ### Q: "But tests passed, isn't that enough?"
+
 **A**: NO. Tests don't catch runtime errors, API failures, missing null checks, or visual issues.
 
 ### Q: "I made a tiny change, do I really need to browse?"
+
 **A**: YES. Tiny changes can break things unexpectedly. Always verify.
 
 ### Q: "What if I forget?"
+
 **A**: The pre-commit hook will ask you. If you skip it and user finds bugs, you've wasted their time.
 
 ### Q: "How long does this take?"
+
 **A**: 30-60 seconds to navigate, check console, and verify. Much faster than debugging later.
 
 ### Q: "What if the page takes a long time to load?"
+
 **A**: That's a signal something is wrong! Investigate before claiming complete.
 
 ---

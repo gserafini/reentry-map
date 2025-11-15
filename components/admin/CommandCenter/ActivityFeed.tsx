@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Box,
   Card,
@@ -37,15 +38,39 @@ interface ActivityEvent {
   description: string
   timestamp: string
   user?: string
+  entityId?: string // ID of the resource/suggestion/update for linking
+  resourceId?: string // For updates, the ID of the resource being updated
 }
 
 export function ActivityFeed() {
+  const router = useRouter()
   const [expanded, setExpanded] = useState(true)
   const [timeRange, setTimeRange] = useState<'1h' | '6h' | '24h'>('24h')
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
 
   const supabase = createClient()
+
+  const handleEventClick = (event: ActivityEvent) => {
+    switch (event.type) {
+      case 'resource':
+        if (event.entityId) {
+          router.push(`/resources/${event.entityId}`)
+        }
+        break
+      case 'suggestion':
+        router.push('/admin/suggestions')
+        break
+      case 'update':
+        if (event.resourceId) {
+          router.push(`/resources/${event.resourceId}`)
+        }
+        break
+      case 'agent':
+        // Could link to agent logs in the future
+        break
+    }
+  }
 
   // Fetch recent events
   useEffect(() => {
@@ -71,21 +96,21 @@ export function ActivityFeed() {
 
           supabase
             .from('resource_suggestions')
-            .select('id, suggested_name, status, created_at, updated_at')
+            .select('id, name, status, created_at')
             .gte('created_at', cutoffTime)
             .order('created_at', { ascending: false })
             .limit(10),
 
           supabase
             .from('resource_updates')
-            .select('id, resource_id, status, created_at, updated_at')
+            .select('id, resource_id, status, created_at')
             .gte('created_at', cutoffTime)
             .order('created_at', { ascending: false })
             .limit(10),
 
           supabase
             .from('agent_sessions')
-            .select('id, session_type, started_at, ended_at')
+            .select('id, agent_type, started_at, ended_at')
             .gte('started_at', cutoffTime)
             .order('started_at', { ascending: false })
             .limit(10),
@@ -102,6 +127,7 @@ export function ActivityFeed() {
             action: 'created',
             description: `Resource "${r.name}" added`,
             timestamp: r.created_at,
+            entityId: r.id,
           })
         })
 
@@ -113,8 +139,9 @@ export function ActivityFeed() {
             id: `suggestion-${s.id}`,
             type: 'suggestion',
             action: action as ActivityEvent['action'],
-            description: `Suggestion "${s.suggested_name}" ${action}`,
-            timestamp: s.updated_at || s.created_at,
+            description: `Suggestion "${s.name}" ${action}`,
+            timestamp: s.created_at,
+            entityId: s.id,
           })
         })
 
@@ -130,7 +157,9 @@ export function ActivityFeed() {
                   ? 'rejected'
                   : 'created',
             description: `Issue report ${u.status}`,
-            timestamp: u.updated_at || u.created_at,
+            timestamp: u.created_at,
+            entityId: u.id,
+            resourceId: u.resource_id,
           })
         })
 
@@ -141,8 +170,9 @@ export function ActivityFeed() {
             id: `session-${s.id}`,
             type: 'agent',
             action: action as ActivityEvent['action'],
-            description: `${s.session_type} agent ${action}`,
+            description: `${s.agent_type} agent ${action}`,
             timestamp: s.ended_at || s.started_at,
+            entityId: s.id,
           })
         })
 
@@ -182,6 +212,7 @@ export function ActivityFeed() {
               action: 'created',
               description: `Resource "${newResource.name}" added`,
               timestamp: newResource.created_at,
+              entityId: newResource.id,
             },
             ...prev.slice(0, 19),
           ])
@@ -201,10 +232,9 @@ export function ActivityFeed() {
         (payload) => {
           const suggestion = payload.new as {
             id: string
-            suggested_name: string
+            name: string
             status: string
             created_at: string
-            updated_at: string
           }
           const action =
             suggestion.status === 'approved'
@@ -217,8 +247,9 @@ export function ActivityFeed() {
               id: `suggestion-${suggestion.id}`,
               type: 'suggestion',
               action: action as ActivityEvent['action'],
-              description: `Suggestion "${suggestion.suggested_name}" ${action}`,
-              timestamp: suggestion.updated_at || suggestion.created_at,
+              description: `Suggestion "${suggestion.name}" ${action}`,
+              timestamp: suggestion.created_at,
+              entityId: suggestion.id,
             },
             ...prev.slice(0, 19),
           ])
@@ -338,7 +369,16 @@ export function ActivityFeed() {
               }}
             >
               {events.map((event) => (
-                <ListItem key={event.id}>
+                <ListItem
+                  key={event.id}
+                  onClick={() => handleEventClick(event)}
+                  sx={{
+                    cursor: event.entityId || event.resourceId ? 'pointer' : 'default',
+                    '&:hover': {
+                      bgcolor: event.entityId || event.resourceId ? 'action.hover' : 'transparent',
+                    },
+                  }}
+                >
                   <ListItemIcon sx={{ minWidth: 36 }}>{getIcon(event)}</ListItemIcon>
                   <ListItemText
                     primary={<Typography variant="body2">{event.description}</Typography>}

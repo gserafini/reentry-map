@@ -24,6 +24,16 @@ interface CoverageMetrics {
   totalResources: number
 }
 
+interface CoverageApiResponse {
+  summary: {
+    total_resources: number
+    counties_with_coverage: number
+    tier1_counties_total: number
+    tier1_counties_covered: number
+    tier1_coverage_percent: number
+  }
+}
+
 export function CoverageSnapshot() {
   const router = useRouter()
   const [metrics, setMetrics] = useState<CoverageMetrics>({
@@ -47,8 +57,14 @@ export function CoverageSnapshot() {
         ])
 
         if (metricsResponse.ok) {
-          const metricsData = (await metricsResponse.json()) as CoverageMetrics
-          setMetrics(metricsData)
+          const apiData = (await metricsResponse.json()) as CoverageApiResponse
+          // Transform API response to match component's expected shape
+          setMetrics({
+            totalCounties: apiData.summary?.tier1_counties_total || 0,
+            coveredCounties: apiData.summary?.tier1_counties_covered || 0,
+            coveragePercentage: apiData.summary?.tier1_coverage_percent || 0,
+            totalResources: apiData.summary?.total_resources || 0,
+          })
         }
 
         if (prioritiesResponse.ok) {

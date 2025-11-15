@@ -38,6 +38,7 @@ interface VerificationSession {
   total_cost: number
   started_at: string
   completed_at?: string
+  expanded?: boolean
 }
 
 export function RealtimeVerificationViewer() {
@@ -79,6 +80,7 @@ export function RealtimeVerificationViewer() {
             events: [event],
             total_cost: 0,
             started_at: event.created_at,
+            expanded: true, // Running sessions start expanded
           })
         } else if (existing) {
           existing.events.push(event)
@@ -88,13 +90,15 @@ export function RealtimeVerificationViewer() {
             existing.total_cost += (event.event_data.total_cost_usd as number) || 0
           }
 
-          // Update status
+          // Update status and auto-collapse when complete
           if (event.event_type === 'completed') {
             existing.status = 'completed'
             existing.completed_at = event.created_at
+            existing.expanded = false // Auto-collapse on completion
           } else if (event.event_type === 'failed') {
             existing.status = 'failed'
             existing.completed_at = event.created_at
+            existing.expanded = false // Auto-collapse on failure
           }
         }
       }
@@ -126,15 +130,29 @@ export function RealtimeVerificationViewer() {
             const existing = newSessions.get(suggestionId)
 
             if (!existing && event.event_type === 'started') {
-              // New verification session started
-              newSessions.set(suggestionId, {
+              // Collapse any previously running sessions
+              newSessions.forEach((session) => {
+                if (session.status === 'running' && session.expanded) {
+                  session.expanded = false
+                }
+              })
+
+              // New verification session started - add at beginning (top)
+              const newSessionsReordered = new Map<string, VerificationSession>()
+              newSessionsReordered.set(suggestionId, {
                 suggestion_id: suggestionId,
                 resource_name: (event.event_data.name as string) || 'Unknown Resource',
                 status: 'running',
                 events: [event],
                 total_cost: 0,
                 started_at: event.created_at,
+                expanded: true, // New sessions start expanded
               })
+              // Add all existing sessions after the new one
+              newSessions.forEach((session, id) => {
+                newSessionsReordered.set(id, session)
+              })
+              return newSessionsReordered
             } else if (existing) {
               // Add event to existing session
               existing.events.push(event)
@@ -144,13 +162,15 @@ export function RealtimeVerificationViewer() {
                 existing.total_cost += (event.event_data.total_cost_usd as number) || 0
               }
 
-              // Update status
+              // Update status and auto-collapse when complete
               if (event.event_type === 'completed') {
                 existing.status = 'completed'
                 existing.completed_at = event.created_at
+                existing.expanded = false // Auto-collapse on completion
               } else if (event.event_type === 'failed') {
                 existing.status = 'failed'
                 existing.completed_at = event.created_at
+                existing.expanded = false // Auto-collapse on failure
               }
             }
 
@@ -213,8 +233,17 @@ export function RealtimeVerificationViewer() {
               <Typography variant="subtitle2" color="primary" gutterBottom>
                 Currently Verifying...
               </Typography>
-              {runningSessions.map((session) => (
-                <VerificationSessionCard key={session.suggestion_id} session={session} />
+              {runningSessions.map((session, index) => (
+                <Box
+                  key={session.suggestion_id}
+                  sx={{
+                    animation: 'slideInFromTop 0.3s ease-out',
+                    animationDelay: `${index * 0.05}s`,
+                    animationFillMode: 'backwards',
+                  }}
+                >
+                  <VerificationSessionCard session={session} />
+                </Box>
               ))}
             </Box>
           )}
@@ -225,8 +254,17 @@ export function RealtimeVerificationViewer() {
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Recent Completions
               </Typography>
-              {completedSessions.map((session) => (
-                <VerificationSessionCard key={session.suggestion_id} session={session} />
+              {completedSessions.map((session, index) => (
+                <Box
+                  key={session.suggestion_id}
+                  sx={{
+                    animation: 'fadeIn 0.3s ease-out',
+                    animationDelay: `${index * 0.05}s`,
+                    animationFillMode: 'backwards',
+                  }}
+                >
+                  <VerificationSessionCard session={session} />
+                </Box>
               ))}
             </Box>
           )}
@@ -238,12 +276,39 @@ export function RealtimeVerificationViewer() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
         }
+
+        @keyframes slideInFromTop {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
       `}</style>
     </Paper>
   )
 }
 
 function VerificationSessionCard({ session }: { session: VerificationSession }) {
+  const [expanded, setExpanded] = useState(session.expanded ?? false)
+
+  // Update expanded state when session.expanded changes
+  useEffect(() => {
+    setExpanded(session.expanded ?? false)
+  }, [session.expanded])
+
   const getStepIcon = (step: string) => {
     if (step.includes('phone')) return <Phone fontSize="small" />
     if (step.includes('url') || step.includes('website')) return <Language fontSize="small" />
@@ -264,12 +329,14 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
 
   return (
     <Accordion
-      defaultExpanded={session.status === 'running'}
+      expanded={expanded}
+      onChange={(_, isExpanded) => setExpanded(isExpanded)}
       sx={{
         mb: 1,
         bgcolor: session.status === 'running' ? 'rgba(33, 150, 243, 0.05)' : 'inherit',
         border: session.status === 'running' ? '1px solid' : 'none',
         borderColor: 'primary.light',
+        transition: 'all 0.3s ease-in-out',
       }}
     >
       <AccordionSummary expandIcon={<ExpandMore />}>
@@ -298,7 +365,7 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
         <Box sx={{ pl: 2 }}>
           {session.events.map((event, index) => (
             <Box
-              key={event.id || index}
+              key={`${session.suggestion_id}-${event.event_type}-${index}`}
               sx={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -317,25 +384,76 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
                 pl: 2,
               }}
             >
-              {getStepIcon((event.event_data.step as string) || event.event_type)}
+              {getStepIcon(
+                (typeof event.event_data.step === 'string' ? event.event_data.step : null) ||
+                  event.event_type
+              )}
               <Box sx={{ flex: 1 }}>
                 <Typography variant="caption" fontWeight="bold">
-                  {event.event_type === 'started' && '🚀 Verification started'}
-                  {event.event_type === 'progress' && (event.event_data.step as string)}
-                  {event.event_type === 'cost' &&
-                    `💰 ${event.event_data.operation as string} ($${(event.event_data.total_cost_usd as number).toFixed(4)})`}
-                  {event.event_type === 'completed' &&
-                    `✅ Completed: ${event.event_data.decision as string}`}
-                  {event.event_type === 'failed' &&
-                    `❌ Failed: ${event.event_data.error as string}`}
+                  {(() => {
+                    if (event.event_type === 'started') return '🚀 Verification started'
+                    if (event.event_type === 'progress' && event.event_data.step)
+                      return String(event.event_data.step)
+                    if (
+                      event.event_type === 'cost' &&
+                      event.event_data.operation &&
+                      event.event_data.total_cost_usd !== undefined
+                    )
+                      return `💰 ${String(event.event_data.operation)} ($${Number(event.event_data.total_cost_usd).toFixed(4)})`
+                    if (event.event_type === 'completed' && event.event_data.decision)
+                      return `✅ Decision: ${String(event.event_data.decision)}`
+                    if (event.event_type === 'failed' && event.event_data.error)
+                      return `❌ Failed: ${String(event.event_data.error)}`
+                    return ''
+                  })()}
                 </Typography>
-                {event.event_data.details ? (
+                {/* Show detailed reasoning for completed events */}
+                {event.event_type === 'completed' && event.event_data.reasoning ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.5 }}
+                  >
+                    <strong>Reasoning:</strong> {String(event.event_data.reasoning)}
+                  </Typography>
+                ) : null}
+                {/* Show checks summary for completed events */}
+                {event.event_type === 'completed' && event.event_data.checks_summary ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.5 }}
+                  >
+                    <strong>Checks:</strong>{' '}
+                    {(() => {
+                      const checks = event.event_data.checks_summary as Record<string, boolean>
+                      return Object.entries(checks)
+                        .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value ? '✓' : '✗'}`)
+                        .join(', ')
+                    })()}
+                  </Typography>
+                ) : null}
+                {/* Show overall score for completed events */}
+                {event.event_type === 'completed' &&
+                event.event_data.overall_score !== undefined ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.5 }}
+                  >
+                    <strong>Confidence Score:</strong>{' '}
+                    {((event.event_data.overall_score as number) * 100).toFixed(0)}%
+                  </Typography>
+                ) : null}
+                {/* Show details for progress events */}
+                {event.event_data.details !== undefined && event.event_data.details !== null ? (
                   <Typography variant="caption" color="text.secondary" display="block">
-                    {String(
-                      typeof event.event_data.details === 'string'
-                        ? event.event_data.details
-                        : JSON.stringify(event.event_data.details)
-                    )}
+                    {typeof event.event_data.details === 'string'
+                      ? event.event_data.details
+                      : JSON.stringify(event.event_data.details)}
                   </Typography>
                 ) : null}
                 <Typography variant="caption" color="text.secondary">

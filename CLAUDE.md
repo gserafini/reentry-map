@@ -866,6 +866,14 @@ When creating a database migration:
 2. **Suggest executing via MCP** - Tell the user: "I can run this migration using Supabase MCP"
 3. **Wait for user confirmation** before executing
 4. **Execute using MCP** after user approves
+5. **Update canonical schema** - After successful execution, update `docs/DATABASE_SCHEMA_CANONICAL.md` to reflect the changes
+
+**⚠️ CRITICAL**: Always keep the canonical schema document in sync with database changes:
+
+- Update `docs/DATABASE_SCHEMA_CANONICAL.md` with new/modified columns
+- Update the "Last Updated" date at the top
+- Add entry to the "Migration History" table at the bottom
+- Update any relevant TypeScript types in `/lib/types/`
 
 **Example workflow:**
 

@@ -8,6 +8,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Map as MapIcon,
   Apartment as ApartmentIcon,
+  Lightbulb as SuggestionsIcon,
 } from '@mui/icons-material'
 
 export function AdminNav() {
@@ -28,6 +29,13 @@ export function AdminNav() {
           onClick={() => router.push('/admin/command-center')}
         >
           Command Center
+        </Button>
+        <Button
+          startIcon={<SuggestionsIcon />}
+          sx={{ mr: 2 }}
+          onClick={() => router.push('/admin/suggestions')}
+        >
+          Suggestions
         </Button>
         <Button
           startIcon={<MapIcon />}

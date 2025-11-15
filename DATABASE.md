@@ -33,7 +33,30 @@ Run these SQL files in the Supabase SQL Editor **in order**:
 
 ## Database Schema
 
-### Core Tables
+> **⚠️ CANONICAL SCHEMA**: For the complete, current database schema with all tables and columns, see **[docs/DATABASE_SCHEMA_CANONICAL.md](docs/DATABASE_SCHEMA_CANONICAL.md)**
+>
+> The canonical schema document is the **source of truth** and is updated with every database migration.
+
+### Core Tables (Quick Reference)
+
+#### resources (76 columns)
+
+Primary table for all reentry resources and services.
+
+**Most important fields**:
+
+- `name`, `description`, `services_offered` (TEXT[])
+- `phone`, `email`, `website`
+- `address`, `latitude`, `longitude` (PostGIS indexed for distance queries)
+- `primary_category`, `categories` (TEXT[]), `tags` (TEXT[])
+- `hours` (JSONB), `timezone`
+- `eligibility_requirements`, `required_documents` (TEXT[]), `fees`
+- `languages` (TEXT[]), `accessibility_features` (TEXT[])
+- `rating_average`, `rating_count`, `review_count` (auto-updated by triggers)
+- `verification_status`, `verification_confidence`, `last_verified_at`, `next_verification_at`
+- `status` ('active' | 'inactive' | 'pending' | 'closed')
+
+**See [docs/DATABASE_SCHEMA_CANONICAL.md](docs/DATABASE_SCHEMA_CANONICAL.md) for all 76 columns with types, defaults, and constraints.**
 
 #### users
 
@@ -45,34 +68,6 @@ Extended user profile linked to Supabase Auth.
 - `avatar_url` (TEXT) - Profile picture URL
 - `is_admin` (BOOLEAN) - Admin flag for access control
 - Created automatically when user signs up via trigger
-
-#### resources
-
-Primary table for all reentry resources.
-
-- `id` (UUID, PK)
-- `name` (TEXT) - Resource name (required)
-- `description` (TEXT) - Detailed description
-- `services_offered` (TEXT[]) - Array of services
-- Contact: `phone`, `email`, `website`
-- Location: `address`, `latitude`, `longitude` (PostGIS indexed)
-- `primary_category` (TEXT) - Main category
-- `categories` (TEXT[]) - All applicable categories
-- `tags` (TEXT[]) - Searchable tags
-- `hours` (JSONB) - Operating hours
-- `eligibility_requirements` (TEXT)
-- `documents_required` (TEXT[])
-- `languages_spoken` (TEXT[])
-- `accessibility_features` (TEXT[])
-- Stats: `rating_average`, `rating_count`, `review_count` (auto-updated)
-- AI fields: `ai_enriched`, `verification_score`, `completeness_score`
-- `status` ('draft' | 'active' | 'inactive' | 'flagged')
-
-**Indexes**:
-
-- Full-text search on name and description
-- Spatial index on latitude/longitude
-- Status, category, tags for filtering
 
 #### user_favorites
 
