@@ -16,6 +16,7 @@ This directory contains comprehensive guides for scaling, optimizing, and operat
 | **[PERFORMANCE_OPTIMIZATION_CHECKLIST.md](PERFORMANCE_OPTIMIZATION_CHECKLIST.md)** | Testing and verification              | Developers, QA             | Before every major release                   |
 | **[COST_ESTIMATION_CALCULATOR.md](COST_ESTIMATION_CALCULATOR.md)**                 | Cost analysis and ROI                 | Product owners, finance    | When planning scaling budget                 |
 | **[COVERAGE_TRACKING_SYSTEM.md](COVERAGE_TRACKING_SYSTEM.md)**                     | Geographic expansion tracking         | Product owners, admins     | When expanding beyond Bay Area               |
+| **[ANALYTICS_STRATEGY.md](ANALYTICS_STRATEGY.md)**                                 | User behavior tracking & analytics    | Developers, product        | Before implementing analytics tracking       |
 
 ---
 
@@ -381,8 +382,17 @@ For help implementing these guides:
 | **PERFORMANCE_OPTIMIZATION_CHECKLIST.md** | New optimization techniques, tool updates          |
 | **COST_ESTIMATION_CALCULATOR.md**         | Pricing changes from vendors, quarterly review     |
 | **COVERAGE_TRACKING_SYSTEM.md**           | Expansion strategy changes                         |
+| **ANALYTICS_STRATEGY.md**                 | New tracking events, funnel definitions, A/B tests |
 
 ### Version History
+
+- **2025-11-14:** Analytics strategy documentation added
+  - Comprehensive analytics implementation guide
+  - Custom Supabase-based tracking (privacy-first)
+  - Conversion funnels and A/B testing framework
+  - Google Search Console integration
+  - Admin user filtering
+  - Enable/disable toggle for testing
 
 - **2025-11-10:** Initial comprehensive scaling guides created
   - Complete scaling roadmap (MVP → 100k resources)
@@ -394,7 +404,7 @@ For help implementing these guides:
 
 ---
 
-**Last Updated:** 2025-11-10
+**Last Updated:** 2025-11-14
 **Maintained By:** Development Team
 **Review Schedule:** Quarterly or after major infrastructure changes
 

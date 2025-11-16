@@ -19,6 +19,7 @@ import {
   generateCategoryInCityUrl,
 } from '@/lib/utils/urls'
 import type { ResourceCategory } from '@/lib/types/database'
+import { PageViewTracker } from '@/components/analytics/PageViewTracker'
 
 // Force dynamic rendering since we fetch data with Supabase server client
 export const dynamic = 'force-dynamic'
@@ -43,6 +44,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <PageViewTracker pageTitle="Home - Find Reentry Resources" />
       {/* Hero Section */}
       <Box
         sx={{

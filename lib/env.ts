@@ -55,6 +55,12 @@ export const env = createEnv({
     NEXT_PUBLIC_DEFAULT_REGION: z.string().default('CA'),
     NEXT_PUBLIC_DEFAULT_LATITUDE: z.coerce.number().default(37.8044),
     NEXT_PUBLIC_DEFAULT_LONGITUDE: z.coerce.number().default(-122.2712),
+
+    // Analytics configuration
+    NEXT_PUBLIC_ANALYTICS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((val) => val === 'true'),
   },
 
   /**
@@ -82,6 +88,7 @@ export const env = createEnv({
     NEXT_PUBLIC_DEFAULT_REGION: process.env.NEXT_PUBLIC_DEFAULT_REGION,
     NEXT_PUBLIC_DEFAULT_LATITUDE: process.env.NEXT_PUBLIC_DEFAULT_LATITUDE,
     NEXT_PUBLIC_DEFAULT_LONGITUDE: process.env.NEXT_PUBLIC_DEFAULT_LONGITUDE,
+    NEXT_PUBLIC_ANALYTICS_ENABLED: process.env.NEXT_PUBLIC_ANALYTICS_ENABLED,
   },
 
   /**
