@@ -1,0 +1,226 @@
+{
+  "careeronestop": {
+    "displayName": "DOL CareerOneStop",
+    "fieldMapping": {
+      "ID": "source_id",
+      "Name": "name",
+      "Address1": "address",
+      "Address2": "address_line_2",
+      "City": "city",
+      "State": "state",
+      "Zip": "zip",
+      "Phone": "phone",
+      "Fax": "fax",
+      "Email": "email",
+      "Website": "website",
+      "OpenHour": "hours_raw",
+      "Latitude": "latitude",
+      "Longitude": "longitude",
+      "LastUpdated": "last_verified",
+      "Services": "services_raw",
+      "Description": "description"
+    },
+    "categoryMapping": {
+      "*": "employment"
+    },
+    "servicesMapping": {
+      "Youth Services": "youth employment programs",
+      "Business Services": "business development support",
+      "Worker Services": "job training and placement",
+      "Career Counseling": "career guidance and counseling",
+      "Job Search Assistance": "job search and placement",
+      "Training Programs": "workforce training",
+      "Apprenticeship": "apprenticeship programs"
+    },
+    "verificationLevel": "L1",
+    "hoursFormat": "structured",
+    "requiresGeocoding": false
+  },
+  "careeronestop_reentry": {
+    "displayName": "DOL CareerOneStop - ReEntry Programs",
+    "fieldMapping": {
+      "ID": "source_id",
+      "Name": "name",
+      "Address1": "address",
+      "Address2": "address_line_2",
+      "City": "city",
+      "State": "state",
+      "Zip": "zip",
+      "Phone": "phone",
+      "Email": "email",
+      "Website": "website",
+      "Latitude": "latitude",
+      "Longitude": "longitude",
+      "Description": "description",
+      "Services": "services_raw"
+    },
+    "categoryMapping": {
+      "*": "employment"
+    },
+    "tags": ["reentry", "workforce-development"],
+    "verificationLevel": "L1",
+    "requiresGeocoding": false
+  },
+  "samhsa": {
+    "displayName": "SAMHSA Treatment Locator",
+    "fieldMapping": {
+      "name1": "name",
+      "name2": "name_alt",
+      "street1": "address",
+      "street2": "address_line_2",
+      "city": "city",
+      "state": "state",
+      "zip": "zip",
+      "phone": "phone",
+      "website": "website",
+      "services": "services_raw",
+      "type_facility": "facility_type_raw",
+      "category": "category_raw"
+    },
+    "categoryMapping": {
+      "SA": "substance-abuse-treatment",
+      "MH": "mental-health",
+      "DUAL": "mental-health",
+      "MAT": "substance-abuse-treatment",
+      "Detox": "substance-abuse-treatment",
+      "Residential": "substance-abuse-treatment",
+      "Outpatient": "substance-abuse-treatment",
+      "Hospital": "healthcare"
+    },
+    "servicesMapping": {
+      "Substance Abuse Treatment": "substance abuse treatment services",
+      "Mental Health Treatment": "mental health counseling and treatment",
+      "Medication Assisted Treatment": "medication-assisted treatment (MAT)",
+      "Detoxification": "detoxification services",
+      "Residential Treatment": "residential treatment programs",
+      "Outpatient Treatment": "outpatient treatment services",
+      "Group Therapy": "group therapy sessions",
+      "Individual Therapy": "individual counseling",
+      "Family Therapy": "family counseling"
+    },
+    "verificationLevel": "L1",
+    "requiresGeocoding": true
+  },
+  "hud_exchange": {
+    "displayName": "HUD Exchange - Continuum of Care",
+    "fieldMapping": {
+      "OrganizationID": "source_id",
+      "OrganizationName": "name",
+      "Address1": "address",
+      "Address2": "address_line_2",
+      "City": "city",
+      "State": "state",
+      "ZIP": "zip",
+      "Phone": "phone",
+      "Website": "website",
+      "ProgramType": "program_type_raw",
+      "TargetPopulation": "target_population_raw",
+      "BedInventory": "bed_count",
+      "Geocode": "geocode_raw"
+    },
+    "categoryMapping": {
+      "Emergency Shelter": "housing",
+      "Transitional Housing": "housing",
+      "Permanent Supportive Housing": "housing",
+      "Rapid Re-Housing": "housing",
+      "Homelessness Prevention": "housing",
+      "Safe Haven": "housing",
+      "Street Outreach": "general-support",
+      "Day Shelter": "general-support",
+      "Services Only": "general-support"
+    },
+    "servicesMapping": {
+      "Emergency Shelter": "emergency shelter beds",
+      "Transitional Housing": "transitional housing (up to 24 months)",
+      "Permanent Supportive Housing": "permanent supportive housing",
+      "Rapid Re-Housing": "rapid re-housing assistance",
+      "Homelessness Prevention": "homelessness prevention services",
+      "Safe Haven": "safe haven housing",
+      "Street Outreach": "street outreach services"
+    },
+    "verificationLevel": "L1",
+    "requiresGeocoding": true
+  },
+  "hud_public_housing": {
+    "displayName": "HUD Public Housing Developments",
+    "fieldMapping": {
+      "FORMAL_PARTICIPANT_NAME": "name",
+      "DEVELOPMENT_NAME": "development_name",
+      "STREET_ADDRESS": "address",
+      "CITY": "city",
+      "STATE": "state",
+      "ZIP_CODE": "zip",
+      "PHONE_NUMBER": "phone",
+      "STD_ADDR": "formatted_address",
+      "STD_CITY": "formatted_city",
+      "STD_ST": "formatted_state",
+      "STD_ZIP5": "formatted_zip",
+      "LATITUDE": "latitude",
+      "LONGITUDE": "longitude",
+      "TOTAL_UNITS": "unit_count"
+    },
+    "categoryMapping": {
+      "*": "housing"
+    },
+    "servicesMapping": {
+      "Public Housing": "public housing units"
+    },
+    "verificationLevel": "L1",
+    "requiresGeocoding": false
+  },
+  "lsc": {
+    "displayName": "Legal Services Corporation",
+    "fieldMapping": {
+      "name": "name",
+      "address": "address",
+      "city": "city",
+      "state": "state",
+      "zip": "zip",
+      "phone": "phone",
+      "website": "website",
+      "email": "email",
+      "services": "services_raw"
+    },
+    "categoryMapping": {
+      "*": "legal-aid"
+    },
+    "servicesMapping": {
+      "Legal Aid": "free legal assistance"
+    },
+    "verificationLevel": "L1",
+    "requiresGeocoding": true
+  },
+  "usda_food": {
+    "displayName": "USDA Food Locator",
+    "fieldMapping": {
+      "name": "name",
+      "address": "address",
+      "city": "city",
+      "state": "state",
+      "zip": "zip",
+      "phone": "phone",
+      "program_type": "program_type_raw",
+      "latitude": "latitude",
+      "longitude": "longitude"
+    },
+    "categoryMapping": {
+      "Food Bank": "food",
+      "Food Pantry": "food",
+      "SNAP Retailer": "food",
+      "WIC Clinic": "food",
+      "TEFAP Site": "food",
+      "Soup Kitchen": "food",
+      "Food Distribution": "food"
+    },
+    "servicesMapping": {
+      "Food Bank": "food bank distribution",
+      "Food Pantry": "food pantry services",
+      "SNAP Retailer": "SNAP/EBT accepted",
+      "WIC Clinic": "WIC nutrition program",
+      "TEFAP Site": "emergency food assistance",
+      "Soup Kitchen": "hot meals served"
+    },
+    "verificationLevel": "L1",
+    "requiresGeocoding": true
+  }
+}

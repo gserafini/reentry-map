@@ -27,6 +27,10 @@ export const env = createEnv({
     // Admin API key for machine-to-machine authentication (Claude Code, scripts)
     ADMIN_API_KEY: z.string().min(32).optional(),
 
+    // CareerOneStop API credentials (for bulk data imports)
+    CAREERONESTOP_USER_ID: z.string().min(1).optional(),
+    CAREERONESTOP_API_KEY: z.string().min(1).optional(),
+
     // GeoIP: Use external IP lookup in development for testing (set to 'true' to enable)
     // When enabled, fetches your actual external IP for GeoIP instead of using localhost
     USE_EXTERNAL_IP_IN_DEV: z
@@ -77,6 +81,8 @@ export const env = createEnv({
     GOOGLE_MAPS_KEY: process.env.GOOGLE_MAPS_KEY,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     ADMIN_API_KEY: process.env.ADMIN_API_KEY,
+    CAREERONESTOP_USER_ID: process.env.CAREERONESTOP_USER_ID,
+    CAREERONESTOP_API_KEY: process.env.CAREERONESTOP_API_KEY,
     USE_EXTERNAL_IP_IN_DEV: process.env.USE_EXTERNAL_IP_IN_DEV,
 
     // Client-side

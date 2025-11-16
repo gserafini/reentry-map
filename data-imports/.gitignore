@@ -1,0 +1,16 @@
+# Ignore all data files (too large for git)
+*.csv
+*.xlsx
+*.xlsb
+*.json
+*.geojson
+*.xml
+*.zip
+*.tar.gz
+
+# Keep directory structure and README
+!README.md
+!.gitignore
+
+# Keep gitkeep files to preserve empty directories
+!.gitkeep

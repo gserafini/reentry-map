@@ -1,62 +1,44 @@
-# Resource Data Imports
+# Bulk Import Data Files
 
-This directory is for importing resource data from JSON files created by AI agents (especially Claude Web).
+This directory stores data files for bulk imports from government data sources.
 
-## Workflow
+## Directory Structure
 
-### For Claude Web Agents:
-
-1. Research resources following Command Center instructions
-2. Save resources to JSON file: `[city]-[state]-resources.json`
-3. Place file in this directory (`data-imports/`)
-4. Run import script: `npm run import:resources`
-5. Files are processed and moved to `archived/`
-
-### For Admins:
-
-1. Check for new files in `data-imports/`
-2. Run: `npm run import:resources`
-3. Review imported suggestions in [Command Center](http://localhost:3003/admin/command-center)
-4. Processed files are automatically archived
-
-## File Format
-
-```json
-{
-  "resources": [
-    {
-      "name": "Organization Name",
-      "address": "123 Main St",
-      "city": "Oakland",
-      "state": "CA",
-      "phone": "(510) 555-1234",
-      "website": "https://example.org",
-      "description": "What they do...",
-      "primary_category": "employment",
-      "services_offered": ["Service 1", "Service 2"],
-      "source": "google_search",
-      "source_url": "https://example.org"
-    }
-  ],
-  "submitter": "claude_web",
-  "notes": "Optional notes about this batch"
-}
+```
+data-imports/
+├── raw/              # Original downloaded files (CSV, Excel, JSON, etc.)
+├── processed/        # Processed/normalized files ready for import
+└── archived/         # Completed imports (with timestamps)
 ```
 
-## Import Script
+## Usage
 
-The import script (`scripts/import-resource-files.mjs`):
+### 1. Download Source Data
 
-1. Scans `data-imports/*.json`
-2. Validates JSON format
-3. Posts to `/api/resources/suggest-batch` endpoint
-4. Moves processed files to `archived/` with timestamp
-5. Reports results (accepted, rejected, errors)
+**CareerOneStop (Priority #1):**
+Visit: https://www.careeronestop.org/Developers/Data/
+Save CSV to: data-imports/raw/careeronestop-ajc.csv
 
-## Archived Files
+**SAMHSA Treatment Locator:**
+Visit: https://www.samhsa.gov/data/report/2024-national-directory-drug-and-alcohol-use-treatment
+Save Excel to: data-imports/raw/samhsa-2024-directory.xlsx
 
-Processed files are moved to `data-imports/archived/` with format:
+### 2. Run Import Scripts
 
-- `YYYYMMDD-HHMMSS-original-filename.json`
+```bash
+# CareerOneStop (nationwide or specific state)
+npm run import:careeronestop
+npm run import:careeronestop -- --state=CA
 
-This preserves a complete audit trail of all imports.
+# SAMHSA
+npm run import:samhsa
+
+# HUD Exchange
+npm run import:hud
+```
+
+## Notes
+
+- Files in raw/ and processed/ are ignored by git (too large)
+- Always backup raw files before processing
+- See main docs/BULK_IMPORT_RECOMMENDATIONS.md for detailed guides
