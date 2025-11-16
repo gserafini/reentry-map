@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
 import { Box } from '@mui/material'
 import { env } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
@@ -55,12 +54,6 @@ export const metadata: Metadata = {
   },
 }
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  display: 'swap',
-  subsets: ['latin'],
-})
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -103,7 +96,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+      <body className="antialiased">
         <Providers>
           <AdminStatusBar />
           <Box
