@@ -149,10 +149,12 @@ export function setupPerformanceTracking() {
 
     // First Input Delay (FID)
     const fidObserver = new PerformanceObserver((list) => {
-      const entries = list.getEntries() as Array<PerformanceEntry & {
-        processingStart: number
-        startTime: number
-      }>
+      const entries = list.getEntries() as Array<
+        PerformanceEntry & {
+          processingStart: number
+          startTime: number
+        }
+      >
       entries.forEach((entry) => {
         trackPerformance('fid', Math.round(entry.processingStart - entry.startTime))
       })
@@ -162,10 +164,12 @@ export function setupPerformanceTracking() {
     // Cumulative Layout Shift (CLS)
     let clsValue = 0
     const clsObserver = new PerformanceObserver((list) => {
-      const entries = list.getEntries() as Array<PerformanceEntry & {
-        hadRecentInput: boolean
-        value: number
-      }>
+      const entries = list.getEntries() as Array<
+        PerformanceEntry & {
+          hadRecentInput: boolean
+          value: number
+        }
+      >
       entries.forEach((entry) => {
         if (!entry.hadRecentInput) {
           clsValue += entry.value

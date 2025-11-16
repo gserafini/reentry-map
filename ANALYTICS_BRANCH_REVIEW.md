@@ -382,12 +382,12 @@ CREATE INDEX idx_resource_events_resource ON analytics_resource_events(resource_
 
 ### Tests
 
-- ****tests**/lib/analytics/queue.test.ts** (9 tests)
+- \***\*tests**/lib/analytics/queue.test.ts\*\* (9 tests)
   - Enable/disable
   - Event tracking
   - Session management
 
-- ****tests**/lib/analytics/schemas.test.ts** (44 tests)
+- \***\*tests**/lib/analytics/schemas.test.ts\*\* (44 tests)
   - Property validation
   - Edge cases
   - Type constraints

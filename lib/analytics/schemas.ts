@@ -62,7 +62,12 @@ export const analyticsPropertiesSchema = z
     featurePropertiesSchema,
     performancePropertiesSchema,
   ])
-  .or(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown())])))
+  .or(
+    z.record(
+      z.string(),
+      z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown())])
+    )
+  )
   .optional()
 
 // Base analytics event schema with event-specific property validation
