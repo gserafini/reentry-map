@@ -2,6 +2,7 @@
 
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline } from '@mui/material'
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
+import { SessionProvider } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import { LocationProvider } from '@/lib/context/LocationContext'
 import { PWAWrapper } from '@/components/pwa/PWAWrapper'
@@ -40,19 +41,21 @@ function MuiThemeWrapper({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <MuiThemeWrapper>
-        <CssBaseline />
-        <LocationProvider>
-          {children}
-          <PWAWrapper />
-        </LocationProvider>
-      </MuiThemeWrapper>
-    </NextThemesProvider>
+    <SessionProvider>
+      <NextThemesProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <MuiThemeWrapper>
+          <CssBaseline />
+          <LocationProvider>
+            {children}
+            <PWAWrapper />
+          </LocationProvider>
+        </MuiThemeWrapper>
+      </NextThemesProvider>
+    </SessionProvider>
   )
 }

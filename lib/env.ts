@@ -10,6 +10,16 @@ export const env = createEnv({
     // Supabase server-only keys
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 
+    // NextAuth.js configuration
+    DATABASE_URL: z.string().url().optional(),
+    DIRECT_DATABASE_URL: z.string().url().optional(),
+    NEXTAUTH_SECRET: z.string().min(16).optional(),
+
+    // Twilio SMS configuration
+    TWILIO_ACCOUNT_SID: z.string().min(1).optional(),
+    TWILIO_AUTH_TOKEN: z.string().min(1).optional(),
+    TWILIO_PHONE_NUMBER: z.string().min(1).optional(),
+
     // AI API keys
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(), // Legacy - not currently used
@@ -70,6 +80,12 @@ export const env = createEnv({
   runtimeEnv: {
     // Server-only
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    DATABASE_URL: process.env.DATABASE_URL,
+    DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
+    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+    TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_VERIFICATION_MODEL: process.env.ANTHROPIC_VERIFICATION_MODEL,
