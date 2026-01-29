@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import { createClient as createServerClient } from '@supabase/supabase-js'
 import { env } from '@/lib/env'
@@ -14,7 +15,10 @@ export interface AdminAuthResult {
   /**
    * Get a Supabase client with appropriate permissions.
    * For API key auth, returns service role client (bypasses RLS).
-   * For session auth, returns regular client with user context.
+   * For session auth, returns service role client for full admin access.
+   *
+   * Note: This still uses Supabase client for data access.
+   * Will be migrated to Drizzle in Phase 3.
    */
   getClient: () => Awaited<ReturnType<typeof createSupabaseClient>>
 }
@@ -23,8 +27,10 @@ export interface AdminAuthResult {
  * Check if request is authenticated as admin
  *
  * Supports two authentication methods:
- * 1. Session-based (Supabase auth) - for browser/Claude Web
+ * 1. Session-based (NextAuth.js) - for browser/Claude Web
  * 2. API key (x-admin-api-key header) - for Claude Code/scripts
+ *
+ * Migration note: Session auth switched from Supabase Auth to NextAuth.js
  *
  * @param request Next.js request object
  * @returns AdminAuthResult with authorization status
@@ -67,14 +73,13 @@ export async function checkAdminAuth(request: NextRequest): Promise<AdminAuthRes
     }
   }
 
-  // Fall back to session-based auth
-  const supabase = await createSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  // Fall back to NextAuth session-based auth
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
 
-  if (authError || !user) {
+  if (!token || !token.id) {
     return {
       isAuthorized: false,
       authMethod: 'none',
@@ -85,17 +90,13 @@ export async function checkAdminAuth(request: NextRequest): Promise<AdminAuthRes
     }
   }
 
-  // Check if user is admin
-  const { data: userData } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.is_admin) {
+  // Check if user is admin from the token
+  // The isAdmin flag is populated in the JWT callback from the database
+  if (!token.isAdmin) {
     return {
       isAuthorized: false,
       authMethod: 'session',
+      userId: token.id as string,
       error: 'Not authorized - admin access required',
       getClient: () => {
         throw new Error('Not authorized')
@@ -103,10 +104,23 @@ export async function checkAdminAuth(request: NextRequest): Promise<AdminAuthRes
     }
   }
 
+  // User is authenticated and is admin
   return {
     isAuthorized: true,
     authMethod: 'session',
-    userId: user.id,
-    getClient: () => supabase,
+    userId: token.id as string,
+    getClient: () => {
+      // Use service role client for admin operations (bypasses RLS)
+      // This ensures admin has full access regardless of RLS policies
+      if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured')
+      }
+      return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      })
+    },
   }
 }

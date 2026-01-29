@@ -17,22 +17,26 @@ import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-export interface LoginFormProps extends React.ComponentPropsWithoutRef<'div'> {
+export interface SignUpFormProps extends React.ComponentPropsWithoutRef<'div'> {
   onSuccess?: () => void
   minimal?: boolean // When true, removes Card wrapper for use in modals
 }
 
 /**
- * Login form component using NextAuth.js credentials provider
+ * Sign up form component using NextAuth.js
  *
- * Supports email/password authentication against self-hosted PostgreSQL
+ * Flow:
+ * 1. User enters email and password
+ * 2. Create user via /api/auth/signup
+ * 3. Auto sign-in via NextAuth credentials provider
+ * 4. Session created on success
  */
-export function LoginFormNextAuth({
+export function SignUpFormNextAuth({
   onSuccess,
   minimal = false,
   className,
   ...props
-}: LoginFormProps) {
+}: SignUpFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -40,13 +44,29 @@ export function LoginFormNextAuth({
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
     try {
-      // Sign in via NextAuth credentials provider
+      // First, create the user account
+      const signupResponse = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const signupData = (await signupResponse.json()) as {
+        error?: string
+        success?: boolean
+      }
+
+      if (!signupResponse.ok) {
+        throw new Error(signupData.error || 'Failed to create account')
+      }
+
+      // Account created successfully, now sign them in
       const result = await signIn('credentials', {
         email,
         password,
@@ -54,20 +74,20 @@ export function LoginFormNextAuth({
       })
 
       if (result?.error) {
-        throw new Error(
-          result.error === 'CredentialsSignin' ? 'Invalid email or password' : result.error
-        )
+        // Account was created but sign-in failed
+        // This shouldn't happen, but handle gracefully
+        throw new Error('Account created. Please sign in manually.')
       }
 
-      // Refresh server components to update auth state in header
+      // Refresh server components to update auth state
       router.refresh()
 
       if (onSuccess) {
         // Used in modal - stay on current page
         onSuccess()
       } else {
-        // Used on standalone page - redirect to home
-        router.push('/')
+        // Used on standalone page - redirect to profile
+        router.push('/profile')
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
@@ -79,7 +99,7 @@ export function LoginFormNextAuth({
   const formContent = (
     <Box
       component="form"
-      onSubmit={handleLogin}
+      onSubmit={handleSignUp}
       sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
     >
       <TextField
@@ -93,65 +113,44 @@ export function LoginFormNextAuth({
         variant="outlined"
         size={minimal ? 'small' : 'medium'}
       />
-      <Box>
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 1,
-          }}
-        >
-          {!minimal && <Typography variant="body2">Password</Typography>}
-          <NextLink
-            href="/auth/forgot-password"
-            style={{
-              fontSize: '0.875rem',
-              textDecoration: 'underline',
-              marginLeft: minimal ? 'auto' : 0,
-            }}
-          >
-            Forgot password?
-          </NextLink>
-        </Box>
-        <TextField
-          label={minimal ? 'Password' : undefined}
-          type={showPassword ? 'text' : 'password'}
-          placeholder="Enter your password"
-          required
-          fullWidth
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          variant="outlined"
-          size={minimal ? 'small' : 'medium'}
-          slotProps={{
-            input: {
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle password visibility"
-                    onClick={() => setShowPassword(!showPassword)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    edge="end"
-                    size="small"
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-      </Box>
+      <TextField
+        label="Password"
+        type={showPassword ? 'text' : 'password'}
+        placeholder="At least 8 characters"
+        required
+        fullWidth
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        variant="outlined"
+        size={minimal ? 'small' : 'medium'}
+        helperText="Minimum 8 characters"
+        slotProps={{
+          input: {
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="toggle password visibility"
+                  onClick={() => setShowPassword(!showPassword)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  edge="end"
+                  size="small"
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
       {error && <Alert severity="error">{error}</Alert>}
       <Button type="submit" variant="contained" fullWidth disabled={isLoading}>
-        {isLoading ? 'Logging in...' : 'Login'}
+        {isLoading ? 'Creating account...' : 'Sign Up'}
       </Button>
       {!minimal && (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-          Don&apos;t have an account?{' '}
-          <NextLink href="/auth/sign-up" style={{ textDecoration: 'underline' }}>
-            Sign up
+          Already have an account?{' '}
+          <NextLink href="/auth/login" style={{ textDecoration: 'underline' }}>
+            Login
           </NextLink>
         </Typography>
       )}
@@ -171,10 +170,10 @@ export function LoginFormNextAuth({
       <Card sx={{ maxWidth: 448, width: '100%', p: 2 }}>
         <CardContent>
           <Typography variant="h4" component="h1" gutterBottom>
-            Login
+            Sign up
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter your email below to log in to your account
+            Create a new account
           </Typography>
           {formContent}
         </CardContent>
@@ -184,4 +183,4 @@ export function LoginFormNextAuth({
 }
 
 // Re-export for drop-in replacement
-export { LoginFormNextAuth as LoginForm }
+export { SignUpFormNextAuth as SignUpForm }

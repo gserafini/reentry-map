@@ -365,7 +365,10 @@ export default function ProfilePage() {
                 {displayName}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Member since {new Date(authUser.created_at).toLocaleDateString()}
+                Member since{' '}
+                {authUser.created_at
+                  ? new Date(authUser.created_at).toLocaleDateString()
+                  : 'recently'}
               </Typography>
             </Box>
             {!isEditing && (

@@ -14,6 +14,7 @@ declare module 'next-auth' {
   interface User extends DefaultUser {
     isAdmin?: boolean
     phone?: string | null
+    created_at?: string | null
   }
 
   /**
@@ -27,6 +28,7 @@ declare module 'next-auth' {
       image?: string | null
       isAdmin?: boolean
       phone?: string | null
+      created_at?: string | null
     }
   }
 }
@@ -39,5 +41,6 @@ declare module 'next-auth/jwt' {
     id?: string
     isAdmin?: boolean
     phone?: string | null
+    created_at?: string | null
   }
 }

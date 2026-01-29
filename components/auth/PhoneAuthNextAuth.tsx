@@ -147,9 +147,11 @@ export function PhoneAuthNextAuth({
       })
 
       if (result?.error) {
-        throw new Error(result.error === 'CredentialsSignin'
-          ? 'Invalid verification code. Please try again.'
-          : result.error)
+        throw new Error(
+          result.error === 'CredentialsSignin'
+            ? 'Invalid verification code. Please try again.'
+            : result.error
+        )
       }
 
       // Refresh server components to update auth state in header

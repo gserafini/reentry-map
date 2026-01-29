@@ -18,10 +18,16 @@ import bcrypt from 'bcryptjs'
 let pool: Pool | null = null
 function getPool(): Pool {
   if (!pool) {
+    const connectionString =
+      process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+
     pool = new Pool({
-      connectionString:
-        process.env.DATABASE_URL ||
-        'postgresql://reentrymap:password@localhost:6432/reentry_map',
+      connectionString,
+      // SSL required for remote connections to PostgreSQL 16
+      ssl:
+        connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
+          ? false
+          : { rejectUnauthorized: false },
     })
   }
   return pool
@@ -69,10 +75,9 @@ export function normalizePhone(phone: string): string {
  * Find user by email
  */
 export async function getUserByEmail(email: string): Promise<DbUser | null> {
-  const { rows } = await getPool().query<DbUser>(
-    'SELECT * FROM users WHERE email = $1 LIMIT 1',
-    [email.toLowerCase()]
-  )
+  const { rows } = await getPool().query<DbUser>('SELECT * FROM users WHERE email = $1 LIMIT 1', [
+    email.toLowerCase(),
+  ])
   return rows[0] || null
 }
 
@@ -81,10 +86,9 @@ export async function getUserByEmail(email: string): Promise<DbUser | null> {
  */
 export async function getUserByPhone(phone: string): Promise<DbUser | null> {
   const normalizedPhone = normalizePhone(phone)
-  const { rows } = await getPool().query<DbUser>(
-    'SELECT * FROM users WHERE phone = $1 LIMIT 1',
-    [normalizedPhone]
-  )
+  const { rows } = await getPool().query<DbUser>('SELECT * FROM users WHERE phone = $1 LIMIT 1', [
+    normalizedPhone,
+  ])
   return rows[0] || null
 }
 
@@ -92,10 +96,7 @@ export async function getUserByPhone(phone: string): Promise<DbUser | null> {
  * Find user by ID
  */
 export async function getUserById(id: string): Promise<DbUser | null> {
-  const { rows } = await getPool().query<DbUser>(
-    'SELECT * FROM users WHERE id = $1 LIMIT 1',
-    [id]
-  )
+  const { rows } = await getPool().query<DbUser>('SELECT * FROM users WHERE id = $1 LIMIT 1', [id])
   return rows[0] || null
 }
 
@@ -108,9 +109,7 @@ export async function createUser(data: {
   name?: string
   password?: string
 }): Promise<DbUser> {
-  const passwordHash = data.password
-    ? await bcrypt.hash(data.password, 12)
-    : null
+  const passwordHash = data.password ? await bcrypt.hash(data.password, 12) : null
 
   const { rows } = await getPool().query<DbUser>(
     `INSERT INTO users (id, email, phone, name, password_hash, created_at, updated_at)
@@ -147,9 +146,7 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   }
 
   // Mark OTP as verified
-  await getPool().query('UPDATE phone_otps SET verified = true WHERE id = $1', [
-    rows[0].id,
-  ])
+  await getPool().query('UPDATE phone_otps SET verified = true WHERE id = $1', [rows[0].id])
 
   return true
 }
@@ -258,6 +255,7 @@ export const authOptions: NextAuthOptions = {
           token.phone = dbUser.phone
           token.name = dbUser.name
           token.picture = dbUser.avatar_url
+          token.created_at = dbUser.created_at?.toISOString() || null
         }
       }
 
@@ -269,6 +267,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.isAdmin = token.isAdmin as boolean
         session.user.phone = token.phone as string | null
+        session.user.created_at = token.created_at as string | null
       }
       return session
     },

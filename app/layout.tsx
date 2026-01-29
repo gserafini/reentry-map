@@ -111,7 +111,7 @@ export default async function RootLayout({
               display: 'flex',
               flexDirection: 'column',
               minHeight: '100vh',
-              pt: { xs: '32px', md: '32px' }, // Top padding for admin status bar (when visible)
+              pt: isAdmin ? { xs: '32px', md: '32px' } : 0, // Top padding only when admin status bar is visible
             }}
           >
             <ClientAppBar

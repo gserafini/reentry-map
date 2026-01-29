@@ -2,7 +2,6 @@
 
 ## Session Summary
 
-
 Deployed reentry-map to dc3-1 with PM2, configured PostgreSQL 16 with PostGIS and pgBouncer, set up cPanel proxy for reentrymap.org
 
 ## What Was Done

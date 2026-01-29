@@ -2,7 +2,6 @@
 
 ## Session Summary
 
-
 Set up NextAuth.js v4 with Twilio phone OTP and email/password providers. Created auth tables on dc3-1. Build successful.
 
 ## What Was Done

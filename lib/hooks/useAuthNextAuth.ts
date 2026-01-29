@@ -16,6 +16,7 @@ export interface AuthUser {
   name?: string | null
   image?: string | null
   isAdmin?: boolean
+  created_at?: string | null
 }
 
 export interface UseAuthResult {
@@ -72,6 +73,7 @@ export function useAuthNextAuth(): UseAuthResult {
         name: session.user.name,
         image: session.user.image,
         isAdmin: session.user.isAdmin,
+        created_at: session.user.created_at,
       }
     : null
 
@@ -88,9 +90,7 @@ export function useAuthNextAuth(): UseAuthResult {
       // Store admin status for analytics filtering
       if (user.isAdmin) {
         localStorage.setItem('analytics_user_role', 'admin')
-        console.log(
-          '[Analytics] Admin user identified - events will be marked as admin'
-        )
+        console.log('[Analytics] Admin user identified - events will be marked as admin')
       } else {
         localStorage.removeItem('analytics_user_role')
       }

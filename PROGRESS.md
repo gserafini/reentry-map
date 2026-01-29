@@ -38,10 +38,11 @@ Individual session reports are stored in `docs/progress/YYYY-MM-DD-title.md`.
 ## For Claude
 
 Use `/do-progress` at end of session to:
+
 1. Commit work to git
 2. Create detailed progress report
 3. Record session to pm.db
 
 ---
 
-*Progress data migrated to pm.db on 2026-01-26. Historical sessions preserved in database.*
+_Progress data migrated to pm.db on 2026-01-26. Historical sessions preserved in database._

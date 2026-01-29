@@ -8,11 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A framework for structured, AI-optimized project management. Key docs:
 
-- **[PROGRESS.md](PROGRESS.md)** - Current status & session notes
 - **[IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)** - Phase breakdown
 - **[ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md)** - Technical decisions (ADRs)
 
-**At session start**: Read PROGRESS.md to understand current state.
+**At session start**: Query pm.db for priorities and recent context:
+
+```bash
+~/.claude/bin/pm next --limit 10              # Get prioritized items
+~/.claude/bin/pm session recent --days 3      # Get recent session context
+```
 
 **Before any frontend commit/demo**: Run quality checks to ensure zero errors.
 

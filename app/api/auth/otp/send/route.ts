@@ -14,8 +14,7 @@ function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
       connectionString:
-        process.env.DATABASE_URL ||
-        'postgresql://reentrymap:password@localhost:6432/reentry_map',
+        process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:6432/reentry_map',
     })
   }
   return pool
@@ -67,19 +66,13 @@ export async function POST(request: NextRequest) {
     const { phone } = body
 
     if (!phone) {
-      return NextResponse.json(
-        { error: 'Phone number is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
     }
 
     // Validate US phone number
     const normalizedPhone = normalizePhone(phone)
     if (!normalizedPhone.match(/^\+1\d{10}$/)) {
-      return NextResponse.json(
-        { error: 'Invalid US phone number format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid US phone number format' }, { status: 400 })
     }
 
     // Check for recent OTP (rate limiting - 1 per 60 seconds)
@@ -125,10 +118,7 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      return NextResponse.json(
-        { error: 'SMS service not configured' },
-        { status: 503 }
-      )
+      return NextResponse.json({ error: 'SMS service not configured' }, { status: 503 })
     }
 
     // Send SMS via Twilio
@@ -144,9 +134,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error sending OTP:', error)
-    return NextResponse.json(
-      { error: 'Failed to send verification code' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to send verification code' }, { status: 500 })
   }
 }
