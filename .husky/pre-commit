@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Check if frontend files were modified
-frontend_changes=$(git diff --cached --name-only | grep -E '(components/|app/.*\.(tsx|jsx)|pages/.*\.(tsx|jsx))')
+frontend_changes=$(git diff --cached --name-only | grep -E '(components/|app/.*\.(tsx|jsx)|pages/.*\.(tsx|jsx))' || true)
 
 if [ -n "$frontend_changes" ]; then
   echo ""

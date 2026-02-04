@@ -26,6 +26,50 @@ type Tier1CountyRow = {
   estimated_annual_releases: number
 }
 
+interface StateEntry {
+  name: string
+  coverage_score: number
+  total_resources: number
+  categories_covered: number
+}
+
+interface CountyEntry {
+  name: string
+  coverage_score: number
+  total_resources: number
+  unique_resources: number
+}
+
+interface DonorReportData {
+  generated_at: string
+  report_period: string
+  executive_summary: {
+    total_resources: number
+    verified_resources: number
+    states_covered: number
+    counties_covered: number
+    tier1_coverage_percent: number
+    estimated_people_served: number
+  }
+  talking_points: string[]
+  geographic_breakdown: {
+    national: {
+      coverage_score: number
+      total_resources: number
+      categories_covered: number
+    }
+    top_states: StateEntry[]
+    top_counties: CountyEntry[]
+  }
+  impact_metrics: {
+    unique_resources: number
+    average_completeness: number
+    average_verification: number
+    resources_with_reviews: number
+  }
+  future_plans: string[]
+}
+
 /**
  * GET /api/admin/coverage/donor-report
  *
@@ -165,7 +209,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function generateMarkdownReport(data: any): string {
+function generateMarkdownReport(data: DonorReportData): string {
   return `
 # Reentry Map - Donor Report
 **Generated:** ${new Date(data.generated_at).toLocaleDateString()}
@@ -193,7 +237,7 @@ ${data.talking_points.map((point: string, i: number) => `${i + 1}. ${point}`).jo
 ### Top 5 States
 ${data.geographic_breakdown.top_states
   .map(
-    (s: any, i: number) =>
+    (s: StateEntry, i: number) =>
       `${i + 1}. **${s.name}**: ${s.coverage_score.toFixed(1)}% coverage, ${s.total_resources} resources, ${s.categories_covered}/13 categories`,
   )
   .join('\n')}
@@ -201,7 +245,7 @@ ${data.geographic_breakdown.top_states
 ### Top 10 Counties
 ${data.geographic_breakdown.top_counties
   .map(
-    (c: any, i: number) =>
+    (c: CountyEntry, i: number) =>
       `${i + 1}. **${c.name}**: ${c.coverage_score.toFixed(1)}% coverage, ${c.total_resources} resources (${c.unique_resources} unique)`,
   )
   .join('\n')}
@@ -223,7 +267,7 @@ ${data.future_plans.map((plan: string, i: number) => `${i + 1}. ${plan}`).join('
 `
 }
 
-function generateHTMLReport(data: any): string {
+function generateHTMLReport(data: DonorReportData): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -293,7 +337,7 @@ function generateHTMLReport(data: any): string {
   <ol>
     ${data.geographic_breakdown.top_states
       .map(
-        (s: any) =>
+        (s: StateEntry) =>
           `<li><strong>${s.name}:</strong> ${s.coverage_score.toFixed(1)}% coverage, ${s.total_resources} resources, ${s.categories_covered}/13 categories</li>`,
       )
       .join('')}
@@ -303,7 +347,7 @@ function generateHTMLReport(data: any): string {
   <ol>
     ${data.geographic_breakdown.top_counties
       .map(
-        (c: any) =>
+        (c: CountyEntry) =>
           `<li><strong>${c.name}:</strong> ${c.coverage_score.toFixed(1)}% coverage, ${c.total_resources} resources (${c.unique_resources} unique)</li>`,
       )
       .join('')}

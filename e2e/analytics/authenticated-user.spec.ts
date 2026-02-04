@@ -9,46 +9,71 @@ import postgres from 'postgres'
  * 2. User ID attached to all events
  * 3. User ID cleared on sign-out
  * 4. Session tracking with user context
+ *
+ * Prerequisites: Analytics database tables must exist.
+ * Tests are automatically skipped if the database or tables are not available.
  */
 
-// Initialize postgres.js client for database verification
-const sql = postgres(
-  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
-)
+type SqlClient = ReturnType<typeof postgres>
+let sql: SqlClient | null = null
+let dbAvailable = false
 
 test.describe('Analytics - Authenticated User', () => {
   let testSessionId: string
   let testUserId: string
 
   test.beforeAll(async () => {
-    // Get a non-admin test user from database
-    const users = await sql`
-      SELECT id, email FROM users
-      WHERE is_admin = false
-      LIMIT 1
-    `
+    try {
+      sql = postgres(
+        process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map',
+        { connect_timeout: 3 }
+      )
+      await sql`SELECT 1 FROM analytics_page_views LIMIT 0`
+      dbAvailable = true
 
-    if (!users || users.length === 0) {
-      // Create a test user if none exists
-      const newUsers = await sql`
-        INSERT INTO users (email, is_admin)
-        VALUES ('test-analytics@example.com', false)
-        RETURNING *
+      // Get a non-admin test user from database
+      const users = await sql`
+        SELECT id, email FROM users
+        WHERE is_admin = false
+        LIMIT 1
       `
 
-      if (!newUsers || newUsers.length === 0) {
-        throw new Error('Could not create test user')
-      }
+      if (!users || users.length === 0) {
+        // Create a test user if none exists
+        const newUsers = await sql`
+          INSERT INTO users (email, is_admin)
+          VALUES ('test-analytics@example.com', false)
+          RETURNING *
+        `
 
-      testUserId = newUsers[0].id
-      console.log(`[Test] Created test user: ${newUsers[0].email} (${testUserId})`)
-    } else {
-      testUserId = users[0].id
-      console.log(`[Test] Using existing test user: ${users[0].email} (${testUserId})`)
+        if (!newUsers || newUsers.length === 0) {
+          throw new Error('Could not create test user')
+        }
+
+        testUserId = newUsers[0].id
+        console.log(`[Test] Created test user: ${newUsers[0].email} (${testUserId})`)
+      } else {
+        testUserId = users[0].id
+        console.log(`[Test] Using existing test user: ${users[0].email} (${testUserId})`)
+      }
+    } catch (error) {
+      console.warn(
+        '[Analytics Tests] Database or analytics tables not available - tests will be skipped',
+        error
+      )
+      dbAvailable = false
+      if (sql) {
+        try {
+          await sql.end()
+        } catch {}
+        sql = null
+      }
     }
   })
 
   test.beforeEach(async ({ page }) => {
+    test.skip(!dbAvailable, 'Analytics database tables not available')
+
     testSessionId = `auth-test-${Date.now()}`
 
     await page.addInitScript(
@@ -61,6 +86,8 @@ test.describe('Analytics - Authenticated User', () => {
   })
 
   test.afterEach(async () => {
+    if (!dbAvailable || !sql) return
+
     // Clean up test data
     await sql`DELETE FROM analytics_page_views WHERE session_id = ${testSessionId}`
     await sql`DELETE FROM analytics_search_events WHERE session_id = ${testSessionId}`
@@ -69,8 +96,11 @@ test.describe('Analytics - Authenticated User', () => {
   })
 
   test.afterAll(async () => {
-    // Close the database connection
-    await sql.end()
+    if (sql) {
+      try {
+        await sql.end()
+      } catch {}
+    }
   })
 
   test('should identify user on sign-in', async ({ page }) => {
@@ -91,7 +121,7 @@ test.describe('Analytics - Authenticated User', () => {
     const storedUserId = await page.evaluate(() => localStorage.getItem('analytics_user_id'))
 
     expect(storedUserId).toBe(testUserId)
-    console.log('[Test] ✅ User identified in analytics (localStorage set)')
+    console.log('[Test] User identified in analytics (localStorage set)')
   })
 
   test('should attach user_id to all events after sign-in', async ({ page }) => {
@@ -111,7 +141,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Verify page view has user_id
-    const pageViews = await sql`
+    const pageViews = await sql!`
       SELECT * FROM analytics_page_views
       WHERE session_id = ${testSessionId}
         AND page_path = '/'
@@ -123,11 +153,11 @@ test.describe('Analytics - Authenticated User', () => {
     expect(pageViews.length).toBe(1)
 
     const pageView = pageViews[0]
-    expect(pageView.user_id).toBe(testUserId) // ⭐ User ID should be attached
-    expect(pageView.is_admin).toBe(false) // Non-admin user
-    expect(pageView.anonymous_id).toBeTruthy() // Anonymous ID still exists
+    expect(pageView.user_id).toBe(testUserId)
+    expect(pageView.is_admin).toBe(false)
+    expect(pageView.anonymous_id).toBeTruthy()
 
-    console.log('[Test] ✅ User ID correctly attached to events')
+    console.log('[Test] User ID correctly attached to events')
   })
 
   test('should maintain user_id across multiple page views', async ({ page }) => {
@@ -153,7 +183,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000) // Final batch
 
     // Verify all page views have the same user_id
-    const allPageViews = await sql`
+    const allPageViews = await sql!`
       SELECT * FROM analytics_page_views
       WHERE session_id = ${testSessionId}
       ORDER BY timestamp DESC
@@ -197,7 +227,7 @@ test.describe('Analytics - Authenticated User', () => {
     storedUserId = await page.evaluate(() => localStorage.getItem('analytics_user_id'))
     expect(storedUserId).toBeNull()
 
-    console.log('[Test] ✅ User ID correctly cleared on sign-out')
+    console.log('[Test] User ID correctly cleared on sign-out')
   })
 
   test('should create session with user context', async ({ page }) => {
@@ -216,7 +246,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Verify session was created with user_id
-    const sessions = await sql`
+    const sessions = await sql!`
       SELECT * FROM analytics_sessions
       WHERE session_id = ${testSessionId}
       LIMIT 1
@@ -226,11 +256,11 @@ test.describe('Analytics - Authenticated User', () => {
     expect(sessions.length).toBe(1)
 
     const session = sessions[0]
-    expect(session.user_id).toBe(testUserId) // ⭐ Session should have user_id
+    expect(session.user_id).toBe(testUserId)
     expect(session.is_admin).toBe(false)
     expect(session.anonymous_id).toBeTruthy()
 
-    console.log('[Test] ✅ Session created with user context')
+    console.log('[Test] Session created with user context')
   })
 
   test('should track resource interactions with user_id', async ({ page }) => {
@@ -255,7 +285,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Verify resource view has user_id
-    const resourceViews = await sql`
+    const resourceViews = await sql!`
       SELECT * FROM analytics_resource_events
       WHERE session_id = ${testSessionId}
         AND event_type = 'view'
@@ -270,7 +300,7 @@ test.describe('Analytics - Authenticated User', () => {
     expect(resourceView.user_id).toBe(testUserId)
     expect(resourceView.is_admin).toBe(false)
 
-    console.log('[Test] ✅ Resource interactions tracked with user_id')
+    console.log('[Test] Resource interactions tracked with user_id')
   })
 
   test('anonymous_id should persist after sign-in', async ({ page }) => {
@@ -298,7 +328,7 @@ test.describe('Analytics - Authenticated User', () => {
 
     expect(anonymousIdAfterSignIn).toBe(anonymousId) // Should be unchanged
 
-    console.log('[Test] ✅ Anonymous ID persists after sign-in (enables cross-device tracking)')
+    console.log('[Test] Anonymous ID persists after sign-in (enables cross-device tracking)')
   })
 
   test('should differentiate between anonymous and authenticated sessions', async ({ page }) => {
@@ -308,7 +338,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Get anonymous page views
-    const anonPageViews = await sql`
+    const anonPageViews = await sql!`
       SELECT * FROM analytics_page_views
       WHERE session_id = ${testSessionId}
         AND user_id IS NULL
@@ -331,7 +361,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Get authenticated page views
-    const authPageViews = await sql`
+    const authPageViews = await sql!`
       SELECT * FROM analytics_page_views
       WHERE session_id = ${testSessionId}
         AND user_id = ${testUserId}
@@ -345,7 +375,7 @@ test.describe('Analytics - Authenticated User', () => {
     expect(anonCount).toBeGreaterThan(0)
     expect(authCount).toBeGreaterThan(0)
 
-    console.log('[Test] ✅ Can differentiate anonymous vs authenticated activity')
+    console.log('[Test] Can differentiate anonymous vs authenticated activity')
   })
 
   test('should track user journey from anonymous to authenticated', async ({ page }) => {
@@ -378,7 +408,7 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000) // Final batch
 
     // Get all events for this session
-    const allEvents = await sql`
+    const allEvents = await sql!`
       SELECT * FROM analytics_page_views
       WHERE session_id = ${testSessionId}
       ORDER BY timestamp ASC
@@ -407,7 +437,7 @@ test.describe('Analytics - Authenticated User', () => {
       const firstAuthTimestamp = new Date(authenticatedEvents[0].timestamp).getTime()
 
       expect(firstAuthTimestamp).toBeGreaterThanOrEqual(lastAnonTimestamp)
-      console.log('[Test] ✅ Journey correctly tracked: anonymous → authenticated')
+      console.log('[Test] Journey correctly tracked: anonymous -> authenticated')
     }
   })
 })

@@ -5,22 +5,47 @@ import postgres from 'postgres'
  * Analytics Integration Tests - Anonymous User Journey
  *
  * Tests the complete analytics flow for an anonymous user:
- * 1. Homepage visit → page_view event
- * 2. Search → search event
- * 3. Resource view → resource_view event
- * 4. Click actions → resource_click_* events
+ * 1. Homepage visit -> page_view event
+ * 2. Search -> search event
+ * 3. Resource view -> resource_view event
+ * 4. Click actions -> resource_click_* events
+ *
+ * Prerequisites: Analytics database tables must exist.
+ * Tests are automatically skipped if the database or tables are not available.
  */
 
-// Initialize postgres.js client for database verification
-const sql = postgres(
-  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
-)
+type SqlClient = ReturnType<typeof postgres>
+let sql: SqlClient | null = null
+let dbAvailable = false
 
 test.describe('Analytics - Anonymous User Journey', () => {
   let testSessionId: string
   let testAnonymousId: string
 
+  test.beforeAll(async () => {
+    try {
+      sql = postgres(
+        process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map',
+        { connect_timeout: 3 }
+      )
+      await sql`SELECT 1 FROM analytics_page_views LIMIT 0`
+      dbAvailable = true
+    } catch {
+      console.warn(
+        '[Analytics Tests] Database or analytics tables not available - tests will be skipped'
+      )
+      if (sql) {
+        try {
+          await sql.end()
+        } catch {}
+        sql = null
+      }
+    }
+  })
+
   test.beforeEach(async ({ page }) => {
+    test.skip(!dbAvailable, 'Analytics database tables not available')
+
     // Generate unique IDs for this test run
     testSessionId = `test-session-${Date.now()}`
     testAnonymousId = `test-anon-${Date.now()}`
@@ -37,6 +62,8 @@ test.describe('Analytics - Anonymous User Journey', () => {
   })
 
   test.afterEach(async () => {
+    if (!dbAvailable || !sql) return
+
     // Clean up test data from database
     await sql`DELETE FROM analytics_page_views WHERE session_id = ${testSessionId}`
     await sql`DELETE FROM analytics_search_events WHERE session_id = ${testSessionId}`
@@ -45,8 +72,11 @@ test.describe('Analytics - Anonymous User Journey', () => {
   })
 
   test.afterAll(async () => {
-    // Close the database connection
-    await sql.end()
+    if (sql) {
+      try {
+        await sql.end()
+      } catch {}
+    }
   })
 
   test('should track homepage page view', async ({ page }) => {
@@ -58,7 +88,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify page_view event in database
-    const pageViews = await sql`
+    const pageViews = await sql!`
       SELECT * FROM analytics_page_views
       WHERE session_id = ${testSessionId}
         AND page_path = '/'
@@ -93,7 +123,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify search event in database
-    const searches = await sql`
+    const searches = await sql!`
       SELECT * FROM analytics_search_events
       WHERE session_id = ${testSessionId}
         AND query = ${'housing'}
@@ -127,7 +157,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify resource_view event in database
-    const resourceViews = await sql`
+    const resourceViews = await sql!`
       SELECT * FROM analytics_resource_events
       WHERE session_id = ${testSessionId}
         AND event_type = 'view'
@@ -165,7 +195,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
       await page.waitForTimeout(6000)
 
       // Verify resource_click_call event
-      const callClicks = await sql`
+      const callClicks = await sql!`
         SELECT * FROM analytics_resource_events
         WHERE session_id = ${testSessionId}
           AND event_type = 'click_call'
@@ -196,7 +226,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
       await page.waitForTimeout(6000)
 
       // Verify resource_click_website event
-      const websiteClicks = await sql`
+      const websiteClicks = await sql!`
         SELECT * FROM analytics_resource_events
         WHERE session_id = ${testSessionId}
           AND event_type = 'click_website'
@@ -219,7 +249,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
       await page.waitForTimeout(6000)
 
       // Verify resource_click_directions event
-      const directionsClicks = await sql`
+      const directionsClicks = await sql!`
         SELECT * FROM analytics_resource_events
         WHERE session_id = ${testSessionId}
           AND event_type = 'click_directions'
@@ -258,7 +288,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify scroll depth was tracked
-    const resourceViews = await sql`
+    const resourceViews = await sql!`
       SELECT * FROM analytics_resource_events
       WHERE session_id = ${testSessionId}
         AND event_type = 'view'
@@ -283,7 +313,7 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify session was created
-    const sessions = await sql`
+    const sessions = await sql!`
       SELECT * FROM analytics_sessions
       WHERE session_id = ${testSessionId}
       LIMIT 1

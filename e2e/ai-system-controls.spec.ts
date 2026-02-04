@@ -1,10 +1,14 @@
 import { test, expect } from '@playwright/test'
+import { loginAsTestUser } from './helpers/auth'
 
 test.describe('AI System Controls', () => {
   test.beforeEach(async ({ page }) => {
+    // Authenticate as admin before accessing admin pages
+    await loginAsTestUser(page, 'admin')
+
     // Navigate to admin settings page
-    await page.goto('http://localhost:3003/admin/settings')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/admin/settings')
+    await page.waitForLoadState('load')
   })
 
   test('should display AI system control panel with all switches', async ({ page }) => {
@@ -53,8 +57,8 @@ test.describe('AI System Controls', () => {
 
   test('should show Command Center status indicator', async ({ page }) => {
     // Navigate to Command Center
-    await page.goto('http://localhost:3003/admin/command-center')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/admin/command-center')
+    await page.waitForLoadState('load')
 
     // Check for AI status banner (should show disabled initially)
     await expect(page.getByText('AI Systems Disabled', { exact: false })).toBeVisible()
@@ -96,8 +100,8 @@ test.describe('AI System Controls', () => {
     await page.waitForTimeout(2000)
 
     // Navigate to Command Center
-    await page.goto('http://localhost:3003/admin/command-center')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/admin/command-center')
+    await page.waitForLoadState('load')
 
     // Check for active status
     await expect(page.getByText('AI Systems Active', { exact: false })).toBeVisible()
@@ -106,8 +110,8 @@ test.describe('AI System Controls', () => {
     await expect(page.getByText('Verification: Auto-Approving', { exact: false })).toBeVisible()
 
     // Clean up - disable AI systems
-    await page.goto('http://localhost:3003/admin/settings')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/admin/settings')
+    await page.waitForLoadState('load')
 
     // Disable master switch
     const masterSwitchCleanup = page

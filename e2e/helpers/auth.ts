@@ -22,18 +22,16 @@ export const TEST_USERS = {
  * Log in as a test user via the login form
  * @param page - Playwright page object
  * @param userType - Type of user to log in as ('regular' or 'admin')
- * @param baseUrl - Base URL of the application (default: http://localhost:3003)
  */
 export async function loginAsTestUser(
   page: Page,
-  userType: keyof typeof TEST_USERS = 'regular',
-  baseUrl: string = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3003'
+  userType: keyof typeof TEST_USERS = 'regular'
 ): Promise<void> {
   const user = TEST_USERS[userType]
 
-  // Navigate to login page
-  await page.goto(`${baseUrl}/auth/login`)
-  await page.waitForLoadState('networkidle')
+  // Navigate to login page (relative URL uses Playwright's baseURL)
+  await page.goto('/auth/login')
+  await page.waitForLoadState('load')
 
   // Fill in credentials
   await page.fill('input[type="email"]', user.email)

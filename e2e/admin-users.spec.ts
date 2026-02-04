@@ -1,19 +1,17 @@
 import { test, expect } from '@playwright/test'
+import { loginAsTestUser } from './helpers/auth'
 
 /**
  * Admin User Management E2E Tests
  * Tests CRUD operations for users and admin promotion
+ *
+ * Uses the shared auth helper for reliable login across all viewports.
  */
 
 test.describe('Admin User Management', () => {
   test.beforeEach(async ({ page }) => {
-    // Log in as admin before each test
-    await page.goto('/')
-    await page.click('text=Log In')
-    await page.fill('input[type="email"]', 'admin@example.com')
-    await page.fill('input[type="password"]', 'adminpassword123')
-    await page.click('button:has-text("Sign In")')
-    await page.waitForTimeout(2000)
+    // Log in as admin before each test using auth helper
+    await loginAsTestUser(page, 'admin')
   })
 
   test('admin can view user list', async ({ page }) => {
@@ -126,7 +124,7 @@ test.describe('Admin User Management', () => {
       .first()
 
     if ((await regularUserRow.count()) === 0) {
-      test.skip('No regular users available for promotion test')
+      test.skip(true, 'No regular users available for promotion test')
     }
 
     // Click edit on regular user
