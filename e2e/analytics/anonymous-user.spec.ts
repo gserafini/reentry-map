@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 
 /**
  * Analytics Integration Tests - Anonymous User Journey
@@ -11,15 +11,9 @@ import { createClient } from '@supabase/supabase-js'
  * 4. Click actions → resource_click_* events
  */
 
-// Initialize Supabase client for database verification
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // Service role to bypass RLS
-  {
-    auth: {
-      persistSession: false,
-    },
-  }
+// Initialize postgres.js client for database verification
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
 )
 
 test.describe('Analytics - Anonymous User Journey', () => {
@@ -44,10 +38,15 @@ test.describe('Analytics - Anonymous User Journey', () => {
 
   test.afterEach(async () => {
     // Clean up test data from database
-    await supabase.from('analytics_page_views').delete().eq('session_id', testSessionId)
-    await supabase.from('analytics_search_events').delete().eq('session_id', testSessionId)
-    await supabase.from('analytics_resource_events').delete().eq('session_id', testSessionId)
-    await supabase.from('analytics_sessions').delete().eq('session_id', testSessionId)
+    await sql`DELETE FROM analytics_page_views WHERE session_id = ${testSessionId}`
+    await sql`DELETE FROM analytics_search_events WHERE session_id = ${testSessionId}`
+    await sql`DELETE FROM analytics_resource_events WHERE session_id = ${testSessionId}`
+    await sql`DELETE FROM analytics_sessions WHERE session_id = ${testSessionId}`
+  })
+
+  test.afterAll(async () => {
+    // Close the database connection
+    await sql.end()
   })
 
   test('should track homepage page view', async ({ page }) => {
@@ -59,19 +58,18 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify page_view event in database
-    const { data: pageViews, error } = await supabase
-      .from('analytics_page_views')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('page_path', '/')
-      .order('timestamp', { ascending: false })
-      .limit(1)
+    const pageViews = await sql`
+      SELECT * FROM analytics_page_views
+      WHERE session_id = ${testSessionId}
+        AND page_path = '/'
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
 
-    expect(error).toBeNull()
     expect(pageViews).not.toBeNull()
-    expect(pageViews!.length).toBe(1)
+    expect(pageViews.length).toBe(1)
 
-    const pageView = pageViews![0]
+    const pageView = pageViews[0]
     expect(pageView.page_title).toContain('Home')
     expect(pageView.is_admin).toBe(false)
     expect(pageView.anonymous_id).toBe(testAnonymousId)
@@ -95,19 +93,18 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify search event in database
-    const { data: searches, error } = await supabase
-      .from('analytics_search_events')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('query', 'housing')
-      .order('timestamp', { ascending: false })
-      .limit(1)
+    const searches = await sql`
+      SELECT * FROM analytics_search_events
+      WHERE session_id = ${testSessionId}
+        AND query = ${'housing'}
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
 
-    expect(error).toBeNull()
     expect(searches).not.toBeNull()
-    expect(searches!.length).toBeGreaterThanOrEqual(1)
+    expect(searches.length).toBeGreaterThanOrEqual(1)
 
-    const search = searches![0]
+    const search = searches[0]
     expect(search.query).toBe('housing')
     expect(search.results_count).toBeGreaterThan(0)
     expect(search.is_admin).toBe(false)
@@ -130,19 +127,18 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify resource_view event in database
-    const { data: resourceViews, error } = await supabase
-      .from('analytics_resource_events')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('event_type', 'view')
-      .order('timestamp', { ascending: false })
-      .limit(1)
+    const resourceViews = await sql`
+      SELECT * FROM analytics_resource_events
+      WHERE session_id = ${testSessionId}
+        AND event_type = 'view'
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
 
-    expect(error).toBeNull()
     expect(resourceViews).not.toBeNull()
-    expect(resourceViews!.length).toBe(1)
+    expect(resourceViews.length).toBe(1)
 
-    const resourceView = resourceViews![0]
+    const resourceView = resourceViews[0]
     expect(resourceView.resource_id).toBeTruthy()
     expect(resourceView.source).toBe('direct') // From homepage featured list
     expect(resourceView.is_admin).toBe(false)
@@ -169,17 +165,17 @@ test.describe('Analytics - Anonymous User Journey', () => {
       await page.waitForTimeout(6000)
 
       // Verify resource_click_call event
-      const { data: callClicks } = await supabase
-        .from('analytics_resource_events')
-        .select('*')
-        .eq('session_id', testSessionId)
-        .eq('event_type', 'click_call')
-        .order('timestamp', { ascending: false })
-        .limit(1)
+      const callClicks = await sql`
+        SELECT * FROM analytics_resource_events
+        WHERE session_id = ${testSessionId}
+          AND event_type = 'click_call'
+        ORDER BY timestamp DESC
+        LIMIT 1
+      `
 
       expect(callClicks).not.toBeNull()
-      expect(callClicks!.length).toBe(1)
-      expect(callClicks![0].is_admin).toBe(false)
+      expect(callClicks.length).toBe(1)
+      expect(callClicks[0].is_admin).toBe(false)
     }
 
     // Click "Visit" website button (if website exists)
@@ -200,13 +196,13 @@ test.describe('Analytics - Anonymous User Journey', () => {
       await page.waitForTimeout(6000)
 
       // Verify resource_click_website event
-      const { data: websiteClicks } = await supabase
-        .from('analytics_resource_events')
-        .select('*')
-        .eq('session_id', testSessionId)
-        .eq('event_type', 'click_website')
-        .order('timestamp', { ascending: false })
-        .limit(1)
+      const websiteClicks = await sql`
+        SELECT * FROM analytics_resource_events
+        WHERE session_id = ${testSessionId}
+          AND event_type = 'click_website'
+        ORDER BY timestamp DESC
+        LIMIT 1
+      `
 
       expect(websiteClicks).not.toBeNull()
       if (websiteClicks && websiteClicks.length > 0) {
@@ -223,17 +219,17 @@ test.describe('Analytics - Anonymous User Journey', () => {
       await page.waitForTimeout(6000)
 
       // Verify resource_click_directions event
-      const { data: directionsClicks } = await supabase
-        .from('analytics_resource_events')
-        .select('*')
-        .eq('session_id', testSessionId)
-        .eq('event_type', 'click_directions')
-        .order('timestamp', { ascending: false })
-        .limit(1)
+      const directionsClicks = await sql`
+        SELECT * FROM analytics_resource_events
+        WHERE session_id = ${testSessionId}
+          AND event_type = 'click_directions'
+        ORDER BY timestamp DESC
+        LIMIT 1
+      `
 
       expect(directionsClicks).not.toBeNull()
-      expect(directionsClicks!.length).toBe(1)
-      expect(directionsClicks![0].is_admin).toBe(false)
+      expect(directionsClicks.length).toBe(1)
+      expect(directionsClicks[0].is_admin).toBe(false)
     }
   })
 
@@ -262,14 +258,14 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify scroll depth was tracked
-    const { data: resourceViews } = await supabase
-      .from('analytics_resource_events')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('event_type', 'view')
-      .not('scroll_depth_percent', 'is', null)
-      .order('timestamp', { ascending: false })
-      .limit(1)
+    const resourceViews = await sql`
+      SELECT * FROM analytics_resource_events
+      WHERE session_id = ${testSessionId}
+        AND event_type = 'view'
+        AND scroll_depth_percent IS NOT NULL
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
 
     if (resourceViews && resourceViews.length > 0) {
       const view = resourceViews[0]
@@ -287,17 +283,16 @@ test.describe('Analytics - Anonymous User Journey', () => {
     await page.waitForTimeout(6000)
 
     // Verify session was created
-    const { data: sessions, error } = await supabase
-      .from('analytics_sessions')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .limit(1)
+    const sessions = await sql`
+      SELECT * FROM analytics_sessions
+      WHERE session_id = ${testSessionId}
+      LIMIT 1
+    `
 
-    expect(error).toBeNull()
     expect(sessions).not.toBeNull()
-    expect(sessions!.length).toBe(1)
+    expect(sessions.length).toBe(1)
 
-    const session = sessions![0]
+    const session = sessions[0]
     expect(session.anonymous_id).toBe(testAnonymousId)
     expect(session.user_id).toBeNull() // Anonymous
     expect(session.is_admin).toBe(false)

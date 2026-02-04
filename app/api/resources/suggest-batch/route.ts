@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { env } from '@/lib/env'
+import { sql } from '@/lib/db/client'
 import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import { getAISystemStatus } from '@/lib/api/settings'
 import type { ResourceSuggestion } from '@/lib/types/database'
@@ -26,12 +25,6 @@ import type { ResourceSuggestion } from '@/lib/types/database'
  */
 export async function POST(request: NextRequest) {
   try {
-    // Use service role client to bypass RLS for public API
-    const supabase = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    )
-
     const body = (await request.json()) as {
       resources: unknown[]
       submitter?: string
@@ -89,32 +82,30 @@ export async function POST(request: NextRequest) {
         }
 
         // Check for existing resource (avoid suggesting duplicates)
-        const { data: existingResource } = await supabase
-          .from('resources')
-          .select('id, name, address')
-          .ilike('name', r.name)
-          .ilike('address', r.address)
-          .eq('city', r.city)
-          .eq('state', r.state)
-          .limit(1)
-          .single()
+        const existingResource = await sql`
+          SELECT id, name, address FROM resources
+          WHERE LOWER(name) = LOWER(${r.name})
+            AND LOWER(address) = LOWER(${r.address})
+            AND city = ${r.city}
+            AND state = ${r.state}
+          LIMIT 1
+        `
 
-        if (existingResource) {
+        if (existingResource.length > 0) {
           results.skipped_duplicates++
           continue
         }
 
         // Check for existing pending suggestion
-        const { data: existingSuggestion } = await supabase
-          .from('resource_suggestions')
-          .select('id, name, address')
-          .ilike('name', r.name)
-          .ilike('address', r.address)
-          .eq('status', 'pending')
-          .limit(1)
-          .single()
+        const existingSuggestion = await sql`
+          SELECT id, name, address FROM resource_suggestions
+          WHERE LOWER(name) = LOWER(${r.name})
+            AND LOWER(address) = LOWER(${r.address})
+            AND status = 'pending'
+          LIMIT 1
+        `
 
-        if (existingSuggestion) {
+        if (existingSuggestion.length > 0) {
           results.skipped_duplicates++
           results.verification_results.push({
             name: r.name,
@@ -126,67 +117,60 @@ export async function POST(request: NextRequest) {
 
         // Create suggestion with FULL resource data (expanded schema)
         // Set suggested_by to NULL for public API submissions (bypasses RLS auth requirement)
-        const { data: suggestion, error } = await supabase
-          .from('resource_suggestions')
-          .insert({
-            // Auth
-            suggested_by: null,
+        let suggestion: Record<string, unknown>
+        try {
+          const reasonText = `Submitted by ${submitter}${notes ? `: ${notes}` : ''}`
+          const insertResult = await sql`
+            INSERT INTO resource_suggestions (
+              suggested_by, name, address, city, state, zip, phone, website, email,
+              description, latitude, longitude, primary_category, category,
+              categories, tags, hours, services_offered, eligibility_requirements,
+              languages, accessibility_features,
+              discovered_via, discovery_notes, reason, status
+            ) VALUES (
+              ${null},
+              ${r.name},
+              ${r.address},
+              ${r.city},
+              ${r.state},
+              ${r.zip || r.zip_code || null},
+              ${r.phone || null},
+              ${r.website || null},
+              ${r.email || null},
+              ${r.description || null},
+              ${r.latitude || null},
+              ${r.longitude || null},
+              ${r.primary_category || 'general_support'},
+              ${r.primary_category || r.category || 'general_support'},
+              ${r.categories || null},
+              ${r.tags || null},
+              ${r.hours ? JSON.stringify(r.hours) : null}::jsonb,
+              ${r.services || r.services_offered || null},
+              ${r.eligibility_criteria || r.eligibility_requirements || null},
+              ${r.languages || null},
+              ${r.accessibility || r.accessibility_features || null},
+              ${r.discovered_via || null},
+              ${r.discovery_notes || null},
+              ${reasonText},
+              ${'pending'}
+            )
+            RETURNING *
+          `
 
-            // Basic info
-            name: r.name,
-            address: r.address,
-            city: r.city,
-            state: r.state,
-            zip: r.zip || r.zip_code || null,
-            phone: r.phone || null,
-            website: r.website || null,
-            email: r.email || null,
-            description: r.description || null,
-
-            // Location
-            latitude: r.latitude || null,
-            longitude: r.longitude || null,
-
-            // Categorization
-            primary_category: r.primary_category || 'general_support',
-            category: r.primary_category || r.category || 'general_support',
-            categories: r.categories || null,
-            tags: r.tags || null,
-
-            // Services & Requirements
-            hours: r.hours || null,
-            services_offered: r.services || r.services_offered || null,
-            eligibility_requirements: r.eligibility_criteria || r.eligibility_requirements || null,
-            required_documents: r.required_documents || null,
-            fees: r.fees || null,
-            languages: r.languages || null,
-            accessibility_features: r.accessibility || r.accessibility_features || null,
-
-            // Organization metadata (for multi-location orgs)
-            org_name: r.org_name || null,
-            location_name: r.location_name || null,
-
-            // Provenance (CRITICAL for data quality tracking)
-            source: r.source || null,
-            source_url: r.source_url || null,
-            discovered_via: r.discovered_via || null,
-            discovery_notes: r.discovery_notes || null,
-            reason: `Submitted by ${submitter}${notes ? `: ${notes}` : ''}`,
-
-            // Status
-            status: 'pending',
-          })
-          .select()
-          .single()
-
-        if (error) {
-          console.error('Error creating suggestion:', error)
+          if (insertResult.length === 0) {
+            throw new Error('Insert returned no rows')
+          }
+          suggestion = insertResult[0] as Record<string, unknown>
+        } catch (insertError) {
+          const errorMessage =
+            insertError instanceof Error ? insertError.message : JSON.stringify(insertError)
+          console.error('Error creating suggestion:', insertError)
           results.errors++
-          results.error_details.push(`${r.name}: ${error.message || JSON.stringify(error)}`)
+          results.error_details.push(`${r.name}: ${errorMessage}`)
           results.verification_results.push({
             name: r.name,
             status: 'error',
-            error: error.message || JSON.stringify(error),
+            error: errorMessage,
           })
           continue
         }
@@ -197,13 +181,15 @@ export async function POST(request: NextRequest) {
         // AUTONOMOUS VERIFICATION
         // ====================================================================
 
+        const suggestionId = suggestion.id as string
+
         // Skip verification if AI systems are disabled
         if (!verificationEnabled || !verificationAgent) {
           results.flagged_for_human++
           results.verification_results.push({
             name: r.name,
             status: 'flagged',
-            suggestion_id: suggestion.id,
+            suggestion_id: suggestionId,
             decision_reason:
               'AI verification is currently disabled. All submissions require manual admin review. Enable AI systems in admin settings to activate autonomous verification.',
           })
@@ -213,13 +199,13 @@ export async function POST(request: NextRequest) {
         try {
           // Run verification
           const verificationResult = await verificationAgent.verify(
-            suggestion as ResourceSuggestion,
+            suggestion as unknown as ResourceSuggestion,
             'initial'
           )
 
           // Log verification to database
           await verificationAgent.logVerification(
-            suggestion.id,
+            suggestionId,
             null, // No resource_id yet
             'initial',
             verificationResult
@@ -228,21 +214,23 @@ export async function POST(request: NextRequest) {
           // Process verification decision
           if (verificationResult.decision === 'auto_approve') {
             // Auto-approve: Create resource immediately
-            const resourceId = await verificationAgent.autoApprove(suggestion as ResourceSuggestion)
+            const resourceId = await verificationAgent.autoApprove(
+              suggestion as unknown as ResourceSuggestion
+            )
             results.auto_approved++
 
             results.verification_results.push({
               name: r.name,
               status: 'auto_approved',
               resource_id: resourceId,
-              suggestion_id: suggestion.id,
+              suggestion_id: suggestionId,
               verification_score: verificationResult.overall_score,
               decision_reason: verificationResult.decision_reason,
             })
           } else if (verificationResult.decision === 'flag_for_human') {
             // Flag for human: Keep as pending with admin notes
             await verificationAgent.flagForHuman(
-              suggestion as ResourceSuggestion,
+              suggestion as unknown as ResourceSuggestion,
               verificationResult.decision_reason
             )
             results.flagged_for_human++
@@ -250,14 +238,14 @@ export async function POST(request: NextRequest) {
             results.verification_results.push({
               name: r.name,
               status: 'flagged',
-              suggestion_id: suggestion.id,
+              suggestion_id: suggestionId,
               verification_score: verificationResult.overall_score,
               decision_reason: verificationResult.decision_reason,
             })
           } else {
             // Auto-reject: Mark as rejected
             await verificationAgent.autoReject(
-              suggestion as ResourceSuggestion,
+              suggestion as unknown as ResourceSuggestion,
               verificationResult.decision_reason
             )
             results.auto_rejected++
@@ -265,7 +253,7 @@ export async function POST(request: NextRequest) {
             results.verification_results.push({
               name: r.name,
               status: 'rejected',
-              suggestion_id: suggestion.id,
+              suggestion_id: suggestionId,
               verification_score: verificationResult.overall_score,
               decision_reason: verificationResult.decision_reason,
             })
@@ -278,7 +266,7 @@ export async function POST(request: NextRequest) {
           results.verification_results.push({
             name: r.name,
             status: 'flagged',
-            suggestion_id: suggestion.id,
+            suggestion_id: suggestionId,
             decision_reason: `Verification error: ${verificationError instanceof Error ? verificationError.message : 'Unknown error'}`,
           })
         }

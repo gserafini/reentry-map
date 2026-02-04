@@ -12,11 +12,10 @@
  * Usage: node scripts/fix-resource-counties.mjs
  *
  * Environment Variables Required:
- * - NEXT_PUBLIC_SUPABASE_URL
- * - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or SUPABASE_SERVICE_ROLE_KEY)
+ * - DATABASE_URL
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -57,18 +56,9 @@ function loadEnv() {
 
 loadEnv()
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required environment variables')
-  console.error('   Required: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
-  console.error('   (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY as fallback)')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 /**
  * Remove " County" suffix from county name for cleaner storage
@@ -173,40 +163,24 @@ async function fixResourceCounties() {
 
   try {
     // Get all resources that have coordinates
-    const { data: resources, error: resourcesError } = await supabase
-      .from('resources')
-      .select('id, name, address, city, state, latitude, longitude, county_fips, county')
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
+    const resources = await sql`
+      SELECT id, name, address, city, state, latitude, longitude, county_fips, county
+      FROM resources
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+    `
 
-    if (resourcesError) throw resourcesError
-
-    if (!resources || resources.length === 0) {
+    if (resources.length === 0) {
       console.log('❌ No resources found with coordinates')
       return
     }
 
     console.log(`📊 Found ${resources.length} resources to process`)
 
-    // Get all counties with geometry (paginated to handle 3000+ counties)
-    let counties = []
-    let page = 0
-    const pageSize = 1000
-
-    while (true) {
-      const { data: batch, error: countiesError } = await supabase
-        .from('county_data')
-        .select('fips_code, state_code, county_name, center_lat, center_lng, geometry')
-        .range(page * pageSize, (page + 1) * pageSize - 1)
-
-      if (countiesError) throw countiesError
-      if (!batch || batch.length === 0) break
-
-      counties = counties.concat(batch)
-      page++
-
-      if (batch.length < pageSize) break
-    }
+    // Get all counties with geometry
+    const counties = await sql`
+      SELECT fips_code, state_code, county_name, center_lat, center_lng, geometry
+      FROM county_data
+    `
 
     console.log(`📍 Loaded ${counties.length} counties with boundaries\n`)
 
@@ -277,20 +251,17 @@ async function fixResourceCounties() {
         console.log(`      ${oldName} → ${newName}${methodInfo}`)
 
         // Update resource
-        const { error: updateError } = await supabase
-          .from('resources')
-          .update({
-            county_fips: newFips,
-            county: countyName,
-          })
-          .eq('id', resource.id)
-
-        if (updateError) {
-          console.error(`   ❌ Error updating resource ${resource.id}:`, updateError.message)
-          failed++
-        } else {
+        try {
+          await sql`
+            UPDATE resources
+            SET county_fips = ${newFips}, county = ${countyName}
+            WHERE id = ${resource.id}
+          `
           updated++
           methodCounts[method] = (methodCounts[method] || 0) + 1
+        } catch (updateError) {
+          console.error(`   ❌ Error updating resource ${resource.id}:`, updateError.message)
+          failed++
         }
       } else {
         unchanged++
@@ -313,13 +284,12 @@ async function fixResourceCounties() {
     console.log(`📌 Total processed: ${resources.length} resources`)
 
     // Show new state
-    const { data: updatedResources } = await supabase
-      .from('resources')
-      .select('county_fips')
-      .not('county_fips', 'is', null)
+    const updatedResources = await sql`
+      SELECT county_fips FROM resources WHERE county_fips IS NOT NULL
+    `
 
     const newAssignments = {}
-    updatedResources?.forEach((r) => {
+    updatedResources.forEach((r) => {
       newAssignments[r.county_fips] = (newAssignments[r.county_fips] || 0) + 1
     })
 
@@ -336,7 +306,7 @@ async function fixResourceCounties() {
       console.log('   2. Click "Recalculate All Metrics" to update coverage scores')
       console.log('   3. Review the coverage dashboard')
     }
-  } catch (_error) {
+  } catch (error) {
     console.error('❌ Error fixing resource counties:', error)
     throw error
   }
@@ -347,12 +317,16 @@ async function main() {
   console.log('Uses proper GeoJSON polygon boundaries for accuracy')
   console.log('='.repeat(60) + '\n')
 
-  await fixResourceCounties()
-
-  console.log('\n✅ County assignment fix complete!')
+  try {
+    await fixResourceCounties()
+    console.log('\n✅ County assignment fix complete!')
+  } finally {
+    await sql.end()
+  }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('\n❌ Fatal error:', error)
+  await sql.end()
   process.exit(1)
 })

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resourceSuggestions, researchTasks } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 /**
  * POST /api/research/submit-candidate
@@ -56,7 +59,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = auth.getClient()
     const body = (await request.json()) as {
       task_id: string
       name: string
@@ -136,13 +138,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify task exists and is in_progress
-    const { data: task, error: taskError } = await supabase
-      .from('research_tasks')
-      .select('*')
-      .eq('id', task_id)
-      .single()
+    const [task] = await db
+      .select()
+      .from(researchTasks)
+      .where(eq(researchTasks.id, task_id))
+      .limit(1)
 
-    if (taskError || !task) {
+    if (!task) {
       return NextResponse.json(
         { error: 'Research task not found', details: 'Invalid task_id or task was deleted' },
         { status: 404 }
@@ -160,49 +162,61 @@ export async function POST(request: NextRequest) {
     }
 
     // Create resource suggestion
-    const { data: suggestion, error: createError } = await supabase
-      .from('resource_suggestions')
-      .insert({
-        name,
-        address,
-        city: city || task.county, // Default to task county if not specified
-        state: state || task.state, // Default to task state
-        zip,
-        phone,
-        email,
-        website,
-        description,
-        category: category || task.category,
-        primary_category: category || task.category,
-        services_offered,
-        hours,
-        eligibility_requirements,
-        status: 'pending', // Awaits verification
-        research_task_id: task_id,
-        discovered_via: discovered_via || 'websearch',
-        discovery_notes,
-      })
-      .select('id')
-      .single()
-
-    if (createError) {
+    let suggestion: { id: string } | undefined
+    try {
+      const [created] = await db
+        .insert(resourceSuggestions)
+        .values({
+          name,
+          address,
+          city: city || task.county, // Default to task county if not specified
+          state: state || task.state, // Default to task state
+          zip,
+          phone,
+          email,
+          website,
+          description,
+          category: category || task.category,
+          primaryCategory: category || task.category,
+          servicesOffered: services_offered,
+          hours,
+          eligibilityRequirements: eligibility_requirements,
+          status: 'pending', // Awaits verification
+          researchTaskId: task_id,
+          discoveredVia: discovered_via || 'websearch',
+          discoveryNotes: discovery_notes,
+        })
+        .returning({ id: resourceSuggestions.id })
+      suggestion = created
+    } catch (createError) {
       console.error('Error creating suggestion:', createError)
       return NextResponse.json(
-        { error: 'Failed to create suggestion', details: createError.message },
+        { error: 'Failed to create suggestion', details: String(createError) },
+        { status: 500 }
+      )
+    }
+
+    if (!suggestion) {
+      return NextResponse.json(
+        { error: 'Failed to create suggestion', details: 'No suggestion returned' },
         { status: 500 }
       )
     }
 
     // Fetch updated task progress (trigger will have updated it)
-    const { data: updatedTask } = await supabase
-      .from('research_tasks')
-      .select('resources_found, target_count, status')
-      .eq('id', task_id)
-      .single()
+    const [updatedTask] = await db
+      .select({
+        resourcesFound: researchTasks.resourcesFound,
+        targetCount: researchTasks.targetCount,
+        status: researchTasks.status,
+      })
+      .from(researchTasks)
+      .where(eq(researchTasks.id, task_id))
+      .limit(1)
 
     const remaining = updatedTask
-      ? updatedTask.target_count - updatedTask.resources_found
-      : task.target_count - task.resources_found - 1
+      ? (updatedTask.targetCount || 20) - (updatedTask.resourcesFound || 0)
+      : (task.targetCount || 20) - (task.resourcesFound || 0) - 1
 
     const taskComplete = updatedTask?.status === 'completed' || remaining <= 0
 
@@ -210,8 +224,8 @@ export async function POST(request: NextRequest) {
       success: true,
       suggestion_id: suggestion.id,
       task_progress: {
-        found: updatedTask?.resources_found || task.resources_found + 1,
-        target: task.target_count,
+        found: updatedTask?.resourcesFound || (task.resourcesFound || 0) + 1,
+        target: task.targetCount || 20,
         remaining: Math.max(0, remaining),
         task_complete: taskComplete,
       },

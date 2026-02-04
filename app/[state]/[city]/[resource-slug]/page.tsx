@@ -1,8 +1,9 @@
 import { Container } from '@mui/material'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import type { Metadata } from 'next'
+import type { Resource } from '@/lib/types/database'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import { parseStateSlug, parseCitySlug, generateResourceSlug } from '@/lib/utils/urls'
 import { LocalBusiness } from '@/components/seo/StructuredData'
@@ -30,7 +31,6 @@ interface ResourcePageProps {
  */
 export default async function ResourcePage({ params }: ResourcePageProps) {
   const { state: stateSlug, city: citySlug, 'resource-slug': resourceSlug } = await params
-  const supabase = await createClient()
   const headersList = await headers()
   const referer = headersList.get('referer') || ''
 
@@ -39,14 +39,12 @@ export default async function ResourcePage({ params }: ResourcePageProps) {
   const city = parseCitySlug(citySlug)
 
   // Find resource by city, state, and name slug
-  const { data: cityResources, error } = await supabase
-    .from('resources')
-    .select('*')
-    .eq('city', city)
-    .eq('state', state)
-    .eq('status', 'active')
+  const cityResources = await sql<Resource[]>`
+    SELECT * FROM resources
+    WHERE city = ${city} AND state = ${state} AND status = 'active'
+  `
 
-  if (error || !cityResources || cityResources.length === 0) {
+  if (!cityResources || cityResources.length === 0) {
     notFound()
   }
 
@@ -80,19 +78,16 @@ export default async function ResourcePage({ params }: ResourcePageProps) {
 // Generate metadata for SEO
 export async function generateMetadata({ params }: ResourcePageProps): Promise<Metadata> {
   const { state: stateSlug, city: citySlug, 'resource-slug': resourceSlug } = await params
-  const supabase = await createClient()
 
   // Parse state and city
   const state = parseStateSlug(stateSlug)
   const city = parseCitySlug(citySlug)
 
   // Find resource
-  const { data: cityResources } = await supabase
-    .from('resources')
-    .select('*')
-    .eq('city', city)
-    .eq('state', state)
-    .eq('status', 'active')
+  const cityResources = await sql<Resource[]>`
+    SELECT * FROM resources
+    WHERE city = ${city} AND state = ${state} AND status = 'active'
+  `
 
   const resource = cityResources?.find(
     (r) => generateResourceSlug(r.name) === resourceSlug.toLowerCase()
@@ -138,20 +133,13 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
 
 // Generate static params for ISR (top resources only to avoid excessive builds)
 export async function generateStaticParams() {
-  const { createStaticClient } = await import('@/lib/supabase/server')
-  const supabase = createStaticClient()
-
   // Generate params for top 100 most viewed/rated resources
-  const { data: topResources } = await supabase
-    .from('resources')
-    .select('name, city, state')
-    .eq('status', 'active')
-    .not('city', 'is', null)
-    .not('state', 'is', null)
-    .order('rating_average', { ascending: false })
-    .limit(100)
-
-  if (!topResources) return []
+  const topResources = await sql<{ name: string; city: string; state: string }[]>`
+    SELECT name, city, state FROM resources
+    WHERE status = 'active' AND city IS NOT NULL AND state IS NOT NULL
+    ORDER BY rating_average DESC NULLS LAST
+    LIMIT 100
+  `
 
   return topResources.map((resource) => {
     const stateSlug = resource.state.toLowerCase()

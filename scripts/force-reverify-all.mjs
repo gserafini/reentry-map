@@ -3,7 +3,7 @@
  * Force all active resources with websites to be re-verified
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -27,20 +27,9 @@ try {
   console.error('⚠️  Could not load .env.local file')
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase credentials')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 async function main() {
   console.log('🔄 Forcing re-verification for all resources with websites...\n')
@@ -49,22 +38,27 @@ async function main() {
   const oneHourAgo = new Date()
   oneHourAgo.setHours(oneHourAgo.getHours() - 1)
 
-  const { data, error } = await supabase
-    .from('resources')
-    .update({
-      next_verification_at: oneHourAgo.toISOString(),
-    })
-    .eq('status', 'active')
-    .not('website', 'is', null)
-    .select('id')
+  try {
+    const data = await sql`
+      UPDATE resources
+      SET next_verification_at = ${oneHourAgo.toISOString()}
+      WHERE status = 'active'
+        AND website IS NOT NULL
+      RETURNING id
+    `
 
-  if (error) {
+    console.log(`✅ Updated ${data.length} resources`)
+    console.log('   All active resources with websites are now due for immediate verification\n')
+  } catch (error) {
     console.error('❌ Error:', error)
+    await sql.end()
     process.exit(1)
   }
 
-  console.log(`✅ Updated ${data.length} resources`)
-  console.log('   All active resources with websites are now due for immediate verification\n')
+  await sql.end()
 }
 
-main().catch(console.error)
+main().catch(async (err) => {
+  console.error(err)
+  await sql.end()
+})

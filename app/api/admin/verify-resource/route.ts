@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient as createServerClient } from '@supabase/supabase-js'
-import { env } from '@/lib/env'
 import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import type { ResourceSuggestion } from '@/lib/ai-agents/verification-agent'
 
@@ -11,12 +9,6 @@ import type { ResourceSuggestion } from '@/lib/ai-agents/verification-agent'
  */
 export async function POST(request: NextRequest) {
   try {
-    // Use service role client to bypass RLS for admin operations
-    const supabase = createServerClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    )
-
     const body = await request.json()
     const { resource_id, suggestion } = body as {
       resource_id: string
@@ -45,9 +37,9 @@ export async function POST(request: NextRequest) {
     console.log(`\n📝 Logging verification to database...`)
     await agent.logVerification(null, resource_id, 'triggered', result)
 
-    // Update the resource with verification results (using service role client)
+    // Update the resource with verification results
     console.log(`\n📝 Updating resource with verification results...`)
-    await agent.updateResourceWithVerificationResults(resource_id, suggestion, result, supabase)
+    await agent.updateResourceWithVerificationResults(resource_id, suggestion, result)
 
     console.log(`\n✅ Verification complete`)
 

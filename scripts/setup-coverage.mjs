@@ -6,7 +6,7 @@
  * This script guides you through the complete setup process
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -41,26 +41,18 @@ function loadEnv() {
 
 loadEnv()
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing required environment variables')
-  console.error(
-    '   Add to .env.local: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'
-  )
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 async function checkTables() {
   console.log('🔍 Step 1: Checking database tables...')
 
-  const { error } = await supabase.from('county_data').select('id').limit(1)
-
-  if (error) {
+  try {
+    await sql`SELECT id FROM county_data LIMIT 1`
+    console.log('   ✅ Tables exist!')
+    return true
+  } catch (_error) {
     console.log('\\n❌ Coverage tracking tables not found!')
     console.log('\\n📋 You need to run migrations in Supabase Dashboard:')
     console.log('\\n1. Open this URL in your browser:')
@@ -72,9 +64,6 @@ async function checkTables() {
     console.log('\\n💡 Tip: The migration file is ~530 lines. Copy all of it!')
     return false
   }
-
-  console.log('   ✅ Tables exist!')
-  return true
 }
 
 async function seedCounties() {
@@ -114,6 +103,7 @@ async function main() {
   const tablesExist = await checkTables()
   if (!tablesExist) {
     console.log('\\n⚠️  Setup paused - complete migration step first')
+    await sql.end()
     process.exit(1)
   }
 
@@ -121,6 +111,7 @@ async function main() {
   const countiesSeeded = await seedCounties()
   if (!countiesSeeded) {
     console.log('\\n⚠️  Setup stopped at county seeding')
+    await sql.end()
     process.exit(1)
   }
 
@@ -128,6 +119,7 @@ async function main() {
   const resourcesEnriched = await enrichResources()
   if (!resourcesEnriched) {
     console.log('\\n⚠️  Setup stopped at resource enrichment')
+    await sql.end()
     process.exit(1)
   }
 
@@ -147,9 +139,12 @@ async function main() {
   console.log('✅ Automated setup complete!')
   console.log('='.repeat(60))
   console.log('\\n📍 Next: Complete Step 4 to activate coverage tracking')
+
+  await sql.end()
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('\\n❌ Fatal error:', error)
+  await sql.end()
   process.exit(1)
 })

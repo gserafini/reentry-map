@@ -1,7 +1,7 @@
 /**
  * NextAuth.js v4 Configuration
  *
- * Replaces Supabase Auth with:
+ * Authentication providers:
  * - Phone OTP via Twilio (custom credentials provider)
  * - Email/Password (credentials provider)
  * - JWT session strategy

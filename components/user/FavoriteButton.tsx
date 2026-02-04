@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { IconButton, CircularProgress, Tooltip } from '@mui/material'
 import { Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { toggleFavorite, isFavorited } from '@/lib/api/favorites'
 import { useRouter } from 'next/navigation'
 
 interface FavoriteButtonProps {
@@ -38,8 +37,14 @@ export function FavoriteButton({
     async function checkFavorite() {
       if (user && resourceId) {
         setChecking(true)
-        const favorited = await isFavorited(user.id, resourceId)
-        setIsFav(favorited)
+        try {
+          const response = await fetch(`/api/favorites/check?resourceId=${resourceId}`)
+          const data = (await response.json()) as { isFavorited?: boolean }
+          setIsFav(data.isFavorited || false)
+        } catch (error) {
+          console.error('Error checking favorite status:', error)
+          setIsFav(false)
+        }
         setChecking(false)
       } else {
         setChecking(false)
@@ -73,12 +78,18 @@ export function FavoriteButton({
     setIsFav(!isFav)
 
     try {
-      const { error } = await toggleFavorite(user.id, resourceId)
+      const method = previousState ? 'DELETE' : 'POST'
+      const response = await fetch('/api/favorites', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resourceId }),
+      })
 
-      if (error) {
+      if (!response.ok) {
         // Revert on error
         setIsFav(previousState)
-        console.error('Failed to toggle favorite:', error)
+        const data = (await response.json()) as { error?: string }
+        console.error('Failed to toggle favorite:', data.error)
       }
     } catch (error) {
       // Revert on error

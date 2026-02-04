@@ -1,5 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
+
+type MetricRow = {
+  geography_type: string
+  geography_id: string
+  geography_name: string
+  coverage_score: number
+  total_resources: number
+  verified_resources: number
+  categories_covered: number
+  unique_resources: number
+  avg_completeness_score: number
+  avg_verification_score: number
+  resources_with_reviews: number
+  reentry_population: number
+  last_updated: string
+}
+
+type Tier1CountyRow = {
+  fips_code: string
+  county_name: string
+  state_code: string
+  priority_tier: number
+}
 
 /**
  * GET /api/admin/coverage/metrics
@@ -14,27 +38,12 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    const auth = await checkAdminAuth(request)
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Get query parameters for filtering
@@ -43,67 +52,56 @@ export async function GET(request: NextRequest) {
     const minScore = searchParams.get('minScore') // Filter by minimum coverage score
     const limit = parseInt(searchParams.get('limit') || '100')
 
-    // Build query
-    let query = supabase
-      .from('coverage_metrics')
-      .select('*')
-      .order('coverage_score', { ascending: false })
-      .limit(limit)
-
-    if (geographyType) {
-      query = query.eq('geography_type', geographyType)
-    }
-
-    if (minScore) {
-      query = query.gte('coverage_score', parseFloat(minScore))
-    }
-
-    const { data: metrics, error: metricsError } = await query
-
-    if (metricsError) throw metricsError
+    // Build query with conditional filters
+    const metrics =
+      geographyType && minScore
+        ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE geography_type = ${geographyType} AND coverage_score >= ${parseFloat(minScore)} ORDER BY coverage_score DESC LIMIT ${limit}`
+        : geographyType
+          ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE geography_type = ${geographyType} ORDER BY coverage_score DESC LIMIT ${limit}`
+          : minScore
+            ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE coverage_score >= ${parseFloat(minScore)} ORDER BY coverage_score DESC LIMIT ${limit}`
+            : await sql<MetricRow[]>`SELECT * FROM coverage_metrics ORDER BY coverage_score DESC LIMIT ${limit}`
 
     // Get national metrics
-    const national = metrics?.find((m) => m.geography_type === 'national') || null
+    const national = metrics.find((m) => m.geography_type === 'national') || null
 
     // Get state metrics
-    const states = metrics?.filter((m) => m.geography_type === 'state') || []
+    const states = metrics.filter((m) => m.geography_type === 'state')
 
     // Get top 10 counties
-    const counties =
-      metrics
-        ?.filter((m) => m.geography_type === 'county')
-        .sort((a, b) => b.coverage_score - a.coverage_score)
-        .slice(0, 10) || []
+    const counties = metrics
+      .filter((m) => m.geography_type === 'county')
+      .sort((a, b) => b.coverage_score - a.coverage_score)
+      .slice(0, 10)
 
     // Get top 10 cities
-    const cities =
-      metrics
-        ?.filter((m) => m.geography_type === 'city')
-        .sort((a, b) => b.coverage_score - a.coverage_score)
-        .slice(0, 10) || []
+    const cities = metrics
+      .filter((m) => m.geography_type === 'city')
+      .sort((a, b) => b.coverage_score - a.coverage_score)
+      .slice(0, 10)
 
     // Calculate summary statistics
-    const totalCountiesWithCoverage = metrics?.filter((m) => m.geography_type === 'county').length || 0
-    const totalCitiesWithCoverage = metrics?.filter((m) => m.geography_type === 'city').length || 0
+    const totalCountiesWithCoverage = metrics.filter((m) => m.geography_type === 'county').length
+    const totalCitiesWithCoverage = metrics.filter((m) => m.geography_type === 'city').length
 
     // Get Tier 1 county coverage (high priority counties)
-    const { data: tier1Counties, error: tier1Error } = await supabase
-      .from('county_data')
-      .select('fips_code, county_name, state_code, priority_tier')
-      .eq('priority_tier', 1)
+    let tier1Counties: Tier1CountyRow[] = []
+    try {
+      tier1Counties = await sql<Tier1CountyRow[]>`SELECT fips_code, county_name, state_code, priority_tier FROM county_data WHERE priority_tier = 1`
+    } catch (tier1Error) {
+      console.error('Error fetching tier 1 counties:', tier1Error)
+    }
 
-    if (tier1Error) console.error('Error fetching tier 1 counties:', tier1Error)
-
-    const tier1Count = tier1Counties?.length || 0
-    const tier1WithCoverage =
-      tier1Counties?.filter((county) => metrics?.some((m) => m.geography_id === county.fips_code && m.total_resources > 0))
-        .length || 0
+    const tier1Count = tier1Counties.length
+    const tier1WithCoverage = tier1Counties.filter((county) =>
+      metrics.some((m) => m.geography_id === county.fips_code && m.total_resources > 0)
+    ).length
 
     const tier1CoveragePercent = tier1Count > 0 ? (tier1WithCoverage / tier1Count) * 100 : 0
 
     return NextResponse.json({
       summary: {
-        last_updated: metrics?.[0]?.last_updated || new Date().toISOString(),
+        last_updated: metrics[0]?.last_updated || new Date().toISOString(),
         total_resources: national?.total_resources || 0,
         national_coverage: national?.coverage_score || 0,
         states_with_coverage: states.length,

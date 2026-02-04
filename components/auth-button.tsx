@@ -8,7 +8,7 @@ import {
   AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { getInitials, getAvatarColor } from '@/lib/utils/avatar'
 import { useGravatar } from '@/lib/hooks/useGravatar'
@@ -36,9 +36,8 @@ export function AuthButton({ userEmail, isAdmin = false }: AuthButtonProps) {
   }
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
     handleClose()
+    await signOut({ redirect: false })
     router.refresh()
   }
 

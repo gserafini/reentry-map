@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { env } from '@/lib/env'
+import { db } from '@/lib/db/client'
+import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
 
 /**
@@ -8,7 +11,7 @@ import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
  * Approve a flagged resource suggestion and create resource (admin only)
  *
  * Authentication:
- * - Session-based (browser/Claude Web): Automatic via Supabase auth
+ * - Session-based (browser/Claude Web): Automatic via NextAuth
  * - API key (Claude Code/scripts): Include header `x-admin-api-key: your-key`
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,18 +26,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Use the appropriate client (service role for API key, regular for session)
-    const supabase = auth.getClient()
     const { id } = await params
 
     // Fetch suggestion
-    const { data: suggestion, error: fetchError } = await supabase
-      .from('resource_suggestions')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const [suggestion] = await db
+      .select()
+      .from(resourceSuggestions)
+      .where(eq(resourceSuggestions.id, id))
+      .limit(1)
 
-    if (fetchError || !suggestion) {
+    if (!suggestion) {
       return NextResponse.json({ error: 'Suggestion not found' }, { status: 404 })
     }
 
@@ -91,15 +92,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Create resource from suggestion (only using columns that exist in resources table)
-    const { data: resource, error: createError } = await supabase
-      .from('resources')
-      .insert({
+    const [resource] = await db
+      .insert(resources)
+      .values({
         name: suggestion.name,
         description: suggestion.description,
-        primary_category: suggestion.primary_category || suggestion.category || 'general_support',
+        primaryCategory: suggestion.primaryCategory || suggestion.category || 'general_support',
         categories: suggestion.categories,
         tags: suggestion.tags,
-        address: suggestion.address,
+        address: suggestion.address || '',
         city: suggestion.city,
         state: suggestion.state,
         zip: suggestion.zip,
@@ -109,47 +110,54 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         email: suggestion.email,
         website: suggestion.website,
         hours: suggestion.hours,
-        services_offered: suggestion.services_offered,
-        eligibility_requirements: suggestion.eligibility_requirements,
+        servicesOffered: suggestion.servicesOffered,
+        eligibilityRequirements: suggestion.eligibilityRequirements,
         languages: suggestion.languages,
-        accessibility_features: suggestion.accessibility_features,
-        address_type: 'physical', // Standard approval assumes physical address
+        accessibilityFeatures: suggestion.accessibilityFeatures,
+        addressType: 'physical', // Standard approval assumes physical address
         status: 'active',
         verified: true,
         source: 'admin_approved',
-        verification_status: 'verified',
+        verificationStatus: 'verified',
       })
-      .select('id')
-      .single()
+      .returning({ id: resources.id })
 
-    if (createError) {
-      console.error('Failed to create resource:', createError)
+    if (!resource) {
+      console.error('Failed to create resource')
       return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 })
     }
 
     // Mark suggestion as approved
-    await supabase
-      .from('resource_suggestions')
-      .update({
+    await db
+      .update(resourceSuggestions)
+      .set({
         status: 'approved',
-        reviewed_by: auth.userId || null,
-        reviewed_at: new Date().toISOString(),
-        review_notes:
+        reviewedBy: auth.userId || null,
+        reviewedAt: new Date(),
+        reviewNotes:
           auth.authMethod === 'api_key' ? 'Approved via API key (Claude Code)' : undefined,
       })
-      .eq('id', id)
+      .where(eq(resourceSuggestions.id, id))
 
     // Update verification log to mark as human reviewed
-    await supabase
-      .from('verification_logs')
-      .update({
-        human_reviewed: true,
-        human_reviewer_id: auth.userId || null,
-        human_decision: 'approved',
-      })
-      .eq('suggestion_id', id)
-      .order('created_at', { ascending: false })
+    // First find the most recent log for this suggestion
+    const [latestLog] = await db
+      .select({ id: verificationLogs.id })
+      .from(verificationLogs)
+      .where(eq(verificationLogs.suggestionId, id))
+      .orderBy(desc(verificationLogs.createdAt))
       .limit(1)
+
+    if (latestLog) {
+      await db
+        .update(verificationLogs)
+        .set({
+          humanReviewed: true,
+          humanReviewerId: auth.userId || null,
+          humanDecision: 'approved',
+        })
+        .where(eq(verificationLogs.id, latestLog.id))
+    }
 
     return NextResponse.json({
       success: true,

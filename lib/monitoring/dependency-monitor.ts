@@ -6,7 +6,7 @@
  * - ipapi.co (GeoIP)
  * - Google Maps API
  * - OpenAI API
- * - Supabase
+ * - PostgreSQL Database
  *
  * Features:
  * - Rate limiting (max 1 alert per service per hour)
@@ -14,7 +14,7 @@
  * - Easy to extend with email notifications (add Resend)
  */
 
-export type DependencyService = 'ipapi.co' | 'google-maps' | 'openai' | 'supabase' | 'vercel'
+export type DependencyService = 'ipapi.co' | 'google-maps' | 'openai' | 'database' | 'vercel'
 
 export interface DependencyAlert {
   service: DependencyService
@@ -162,14 +162,14 @@ export async function monitorOpenAIService(
 }
 
 /**
- * Monitor Supabase
+ * Monitor Database
  */
-export async function monitorSupabaseService(
+export async function monitorDatabaseService(
   error: Error,
   details?: Record<string, unknown>
 ): Promise<void> {
   await sendDependencyAlert({
-    service: 'supabase',
+    service: 'database',
     error: error.message,
     details: {
       ...details,

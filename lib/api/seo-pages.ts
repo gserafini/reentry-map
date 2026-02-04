@@ -4,7 +4,7 @@
  * Only creates pages where we have meaningful content (5+ resources)
  */
 
-import { createStaticClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import type { ResourceCategory } from '@/lib/types/database'
 
 export interface CityPageData {
@@ -37,50 +37,36 @@ export interface CategoryInCityPageData {
  * Threshold: 5+ total resources
  */
 export async function getCityPages(): Promise<CityPageData[]> {
-  const supabase = createStaticClient()
+  // Get cities with 5+ active resources
+  const validCities = await sql<{ city: string; state: string; count: number }[]>`
+    SELECT city, state, COUNT(*)::int as count FROM resources
+    WHERE status = 'active' AND city IS NOT NULL AND state IS NOT NULL
+    GROUP BY city, state
+    HAVING COUNT(*) >= 5
+    ORDER BY count DESC
+  `
 
-  // Get city totals
-  const { data: cityTotals, error: cityError } = await supabase
-    .from('resources')
-    .select('city, state')
-    .eq('status', 'active')
-    .not('city', 'is', null)
-    .not('state', 'is', null)
-
-  if (cityError || !cityTotals) {
-    console.error('Error fetching city totals:', cityError)
+  if (!validCities || validCities.length === 0) {
     return []
   }
-
-  // Count resources per city
-  const cityCounts = cityTotals.reduce(
-    (acc, resource) => {
-      const key = `${resource.city}|${resource.state}`
-      acc[key] = (acc[key] || 0) + 1
-      return acc
-    },
-    {} as Record<string, number>
-  )
-
-  // Filter cities with 5+ resources
-  const validCities = Object.entries(cityCounts)
-    .filter(([, count]) => count >= 5)
-    .map(([key]) => {
-      const [city, state] = key.split('|')
-      return { city, state }
-    })
 
   // Get detailed data for each valid city
   const cityPages: CityPageData[] = []
 
   for (const { city, state } of validCities) {
     // Get all resources in this city
-    const { data: cityResources } = await supabase
-      .from('resources')
-      .select('id, name, primary_category, rating_average, created_at')
-      .eq('city', city)
-      .eq('state', state)
-      .eq('status', 'active')
+    const cityResources = await sql<
+      {
+        id: string
+        name: string
+        primary_category: string
+        rating_average: number | null
+        created_at: string
+      }[]
+    >`
+      SELECT id, name, primary_category, rating_average, created_at FROM resources
+      WHERE city = ${city} AND state = ${state} AND status = 'active'
+    `
 
     if (!cityResources || cityResources.length < 5) continue
 
@@ -129,21 +115,33 @@ export async function getCityPages(): Promise<CityPageData[]> {
  * Threshold: 3+ resources in that category/city combo
  */
 export async function getCategoryInCityPages(): Promise<CategoryInCityPageData[]> {
-  const supabase = createStaticClient()
+  const resources = await sql<
+    {
+      id: string
+      name: string
+      city: string
+      state: string
+      primary_category: string
+      rating_average: number | null
+    }[]
+  >`
+    SELECT id, name, city, state, primary_category, rating_average FROM resources
+    WHERE status = 'active' AND city IS NOT NULL AND state IS NOT NULL
+  `
 
-  const { data: resources, error } = await supabase
-    .from('resources')
-    .select('id, name, city, state, primary_category, rating_average')
-    .eq('status', 'active')
-    .not('city', 'is', null)
-    .not('state', 'is', null)
-
-  if (error || !resources) {
-    console.error('Error fetching resources for category pages:', error)
+  if (!resources || resources.length === 0) {
     return []
   }
 
   // Group by city/category
+  type ResourceRow = {
+    id: string
+    name: string
+    city: string
+    state: string
+    primary_category: string
+    rating_average: number | null
+  }
   const grouped = resources.reduce(
     (acc, resource) => {
       const key = `${resource.city}|${resource.state}|${resource.primary_category}`
@@ -153,7 +151,7 @@ export async function getCategoryInCityPages(): Promise<CategoryInCityPageData[]
       acc[key].push(resource)
       return acc
     },
-    {} as Record<string, typeof resources>
+    {} as Record<string, ResourceRow[]>
   )
 
   // Build pages for combinations with 3+ resources

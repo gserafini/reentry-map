@@ -1,0 +1,12 @@
+# Project Management Configuration
+# This file enables pm auto-detection from any directory within the project.
+#
+# Usage:
+#   ~/.claude/bin/pm session record --title "..."  # Auto-detects project
+#   ~/.claude/bin/pm session recent                # Shows this project's sessions
+#   ~/.claude/bin/pm next                          # What to work on next
+#
+# Database: ~/.claude/pm.db
+# CLI: ~/.claude/bin/pm
+
+id: 'reentry_map'

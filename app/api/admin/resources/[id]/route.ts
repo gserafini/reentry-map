@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { determineCounty } from '@/lib/utils/county'
 import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
 
@@ -10,33 +13,19 @@ import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+    const [data] = await db.select().from(resources).where(eq(resources.id, id)).limit(1)
 
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const { data, error } = await supabase.from('resources').select('*').eq('id', id).single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
-      }
-      throw error
+    if (!data) {
+      return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
     }
 
     return NextResponse.json({ data })
@@ -53,24 +42,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,12 +66,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Update resource
-    const { data, error } = await supabase
-      .from('resources')
-      .update({
+    const [data] = await db
+      .update(resources)
+      .set({
         name: body.name,
         description: body.description || null,
-        primary_category: body.primary_category,
+        primaryCategory: body.primary_category,
         categories: body.categories || null,
         tags: body.tags || null,
         address: body.address,
@@ -103,31 +81,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         latitude: body.latitude || null,
         longitude: body.longitude || null,
         county: countyData?.county || null,
-        county_fips: countyData?.county_fips || null,
+        countyFips: countyData?.county_fips || null,
         phone: body.phone || null,
         email: body.email || null,
         website: body.website || null,
         hours: body.hours || null,
-        services_offered: body.services_offered || null,
-        eligibility_requirements: body.eligibility_requirements || null,
-        required_documents: body.required_documents || null,
+        servicesOffered: body.services_offered || null,
+        eligibilityRequirements: body.eligibility_requirements || null,
+        requiredDocuments: body.required_documents || null,
         fees: body.fees || null,
         languages: body.languages || null,
-        accessibility_features: body.accessibility_features || null,
+        accessibilityFeatures: body.accessibility_features || null,
         status: body.status,
         verified: body.verified,
         // Geocoding metadata (from Google Maps Geocoding API)
-        google_place_id: body.placeId || null,
-        location_type: body.locationType || null,
+        googlePlaceId: body.placeId || null,
+        locationType: body.locationType || null,
         neighborhood: body.neighborhood || null,
-        formatted_address: body.formattedAddress || null,
+        formattedAddress: body.formattedAddress || null,
       })
-      .eq('id', id)
-      .select()
-      .single()
+      .where(eq(resources.id, id))
+      .returning()
 
-    if (error) {
-      throw error
+    if (!data) {
+      return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
     }
 
     // Capture screenshot on every update (asynchronous, non-blocking)
@@ -137,13 +114,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         .then(async (screenshotResult) => {
           if (screenshotResult) {
             // Update resource with screenshot URL
-            await supabase
-              .from('resources')
-              .update({
-                screenshot_url: screenshotResult.url,
-                screenshot_captured_at: screenshotResult.capturedAt.toISOString(),
+            await db
+              .update(resources)
+              .set({
+                screenshotUrl: screenshotResult.url,
+                screenshotCapturedAt: screenshotResult.capturedAt,
               })
-              .eq('id', data.id)
+              .where(eq(resources.id, data.id))
             console.log(`Screenshot updated for resource ${data.id}`)
           }
         })
@@ -169,31 +146,16 @@ export async function DELETE(
 ) {
   const { id } = await params
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const { error } = await supabase.from('resources').delete().eq('id', id)
-
-    if (error) {
-      throw error
-    }
+    await db.delete(resources).where(eq(resources.id, id))
 
     return NextResponse.json({ success: true })
   } catch (error) {

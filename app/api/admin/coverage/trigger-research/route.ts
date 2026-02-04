@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
+
+type CountyRow = {
+  fips_code: string
+  county_name: string
+  state_code: string
+  priority_tier: number
+  estimated_annual_releases: number
+  total_population: number | null
+}
 
 /**
  * POST /api/admin/coverage/trigger-research
@@ -20,27 +30,12 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    const auth = await checkAdminAuth(request)
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     const body = (await request.json()) as { county_fips?: string; categories?: string[]; priority?: string }
@@ -51,13 +46,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get county data
-    const { data: county, error: countyError } = await supabase
-      .from('county_data')
-      .select('*')
-      .eq('fips_code', county_fips)
-      .single()
+    const countyRows = await sql<CountyRow[]>`SELECT * FROM county_data WHERE fips_code = ${county_fips} LIMIT 1`
+    const county = countyRows[0]
 
-    if (countyError || !county) {
+    if (!county) {
       return NextResponse.json({ error: 'County not found' }, { status: 404 })
     }
 
@@ -68,22 +60,23 @@ export async function POST(request: NextRequest) {
     const jobId = `research-${county_fips}-${Date.now()}`
 
     // Log the research request to ai_agent_logs
-    const { error: logError } = await supabase.from('ai_agent_logs').insert({
-      agent_type: 'discovery',
-      operation: 'county_research',
-      input_data: {
-        county_fips,
-        county_name: county.county_name,
-        state: county.state_code,
-        categories: categories || 'all',
-        priority: researchPriority,
-        job_id: jobId,
-      },
-      status: 'pending',
-      initiated_by: user.id,
-    })
-
-    if (logError) {
+    // Schema columns: agent_type, action, input, output, success, error_message, confidence_score, cost, duration_ms
+    try {
+      await sql`INSERT INTO ai_agent_logs (agent_type, action, input, success) VALUES (
+        ${'discovery'},
+        ${'county_research'},
+        ${JSON.stringify({
+          county_fips,
+          county_name: county.county_name,
+          state: county.state_code,
+          categories: categories || 'all',
+          priority: researchPriority,
+          job_id: jobId,
+          initiated_by: auth.userId || null,
+        })},
+        ${false}
+      )`
+    } catch (logError) {
       console.error('Error logging research request:', logError)
       // Continue anyway - logging failure shouldn't block the request
     }

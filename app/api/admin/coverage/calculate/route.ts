@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
 
 /**
  * POST /api/admin/coverage/calculate
@@ -20,64 +21,72 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    // Check admin authentication
+    const auth = await checkAdminAuth(request)
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     const body = (await request.json()) as { geography_type?: string; geography_id?: string }
     const { geography_type, geography_id } = body
 
     let calculated = 0
-    const results: any[] = []
+
+    interface CoverageMetricRow {
+      id: string
+      geography_type: string
+      geography_id: string
+      geography_name: string
+      coverage_score: number
+      resource_count_score: number
+      category_coverage_score: number
+      population_coverage_score: number
+      verification_score: number
+      total_resources: number
+      verified_resources: number
+      categories_covered: number
+      unique_resources: number
+      total_population: number | null
+      reentry_population: number | null
+      resources_in_211: number
+      comprehensiveness_ratio: number
+      avg_completeness_score: number | null
+      avg_verification_score: number | null
+      resources_with_reviews: number
+      review_coverage_pct: number
+      calculated_at: string
+      last_updated: string
+    }
+
+    const results: CoverageMetricRow[] = []
 
     if (geography_type === 'all' || (!geography_type && !geography_id)) {
       // Recalculate everything
-      const { data, error } = await supabase.rpc('recalculate_all_coverage')
+      const data = await sql<CoverageMetricRow[]>`SELECT * FROM recalculate_all_coverage()`
 
-      if (error) throw error
-
-      calculated = data?.length || 0
-      results.push(...(data || []))
+      calculated = data.length
+      results.push(...data)
     } else if (geography_type && geography_id) {
       // Recalculate specific geography
-      const { error } = await supabase.rpc('calculate_coverage_metrics', {
-        p_geography_type: geography_type,
-        p_geography_id: geography_id,
-      })
-
-      if (error) throw error
+      await sql`SELECT * FROM calculate_coverage_metrics(${geography_type}, ${geography_id})`
 
       // Fetch the updated metric
-      const { data: metric, error: metricError } = await supabase
-        .from('coverage_metrics')
-        .select('*')
-        .eq('geography_type', geography_type)
-        .eq('geography_id', geography_id)
-        .single()
+      const metricRows = await sql<CoverageMetricRow[]>`
+        SELECT * FROM coverage_metrics
+        WHERE geography_type = ${geography_type}
+          AND geography_id = ${geography_id}
+        LIMIT 1
+      `
 
-      if (metricError) throw metricError
+      if (metricRows.length === 0) {
+        throw new Error(`No metric found for ${geography_type}/${geography_id} after calculation`)
+      }
 
       calculated = 1
-      results.push(metric)
+      results.push(metricRows[0])
     } else if (geography_type) {
       // Recalculate all of one type
       let geographies: string[] = []
@@ -85,46 +94,42 @@ export async function POST(request: NextRequest) {
       if (geography_type === 'national') {
         geographies = ['US']
       } else if (geography_type === 'state') {
-        const { data: states } = await supabase.from('resources').select('state').eq('status', 'active')
-
-        geographies = [...new Set(states?.map((s) => s.state) || [])]
+        const states = await sql<{ state: string }[]>`
+          SELECT DISTINCT state FROM resources WHERE status = 'active'
+        `
+        geographies = states.map((s) => s.state)
       } else if (geography_type === 'county') {
-        const { data: counties } = await supabase
-          .from('resources')
-          .select('county_fips')
-          .eq('status', 'active')
-          .not('county_fips', 'is', null)
-
-        geographies = [...new Set(counties?.map((c) => c.county_fips!) || [])]
+        const counties = await sql<{ county_fips: string }[]>`
+          SELECT DISTINCT county_fips FROM resources
+          WHERE status = 'active' AND county_fips IS NOT NULL
+        `
+        geographies = counties.map((c) => c.county_fips)
       } else if (geography_type === 'city') {
-        const { data: cities } = await supabase.from('resources').select('city').eq('status', 'active')
-
-        geographies = [...new Set(cities?.map((c) => c.city) || [])]
+        const cities = await sql<{ city: string }[]>`
+          SELECT DISTINCT city FROM resources WHERE status = 'active'
+        `
+        geographies = cities.map((c) => c.city)
       }
 
       // Calculate each geography
       for (const geoId of geographies) {
-        const { error } = await supabase.rpc('calculate_coverage_metrics', {
-          p_geography_type: geography_type,
-          p_geography_id: geoId,
-        })
-
-        if (error) {
-          console.error(`Error calculating ${geography_type}/${geoId}:`, error)
+        try {
+          await sql`SELECT * FROM calculate_coverage_metrics(${geography_type}, ${geoId})`
+          calculated++
+        } catch (err) {
+          console.error(`Error calculating ${geography_type}/${geoId}:`, err)
           continue
         }
-
-        calculated++
       }
 
       // Fetch updated metrics
-      const { data: metrics } = await supabase
-        .from('coverage_metrics')
-        .select('*')
-        .eq('geography_type', geography_type)
-        .order('coverage_score', { ascending: false })
+      const metrics = await sql<CoverageMetricRow[]>`
+        SELECT * FROM coverage_metrics
+        WHERE geography_type = ${geography_type}
+        ORDER BY coverage_score DESC
+      `
 
-      results.push(...(metrics || []))
+      results.push(...metrics)
     } else {
       return NextResponse.json({ error: 'Must provide geography_type or set to "all"' }, { status: 400 })
     }

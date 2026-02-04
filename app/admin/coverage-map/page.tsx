@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
 import { redirect } from 'next/navigation'
 import { CoverageMapDashboard } from '@/components/admin/CoverageMapDashboard'
 
@@ -9,26 +10,15 @@ export const metadata: Metadata = {
 }
 
 export default async function CoverageMapPage() {
-  const supabase = await createClient()
+  const session = await getServerSession(authOptions)
 
   // Check authentication
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!session?.user) {
     redirect('/auth')
   }
 
-  // Check admin status
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (profileError || !profile?.is_admin) {
+  // Check admin status (from JWT token populated by NextAuth callbacks)
+  if (!session.user.isAdmin) {
     redirect('/') // Redirect non-admins to home
   }
 

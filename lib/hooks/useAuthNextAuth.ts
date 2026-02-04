@@ -6,8 +6,7 @@ import { useEffect } from 'react'
 import { identifyUser, clearUser } from '@/lib/analytics/queue'
 
 /**
- * Unified user type that works with both Supabase and NextAuth
- * This allows gradual migration from Supabase to NextAuth
+ * Unified user type for NextAuth authentication
  */
 export interface AuthUser {
   id: string

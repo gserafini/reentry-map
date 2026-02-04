@@ -3,7 +3,7 @@
  * Check screenshot status for resources
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -27,71 +27,71 @@ try {
   console.error('⚠️  Could not load .env.local file')
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing Supabase credentials')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 async function main() {
   console.log('📸 Checking screenshot status...\n')
 
-  // Get counts
-  const { data, error } = await supabase.rpc('get_screenshot_stats', {})
-
-  if (error) {
+  // Try RPC function first, fall back to manual query
+  try {
+    const data = await sql`SELECT * FROM get_screenshot_stats()`
+    console.log(data)
+  } catch (_rpcError) {
     // Fallback to manual query if RPC doesn't exist
-    const { data: resources, error: fetchError } = await supabase
-      .from('resources')
-      .select('id, name, website, screenshot_url, screenshot_captured_at')
+    try {
+      const resources = await sql`
+        SELECT id, name, website, screenshot_url, screenshot_captured_at
+        FROM resources
+      `
 
-    if (fetchError) {
-      console.error('❌ Error fetching resources:', fetchError)
+      const totalResources = resources.length
+      const resourcesWithWebsites = resources.filter((r) => r.website).length
+      const resourcesWithScreenshots = resources.filter((r) => r.screenshot_url).length
+
+      console.log(`📊 Screenshot Status:`)
+      console.log(`   Total resources: ${totalResources}`)
+      console.log(`   Resources with websites: ${resourcesWithWebsites}`)
+      console.log(`   Resources with screenshots: ${resourcesWithScreenshots}`)
+      console.log(`   Missing screenshots: ${resourcesWithWebsites - resourcesWithScreenshots}`)
+
+      if (resourcesWithScreenshots > 0) {
+        console.log('\n✅ Resources with screenshots:')
+        resources
+          .filter((r) => r.screenshot_url)
+          .forEach((r) => {
+            console.log(`   - ${r.name}`)
+            console.log(`     Screenshot: ${r.screenshot_url}`)
+            console.log(`     Captured: ${new Date(r.screenshot_captured_at).toLocaleString()}`)
+          })
+      }
+
+      if (resourcesWithWebsites - resourcesWithScreenshots > 0) {
+        console.log('\n⚠️  Resources missing screenshots:')
+        resources
+          .filter((r) => r.website && !r.screenshot_url)
+          .slice(0, 10)
+          .forEach((r) => {
+            console.log(`   - ${r.name}`)
+            console.log(`     Website: ${r.website}`)
+          })
+
+        if (resourcesWithWebsites - resourcesWithScreenshots > 10) {
+          console.log(`   ... and ${resourcesWithWebsites - resourcesWithScreenshots - 10} more`)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching resources:', error)
+      await sql.end()
       process.exit(1)
     }
-
-    const totalResources = resources.length
-    const resourcesWithWebsites = resources.filter((r) => r.website).length
-    const resourcesWithScreenshots = resources.filter((r) => r.screenshot_url).length
-
-    console.log(`📊 Screenshot Status:`)
-    console.log(`   Total resources: ${totalResources}`)
-    console.log(`   Resources with websites: ${resourcesWithWebsites}`)
-    console.log(`   Resources with screenshots: ${resourcesWithScreenshots}`)
-    console.log(`   Missing screenshots: ${resourcesWithWebsites - resourcesWithScreenshots}`)
-
-    if (resourcesWithScreenshots > 0) {
-      console.log('\n✅ Resources with screenshots:')
-      resources
-        .filter((r) => r.screenshot_url)
-        .forEach((r) => {
-          console.log(`   - ${r.name}`)
-          console.log(`     Screenshot: ${r.screenshot_url}`)
-          console.log(`     Captured: ${new Date(r.screenshot_captured_at).toLocaleString()}`)
-        })
-    }
-
-    if (resourcesWithWebsites - resourcesWithScreenshots > 0) {
-      console.log('\n⚠️  Resources missing screenshots:')
-      resources
-        .filter((r) => r.website && !r.screenshot_url)
-        .slice(0, 10)
-        .forEach((r) => {
-          console.log(`   - ${r.name}`)
-          console.log(`     Website: ${r.website}`)
-        })
-
-      if (resourcesWithWebsites - resourcesWithScreenshots > 10) {
-        console.log(`   ... and ${resourcesWithWebsites - resourcesWithScreenshots - 10} more`)
-      }
-    }
-  } else {
-    console.log(data)
   }
+
+  await sql.end()
 }
 
-main().catch(console.error)
+main().catch(async (err) => {
+  console.error(err)
+  await sql.end()
+})

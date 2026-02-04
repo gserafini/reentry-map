@@ -17,12 +17,7 @@ import {
   CircularProgress,
 } from '@mui/material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { submitReview, updateReview, getUserReview } from '@/lib/api/reviews'
 import { useRouter } from 'next/navigation'
-import type { Database } from '@/lib/types/database'
-
-type ResourceReviewInsert = Database['public']['Tables']['resource_reviews']['Insert']
-
 interface ReviewFormProps {
   resourceId: string
   resourceName: string
@@ -68,19 +63,46 @@ export function ReviewForm({ resourceId, resourceName, onSuccess, onCancel }: Re
         return
       }
 
-      const existingReview = await getUserReview(user.id, resourceId)
+      try {
+        const response = await fetch(`/api/reviews?resourceId=${resourceId}&userReview=true`)
+        interface ExistingReviewResponse {
+          review?: {
+            id: string
+            rating: number
+            text?: string | null
+            pros?: string[] | string | null
+            cons?: string[] | string | null
+            tips?: string | null
+            was_helpful?: boolean
+            would_recommend?: boolean
+            visited_date?: string | null
+          } | null
+        }
+        const data = (await response.json()) as ExistingReviewResponse
+        const existingReview = data.review
 
-      if (existingReview) {
-        // Populate form with existing review
-        setExistingReviewId(existingReview.id)
-        setRating(existingReview.rating)
-        setReviewText(existingReview.review_text || '')
-        setPros(existingReview.pros || '')
-        setCons(existingReview.cons || '')
-        setTips(existingReview.tips || '')
-        setWasHelpful(existingReview.was_helpful || false)
-        setWouldRecommend(existingReview.would_recommend || false)
-        setVisitedDate(existingReview.visited_date || '')
+        if (existingReview) {
+          // Populate form with existing review
+          setExistingReviewId(existingReview.id)
+          setRating(existingReview.rating)
+          setReviewText(existingReview.text || '')
+          setPros(
+            Array.isArray(existingReview.pros)
+              ? existingReview.pros.join(', ')
+              : existingReview.pros || ''
+          )
+          setCons(
+            Array.isArray(existingReview.cons)
+              ? existingReview.cons.join(', ')
+              : existingReview.cons || ''
+          )
+          setTips(existingReview.tips || '')
+          setWasHelpful(existingReview.was_helpful || false)
+          setWouldRecommend(existingReview.would_recommend || false)
+          setVisitedDate(existingReview.visited_date || '')
+        }
+      } catch (error) {
+        console.error('Error checking existing review:', error)
       }
 
       setCheckingExisting(false)
@@ -119,20 +141,36 @@ export function ReviewForm({ resourceId, resourceName, onSuccess, onCancel }: Re
     setError(null)
 
     try {
+      // Convert pros/cons to arrays if they're comma-separated strings
+      const prosArray = pros
+        ? pros
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean)
+        : null
+      const consArray = cons
+        ? cons
+            .split(',')
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : null
+
       if (existingReviewId) {
         // Update existing review
-        const { error: updateError } = await updateReview(existingReviewId, {
-          rating,
-          review_text: reviewText,
-          pros: pros || null,
-          cons: cons || null,
-          tips: tips || null,
-          was_helpful: wasHelpful,
-          would_recommend: wouldRecommend,
-          visited_date: visitedDate || null,
+        const response = await fetch('/api/reviews', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reviewId: existingReviewId,
+            rating,
+            text: reviewText,
+            pros: prosArray,
+            cons: consArray,
+            tips: tips || null,
+          }),
         })
 
-        if (updateError) {
+        if (!response.ok) {
           setError('Failed to update review. Please try again.')
         } else {
           setSuccess(true)
@@ -142,22 +180,20 @@ export function ReviewForm({ resourceId, resourceName, onSuccess, onCancel }: Re
         }
       } else {
         // Create new review
-        const review: ResourceReviewInsert = {
-          user_id: user.id,
-          resource_id: resourceId,
-          rating,
-          review_text: reviewText,
-          pros: pros || null,
-          cons: cons || null,
-          tips: tips || null,
-          was_helpful: wasHelpful,
-          would_recommend: wouldRecommend,
-          visited_date: visitedDate || null,
-        }
+        const response = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resourceId,
+            rating,
+            text: reviewText,
+            pros: prosArray,
+            cons: consArray,
+            tips: tips || null,
+          }),
+        })
 
-        const { error: submitError } = await submitReview(review)
-
-        if (submitError) {
+        if (!response.ok) {
           setError('Failed to submit review. Please try again.')
         } else {
           setSuccess(true)

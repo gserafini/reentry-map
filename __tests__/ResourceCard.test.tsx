@@ -1,8 +1,25 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import ResourceCard from '@/components/resources/ResourceCard'
 import { LocationProvider } from '@/lib/context/LocationContext'
+
+// Mock NextAuth session (needed by FavoriteButton in ResourceCard)
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({ data: null, status: 'unauthenticated' }),
+  signOut: vi.fn(),
+}))
+
+// Mock Next.js router
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}))
+
+// Mock analytics
+vi.mock('@/lib/analytics/queue', () => ({
+  identifyUser: vi.fn(),
+  clearUser: vi.fn(),
+}))
 
 describe('ResourceCard', () => {
   const mockResource = {
@@ -36,7 +53,6 @@ describe('ResourceCard', () => {
       </LocationProvider>
     )
 
-    // FavoriteButton should be rendered
     const favoriteButtons = screen.getAllByRole('button')
     expect(favoriteButtons.length).toBeGreaterThan(0)
   })

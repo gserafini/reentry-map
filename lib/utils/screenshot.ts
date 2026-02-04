@@ -1,25 +1,28 @@
 /**
  * Website screenshot utility for resource pages
  *
- * Captures screenshots of resource websites using Playwright and uploads to Supabase Storage
+ * Captures screenshots of resource websites using Playwright and saves to local filesystem
  */
 
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { chromium } from 'playwright'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
-import { env } from '@/lib/env'
+
+/** Directory where screenshots are stored (served statically by Next.js) */
+const SCREENSHOTS_DIR = path.join(process.cwd(), 'public', 'screenshots')
 
 export interface ScreenshotResult {
-  url: string // Public URL to screenshot in Supabase Storage
+  url: string // Public URL path to screenshot
   capturedAt: Date
 }
 
 /**
- * Capture screenshot of a website and upload to Supabase Storage
+ * Capture screenshot of a website and save to local filesystem
  *
  * @param websiteUrl - URL of website to screenshot
- * @param resourceId - Resource ID (used for storage filename)
- * @returns Public URL to screenshot and capture timestamp
+ * @param resourceId - Resource ID (used for filename)
+ * @returns Public URL path to screenshot and capture timestamp
  */
 export async function captureWebsiteScreenshot(
   websiteUrl: string,
@@ -72,38 +75,16 @@ export async function captureWebsiteScreenshot(
       })
       .toBuffer()
 
-    // Upload to Supabase Storage using service role key (bypasses RLS)
-    const supabase = createSupabaseClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    // Ensure screenshots directory exists
+    await fs.mkdir(SCREENSHOTS_DIR, { recursive: true })
+
+    // Write screenshot to local filesystem
     const filename = `${resourceId}.jpg`
-
-    const { data: _uploadData, error: uploadError } = await supabase.storage
-      .from('resource-screenshots')
-      .upload(filename, jpgBuffer, {
-        contentType: 'image/jpeg',
-        upsert: true, // Overwrite if exists
-      })
-
-    if (uploadError) {
-      console.error('Error uploading screenshot:', uploadError)
-      return null
-    }
-
-    // Get public URL
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('resource-screenshots').getPublicUrl(filename)
+    const filepath = path.join(SCREENSHOTS_DIR, filename)
+    await fs.writeFile(filepath, jpgBuffer)
 
     return {
-      url: publicUrl,
+      url: `/screenshots/${filename}`,
       capturedAt: new Date(),
     }
   } catch (error) {
@@ -117,34 +98,25 @@ export async function captureWebsiteScreenshot(
 }
 
 /**
- * Delete screenshot from Supabase Storage
+ * Delete screenshot from local filesystem
  *
  * @param resourceId - Resource ID
  */
 export async function deleteWebsiteScreenshot(resourceId: string): Promise<boolean> {
   try {
-    // Use service role key to bypass RLS
-    const supabase = createSupabaseClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
     const filename = `${resourceId}.jpg`
-
-    const { error } = await supabase.storage.from('resource-screenshots').remove([filename])
-
-    if (error) {
-      console.error('Error deleting screenshot:', error)
-      return false
-    }
-
+    const filepath = path.join(SCREENSHOTS_DIR, filename)
+    await fs.unlink(filepath)
     return true
   } catch (error) {
+    // Ignore "file not found" errors (ENOENT)
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    ) {
+      return true
+    }
     console.error('Error deleting screenshot:', error)
     return false
   }

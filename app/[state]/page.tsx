@@ -12,7 +12,7 @@ import {
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { LocationOn as LocationIcon, Apartment as CityIcon } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import { BreadcrumbList, CollectionPage } from '@/components/seo/StructuredData'
 import { parseStateSlug, generateCityUrl, generateStateUrl } from '@/lib/utils/urls'
 import type { Metadata } from 'next'
@@ -31,42 +31,28 @@ interface StatePageProps {
 export default async function StatePage({ params }: StatePageProps) {
   const { state: stateSlug } = await params
   const state = parseStateSlug(stateSlug)
-  const supabase = await createClient()
 
   // Get total resource count for this state
-  const { count: totalResources } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('state', state)
-    .eq('status', 'active')
+  const [{ count: totalResources }] = await sql<[{ count: number }]>`
+    SELECT COUNT(*)::int as count FROM resources
+    WHERE state = ${state} AND status = 'active'
+  `
 
   if (!totalResources || totalResources === 0) {
     notFound()
   }
 
-  // Get cities in this state with resource counts
-  const { data: cities } = await supabase
-    .from('resources')
-    .select('city')
-    .eq('state', state)
-    .eq('status', 'active')
-    .not('city', 'is', null)
+  // Get cities in this state with resource counts, sorted by count descending
+  const cityRows = await sql<{ city: string; count: number }[]>`
+    SELECT city, COUNT(*)::int as count FROM resources
+    WHERE state = ${state} AND status = 'active' AND city IS NOT NULL
+    GROUP BY city
+    ORDER BY count DESC
+    LIMIT 20
+  `
 
-  // Count resources per city
-  const cityCounts = cities?.reduce(
-    (acc, { city }) => {
-      if (city) {
-        acc[city] = (acc[city] || 0) + 1
-      }
-      return acc
-    },
-    {} as Record<string, number>
-  )
-
-  // Sort cities by resource count
-  const sortedCities = Object.entries(cityCounts || {})
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 20) // Show top 20 cities
+  // Convert to sorted entries format
+  const sortedCities: [string, number][] = cityRows.map((row) => [row.city, row.count])
 
   const stateUrl = generateStateUrl(state)
 
@@ -180,14 +166,12 @@ export default async function StatePage({ params }: StatePageProps) {
 export async function generateMetadata({ params }: StatePageProps): Promise<Metadata> {
   const { state: stateSlug } = await params
   const state = parseStateSlug(stateSlug)
-  const supabase = await createClient()
 
   // Get resource count
-  const { count: totalResources } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('state', state)
-    .eq('status', 'active')
+  const [{ count: totalResources }] = await sql<[{ count: number }]>`
+    SELECT COUNT(*)::int as count FROM resources
+    WHERE state = ${state} AND status = 'active'
+  `
 
   if (!totalResources || totalResources === 0) {
     return { title: 'Page Not Found | Reentry Map' }
@@ -242,22 +226,13 @@ export async function generateMetadata({ params }: StatePageProps): Promise<Meta
 
 // Generate static params for all states with resources (ISR)
 export async function generateStaticParams() {
-  const { createStaticClient } = await import('@/lib/supabase/server')
-  const supabase = createStaticClient()
-
   // Get all unique states that have active resources
-  const { data: states } = await supabase
-    .from('resources')
-    .select('state')
-    .eq('status', 'active')
-    .not('state', 'is', null)
+  const states = await sql<{ state: string }[]>`
+    SELECT DISTINCT state FROM resources
+    WHERE status = 'active' AND state IS NOT NULL
+  `
 
-  if (!states) return []
-
-  // Get unique states
-  const uniqueStates = [...new Set(states.map((r) => r.state).filter(Boolean))]
-
-  return uniqueStates.map((state) => ({
-    state: state!.toLowerCase(),
+  return states.map((row) => ({
+    state: row.state.toLowerCase(),
   }))
 }

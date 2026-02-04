@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Box,
@@ -29,7 +29,6 @@ import {
   Psychology as AIIcon,
   Person as PersonIcon,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 
 interface ActivityEvent {
   id: string
@@ -42,14 +41,21 @@ interface ActivityEvent {
   resourceId?: string // For updates, the ID of the resource being updated
 }
 
+interface ActivityFeedResponse {
+  activity?: {
+    resources: Array<{ id: string; name: string; created_at: string; updated_at: string }>
+    suggestions: Array<{ id: string; name: string; status: string; created_at: string }>
+    updates: Array<{ id: string; resource_id: string; status: string; created_at: string }>
+    sessions: Array<{ id: string; agent_type: string; started_at: string; ended_at: string | null }>
+  }
+}
+
 export function ActivityFeed() {
   const router = useRouter()
   const [expanded, setExpanded] = useState(true)
   const [timeRange, setTimeRange] = useState<'1h' | '6h' | '24h'>('24h')
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
-
-  const supabase = createClient()
 
   const handleEventClick = (event: ActivityEvent) => {
     switch (event.type) {
@@ -72,196 +78,97 @@ export function ActivityFeed() {
     }
   }
 
-  // Fetch recent events
-  useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const now = Date.now()
-        const timeRangeMs = {
-          '1h': 60 * 60 * 1000,
-          '6h': 6 * 60 * 60 * 1000,
-          '24h': 24 * 60 * 60 * 1000,
-        }[timeRange]
-
-        const cutoffTime = new Date(now - timeRangeMs).toISOString()
-
-        // Fetch recent changes from multiple tables
-        const [resources, suggestions, updates, sessions] = await Promise.all([
-          supabase
-            .from('resources')
-            .select('id, name, created_at, updated_at')
-            .gte('created_at', cutoffTime)
-            .order('created_at', { ascending: false })
-            .limit(10),
-
-          supabase
-            .from('resource_suggestions')
-            .select('id, name, status, created_at')
-            .gte('created_at', cutoffTime)
-            .order('created_at', { ascending: false })
-            .limit(10),
-
-          supabase
-            .from('resource_updates')
-            .select('id, resource_id, status, created_at')
-            .gte('created_at', cutoffTime)
-            .order('created_at', { ascending: false })
-            .limit(10),
-
-          supabase
-            .from('agent_sessions')
-            .select('id, agent_type, started_at, ended_at')
-            .gte('started_at', cutoffTime)
-            .order('started_at', { ascending: false })
-            .limit(10),
-        ])
-
-        // Combine and format events
-        const combinedEvents: ActivityEvent[] = []
-
-        // Resources
-        resources.data?.forEach((r) => {
-          combinedEvents.push({
-            id: `resource-${r.id}`,
-            type: 'resource',
-            action: 'created',
-            description: `Resource "${r.name}" added`,
-            timestamp: r.created_at,
-            entityId: r.id,
-          })
-        })
-
-        // Suggestions
-        suggestions.data?.forEach((s) => {
-          const action =
-            s.status === 'approved' ? 'approved' : s.status === 'rejected' ? 'rejected' : 'created'
-          combinedEvents.push({
-            id: `suggestion-${s.id}`,
-            type: 'suggestion',
-            action: action as ActivityEvent['action'],
-            description: `Suggestion "${s.name}" ${action}`,
-            timestamp: s.created_at,
-            entityId: s.id,
-          })
-        })
-
-        // Updates/Reports
-        updates.data?.forEach((u) => {
-          combinedEvents.push({
-            id: `update-${u.id}`,
-            type: 'update',
-            action:
-              u.status === 'approved'
-                ? 'approved'
-                : u.status === 'rejected'
-                  ? 'rejected'
-                  : 'created',
-            description: `Issue report ${u.status}`,
-            timestamp: u.created_at,
-            entityId: u.id,
-            resourceId: u.resource_id,
-          })
-        })
-
-        // Agent Sessions
-        sessions.data?.forEach((s) => {
-          const action = s.ended_at ? 'completed' : 'started'
-          combinedEvents.push({
-            id: `session-${s.id}`,
-            type: 'agent',
-            action: action as ActivityEvent['action'],
-            description: `${s.agent_type} agent ${action}`,
-            timestamp: s.ended_at || s.started_at,
-            entityId: s.id,
-          })
-        })
-
-        // Sort by timestamp descending
-        combinedEvents.sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        )
-
-        setEvents(combinedEvents.slice(0, 20))
-      } catch (error) {
-        console.error('Error fetching activity events:', error)
-      } finally {
-        setLoading(false)
+  const fetchEvents = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/dashboard/stats?section=activity&timeRange=${timeRange}`
+      )
+      if (!response.ok) {
+        throw new Error('Failed to fetch activity')
       }
+      const data = (await response.json()) as ActivityFeedResponse
+
+      if (!data.activity) {
+        setEvents([])
+        return
+      }
+
+      // Combine and format events
+      const combinedEvents: ActivityEvent[] = []
+
+      // Resources
+      data.activity.resources?.forEach((r) => {
+        combinedEvents.push({
+          id: `resource-${r.id}`,
+          type: 'resource',
+          action: 'created',
+          description: `Resource "${r.name}" added`,
+          timestamp: r.created_at,
+          entityId: r.id,
+        })
+      })
+
+      // Suggestions
+      data.activity.suggestions?.forEach((s) => {
+        const action =
+          s.status === 'approved' ? 'approved' : s.status === 'rejected' ? 'rejected' : 'created'
+        combinedEvents.push({
+          id: `suggestion-${s.id}`,
+          type: 'suggestion',
+          action: action as ActivityEvent['action'],
+          description: `Suggestion "${s.name}" ${action}`,
+          timestamp: s.created_at,
+          entityId: s.id,
+        })
+      })
+
+      // Updates/Reports
+      data.activity.updates?.forEach((u) => {
+        combinedEvents.push({
+          id: `update-${u.id}`,
+          type: 'update',
+          action:
+            u.status === 'approved' ? 'approved' : u.status === 'rejected' ? 'rejected' : 'created',
+          description: `Issue report ${u.status}`,
+          timestamp: u.created_at,
+          entityId: u.id,
+          resourceId: u.resource_id,
+        })
+      })
+
+      // Agent Sessions
+      data.activity.sessions?.forEach((s) => {
+        const action = s.ended_at ? 'completed' : 'started'
+        combinedEvents.push({
+          id: `session-${s.id}`,
+          type: 'agent',
+          action: action as ActivityEvent['action'],
+          description: `${s.agent_type} agent ${action}`,
+          timestamp: s.ended_at || s.started_at,
+          entityId: s.id,
+        })
+      })
+
+      // Sort by timestamp descending
+      combinedEvents.sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+
+      setEvents(combinedEvents.slice(0, 20))
+    } catch (error) {
+      console.error('Error fetching activity events:', error)
+    } finally {
+      setLoading(false)
     }
+  }, [timeRange])
 
-    fetchEvents()
-  }, [timeRange, supabase])
-
-  // Real-time subscriptions for new events
+  // Initial fetch + polling every 10 seconds (replaces real-time subscriptions)
   useEffect(() => {
-    const resourcesChannel = supabase
-      .channel('activity_resources')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'resources',
-        },
-        (payload) => {
-          const newResource = payload.new as { id: string; name: string; created_at: string }
-          setEvents((prev) => [
-            {
-              id: `resource-${newResource.id}`,
-              type: 'resource',
-              action: 'created',
-              description: `Resource "${newResource.name}" added`,
-              timestamp: newResource.created_at,
-              entityId: newResource.id,
-            },
-            ...prev.slice(0, 19),
-          ])
-        }
-      )
-      .subscribe()
-
-    const suggestionsChannel = supabase
-      .channel('activity_suggestions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resource_suggestions',
-        },
-        (payload) => {
-          const suggestion = payload.new as {
-            id: string
-            name: string
-            status: string
-            created_at: string
-          }
-          const action =
-            suggestion.status === 'approved'
-              ? 'approved'
-              : suggestion.status === 'rejected'
-                ? 'rejected'
-                : 'created'
-          setEvents((prev) => [
-            {
-              id: `suggestion-${suggestion.id}`,
-              type: 'suggestion',
-              action: action as ActivityEvent['action'],
-              description: `Suggestion "${suggestion.name}" ${action}`,
-              timestamp: suggestion.created_at,
-              entityId: suggestion.id,
-            },
-            ...prev.slice(0, 19),
-          ])
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(resourcesChannel)
-      supabase.removeChannel(suggestionsChannel)
-    }
-  }, [supabase])
+    setLoading(true)
+    fetchEvents()
+    const interval = setInterval(fetchEvents, 10000)
+    return () => clearInterval(interval)
+  }, [fetchEvents])
 
   const getIcon = (event: ActivityEvent) => {
     switch (event.type) {

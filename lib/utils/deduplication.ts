@@ -7,7 +7,7 @@
  * 3. Auto-detection of parent-child relationships
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import type { Resource } from '@/lib/types/database'
 
 export interface DeduplicationResult {
@@ -32,10 +32,8 @@ export interface ImportResource {
  * Returns deduplication result with suggested action
  */
 export async function checkForDuplicate(resource: ImportResource): Promise<DeduplicationResult> {
-  const supabase = await createClient()
-
   // Strategy 1: Exact address match (most reliable)
-  const exactMatch = await findExactAddressMatch(resource, supabase)
+  const exactMatch = await findExactAddressMatch(resource)
   if (exactMatch) {
     return {
       isDuplicate: true,
@@ -47,7 +45,7 @@ export async function checkForDuplicate(resource: ImportResource): Promise<Dedup
   }
 
   // Strategy 2: Fuzzy name + similar address (catches typos, formatting differences)
-  const fuzzyMatch = await findFuzzyMatch(resource, supabase)
+  const fuzzyMatch = await findFuzzyMatch(resource)
   if (fuzzyMatch && fuzzyMatch.similarity > 0.8) {
     return {
       isDuplicate: true,
@@ -70,21 +68,17 @@ export async function checkForDuplicate(resource: ImportResource): Promise<Dedup
  * Find exact address match
  * Normalizes address, city, state for comparison
  */
-async function findExactAddressMatch(
-  resource: ImportResource,
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<Resource | null> {
-  const { data } = await supabase
-    .from('resources')
-    .select('*')
-    .ilike('address', resource.address.trim())
-    .ilike('city', resource.city?.trim() || '')
-    .ilike('state', resource.state?.trim() || '')
-    .eq('status', 'active')
-    .limit(1)
-    .single()
+async function findExactAddressMatch(resource: ImportResource): Promise<Resource | null> {
+  const rows = await sql<Resource[]>`
+    SELECT * FROM resources
+    WHERE LOWER(address) = LOWER(${resource.address.trim()})
+    AND LOWER(city) = LOWER(${resource.city?.trim() || ''})
+    AND LOWER(state) = LOWER(${resource.state?.trim() || ''})
+    AND status = 'active'
+    LIMIT 1
+  `
 
-  return data
+  return rows[0] || null
 }
 
 /**
@@ -92,21 +86,17 @@ async function findExactAddressMatch(
  * Uses PostgreSQL's trigram similarity for fuzzy matching
  */
 async function findFuzzyMatch(
-  resource: ImportResource,
-  supabase: Awaited<ReturnType<typeof createClient>>
+  resource: ImportResource
 ): Promise<{ resource: Resource; similarity: number } | null> {
-  // Use raw SQL query to leverage pg_trgm similarity function
-  const { data, error } = await supabase.rpc('find_similar_resources', {
-    search_name: resource.name,
-    search_address: resource.address,
-    similarity_threshold: 0.7,
-  })
+  const rows = await sql<(Resource & { similarity_score: number })[]>`
+    SELECT * FROM find_similar_resources(${resource.name}, ${resource.address}, ${0.7})
+  `
 
-  if (error || !data || data.length === 0) {
+  if (!rows || rows.length === 0) {
     return null
   }
 
-  const match = data[0]
+  const match = rows[0]
   return {
     resource: match,
     similarity: match.similarity_score || 0,

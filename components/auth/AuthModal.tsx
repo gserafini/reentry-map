@@ -16,7 +16,7 @@ import { Close as CloseIcon, Settings as SettingsIcon } from '@mui/icons-materia
 import { LoginForm } from '@/components/login-form'
 import { SignUpForm } from '@/components/sign-up-form'
 import { PhoneAuth } from '@/components/auth/PhoneAuth'
-import { getFeatureFlags } from '@/lib/api/settings'
+import { getFeatureFlags } from '@/lib/api/settings-client'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { FeatureFlags } from '@/lib/types/settings'
 

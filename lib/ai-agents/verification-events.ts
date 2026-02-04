@@ -5,7 +5,7 @@
  * and tracks AI API costs to ai_usage_logs table
  */
 
-import { createClient } from '@/lib/supabase/client'
+import { sql } from '@/lib/db/client'
 
 export type VerificationEventType = 'started' | 'progress' | 'cost' | 'completed' | 'failed'
 
@@ -33,15 +33,12 @@ export interface CostTrackingData {
  * Emit a verification event for real-time display in Command Center
  */
 export async function emitVerificationEvent(event: VerificationEvent): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase.from('verification_events').insert({
-    suggestion_id: event.suggestion_id,
-    event_type: event.event_type,
-    event_data: event.event_data,
-  })
-
-  if (error) {
+  try {
+    await sql`
+      INSERT INTO verification_events (suggestion_id, event_type, event_data)
+      VALUES (${event.suggestion_id}, ${event.event_type}, ${JSON.stringify(event.event_data)}::jsonb)
+    `
+  } catch (error) {
     console.error('Failed to emit verification event:', error)
   }
 }
@@ -50,23 +47,23 @@ export async function emitVerificationEvent(event: VerificationEvent): Promise<v
  * Track AI API cost to ai_usage_logs table
  */
 export async function trackAICost(data: CostTrackingData): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase.from('ai_usage_logs').insert({
-    operation_type: data.operation_type,
-    provider: data.provider,
-    model: data.model,
-    input_tokens: data.input_tokens,
-    output_tokens: data.output_tokens,
-    input_cost_usd: data.input_cost_usd,
-    output_cost_usd: data.output_cost_usd,
-    duration_ms: data.duration_ms,
-    suggestion_id: data.suggestion_id,
-    resource_id: data.resource_id,
-    operation_context: data.operation_context || {},
-  })
-
-  if (error) {
+  try {
+    await sql`
+      INSERT INTO ai_usage_logs (
+        operation_type, provider, model,
+        input_tokens, output_tokens,
+        input_cost_usd, output_cost_usd,
+        duration_ms, suggestion_id, resource_id,
+        operation_context
+      ) VALUES (
+        ${data.operation_type}, ${data.provider}, ${data.model},
+        ${data.input_tokens}, ${data.output_tokens},
+        ${data.input_cost_usd}, ${data.output_cost_usd},
+        ${data.duration_ms || null}, ${data.suggestion_id || null}, ${data.resource_id || null},
+        ${JSON.stringify(data.operation_context || {})}::jsonb
+      )
+    `
+  } catch (error) {
     console.error('Failed to track AI cost:', error)
   }
 

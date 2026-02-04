@@ -26,7 +26,7 @@ import {
   Visibility as VisibilityIcon,
   AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material'
-import { getAISystemStatus } from '@/lib/api/settings'
+import { getAISystemStatus } from '@/lib/api/settings-client'
 import type { AISystemStatus } from '@/lib/types/settings'
 
 export function SystemHealth() {

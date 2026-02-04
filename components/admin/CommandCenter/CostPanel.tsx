@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Box,
@@ -24,12 +24,16 @@ import {
   ExpandMore,
   OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 
 interface CostBreakdown {
   operation: string
   cost: number
   count: number
+}
+
+interface CostStatsResponse {
+  costs?: { monthly_cost: number; weekly_cost: number; daily_cost: number }
+  costBreakdown?: CostBreakdown[]
 }
 
 export function CostPanel() {
@@ -43,119 +47,31 @@ export function CostPanel() {
 
   const monthlyBudget = 25 // TODO: Make configurable
 
-  const supabase = createClient()
-
-  // Fetch cost data
-  useEffect(() => {
-    async function fetchCosts() {
-      try {
-        const now = new Date()
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        const dayStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
-
-        // Fetch costs for different time periods
-        const [monthlyData, weeklyData, dailyData] = await Promise.all([
-          supabase.from('ai_usage_logs').select('*').gte('created_at', monthStart),
-
-          supabase.from('ai_usage_logs').select('*').gte('created_at', weekStart),
-
-          supabase.from('ai_usage_logs').select('*').gte('created_at', dayStart),
-        ])
-
-        // Calculate total costs
-        const monthlyTotal = monthlyData.data?.reduce(
-          (sum, log) => sum + (log.total_cost_usd || 0),
-          0
-        )
-        const weeklyTotal = weeklyData.data?.reduce(
-          (sum, log) => sum + (log.total_cost_usd || 0),
-          0
-        )
-        const dailyTotal = dailyData.data?.reduce((sum, log) => sum + (log.total_cost_usd || 0), 0)
-
-        setMonthlyCost(monthlyTotal || 0)
-        setWeeklyCost(weeklyTotal || 0)
-        setDailyCost(dailyTotal || 0)
-
-        // Calculate breakdown by operation
-        const operationCosts: Record<string, { cost: number; count: number }> = {}
-
-        monthlyData.data?.forEach((log) => {
-          const op = log.operation || 'other'
-          if (!operationCosts[op]) {
-            operationCosts[op] = { cost: 0, count: 0 }
-          }
-          operationCosts[op].cost += log.total_cost_usd || 0
-          operationCosts[op].count += 1
-        })
-
-        const breakdownArray = Object.entries(operationCosts)
-          .map(([operation, data]) => ({
-            operation,
-            cost: data.cost,
-            count: data.count,
-          }))
-          .sort((a, b) => b.cost - a.cost)
-
-        setBreakdown(breakdownArray)
-      } catch (error) {
-        console.error('Error fetching costs:', error)
-      } finally {
-        setLoading(false)
+  const fetchCosts = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/dashboard/stats?section=costs')
+      if (!response.ok) {
+        throw new Error('Failed to fetch costs')
       }
+      const data = (await response.json()) as CostStatsResponse
+
+      setMonthlyCost(data.costs?.monthly_cost || 0)
+      setWeeklyCost(data.costs?.weekly_cost || 0)
+      setDailyCost(data.costs?.daily_cost || 0)
+      setBreakdown(data.costBreakdown || [])
+    } catch (error) {
+      console.error('Error fetching costs:', error)
+    } finally {
+      setLoading(false)
     }
+  }, [])
 
-    fetchCosts()
-
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchCosts, 60000)
-
-    return () => clearInterval(interval)
-  }, [supabase])
-
-  // Real-time subscription for new costs
+  // Initial fetch + polling every 60 seconds (replaces real-time subscription)
   useEffect(() => {
-    const costsChannel = supabase
-      .channel('cost_panel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'ai_usage_logs',
-        },
-        (payload) => {
-          const newLog = payload.new as { total_cost_usd: number; operation: string }
-          setMonthlyCost((prev) => prev + (newLog.total_cost_usd || 0))
-          setWeeklyCost((prev) => prev + (newLog.total_cost_usd || 0))
-          setDailyCost((prev) => prev + (newLog.total_cost_usd || 0))
-
-          // Update breakdown
-          setBreakdown((prev) => {
-            const operation = newLog.operation || 'other'
-            const existing = prev.find((b) => b.operation === operation)
-
-            if (existing) {
-              return prev.map((b) =>
-                b.operation === operation
-                  ? { ...b, cost: b.cost + (newLog.total_cost_usd || 0), count: b.count + 1 }
-                  : b
-              )
-            } else {
-              return [...prev, { operation, cost: newLog.total_cost_usd || 0, count: 1 }].sort(
-                (a, b) => b.cost - a.cost
-              )
-            }
-          })
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(costsChannel)
-    }
-  }, [supabase])
+    fetchCosts()
+    const interval = setInterval(fetchCosts, 60000)
+    return () => clearInterval(interval)
+  }, [fetchCosts])
 
   if (loading) {
     return (

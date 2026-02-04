@@ -24,7 +24,7 @@ import {
   MyLocation as GeocodeIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { submitSuggestion } from '@/lib/api/suggestions'
+import { submitSuggestion } from '@/lib/api/suggestions-client'
 import { CATEGORIES } from '@/lib/utils/categories'
 import { geocodeAddress } from '@/lib/utils/geocoding'
 import type { Database } from '@/lib/types/database'

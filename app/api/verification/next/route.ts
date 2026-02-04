@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resourceSuggestions, researchTasks } from '@/lib/db/schema'
+import { eq, asc } from 'drizzle-orm'
 
 /**
  * GET /api/verification/next
@@ -54,30 +57,54 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = auth.getClient()
-
-    // Fetch ONE pending suggestion with priority logic
+    // Fetch pending suggestions with joined research task info
     // Priority: missing email > incomplete > oldest
-    const { data: suggestions, error: fetchError } = await supabase
-      .from('resource_suggestions')
-      .select(
-        `
-        *,
-        research_tasks (
-          county,
-          state,
-          category
-        )
-      `
-      )
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
+    const suggestionsRaw = await db
+      .select({
+        id: resourceSuggestions.id,
+        name: resourceSuggestions.name,
+        address: resourceSuggestions.address,
+        city: resourceSuggestions.city,
+        state: resourceSuggestions.state,
+        zip: resourceSuggestions.zip,
+        phone: resourceSuggestions.phone,
+        email: resourceSuggestions.email,
+        website: resourceSuggestions.website,
+        description: resourceSuggestions.description,
+        category: resourceSuggestions.category,
+        servicesOffered: resourceSuggestions.servicesOffered,
+        hours: resourceSuggestions.hours,
+        eligibilityRequirements: resourceSuggestions.eligibilityRequirements,
+        discoveredVia: resourceSuggestions.discoveredVia,
+        discoveryNotes: resourceSuggestions.discoveryNotes,
+        researchTaskId: resourceSuggestions.researchTaskId,
+        createdAt: resourceSuggestions.createdAt,
+        // Research task fields
+        taskCounty: researchTasks.county,
+        taskState: researchTasks.state,
+        taskCategory: researchTasks.category,
+      })
+      .from(resourceSuggestions)
+      .leftJoin(researchTasks, eq(resourceSuggestions.researchTaskId, researchTasks.id))
+      .where(eq(resourceSuggestions.status, 'pending'))
+      .orderBy(asc(resourceSuggestions.createdAt))
       .limit(20) // Get a few to calculate priority
 
-    if (fetchError) {
-      console.error('Error fetching suggestions:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch suggestions' }, { status: 500 })
-    }
+    // Transform to expected format
+    const suggestions = suggestionsRaw.map((s) => ({
+      ...s,
+      services_offered: s.servicesOffered,
+      eligibility_requirements: s.eligibilityRequirements,
+      discovered_via: s.discoveredVia,
+      discovery_notes: s.discoveryNotes,
+      research_tasks: s.taskCounty
+        ? {
+            county: s.taskCounty,
+            state: s.taskState,
+            category: s.taskCategory,
+          }
+        : null,
+    }))
 
     if (!suggestions || suggestions.length === 0) {
       return NextResponse.json({

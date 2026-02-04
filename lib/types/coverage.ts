@@ -1,6 +1,6 @@
 /**
  * TypeScript type definitions for coverage tracking system
- * Based on supabase/migrations/20250129000000_coverage_tracking_tables.sql
+ * Based on coverage tracking database tables
  */
 
 /**

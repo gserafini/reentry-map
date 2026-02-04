@@ -2,6 +2,18 @@ import '@testing-library/jest-dom/vitest'
 import { createElement } from 'react'
 import { vi } from 'vitest'
 
+// Mock database client globally to prevent DATABASE_URL throw during test module loading
+const mockSql = Object.assign(vi.fn().mockResolvedValue([]), {
+  begin: vi
+    .fn()
+    .mockImplementation((fn: (...args: unknown[]) => unknown) => fn(vi.fn().mockResolvedValue([]))),
+  end: vi.fn(),
+})
+vi.mock('@/lib/db/client', () => ({
+  db: {},
+  sql: mockSql,
+}))
+
 // Shared mock router state that can be controlled in tests
 // @ts-expect-error - globalThis type augmentation
 globalThis.mockRouterState = {

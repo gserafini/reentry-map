@@ -13,22 +13,19 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
-// Mock Supabase client
-const mockSignInWithOtp = vi.fn()
-const mockVerifyOtp = vi.fn()
-
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      signInWithOtp: mockSignInWithOtp,
-      verifyOtp: mockVerifyOtp,
-    },
-  }),
+// Mock NextAuth signIn (used for OTP verification)
+const mockSignIn = vi.fn()
+vi.mock('next-auth/react', () => ({
+  signIn: (...args: unknown[]) => mockSignIn(...args),
 }))
+
+// Mock global fetch (used for /api/auth/otp/send)
+const mockFetch = vi.fn()
 
 describe('PhoneAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    global.fetch = mockFetch
   })
 
   describe('Phone Entry Step', () => {
@@ -64,7 +61,10 @@ describe('PhoneAuth', () => {
 
     it('sends OTP when form is submitted', async () => {
       const user = userEvent.setup()
-      mockSignInWithOtp.mockResolvedValue({ data: { messageId: 'test' }, error: null })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      })
 
       render(<PhoneAuth />)
 
@@ -75,9 +75,10 @@ describe('PhoneAuth', () => {
       await user.click(button)
 
       await waitFor(() => {
-        expect(mockSignInWithOtp).toHaveBeenCalledWith({
-          phone: '+15551234567',
-          options: {},
+        expect(mockFetch).toHaveBeenCalledWith('/api/auth/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: '+15551234567' }),
         })
       })
     })
@@ -100,8 +101,9 @@ describe('PhoneAuth', () => {
 
     it('shows error when OTP send fails', async () => {
       const user = userEvent.setup()
-      mockSignInWithOtp.mockResolvedValue({
-        error: new Error('Unsupported phone provider'),
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Unsupported phone provider' }),
       })
 
       render(<PhoneAuth />)
@@ -122,9 +124,12 @@ describe('PhoneAuth', () => {
     // Helper function to get to OTP step
     async function navigateToOtpStep() {
       const user = userEvent.setup()
-      // Mock successful OTP send - include data property and use mockImplementation for immediate return
-      mockSignInWithOtp.mockImplementation(() =>
-        Promise.resolve({ data: { messageId: 'test' }, error: null })
+      // Mock successful OTP send via fetch
+      mockFetch.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({}),
+        })
       )
 
       render(<PhoneAuth />)
@@ -183,7 +188,7 @@ describe('PhoneAuth', () => {
 
     it('verifies OTP when form is submitted', async () => {
       const user = await navigateToOtpStep()
-      mockVerifyOtp.mockResolvedValue({ error: null })
+      mockSignIn.mockResolvedValue({ error: null })
 
       const input = screen.getByLabelText(/verification code/i)
       const button = screen.getByRole('button', { name: /verify and log in/i })
@@ -193,17 +198,17 @@ describe('PhoneAuth', () => {
       await user.click(button)
 
       await waitFor(() => {
-        expect(mockVerifyOtp).toHaveBeenCalledWith({
+        expect(mockSignIn).toHaveBeenCalledWith('phone-otp', {
           phone: '+15551234567',
-          token: '123456',
-          type: 'sms',
+          code: '123456',
+          redirect: false,
         })
       })
     }, 15000)
 
     it('redirects after successful verification', async () => {
       const user = await navigateToOtpStep()
-      mockVerifyOtp.mockResolvedValue({ error: null })
+      mockSignIn.mockResolvedValue({ error: null })
 
       const input = screen.getByLabelText(/verification code/i)
       const button = screen.getByRole('button', { name: /verify and log in/i })
@@ -238,8 +243,8 @@ describe('PhoneAuth', () => {
 
     it('shows error when verification fails', async () => {
       const user = await navigateToOtpStep()
-      mockVerifyOtp.mockResolvedValue({
-        error: new Error('Invalid verification code'),
+      mockSignIn.mockResolvedValue({
+        error: 'CredentialsSignin',
       })
 
       const input = screen.getByLabelText(/verification code/i)
@@ -282,8 +287,11 @@ describe('PhoneAuth', () => {
     it.skip('resends OTP when resend button is clicked', async () => {
       const user = await navigateToOtpStep()
 
-      mockSignInWithOtp.mockClear()
-      mockSignInWithOtp.mockResolvedValue({ data: { messageId: 'test' }, error: null })
+      mockFetch.mockClear()
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      })
 
       // Enable fake timers AFTER navigation completes
       vi.useFakeTimers()
@@ -300,9 +308,10 @@ describe('PhoneAuth', () => {
       await user.click(resendButton)
 
       await waitFor(() => {
-        expect(mockSignInWithOtp).toHaveBeenCalledWith({
-          phone: '+15551234567',
-          options: {},
+        expect(mockFetch).toHaveBeenCalledWith('/api/auth/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: '+15551234567' }),
         })
       })
 
@@ -344,7 +353,10 @@ describe('PhoneAuth', () => {
       )
 
       // Go back to OTP step
-      mockSignInWithOtp.mockResolvedValue({ data: { messageId: 'test' }, error: null })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      })
       const phoneInput = screen.getByLabelText(/log in with my mobile phone/i)
       const sendButton = screen.getByRole('button', { name: /send verification code/i })
       fireEvent.change(phoneInput, { target: { value: '5551234567' } })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Box,
@@ -28,12 +28,17 @@ import {
   Psychology as AIIcon,
   PlayArrow as ProcessIcon,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 
 interface PendingStats {
   suggestions: number
   updates: number
   urgent: number
+}
+
+interface PendingStatsResponse {
+  suggestions?: { pending: number; recent_pending: number }
+  updates?: { pending: number }
+  urgent?: { urgent: number }
 }
 
 function AnimatedCounter({ value }: { value: number }) {
@@ -77,8 +82,6 @@ export function PendingActions() {
   const [processing, setProcessing] = useState(false)
   const [processResult, setProcessResult] = useState<string | null>(null)
 
-  const supabase = createClient()
-
   // Handle auto-verification toggle
   const handleToggleAutoVerify = () => {
     setAutoVerifyEnabled(!autoVerifyEnabled)
@@ -111,127 +114,46 @@ export function PendingActions() {
       }
 
       if (result.success && result.message) {
-        setProcessResult(`✅ ${result.message} ($${(result.totalCost || 0).toFixed(4)} API cost)`)
+        setProcessResult(
+          `Verified: ${result.message} ($${(result.totalCost || 0).toFixed(4)} API cost)`
+        )
       } else {
-        setProcessResult(`❌ Error: ${result.error || 'Unknown error'}`)
+        setProcessResult(`Error: ${result.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error processing queue:', error)
-      setProcessResult('❌ Failed to process queue')
+      setProcessResult('Failed to process queue')
     } finally {
       setProcessing(false)
     }
   }
 
-  // Initial fetch
-  useEffect(() => {
-    async function fetchPendingStats() {
-      try {
-        // Fetch counts in parallel
-        const [suggestionsCount, updatesCount, urgentCount] = await Promise.all([
-          // Pending suggestions
-          supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending'),
-
-          // Pending updates
-          supabase
-            .from('resource_updates')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending'),
-
-          // Urgent items (older than 3 days)
-          supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-            .lt('created_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()),
-        ])
-
-        setStats({
-          suggestions: suggestionsCount.count || 0,
-          updates: updatesCount.count || 0,
-          urgent: urgentCount.count || 0,
-        })
-      } catch (error) {
-        console.error('Error fetching pending stats:', error)
-      } finally {
-        setLoading(false)
+  const fetchPendingStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/dashboard/stats?section=suggestions')
+      if (!response.ok) {
+        throw new Error('Failed to fetch pending stats')
       }
-    }
+      const data = (await response.json()) as PendingStatsResponse
 
+      setStats({
+        suggestions: data.suggestions?.pending || 0,
+        updates: data.updates?.pending || 0,
+        urgent: data.urgent?.urgent || 0,
+      })
+    } catch (error) {
+      console.error('Error fetching pending stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Initial fetch + polling every 10 seconds (replaces real-time subscriptions)
+  useEffect(() => {
     fetchPendingStats()
-  }, [supabase])
-
-  // Real-time subscription for suggestions
-  useEffect(() => {
-    const suggestionsChannel = supabase
-      .channel('pending_suggestions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resource_suggestions',
-        },
-        async () => {
-          const [suggestionsCount, urgentCount] = await Promise.all([
-            supabase
-              .from('resource_suggestions')
-              .select('*', { count: 'exact', head: true })
-              .eq('status', 'pending'),
-
-            supabase
-              .from('resource_suggestions')
-              .select('*', { count: 'exact', head: true })
-              .eq('status', 'pending')
-              .lt('created_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()),
-          ])
-
-          setStats((prev) => ({
-            ...prev,
-            suggestions: suggestionsCount.count || 0,
-            urgent: urgentCount.count || 0,
-          }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(suggestionsChannel)
-    }
-  }, [supabase])
-
-  // Real-time subscription for updates
-  useEffect(() => {
-    const updatesChannel = supabase
-      .channel('pending_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resource_updates',
-        },
-        async () => {
-          const { count } = await supabase
-            .from('resource_updates')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-
-          setStats((prev) => ({
-            ...prev,
-            updates: count || 0,
-          }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(updatesChannel)
-    }
-  }, [supabase])
+    const interval = setInterval(fetchPendingStats, 10000)
+    return () => clearInterval(interval)
+  }, [fetchPendingStats])
 
   const totalPending = stats.suggestions + stats.updates
 
@@ -296,7 +218,10 @@ export function PendingActions() {
 
         {/* Process Result Message */}
         {processResult && (
-          <Alert severity={processResult.startsWith('✅') ? 'success' : 'error'} sx={{ mb: 2 }}>
+          <Alert
+            severity={processResult.startsWith('Verified') ? 'success' : 'error'}
+            sx={{ mb: 2 }}
+          >
             {processResult}
           </Alert>
         )}
@@ -327,7 +252,7 @@ export function PendingActions() {
 
         {totalPending === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            ✅ All caught up! No pending items to review.
+            All caught up! No pending items to review.
           </Typography>
         ) : (
           <List dense disablePadding>

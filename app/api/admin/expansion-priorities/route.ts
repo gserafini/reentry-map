@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db, sql } from '@/lib/db/client'
+import { expansionPriorities } from '@/lib/db/schema'
 import type {
   CreateExpansionPriorityRequest,
   ExpansionPriorityFilters,
@@ -10,27 +12,51 @@ import type {
   ExpansionRegion,
 } from '@/lib/types/expansion'
 
+interface ExpansionPriorityWithProgress {
+  id: string
+  city: string
+  state: string
+  county: string | null
+  metro_area: string | null
+  region: string | null
+  phase: string | null
+  status: string
+  research_status: string
+  priority_score: number
+  population: number | null
+  state_release_volume: number | null
+  incarceration_rate: number | null
+  data_availability_score: number | null
+  geographic_cluster_bonus: number | null
+  community_partner_count: number | null
+  target_resource_count: number | null
+  current_resource_count: number | null
+  target_launch_date: string | null
+  priority_categories: string[] | null
+  data_sources: string[] | null
+  strategic_rationale: string | null
+  special_considerations: string | null
+  research_notes: string | null
+  blockers: string | null
+  research_agent_assigned_at: string | null
+  research_agent_completed_at: string | null
+  actual_launch_date: string | null
+  launched_by: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 // GET /api/admin/expansion-priorities - List expansion priorities with filtering
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await checkAdminAuth(request)
 
-    // Check admin auth
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Parse query parameters
@@ -55,52 +81,54 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    // Build query using the view that includes progress
-    let query = supabase.from('expansion_priorities_with_progress').select('*')
+    // Build query using the view that includes progress (using raw SQL)
+    // This is simpler than trying to build dynamic WHERE clauses
+    let whereClause = 'WHERE 1=1'
+    const params: (string | string[] | number)[] = []
+    let paramIndex = 1
 
-    // Apply filters
     if (filters.status && filters.status.length > 0) {
-      query = query.in('status', filters.status)
+      whereClause += ` AND status = ANY($${paramIndex++}::text[])`
+      params.push(filters.status)
     }
     if (filters.research_status && filters.research_status.length > 0) {
-      query = query.in('research_status', filters.research_status)
+      whereClause += ` AND research_status = ANY($${paramIndex++}::text[])`
+      params.push(filters.research_status)
     }
     if (filters.phase && filters.phase.length > 0) {
-      query = query.in('phase', filters.phase)
+      whereClause += ` AND phase = ANY($${paramIndex++}::text[])`
+      params.push(filters.phase)
     }
     if (filters.state && filters.state.length > 0) {
-      query = query.in('state', filters.state)
+      whereClause += ` AND state = ANY($${paramIndex++}::text[])`
+      params.push(filters.state)
     }
     if (filters.region && filters.region.length > 0) {
-      query = query.in('region', filters.region)
+      whereClause += ` AND region = ANY($${paramIndex++}::text[])`
+      params.push(filters.region)
     }
     if (filters.min_priority_score !== undefined) {
-      query = query.gte('priority_score', filters.min_priority_score)
+      whereClause += ` AND priority_score >= $${paramIndex++}`
+      params.push(filters.min_priority_score)
     }
     if (filters.search) {
-      // Full-text search on city, metro_area, strategic_rationale
-      query = query.textSearch('city', filters.search.split(' ').join(' & '), {
-        type: 'websearch',
-      })
+      whereClause += ` AND city ILIKE $${paramIndex++}`
+      params.push(`%${filters.search}%`)
     }
 
-    // Apply sorting
-    query = query.order(sortField, { ascending: sortDirection === 'asc' })
+    const orderClause = `ORDER BY ${sortField} ${sortDirection === 'asc' ? 'ASC' : 'DESC'}`
+    const limitClause = `LIMIT ${limit} OFFSET ${offset}`
 
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1)
-
-    const { data, error, count } = await query
-
-    if (error) {
-      console.error('Error fetching expansion priorities:', error)
-      return NextResponse.json({ error: 'Failed to fetch expansion priorities' }, { status: 500 })
-    }
+    // Execute query (using raw SQL for view)
+    const data = await sql.unsafe<ExpansionPriorityWithProgress[]>(
+      `SELECT * FROM expansion_priorities_with_progress ${whereClause} ${orderClause} ${limitClause}`,
+      params
+    )
 
     return NextResponse.json({
       data,
       pagination: {
-        total: count || data?.length || 0,
+        total: data?.length || 0,
         limit,
         offset,
       },
@@ -114,24 +142,13 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/expansion-priorities - Create new expansion priority
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await checkAdminAuth(request)
 
-    // Check admin auth
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     const body = (await request.json()) as CreateExpansionPriorityRequest
@@ -142,45 +159,44 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert expansion priority
-    const { data, error } = await supabase
-      .from('expansion_priorities')
-      .insert({
-        city: body.city,
-        state: body.state,
-        county: body.county,
-        metro_area: body.metro_area,
-        region: body.region,
-        phase: body.phase,
-        population: body.population,
-        state_release_volume: body.state_release_volume,
-        incarceration_rate: body.incarceration_rate,
-        data_availability_score: body.data_availability_score,
-        geographic_cluster_bonus: body.geographic_cluster_bonus,
-        community_partner_count: body.community_partner_count,
-        target_resource_count: body.target_resource_count || 50,
-        target_launch_date: body.target_launch_date,
-        priority_categories: body.priority_categories || [],
-        data_sources: body.data_sources || [],
-        strategic_rationale: body.strategic_rationale,
-        special_considerations: body.special_considerations,
-        created_by: user.id,
-      })
-      .select()
-      .single()
+    try {
+      const [data] = await db
+        .insert(expansionPriorities)
+        .values({
+          city: body.city,
+          state: body.state,
+          county: body.county,
+          metroArea: body.metro_area,
+          region: body.region,
+          phase: body.phase,
+          population: body.population,
+          stateReleaseVolume: body.state_release_volume,
+          incarcerationRate: body.incarceration_rate,
+          dataAvailabilityScore: body.data_availability_score,
+          geographicClusterBonus: body.geographic_cluster_bonus,
+          communityPartnerCount: body.community_partner_count,
+          targetResourceCount: body.target_resource_count || 50,
+          targetLaunchDate: body.target_launch_date ? new Date(body.target_launch_date) : null,
+          priorityCategories: body.priority_categories || [],
+          dataSources: body.data_sources || [],
+          strategicRationale: body.strategic_rationale,
+          specialConsiderations: body.special_considerations,
+          createdBy: auth.userId || null,
+        })
+        .returning()
 
-    if (error) {
-      console.error('Error creating expansion priority:', error)
-      if (error.code === '23505') {
+      return NextResponse.json(data, { status: 201 })
+    } catch (insertError) {
+      const errorCode = (insertError as { code?: string }).code
+      if (errorCode === '23505') {
         // Unique constraint violation
         return NextResponse.json(
           { error: 'Expansion priority for this city/state already exists' },
           { status: 409 }
         )
       }
-      return NextResponse.json({ error: 'Failed to create expansion priority' }, { status: 500 })
+      throw insertError
     }
-
-    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Error in POST /api/admin/expansion-priorities:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

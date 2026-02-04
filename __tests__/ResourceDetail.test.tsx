@@ -1,7 +1,24 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import type { Resource } from '@/lib/types/database'
+
+// Mock NextAuth session (needed by child components like FavoriteButton)
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({ data: null, status: 'unauthenticated' }),
+  signOut: vi.fn(),
+}))
+
+// Mock Next.js router (needed by useAuth)
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}))
+
+// Mock analytics
+vi.mock('@/lib/analytics/queue', () => ({
+  identifyUser: vi.fn(),
+  clearUser: vi.fn(),
+}))
 
 describe('ResourceDetail', () => {
   const mockResource: Resource = {
@@ -79,9 +96,7 @@ describe('ResourceDetail', () => {
 
   it('displays rating information', () => {
     render(<ResourceDetail resource={mockResource} />)
-    // Check for rating - might be split across elements
     expect(screen.getByText(/4.5/)).toBeInTheDocument()
-    // Check for review count - might be "10 Reviews", "10", or other format
     const container = screen
       .getByText(/4.5/)
       .closest('[itemtype="https://schema.org/LocalBusiness"]')

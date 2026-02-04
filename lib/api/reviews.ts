@@ -1,213 +1,266 @@
-import { createClient } from '@/lib/supabase/client'
-import type { Database } from '@/lib/types/database'
-
-type ResourceReviewInsert = Database['public']['Tables']['resource_reviews']['Insert']
-
 /**
- * Reviews API
+ * Reviews API - Drizzle ORM Implementation
  *
- * Functions for managing resource reviews
+ * Functions for managing resource reviews using self-hosted PostgreSQL.
  */
+
+import { sql as sqlClient } from '@/lib/db/client'
+
+export interface ResourceReview {
+  id: string
+  user_id: string
+  resource_id: string
+  rating: number
+  text: string | null
+  pros: string[] | null
+  cons: string[] | null
+  tips: string | null
+  status: string
+  helpful_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ResourceReviewWithUser extends ResourceReview {
+  user: {
+    id: string
+    name: string | null
+    phone: string | null
+    avatar_url: string | null
+  } | null
+}
+
+export interface ReviewInsert {
+  user_id: string
+  resource_id: string
+  rating: number
+  text?: string | null
+  pros?: string[] | null
+  cons?: string[] | null
+  tips?: string | null
+}
+
+export interface ReviewHelpfulness {
+  id: string
+  user_id: string
+  review_id: string
+  is_helpful: boolean
+  created_at: string
+}
 
 /**
  * Get all reviews for a resource
  */
 export async function getResourceReviews(resourceId: string) {
-  const supabase = createClient()
-
-  // First check if there are any reviews (avoid query error when no reviews exist)
-  const { count } = await supabase
-    .from('resource_reviews')
-    .select('*', { count: 'exact', head: true })
-    .eq('resource_id', resourceId)
-
-  // If no reviews, return empty array
-  if (!count || count === 0) {
-    return { data: [], error: null }
-  }
-
-  // Fetch reviews with user data
-  const { data, error } = await supabase
-    .from('resource_reviews')
-    .select(
-      `
-      *,
-      user:users!resource_reviews_user_id_fkey(id, name, phone, avatar_url)
+  try {
+    // Direct query with join - no need to check count first
+    const data = await sqlClient<ResourceReviewWithUser[]>`
+      SELECT
+        rr.id,
+        rr.user_id,
+        rr.resource_id,
+        rr.rating,
+        rr.text,
+        rr.pros,
+        rr.cons,
+        rr.tips,
+        rr.status,
+        rr.helpful_count,
+        rr.created_at::text,
+        rr.updated_at::text,
+        json_build_object('id', u.id, 'name', u.name, 'phone', u.phone, 'avatar_url', u.avatar_url) as user
+      FROM resource_reviews rr
+      LEFT JOIN users u ON rr.user_id = u.id
+      WHERE rr.resource_id = ${resourceId}
+      ORDER BY rr.created_at DESC
     `
-    )
-    .eq('resource_id', resourceId)
-    .order('created_at', { ascending: false })
 
-  if (error) {
+    return { data: data || [], error: null }
+  } catch (error) {
     console.error('Error fetching reviews:', error)
-    return { data: [], error }
+    return { data: [], error: error as Error }
   }
-
-  return { data: data || [], error: null }
 }
 
 /**
  * Get user's review for a resource
  */
 export async function getUserReview(userId: string, resourceId: string) {
-  const supabase = createClient()
+  try {
+    const result = await sqlClient<ResourceReview[]>`
+      SELECT
+        id, user_id, resource_id, rating, text, pros, cons, tips, status, helpful_count,
+        created_at::text, updated_at::text
+      FROM resource_reviews
+      WHERE user_id = ${userId} AND resource_id = ${resourceId}
+      LIMIT 1
+    `
 
-  const { data, error } = await supabase
-    .from('resource_reviews')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('resource_id', resourceId)
-    .single()
-
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116 is "not found" which is fine
+    return result[0] || null
+  } catch (error) {
     console.error('Error fetching user review:', error)
+    return null
   }
-
-  return data
 }
 
 /**
  * Submit a new review
  */
-export async function submitReview(review: ResourceReviewInsert) {
-  const supabase = createClient()
+export async function submitReview(review: ReviewInsert) {
+  try {
+    const data = await sqlClient<ResourceReview[]>`
+      INSERT INTO resource_reviews (user_id, resource_id, rating, text, pros, cons, tips)
+      VALUES (
+        ${review.user_id},
+        ${review.resource_id},
+        ${review.rating},
+        ${review.text || null},
+        ${review.pros || null},
+        ${review.cons || null},
+        ${review.tips || null}
+      )
+      RETURNING id, user_id, resource_id, rating, text, pros, cons, tips, status, helpful_count, created_at::text, updated_at::text
+    `
 
-  const { data, error } = await supabase.from('resource_reviews').insert(review).select().single()
-
-  if (error) {
+    return { data: data[0] || null, error: null }
+  } catch (error) {
     console.error('Error submitting review:', error)
-    return { data: null, error }
+    return { data: null, error: error as Error }
   }
-
-  return { data, error: null }
 }
 
 /**
  * Update an existing review
  */
-export async function updateReview(reviewId: string, updates: Partial<ResourceReviewInsert>) {
-  const supabase = createClient()
+export async function updateReview(
+  reviewId: string,
+  userId: string,
+  updates: Partial<ReviewInsert>
+) {
+  try {
+    // Only update fields that were explicitly provided
+    const data = await sqlClient<ResourceReview[]>`
+      UPDATE resource_reviews
+      SET
+        rating = CASE WHEN ${updates.rating !== undefined} THEN ${updates.rating ?? null} ELSE rating END,
+        text = CASE WHEN ${updates.text !== undefined} THEN ${updates.text ?? null} ELSE text END,
+        pros = CASE WHEN ${updates.pros !== undefined} THEN ${updates.pros ?? null} ELSE pros END,
+        cons = CASE WHEN ${updates.cons !== undefined} THEN ${updates.cons ?? null} ELSE cons END,
+        tips = CASE WHEN ${updates.tips !== undefined} THEN ${updates.tips ?? null} ELSE tips END,
+        updated_at = NOW()
+      WHERE id = ${reviewId} AND user_id = ${userId}
+      RETURNING id, user_id, resource_id, rating, text, pros, cons, tips, status, helpful_count, created_at::text, updated_at::text
+    `
 
-  const { data, error } = await supabase
-    .from('resource_reviews')
-    .update(updates)
-    .eq('id', reviewId)
-    .select()
-    .single()
+    if (data.length === 0) {
+      return { data: null, error: new Error('Review not found or not owned by user') }
+    }
 
-  if (error) {
+    return { data: data[0], error: null }
+  } catch (error) {
     console.error('Error updating review:', error)
-    return { data: null, error }
+    return { data: null, error: error as Error }
   }
-
-  return { data, error: null }
 }
 
 /**
  * Delete a review
  */
 export async function deleteReview(reviewId: string, userId: string) {
-  const supabase = createClient()
+  try {
+    await sqlClient`
+      DELETE FROM resource_reviews
+      WHERE id = ${reviewId} AND user_id = ${userId}
+    `
 
-  const { error } = await supabase
-    .from('resource_reviews')
-    .delete()
-    .eq('id', reviewId)
-    .eq('user_id', userId) // Ensure user can only delete their own review
-
-  if (error) {
+    return { error: null }
+  } catch (error) {
     console.error('Error deleting review:', error)
-    return { error }
+    return { error: error as Error }
   }
-
-  return { error: null }
 }
 
 /**
  * Vote on review helpfulness
  */
 export async function voteReviewHelpfulness(userId: string, reviewId: string, isHelpful: boolean) {
-  const supabase = createClient()
+  try {
+    const data = await sqlClient<ReviewHelpfulness[]>`
+      INSERT INTO review_helpfulness (user_id, review_id, is_helpful)
+      VALUES (${userId}, ${reviewId}, ${isHelpful})
+      ON CONFLICT (user_id, review_id)
+      DO UPDATE SET is_helpful = ${isHelpful}
+      RETURNING id, user_id, review_id, is_helpful, created_at::text
+    `
 
-  const vote = {
-    user_id: userId,
-    review_id: reviewId,
-    is_helpful: isHelpful,
-  }
-
-  const { data, error } = await supabase
-    .from('review_helpfulness')
-    .upsert(vote, {
-      onConflict: 'user_id,review_id',
-    })
-    .select()
-    .single()
-
-  if (error) {
+    return { data: data[0] || null, error: null }
+  } catch (error) {
     console.error('Error voting on review helpfulness:', error)
-    return { data: null, error }
+    return { data: null, error: error as Error }
   }
-
-  return { data, error: null }
 }
 
 /**
  * Remove helpfulness vote
  */
 export async function removeHelpfulnessVote(userId: string, reviewId: string) {
-  const supabase = createClient()
+  try {
+    await sqlClient`
+      DELETE FROM review_helpfulness
+      WHERE user_id = ${userId} AND review_id = ${reviewId}
+    `
 
-  const { error } = await supabase
-    .from('review_helpfulness')
-    .delete()
-    .eq('user_id', userId)
-    .eq('review_id', reviewId)
-
-  if (error) {
+    return { error: null }
+  } catch (error) {
     console.error('Error removing helpfulness vote:', error)
-    return { error }
+    return { error: error as Error }
   }
-
-  return { error: null }
 }
 
 /**
  * Get user's helpfulness votes for reviews
  */
 export async function getUserHelpfulnessVotes(userId: string, reviewIds: string[]) {
-  const supabase = createClient()
+  try {
+    if (reviewIds.length === 0) {
+      return { data: [], error: null }
+    }
 
-  const { data, error } = await supabase
-    .from('review_helpfulness')
-    .select('*')
-    .eq('user_id', userId)
-    .in('review_id', reviewIds)
+    const data = await sqlClient<ReviewHelpfulness[]>`
+      SELECT id, user_id, review_id, is_helpful, created_at::text
+      FROM review_helpfulness
+      WHERE user_id = ${userId}
+        AND review_id = ANY(${reviewIds}::uuid[])
+    `
 
-  if (error) {
+    return { data, error: null }
+  } catch (error) {
     console.error('Error fetching helpfulness votes:', error)
-    return { data: null, error }
+    return { data: null, error: error as Error }
   }
-
-  return { data, error: null }
 }
 
 /**
  * Get review statistics
  */
 export async function getReviewStats(resourceId: string) {
-  const supabase = createClient()
+  try {
+    const data = await sqlClient<
+      { rating_average: number; rating_count: number; review_count: number }[]
+    >`
+      SELECT rating_average, rating_count, review_count
+      FROM resources
+      WHERE id = ${resourceId}
+      LIMIT 1
+    `
 
-  const { data, error } = await supabase
-    .from('resources')
-    .select('rating_average, rating_count, review_count')
-    .eq('id', resourceId)
-    .single()
+    if (data.length === 0) {
+      return { data: null, error: new Error('Resource not found') }
+    }
 
-  if (error) {
+    return { data: data[0], error: null }
+  } catch (error) {
     console.error('Error fetching review stats:', error)
-    return { data: null, error }
+    return { data: null, error: error as Error }
   }
-
-  return { data, error: null }
 }

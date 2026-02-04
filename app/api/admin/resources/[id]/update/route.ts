@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 /**
  * PATCH /api/admin/resources/[id]/update
@@ -8,7 +11,7 @@ import { checkAdminAuth } from '@/lib/utils/admin-auth'
  * Used for re-verification sweeps to update contact info, hours, services
  *
  * Authentication:
- * - Session-based (browser/Claude Web): Automatic via Supabase auth
+ * - Session-based (browser/Claude Web): Automatic via NextAuth
  * - API key (Claude Code/scripts): Include header `x-admin-api-key: your-key`
  *
  * Body:
@@ -41,7 +44,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    const supabase = auth.getClient()
     const { id } = await params
     const body = (await request.json()) as {
       updates?: Record<string, unknown>
@@ -82,31 +84,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // Fetch current resource
-    const { data: resource, error: fetchError } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const [resource] = await db.select().from(resources).where(eq(resources.id, id)).limit(1)
 
-    if (fetchError || !resource) {
+    if (!resource) {
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
     }
 
     // Build update object with tracking fields
     const updateData = {
       ...updates,
-      verification_source,
-      last_verified_at: new Date().toISOString(),
-      verified_by: auth.userId || 'api_key',
+      verificationSource: verification_source,
+      lastVerifiedAt: new Date(),
+      verifiedBy: auth.userId || 'api_key',
     }
 
     // Update resource
-    const { error: updateError } = await supabase.from('resources').update(updateData).eq('id', id)
-
-    if (updateError) {
-      console.error('Failed to update resource:', updateError)
-      return NextResponse.json({ error: 'Failed to update resource' }, { status: 500 })
-    }
+    await db.update(resources).set(updateData).where(eq(resources.id, id))
 
     // Log the verification notes (could add to audit log table in future)
     console.log(`Resource ${id} updated:`, verification_notes)

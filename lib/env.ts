@@ -7,9 +7,6 @@ export const env = createEnv({
    * These are never exposed to the client
    */
   server: {
-    // Supabase server-only keys
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-
     // NextAuth.js configuration
     DATABASE_URL: z.string().url().optional(),
     DIRECT_DATABASE_URL: z.string().url().optional(),
@@ -50,10 +47,6 @@ export const env = createEnv({
    * These must be prefixed with NEXT_PUBLIC_
    */
   client: {
-    // Supabase public configuration
-    NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-
     // Application URL (for redirects, SEO, etc.)
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 
@@ -79,7 +72,6 @@ export const env = createEnv({
    */
   runtimeEnv: {
     // Server-only
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
     DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
@@ -96,8 +88,6 @@ export const env = createEnv({
     USE_EXTERNAL_IP_IN_DEV: process.env.USE_EXTERNAL_IP_IN_DEV,
 
     // Client-side
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_GOOGLE_MAPS_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY,
     NEXT_PUBLIC_DEFAULT_CITY: process.env.NEXT_PUBLIC_DEFAULT_CITY,

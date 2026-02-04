@@ -6,8 +6,6 @@
  * Queries the expansion priorities database to get the highest-priority
  * locations ready for research by AI agents.
  *
- * Uses Supabase service role key for admin access (bypasses RLS).
- *
  * Usage:
  *   node scripts/get-next-targets.mjs [limit] [status] [research_status]
  *
@@ -17,16 +15,43 @@
  *   node scripts/get-next-targets.mjs 20 identified,researching not_started,blocked
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const projectRoot = join(__dirname, '..')
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('Error: Missing Supabase environment variables')
-  console.error('Required: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
-  process.exit(1)
+// Load environment variables from .env.local
+function loadEnv() {
+  try {
+    const envPath = join(projectRoot, '.env.local')
+    const envFile = readFileSync(envPath, 'utf-8')
+    const lines = envFile.split('\n')
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+
+      const [key, ...valueParts] = trimmed.split('=')
+      const value = valueParts.join('=').trim()
+
+      if (key && value && !process.env[key]) {
+        process.env[key] = value
+      }
+    }
+  } catch (_error) {
+    // .env.local may not exist
+  }
 }
+
+loadEnv()
+
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 // Parse command line args
 const limit = parseInt(process.argv[2] || '10')
@@ -37,34 +62,17 @@ const researchStatusFilter = process.argv[4]
 
 async function getNextTargets() {
   try {
-    // Create Supabase admin client (bypasses RLS)
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    // Build query matching API logic
-    let query = supabase
-      .from('expansion_priorities')
-      .select('*')
-      .order('priority_score', { ascending: false })
-
-    // Apply filters (matching next-target API defaults)
-    query = query.in('status', statusFilter)
-    query = query.in('research_status', researchStatusFilter)
-    query = query.limit(limit)
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Database error:', error)
-      process.exit(1)
-    }
+    const data = await sql`
+      SELECT *
+      FROM expansion_priorities
+      WHERE status = ANY(${statusFilter})
+        AND research_status = ANY(${researchStatusFilter})
+      ORDER BY priority_score DESC
+      LIMIT ${limit}
+    `
 
     // Display results
-    if (!data || data.length === 0) {
+    if (data.length === 0) {
       console.log('\n⚠️  No targets found matching criteria')
       console.log(`   Status: ${statusFilter.join(', ')}`)
       console.log(`   Research Status: ${researchStatusFilter.join(', ')}`)
@@ -99,6 +107,8 @@ async function getNextTargets() {
   } catch (error) {
     console.error('Error:', error.message)
     process.exit(1)
+  } finally {
+    await sql.end()
   }
 }
 

@@ -1,35 +1,13 @@
 import { getSession } from 'next-auth/react'
 
 /**
- * Admin utilities
+ * Admin utilities (client-safe)
  *
- * Functions for checking admin access and permissions
+ * Functions for checking admin access in client components.
+ * Uses NextAuth.js session only - no database imports.
  *
- * Migration note: Switched from Supabase Auth to NextAuth.js
+ * For server-side admin auth, use lib/utils/admin-auth.ts
  */
-
-/**
- * Check if a user is an admin by user ID
- *
- * Note: This still queries the Supabase database for admin status.
- * The isAdmin flag is also available in the NextAuth session token.
- *
- * @deprecated Use useAuth().isAdmin instead when possible
- */
-export async function isAdmin(userId: string): Promise<boolean> {
-  // Import dynamically to avoid client-side issues
-  const { createClient } = await import('@/lib/supabase/client')
-  const supabase = createClient()
-
-  const { data, error } = await supabase.from('users').select('is_admin').eq('id', userId).single()
-
-  if (error) {
-    console.error('Error checking admin status:', error)
-    return false
-  }
-
-  return data?.is_admin || false
-}
 
 /**
  * Check if current user is admin (for use in components)

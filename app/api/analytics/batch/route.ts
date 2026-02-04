@@ -9,12 +9,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import type { AnalyticsEvent } from '@/lib/analytics/queue'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { analyticsEventBatchSchema } from '@/lib/analytics/schemas'
+import { sql } from '@/lib/db/client'
 
-export const runtime = 'edge' // Fast cold starts
 export const maxDuration = 1 // Max 1 second (forces fast return)
 
 // Enriched event with server-side data
@@ -69,10 +67,7 @@ export async function POST(request: NextRequest) {
  * This runs AFTER the HTTP response is sent
  */
 async function processEventsAsync(events: AnalyticsEvent[], request: NextRequest): Promise<void> {
-  const supabase = await createClient()
-
-  // Get IP-based geolocation from Vercel headers (privacy-safe)
-  // Note: request.geo is only available in Edge runtime on Vercel
+  // Get IP-based geolocation from headers (privacy-safe)
   const country = (request as NextRequest & { geo?: { country?: string } }).geo?.country || null
   const city = (request as NextRequest & { geo?: { city?: string } }).geo?.city || null
   const region = (request as NextRequest & { geo?: { region?: string } }).geo?.region || null
@@ -91,61 +86,52 @@ async function processEventsAsync(events: AnalyticsEvent[], request: NextRequest
 
   // Route events to appropriate tables based on event type
   await Promise.all([
-    processPageViewEvents(enrichedEvents, supabase),
-    processSearchEvents(enrichedEvents, supabase),
-    processResourceEvents(enrichedEvents, supabase),
-    processMapEvents(enrichedEvents, supabase),
-    processFeatureEvents(enrichedEvents, supabase),
-    processPerformanceEvents(enrichedEvents, supabase),
+    processPageViewEvents(enrichedEvents),
+    processSearchEvents(enrichedEvents),
+    processResourceEvents(enrichedEvents),
+    processMapEvents(enrichedEvents),
+    processFeatureEvents(enrichedEvents),
+    processPerformanceEvents(enrichedEvents),
   ])
 
   // Update session metadata
-  await updateSessionMetadata(enrichedEvents, supabase)
+  await updateSessionMetadata(enrichedEvents)
 }
 
-async function processPageViewEvents(events: EnrichedAnalyticsEvent[], supabase: SupabaseClient) {
+async function processPageViewEvents(events: EnrichedAnalyticsEvent[]) {
   const pageViews = events.filter((e) => e.event === 'page_view')
   if (pageViews.length === 0) return
 
-  await supabase.from('analytics_page_views').insert(
-    pageViews.map((e) => ({
-      session_id: e.session_id,
-      user_id: e.user_id,
-      anonymous_id: e.anonymous_id,
-      is_admin: e.is_admin,
-      page_path: e.page_path,
-      page_title: e.properties?.page_title,
-      referrer: e.referrer,
-      viewport_width: e.viewport?.width,
-      viewport_height: e.viewport?.height,
-      load_time_ms: e.properties?.load_time_ms,
-      timestamp: e.timestamp,
-    }))
-  )
+  for (const e of pageViews) {
+    const pageTitle = (e.properties?.page_title as string) ?? null
+    const loadTimeMs = (e.properties?.load_time_ms as number) ?? null
+    await sql`
+      INSERT INTO analytics_page_views (session_id, user_id, anonymous_id, is_admin, page_path, page_title, referrer, viewport_width, viewport_height, load_time_ms, timestamp)
+      VALUES (${e.session_id ?? null}, ${e.user_id ?? null}, ${e.anonymous_id ?? null}, ${e.is_admin ?? false}, ${e.page_path ?? null}, ${pageTitle}, ${e.referrer ?? null}, ${e.viewport?.width ?? null}, ${e.viewport?.height ?? null}, ${loadTimeMs}, ${e.timestamp ?? null})
+    `
+  }
 }
 
-async function processSearchEvents(events: EnrichedAnalyticsEvent[], supabase: SupabaseClient) {
+async function processSearchEvents(events: EnrichedAnalyticsEvent[]) {
   const searches = events.filter((e) => e.event === 'search')
   if (searches.length === 0) return
 
-  await supabase.from('analytics_search_events').insert(
-    searches.map((e) => ({
-      session_id: e.session_id,
-      user_id: e.user_id,
-      anonymous_id: e.anonymous_id,
-      is_admin: e.is_admin,
-      search_query: e.properties?.query,
-      filters: e.properties?.filters,
-      results_count: e.properties?.results_count,
-      first_click_position: e.properties?.first_click_position,
-      time_to_first_click_seconds: e.properties?.time_to_first_click_seconds,
-      refinement_count: e.properties?.refinement_count || 0,
-      timestamp: e.timestamp,
-    }))
-  )
+  for (const e of searches) {
+    const props = e.properties
+    const filtersJson: string | null = props?.filters ? JSON.stringify(props.filters) : null
+    const query = (props?.query as string) ?? null
+    const resultsCount = (props?.results_count as number) ?? null
+    const firstClickPos = (props?.first_click_position as number) ?? null
+    const timeToFirstClick = (props?.time_to_first_click_seconds as number) ?? null
+    const refinementCount = (props?.refinement_count as number) ?? 0
+    await sql`
+      INSERT INTO analytics_search_events (session_id, user_id, anonymous_id, is_admin, search_query, filters, results_count, first_click_position, time_to_first_click_seconds, refinement_count, timestamp)
+      VALUES (${e.session_id ?? null}, ${e.user_id ?? null}, ${e.anonymous_id ?? null}, ${e.is_admin ?? false}, ${query}, ${filtersJson}, ${resultsCount}, ${firstClickPos}, ${timeToFirstClick}, ${refinementCount}, ${e.timestamp ?? null})
+    `
+  }
 }
 
-async function processResourceEvents(events: EnrichedAnalyticsEvent[], supabase: SupabaseClient) {
+async function processResourceEvents(events: EnrichedAnalyticsEvent[]) {
   const resourceEvents = events.filter((e) =>
     [
       'resource_view',
@@ -158,88 +144,69 @@ async function processResourceEvents(events: EnrichedAnalyticsEvent[], supabase:
   )
   if (resourceEvents.length === 0) return
 
-  await supabase.from('analytics_resource_events').insert(
-    resourceEvents.map((e) => ({
-      session_id: e.session_id,
-      user_id: e.user_id,
-      anonymous_id: e.anonymous_id,
-      is_admin: e.is_admin,
-      resource_id: e.properties?.resource_id,
-      event_type: e.event.replace('resource_', ''),
-      time_spent_seconds: e.properties?.time_spent_seconds,
-      scroll_depth_percent: e.properties?.scroll_depth_percent,
-      source: e.properties?.source,
-      metadata: e.properties?.metadata,
-      timestamp: e.timestamp,
-    }))
-  )
+  for (const e of resourceEvents) {
+    const props = e.properties
+    const metadataJson: string | null = props?.metadata ? JSON.stringify(props.metadata) : null
+    const resourceId = (props?.resource_id as string) ?? null
+    const timeSpent = (props?.time_spent_seconds as number) ?? null
+    const scrollDepth = (props?.scroll_depth_percent as number) ?? null
+    const source = (props?.source as string) ?? null
+    await sql`
+      INSERT INTO analytics_resource_events (session_id, user_id, anonymous_id, is_admin, resource_id, event_type, time_spent_seconds, scroll_depth_percent, source, metadata, timestamp)
+      VALUES (${e.session_id ?? null}, ${e.user_id ?? null}, ${e.anonymous_id ?? null}, ${e.is_admin ?? false}, ${resourceId}, ${e.event.replace('resource_', '')}, ${timeSpent}, ${scrollDepth}, ${source}, ${metadataJson}, ${e.timestamp ?? null})
+    `
+  }
 }
 
-async function processMapEvents(events: EnrichedAnalyticsEvent[], supabase: SupabaseClient) {
+async function processMapEvents(events: EnrichedAnalyticsEvent[]) {
   const mapEvents = events.filter((e) =>
     ['map_move', 'map_zoom', 'map_marker_click'].includes(e.event)
   )
   if (mapEvents.length === 0) return
 
-  await supabase.from('analytics_map_events').insert(
-    mapEvents.map((e) => ({
-      session_id: e.session_id,
-      user_id: e.user_id,
-      anonymous_id: e.anonymous_id,
-      is_admin: e.is_admin,
-      event_type: e.event.replace('map_', ''),
-      center_lat: e.properties?.center_lat,
-      center_lng: e.properties?.center_lng,
-      zoom_level: e.properties?.zoom_level,
-      visible_markers: e.properties?.visible_markers,
-      timestamp: e.timestamp,
-    }))
-  )
+  for (const e of mapEvents) {
+    const centerLat = (e.properties?.center_lat as number) ?? null
+    const centerLng = (e.properties?.center_lng as number) ?? null
+    const zoomLevel = (e.properties?.zoom_level as number) ?? null
+    const visibleMarkers = (e.properties?.visible_markers as number) ?? null
+    await sql`
+      INSERT INTO analytics_map_events (session_id, user_id, anonymous_id, is_admin, event_type, center_lat, center_lng, zoom_level, visible_markers, timestamp)
+      VALUES (${e.session_id ?? null}, ${e.user_id ?? null}, ${e.anonymous_id ?? null}, ${e.is_admin ?? false}, ${e.event.replace('map_', '')}, ${centerLat}, ${centerLng}, ${zoomLevel}, ${visibleMarkers}, ${e.timestamp ?? null})
+    `
+  }
 }
 
-async function processFeatureEvents(events: EnrichedAnalyticsEvent[], supabase: SupabaseClient) {
+async function processFeatureEvents(events: EnrichedAnalyticsEvent[]) {
   const featureEvents = events.filter((e) => e.event.startsWith('feature_'))
   if (featureEvents.length === 0) return
 
-  await supabase.from('analytics_feature_events').insert(
-    featureEvents.map((e) => ({
-      session_id: e.session_id,
-      user_id: e.user_id,
-      anonymous_id: e.anonymous_id,
-      is_admin: e.is_admin,
-      feature_name: e.event.replace('feature_', ''),
-      event_type: e.properties?.event_type || 'use',
-      metadata: e.properties,
-      timestamp: e.timestamp,
-    }))
-  )
+  for (const e of featureEvents) {
+    const eventType = (e.properties?.event_type as string) ?? 'use'
+    const propsJson: string | null = e.properties ? JSON.stringify(e.properties) : null
+    await sql`
+      INSERT INTO analytics_feature_events (session_id, user_id, anonymous_id, is_admin, feature_name, event_type, metadata, timestamp)
+      VALUES (${e.session_id ?? null}, ${e.user_id ?? null}, ${e.anonymous_id ?? null}, ${e.is_admin ?? false}, ${e.event.replace('feature_', '')}, ${eventType}, ${propsJson}, ${e.timestamp ?? null})
+    `
+  }
 }
 
-async function processPerformanceEvents(
-  events: EnrichedAnalyticsEvent[],
-  supabase: SupabaseClient
-) {
+async function processPerformanceEvents(events: EnrichedAnalyticsEvent[]) {
   const perfEvents = events.filter((e) => ['performance', 'error'].includes(e.event))
   if (perfEvents.length === 0) return
 
-  await supabase.from('analytics_performance_events').insert(
-    perfEvents.map((e) => ({
-      session_id: e.session_id,
-      user_id: e.user_id,
-      anonymous_id: e.anonymous_id,
-      is_admin: e.is_admin,
-      event_type: e.event,
-      page_path: e.page_path,
-      metric_name: e.properties?.metric_name,
-      metric_value: e.properties?.metric_value,
-      error_message: e.properties?.error_message,
-      error_stack: e.properties?.error_stack,
-      timestamp: e.timestamp,
-    }))
-  )
+  for (const e of perfEvents) {
+    const metricName = (e.properties?.metric_name as string) ?? null
+    const metricValue = (e.properties?.metric_value as number) ?? null
+    const errorMessage = (e.properties?.error_message as string) ?? null
+    const errorStack = (e.properties?.error_stack as string) ?? null
+    await sql`
+      INSERT INTO analytics_performance_events (session_id, user_id, anonymous_id, is_admin, event_type, page_path, metric_name, metric_value, error_message, error_stack, timestamp)
+      VALUES (${e.session_id ?? null}, ${e.user_id ?? null}, ${e.anonymous_id ?? null}, ${e.is_admin ?? false}, ${e.event ?? null}, ${e.page_path ?? null}, ${metricName}, ${metricValue}, ${errorMessage}, ${errorStack}, ${e.timestamp ?? null})
+    `
+  }
 }
 
-async function updateSessionMetadata(events: EnrichedAnalyticsEvent[], supabase: SupabaseClient) {
+async function updateSessionMetadata(events: EnrichedAnalyticsEvent[]) {
   // Get unique sessions from this batch
   const sessions = new Map<
     string,
@@ -280,21 +247,13 @@ async function updateSessionMetadata(events: EnrichedAnalyticsEvent[], supabase:
   })
 
   // Upsert sessions (create if not exists, update if exists)
-  await supabase.from('analytics_sessions').upsert(
-    Array.from(sessions.values()).map((s) => ({
-      session_id: s.session_id,
-      user_id: s.user_id,
-      anonymous_id: s.anonymous_id,
-      is_admin: s.is_admin,
-      device_type: s.device_type,
-      browser: s.browser,
-      os: s.os,
-      city: s.city,
-      state: s.region,
-      country: s.country,
-      started_at: s.started_at,
-      referrer: s.referrer,
-    })),
-    { onConflict: 'session_id' }
-  )
+  for (const s of sessions.values()) {
+    await sql`
+      INSERT INTO analytics_sessions (session_id, user_id, anonymous_id, is_admin, device_type, browser, os, city, state, country, started_at, referrer)
+      VALUES (${s.session_id ?? null}, ${s.user_id ?? null}, ${s.anonymous_id ?? null}, ${s.is_admin ?? false}, ${s.device_type ?? null}, ${s.browser ?? null}, ${s.os ?? null}, ${s.city ?? null}, ${s.region ?? null}, ${s.country ?? null}, ${s.started_at ?? null}, ${s.referrer ?? null})
+      ON CONFLICT (session_id) DO UPDATE SET
+        user_id = COALESCE(EXCLUDED.user_id, analytics_sessions.user_id),
+        anonymous_id = COALESCE(EXCLUDED.anonymous_id, analytics_sessions.anonymous_id)
+    `
+  }
 }

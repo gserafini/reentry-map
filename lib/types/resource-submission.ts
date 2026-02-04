@@ -10,7 +10,7 @@
  *
  * When you add a field to the resources table:
  * 1. Update database migration
- * 2. Regenerate database types (npm run supabase:types)
+ * 2. Update database types in lib/types/database.ts
  * 3. ResourceSubmission automatically includes the new field
  *
  * Used by:

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BaseAgent } from './base-agent'
-import { createClient } from '@/lib/supabase/client'
+import { sql } from '@/lib/db/client'
 import { geocodeAddress } from '@/lib/utils/geocoding'
 
 interface _EnrichmentResult {
@@ -72,21 +72,18 @@ export class EnrichmentAgent extends BaseAgent {
    * Get resources that need enrichment (missing key fields)
    */
   private async getResourcesNeedingEnrichment(): Promise<any[]> {
-    const supabase = createClient()
-
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('status', 'active')
-      .or('latitude.is.null,longitude.is.null,description.is.null,hours.is.null')
-      .limit(20) // Process in batches
-
-    if (error) {
+    try {
+      const rows = await sql`
+        SELECT * FROM resources
+        WHERE status = 'active'
+        AND (latitude IS NULL OR longitude IS NULL OR description IS NULL OR hours IS NULL)
+        LIMIT 20
+      `
+      return rows
+    } catch (error) {
       console.error('Error fetching resources:', error)
       return []
     }
-
-    return data || []
   }
 
   /**
@@ -101,21 +98,17 @@ export class EnrichmentAgent extends BaseAgent {
     const fieldsEnriched: string[] = []
 
     try {
-      const supabase = createClient()
-
       // 1. Geocode address if missing coordinates
       if (resource.address && (!resource.latitude || !resource.longitude)) {
         try {
           const coords = await geocodeAddress(resource.address)
           if (coords) {
-            await supabase
-              .from('resources')
-              .update({
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-              })
-              .eq('id', resource.id)
-
+            await sql`
+              UPDATE resources SET
+                latitude = ${coords.latitude},
+                longitude = ${coords.longitude}
+              WHERE id = ${resource.id}
+            `
             fieldsEnriched.push('coordinates')
           }
         } catch (error) {
@@ -129,22 +122,26 @@ export class EnrichmentAgent extends BaseAgent {
           const enriched = await this.enrichFromWebsite(resource.website)
           totalCost += enriched.costCents || 0
 
-          const updates: Record<string, unknown> = {}
           if (enriched.hours && !resource.hours) {
-            updates.hours = enriched.hours
+            await sql`
+              UPDATE resources SET hours = ${JSON.stringify(enriched.hours)}::jsonb
+              WHERE id = ${resource.id}
+            `
             fieldsEnriched.push('hours')
           }
           if (enriched.description && !resource.description) {
-            updates.description = enriched.description
+            await sql`
+              UPDATE resources SET description = ${enriched.description}
+              WHERE id = ${resource.id}
+            `
             fieldsEnriched.push('description')
           }
-          if (enriched.services && !resource.services) {
-            updates.services = enriched.services
+          if (enriched.services && !resource.services_offered) {
+            await sql`
+              UPDATE resources SET services_offered = ${enriched.services}
+              WHERE id = ${resource.id}
+            `
             fieldsEnriched.push('services')
-          }
-
-          if (Object.keys(updates).length > 0) {
-            await supabase.from('resources').update(updates).eq('id', resource.id)
           }
         } catch (error) {
           console.error('Website enrichment error:', error)
@@ -153,13 +150,12 @@ export class EnrichmentAgent extends BaseAgent {
 
       // Mark as AI enriched
       if (fieldsEnriched.length > 0) {
-        await supabase
-          .from('resources')
-          .update({
-            ai_enriched: true,
-            last_verified: new Date().toISOString(),
-          })
-          .eq('id', resource.id)
+        await sql`
+          UPDATE resources SET
+            ai_enriched = true,
+            last_verified_at = NOW()
+          WHERE id = ${resource.id}
+        `
       }
 
       return {

@@ -19,7 +19,6 @@ import {
   ThumbDownOutlined as ThumbDownOutlinedIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { voteReviewHelpfulness, removeHelpfulnessVote } from '@/lib/api/reviews'
 import { getUserDisplayName } from '@/lib/utils/avatar'
 import { useRouter } from 'next/navigation'
 import type { Database } from '@/lib/types/database'
@@ -65,15 +64,23 @@ export function ReviewCard({ review, userVote, onVoteChange }: ReviewCardProps) 
     try {
       // If clicking the same vote, remove it
       if (currentVote?.is_helpful === isHelpful) {
-        const { error } = await removeHelpfulnessVote(user.id, review.id)
-        if (!error) {
+        const response = await fetch('/api/reviews/helpfulness', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviewId: review.id }),
+        })
+        if (response.ok) {
           setCurrentVote(null)
           onVoteChange?.()
         }
       } else {
         // Submit new vote
-        const { error } = await voteReviewHelpfulness(user.id, review.id, isHelpful)
-        if (!error) {
+        const response = await fetch('/api/reviews/helpfulness', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviewId: review.id, isHelpful }),
+        })
+        if (response.ok) {
           setCurrentVote({ is_helpful: isHelpful })
           onVoteChange?.()
         }

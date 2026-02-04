@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Box,
   Paper,
@@ -20,7 +20,6 @@ import {
   Map as MapIcon,
   AttachMoney,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 
 interface VerificationEvent {
   id: string
@@ -41,156 +40,88 @@ interface VerificationSession {
   expanded?: boolean
 }
 
+interface VerificationResponse {
+  verificationEvents?: VerificationEvent[]
+}
+
 export function RealtimeVerificationViewer() {
   const [sessions, setSessions] = useState<Map<string, VerificationSession>>(
     new Map<string, VerificationSession>()
   )
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
-  // Load recent verification sessions (last 1 hour)
-  useEffect(() => {
-    async function loadRecentSessions() {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const processEvents = useCallback((events: VerificationEvent[]) => {
+    const sessionsMap = new Map<string, VerificationSession>()
 
-      const { data: events, error } = await supabase
-        .from('verification_events')
-        .select('*')
-        .gte('created_at', oneHourAgo)
-        .order('created_at', { ascending: true })
+    for (const event of events) {
+      const suggestionId = event.suggestion_id
+      const existing = sessionsMap.get(suggestionId)
 
-      if (error) {
-        console.error('Error loading verification events:', error)
-        setLoading(false)
-        return
-      }
+      if (!existing && event.event_type === 'started') {
+        sessionsMap.set(suggestionId, {
+          suggestion_id: suggestionId,
+          resource_name: (event.event_data.name as string) || 'Unknown Resource',
+          status: 'running',
+          events: [event],
+          total_cost: 0,
+          started_at: event.created_at,
+          expanded: true, // Running sessions start expanded
+        })
+      } else if (existing) {
+        existing.events.push(event)
 
-      // Group events by suggestion_id
-      const sessionsMap = new Map<string, VerificationSession>()
+        // Update total cost
+        if (event.event_type === 'cost') {
+          existing.total_cost += (event.event_data.total_cost_usd as number) || 0
+        }
 
-      for (const event of events || []) {
-        const suggestionId = event.suggestion_id
-        const existing = sessionsMap.get(suggestionId)
-
-        if (!existing && event.event_type === 'started') {
-          sessionsMap.set(suggestionId, {
-            suggestion_id: suggestionId,
-            resource_name: (event.event_data.name as string) || 'Unknown Resource',
-            status: 'running',
-            events: [event],
-            total_cost: 0,
-            started_at: event.created_at,
-            expanded: true, // Running sessions start expanded
-          })
-        } else if (existing) {
-          existing.events.push(event)
-
-          // Update total cost
-          if (event.event_type === 'cost') {
-            existing.total_cost += (event.event_data.total_cost_usd as number) || 0
-          }
-
-          // Update status and auto-collapse when complete
-          if (event.event_type === 'completed') {
-            existing.status = 'completed'
-            existing.completed_at = event.created_at
-            existing.expanded = false // Auto-collapse on completion
-          } else if (event.event_type === 'failed') {
-            existing.status = 'failed'
-            existing.completed_at = event.created_at
-            existing.expanded = false // Auto-collapse on failure
-          }
+        // Update status and auto-collapse when complete
+        if (event.event_type === 'completed') {
+          existing.status = 'completed'
+          existing.completed_at = event.created_at
+          existing.expanded = false // Auto-collapse on completion
+        } else if (event.event_type === 'failed') {
+          existing.status = 'failed'
+          existing.completed_at = event.created_at
+          existing.expanded = false // Auto-collapse on failure
         }
       }
+    }
 
+    return sessionsMap
+  }, [])
+
+  const fetchVerificationEvents = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/dashboard/stats?section=verification')
+      if (!response.ok) {
+        throw new Error('Failed to fetch verification events')
+      }
+      const data = (await response.json()) as VerificationResponse
+
+      const events = data.verificationEvents || []
+      const sessionsMap = processEvents(events)
       setSessions(sessionsMap)
+    } catch (error) {
+      console.error('Error loading verification events:', error)
+    } finally {
       setLoading(false)
     }
+  }, [processEvents])
 
-    loadRecentSessions()
-  }, [supabase])
-
-  // Subscribe to new verification events via Realtime
+  // Initial fetch + polling every 5 seconds (replaces real-time subscription)
   useEffect(() => {
-    const channel = supabase
-      .channel('verification_events_realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'verification_events',
-        },
-        (payload) => {
-          const event = payload.new as VerificationEvent
-
-          setSessions((prev) => {
-            const newSessions = new Map(prev)
-            const suggestionId = event.suggestion_id
-            const existing = newSessions.get(suggestionId)
-
-            if (!existing && event.event_type === 'started') {
-              // Collapse any previously running sessions
-              newSessions.forEach((session) => {
-                if (session.status === 'running' && session.expanded) {
-                  session.expanded = false
-                }
-              })
-
-              // New verification session started - add at beginning (top)
-              const newSessionsReordered = new Map<string, VerificationSession>()
-              newSessionsReordered.set(suggestionId, {
-                suggestion_id: suggestionId,
-                resource_name: (event.event_data.name as string) || 'Unknown Resource',
-                status: 'running',
-                events: [event],
-                total_cost: 0,
-                started_at: event.created_at,
-                expanded: true, // New sessions start expanded
-              })
-              // Add all existing sessions after the new one
-              newSessions.forEach((session, id) => {
-                newSessionsReordered.set(id, session)
-              })
-              return newSessionsReordered
-            } else if (existing) {
-              // Add event to existing session
-              existing.events.push(event)
-
-              // Update total cost
-              if (event.event_type === 'cost') {
-                existing.total_cost += (event.event_data.total_cost_usd as number) || 0
-              }
-
-              // Update status and auto-collapse when complete
-              if (event.event_type === 'completed') {
-                existing.status = 'completed'
-                existing.completed_at = event.created_at
-                existing.expanded = false // Auto-collapse on completion
-              } else if (event.event_type === 'failed') {
-                existing.status = 'failed'
-                existing.completed_at = event.created_at
-                existing.expanded = false // Auto-collapse on failure
-              }
-            }
-
-            return newSessions
-          })
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [supabase])
+    fetchVerificationEvents()
+    const interval = setInterval(fetchVerificationEvents, 5000)
+    return () => clearInterval(interval)
+  }, [fetchVerificationEvents])
 
   // Render loading state
   if (loading) {
     return (
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" gutterBottom>
-          🔄 Real-Time Verification
+          Real-Time Verification
         </Typography>
         <LinearProgress />
       </Paper>
@@ -209,7 +140,7 @@ export function RealtimeVerificationViewer() {
   return (
     <Paper sx={{ p: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <Typography variant="h6">🔄 Real-Time Verification</Typography>
+        <Typography variant="h6">Real-Time Verification</Typography>
         {runningSessions.length > 0 && (
           <Chip
             label={`${runningSessions.length} active`}
@@ -348,9 +279,9 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
             <Chip label="In Progress" color="primary" size="small" />
           )}
           {session.status === 'completed' && (
-            <Chip label="✓ Completed" color="success" size="small" />
+            <Chip label="Completed" color="success" size="small" />
           )}
-          {session.status === 'failed' && <Chip label="✗ Failed" color="error" size="small" />}
+          {session.status === 'failed' && <Chip label="Failed" color="error" size="small" />}
           {session.total_cost > 0 && (
             <Chip
               label={`$${session.total_cost.toFixed(4)}`}
@@ -391,7 +322,7 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
               <Box sx={{ flex: 1 }}>
                 <Typography variant="caption" fontWeight="bold">
                   {(() => {
-                    if (event.event_type === 'started') return '🚀 Verification started'
+                    if (event.event_type === 'started') return 'Verification started'
                     if (event.event_type === 'progress' && event.event_data.step)
                       return String(event.event_data.step)
                     if (
@@ -399,11 +330,11 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
                       event.event_data.operation &&
                       event.event_data.total_cost_usd !== undefined
                     )
-                      return `💰 ${String(event.event_data.operation)} ($${Number(event.event_data.total_cost_usd).toFixed(4)})`
+                      return `${String(event.event_data.operation)} ($${Number(event.event_data.total_cost_usd).toFixed(4)})`
                     if (event.event_type === 'completed' && event.event_data.decision)
-                      return `✅ Decision: ${String(event.event_data.decision)}`
+                      return `Decision: ${String(event.event_data.decision)}`
                     if (event.event_type === 'failed' && event.event_data.error)
-                      return `❌ Failed: ${String(event.event_data.error)}`
+                      return `Failed: ${String(event.event_data.error)}`
                     return ''
                   })()}
                 </Typography>
@@ -430,7 +361,9 @@ function VerificationSessionCard({ session }: { session: VerificationSession }) 
                     {(() => {
                       const checks = event.event_data.checks_summary as Record<string, boolean>
                       return Object.entries(checks)
-                        .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value ? '✓' : '✗'}`)
+                        .map(
+                          ([key, value]) => `${key.replace(/_/g, ' ')}: ${value ? 'pass' : 'fail'}`
+                        )
                         .join(', ')
                     })()}
                   </Typography>

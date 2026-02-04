@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useAuth } from '@/lib/hooks/useAuth'
-import type { User } from '@supabase/supabase-js'
 
 // Mock Next.js router
 const mockPush = vi.fn()
@@ -13,42 +12,46 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
-// Mock Supabase client
+// Mock NextAuth
+const mockUseSession = vi.fn()
 const mockSignOut = vi.fn()
-const mockGetUser = vi.fn()
-const mockOnAuthStateChange = vi.fn()
+vi.mock('next-auth/react', () => ({
+  useSession: () => mockUseSession(),
+  signOut: (...args: unknown[]) => mockSignOut(...args),
+}))
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      signOut: mockSignOut,
-      getUser: mockGetUser,
-      onAuthStateChange: mockOnAuthStateChange,
-    },
-  }),
+// Mock analytics
+vi.mock('@/lib/analytics/queue', () => ({
+  identifyUser: vi.fn(),
+  clearUser: vi.fn(),
 }))
 
 describe('useAuth', () => {
-  const mockUser: User = {
+  const mockSessionUser = {
     id: 'test-user-id',
     email: 'test@example.com',
+    phone: '+15551234567',
+    name: 'Test User',
+    image: null,
+    isAdmin: false,
     created_at: '2024-01-01T00:00:00Z',
-    app_metadata: {},
-    user_metadata: {},
-    aud: 'authenticated',
-    role: 'authenticated',
-  } as User
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Default: no subscription cleanup needed
-    mockOnAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: vi.fn() } },
+    // Mock localStorage
+    const store: Record<string, string> = {}
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
+      store[key] = value
+    })
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null)
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => {
+      delete store[key]
     })
   })
 
   it('starts with loading state', () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
+    mockUseSession.mockReturnValue({ data: null, status: 'loading' })
 
     const { result } = renderHook(() => useAuth())
 
@@ -57,115 +60,79 @@ describe('useAuth', () => {
     expect(result.current.isAuthenticated).toBe(false)
   })
 
-  it('loads authenticated user', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null })
+  it('loads authenticated user', () => {
+    mockUseSession.mockReturnValue({
+      data: { user: mockSessionUser },
+      status: 'authenticated',
+    })
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    expect(result.current.user).toEqual(mockUser)
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.user).toEqual(mockSessionUser)
     expect(result.current.isAuthenticated).toBe(true)
   })
 
-  it('handles no authenticated user', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
+  it('handles no authenticated user', () => {
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' })
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
+    expect(result.current.isLoading).toBe(false)
     expect(result.current.user).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
   })
 
-  it('handles getUser error', async () => {
-    mockGetUser.mockRejectedValue(new Error('Auth error'))
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('exposes isAdmin from session', () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { ...mockSessionUser, isAdmin: true } },
+      status: 'authenticated',
+    })
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    expect(result.current.user).toBeNull()
-    expect(result.current.isAuthenticated).toBe(false)
-    expect(consoleSpy).toHaveBeenCalledWith('Error fetching user:', expect.any(Error))
-
-    consoleSpy.mockRestore()
+    expect(result.current.isAdmin).toBe(true)
   })
 
-  it('listens to auth state changes', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
-
-    const authCallback = vi.fn()
-    mockOnAuthStateChange.mockImplementation((callback) => {
-      authCallback.mockImplementation(callback)
-      return {
-        data: { subscription: { unsubscribe: vi.fn() } },
-      }
+  it('defaults isAdmin to false when not set', () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { ...mockSessionUser, isAdmin: undefined } },
+      status: 'authenticated',
     })
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    // Simulate auth state change (user signs in)
-    act(() => {
-      authCallback('SIGNED_IN', { user: mockUser })
-    })
-
-    await waitFor(() => {
-      expect(result.current.user).toEqual(mockUser)
-      expect(result.current.isAuthenticated).toBe(true)
-    })
+    expect(result.current.isAdmin).toBe(false)
   })
 
   it('signs out user and redirects', async () => {
-    // Return user initially, then null after sign out
-    mockGetUser.mockResolvedValueOnce({ data: { user: mockUser }, error: null })
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
-    mockSignOut.mockResolvedValue({ error: null })
+    mockUseSession.mockReturnValue({
+      data: { user: mockSessionUser },
+      status: 'authenticated',
+    })
+    mockSignOut.mockResolvedValue(undefined)
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    // Sign out
     await act(async () => {
       await result.current.signOut()
     })
 
-    await waitFor(() => {
-      expect(result.current.user).toBeNull()
-    })
-
-    expect(mockSignOut).toHaveBeenCalled()
+    expect(mockSignOut).toHaveBeenCalledWith({ redirect: false })
     expect(mockRefresh).toHaveBeenCalled()
     expect(mockPush).toHaveBeenCalledWith('/')
   })
 
   it('handles sign out error', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null })
+    mockUseSession.mockReturnValue({
+      data: { user: mockSessionUser },
+      status: 'authenticated',
+    })
     mockSignOut.mockRejectedValue(new Error('Sign out error'))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    // Attempt sign out
     await act(async () => {
       await result.current.signOut()
     })
@@ -175,61 +142,53 @@ describe('useAuth', () => {
     consoleSpy.mockRestore()
   })
 
-  it('refreshes user data', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null })
+  it('refreshes via router refresh', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: mockSessionUser },
+      status: 'authenticated',
+    })
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    // Change mock to return updated user
-    const updatedUser = { ...mockUser, email: 'updated@example.com' }
-    mockGetUser.mockResolvedValue({ data: { user: updatedUser }, error: null })
-
-    // Refresh user
     await act(async () => {
       await result.current.refreshUser()
     })
 
-    expect(result.current.user?.email).toBe('updated@example.com')
+    expect(mockRefresh).toHaveBeenCalled()
   })
 
-  it('handles refresh user error', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null })
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('returns null user when session has no user', () => {
+    mockUseSession.mockReturnValue({ data: { user: null }, status: 'unauthenticated' })
 
     const { result } = renderHook(() => useAuth())
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
-
-    // Make next getUser call fail
-    mockGetUser.mockRejectedValue(new Error('Refresh error'))
-
-    // Attempt refresh
-    await act(async () => {
-      await result.current.refreshUser()
-    })
-
-    expect(consoleSpy).toHaveBeenCalledWith('Error refreshing user:', expect.any(Error))
-
-    consoleSpy.mockRestore()
+    expect(result.current.user).toBeNull()
+    expect(result.current.isAuthenticated).toBe(false)
   })
 
-  it('unsubscribes from auth changes on unmount', () => {
-    const unsubscribeMock = vi.fn()
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
-    mockOnAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: unsubscribeMock } },
+  it('provides correct user fields from NextAuth session', () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: 'user-123',
+          email: 'user@example.com',
+          phone: '+15551234567',
+          name: 'Test User',
+          image: '/avatar.jpg',
+          isAdmin: true,
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      },
+      status: 'authenticated',
     })
 
-    const { unmount } = renderHook(() => useAuth())
+    const { result } = renderHook(() => useAuth())
 
-    unmount()
-
-    expect(unsubscribeMock).toHaveBeenCalled()
+    expect(result.current.user?.id).toBe('user-123')
+    expect(result.current.user?.email).toBe('user@example.com')
+    expect(result.current.user?.phone).toBe('+15551234567')
+    expect(result.current.user?.name).toBe('Test User')
+    expect(result.current.user?.image).toBe('/avatar.jpg')
+    expect(result.current.user?.isAdmin).toBe(true)
   })
 })

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resourceSuggestions, verificationLogs } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * GET /api/admin/verification-queue
@@ -9,7 +11,7 @@ import { checkAdminAuth } from '@/lib/utils/admin-auth'
  * to perform manual verification. Optimized for AI agents browsing websites.
  *
  * Authentication:
- * - Session-based (browser/Claude Web): Automatic via Supabase auth
+ * - Session-based (browser/Claude Web): Automatic via NextAuth
  * - API key (Claude Code/scripts): Include header `x-admin-api-key: your-key`
  */
 export async function GET(request: NextRequest) {
@@ -24,35 +26,33 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
-
     // Get query parameters
     const searchParams = request.nextUrl.searchParams
     const limit = parseInt(searchParams.get('limit') || '10')
     const status = searchParams.get('status') || 'pending'
 
-    // Fetch flagged suggestions with latest verification log
-    const { data: suggestions, error } = await supabase
-      .from('resource_suggestions')
-      .select('*')
-      .eq('status', status)
-      .order('created_at', { ascending: false })
+    // Fetch flagged suggestions
+    const suggestions = await db
+      .select()
+      .from(resourceSuggestions)
+      .where(eq(resourceSuggestions.status, status))
+      .orderBy(desc(resourceSuggestions.createdAt))
       .limit(limit)
-
-    if (error) {
-      throw error
-    }
 
     // For each suggestion, fetch latest verification log
     const queue = await Promise.all(
-      (suggestions || []).map(async (suggestion) => {
-        const { data: log } = await supabase
-          .from('verification_logs')
-          .select('overall_score, decision_reason, checks_performed, conflicts_found')
-          .eq('suggestion_id', suggestion.id)
-          .order('created_at', { ascending: false })
+      suggestions.map(async (suggestion) => {
+        const [log] = await db
+          .select({
+            overallScore: verificationLogs.overallScore,
+            decisionReason: verificationLogs.decisionReason,
+            checksPerformed: verificationLogs.checksPerformed,
+            conflictsFound: verificationLogs.conflictsFound,
+          })
+          .from(verificationLogs)
+          .where(eq(verificationLogs.suggestionId, suggestion.id))
+          .orderBy(desc(verificationLogs.createdAt))
           .limit(1)
-          .single()
 
         return {
           id: suggestion.id,
@@ -65,21 +65,34 @@ export async function GET(request: NextRequest) {
           email: suggestion.email,
           website: suggestion.website,
           description: suggestion.description,
-          primary_category: suggestion.primary_category,
-          services_offered: suggestion.services_offered,
+          primary_category: suggestion.primaryCategory,
+          services_offered: suggestion.servicesOffered,
           hours: suggestion.hours,
 
           // Verification context
-          verification_log: log || null,
+          verification_log: log
+            ? {
+                overall_score: log.overallScore,
+                decision_reason: log.decisionReason,
+                checks_performed: log.checksPerformed,
+                conflicts_found: log.conflictsFound,
+              }
+            : null,
 
           // Checks needed (based on automated verification failures)
-          checks_needed: determineChecksNeeded(log),
+          checks_needed: determineChecksNeeded(
+            log
+              ? {
+                  checks_performed: log.checksPerformed as VerificationLog['checks_performed'],
+                }
+              : null
+          ),
 
           // Admin notes (why it was flagged)
-          admin_notes: suggestion.admin_notes,
+          admin_notes: suggestion.adminNotes,
 
           // Submission context
-          created_at: suggestion.created_at,
+          created_at: suggestion.createdAt,
         }
       })
     )

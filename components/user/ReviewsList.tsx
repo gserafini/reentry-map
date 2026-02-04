@@ -15,7 +15,6 @@ import {
 } from '@mui/material'
 import { RateReview as RateReviewIcon } from '@mui/icons-material'
 import { ReviewCard } from './ReviewCard'
-import { getResourceReviews, getUserHelpfulnessVotes } from '@/lib/api/reviews'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { Database } from '@/lib/types/database'
 
@@ -57,23 +56,36 @@ export function ReviewsList({ resourceId, onWriteReviewClick }: ReviewsListProps
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await getResourceReviews(resourceId)
+      try {
+        const response = await fetch(`/api/reviews?resourceId=${resourceId}`)
+        const result = (await response.json()) as { data?: ResourceReview[] }
 
-      if (fetchError) {
-        setError('Failed to load reviews. Please try again.')
-      } else if (data) {
-        setReviews(data as ResourceReview[])
+        if (!response.ok) {
+          setError('Failed to load reviews. Please try again.')
+        } else if (result.data) {
+          setReviews(result.data)
 
-        // Fetch user's votes if authenticated
-        if (user && data.length > 0) {
-          const reviewIds = data.map((r) => r.id)
-          const { data: votes } = await getUserHelpfulnessVotes(user.id, reviewIds)
+          // Fetch user's votes if authenticated
+          if (user && result.data.length > 0) {
+            const reviewIds = result.data.map((r) => r.id)
+            const votesResponse = await fetch(
+              `/api/reviews/helpfulness?reviewIds=${reviewIds.join(',')}`
+            )
+            const votesResult = (await votesResponse.json()) as {
+              data?: Array<{ review_id: string; is_helpful: boolean }>
+            }
 
-          if (votes) {
-            const votesMap = new Map(votes.map((v) => [v.review_id, { is_helpful: v.is_helpful }]))
-            setUserVotes(votesMap)
+            if (votesResult.data) {
+              const votesMap = new Map(
+                votesResult.data.map((v) => [v.review_id, { is_helpful: v.is_helpful }])
+              )
+              setUserVotes(votesMap)
+            }
           }
         }
+      } catch (fetchError) {
+        setError('Failed to load reviews. Please try again.')
+        console.error(fetchError)
       }
 
       setLoading(false)

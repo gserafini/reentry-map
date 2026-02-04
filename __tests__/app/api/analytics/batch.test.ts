@@ -1,26 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { POST } from '@/app/api/analytics/batch/route'
 import { NextRequest } from 'next/server'
 
-// Mock Supabase client
-const mockInsert = vi.fn().mockReturnThis()
-const mockUpsert = vi.fn().mockReturnThis()
-const mockFrom = vi.fn().mockReturnValue({
-  insert: mockInsert,
-  upsert: mockUpsert,
-})
-
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() => ({
-    from: mockFrom,
-  })),
+// vi.hoisted ensures mockSql is available when vi.mock factory runs (hoisted above imports)
+const { mockSql } = vi.hoisted(() => ({
+  mockSql: vi.fn().mockResolvedValue([]),
 }))
+
+vi.mock('@/lib/db/client', () => ({
+  db: {},
+  sql: mockSql,
+}))
+
+import { POST } from '@/app/api/analytics/batch/route'
 
 describe('Analytics Batch API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockInsert.mockResolvedValue({ data: null, error: null })
-    mockUpsert.mockResolvedValue({ data: null, error: null })
+    mockSql.mockResolvedValue([])
   })
 
   const createMockRequest = (body: unknown) => {
@@ -214,11 +210,8 @@ describe('Analytics Batch API', () => {
     })
 
     it('handles database errors gracefully', async () => {
-      // Mock database error
-      mockInsert.mockResolvedValueOnce({
-        data: null,
-        error: new Error('Database connection failed'),
-      })
+      // Mock database error (sql tagged template throws)
+      mockSql.mockRejectedValueOnce(new Error('Database connection failed'))
 
       const request = createMockRequest([validEvent])
       const response = await POST(request)

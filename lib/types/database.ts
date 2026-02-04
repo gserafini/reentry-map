@@ -1,7 +1,6 @@
 /**
- * Database type definitions for Supabase
- * Auto-generated from Supabase schema with custom helper types
- * Last updated: 2025-10-24
+ * Database type definitions
+ * Based on database schema with custom helper types
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]

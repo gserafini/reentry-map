@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { sql } from '@/lib/db/client'
 import OpenAI from 'openai'
 import { env } from '@/lib/env'
 
@@ -47,27 +47,18 @@ export abstract class BaseAgent {
    * Start agent execution and create log entry
    */
   protected async startLog(): Promise<string> {
-    const supabase = createClient()
+    const rows = await sql<{ id: string }[]>`
+      INSERT INTO ai_agent_logs (agent_type, status, resources_processed, resources_added, resources_updated)
+      VALUES (${this.agentType}, ${'success'}, ${0}, ${0}, ${0})
+      RETURNING id
+    `
 
-    const { data, error } = await supabase
-      .from('ai_agent_logs')
-      .insert({
-        agent_type: this.agentType,
-        status: 'success', // Will be updated on completion
-        resources_processed: 0,
-        resources_added: 0,
-        resources_updated: 0,
-      })
-      .select('id')
-      .single()
-
-    if (error) {
-      console.error('Failed to create agent log:', error)
-      throw error
+    if (!rows[0]) {
+      throw new Error('Failed to create agent log')
     }
 
-    this.logId = data.id
-    return data.id
+    this.logId = rows[0].id
+    return rows[0].id
   }
 
   /**
@@ -76,17 +67,20 @@ export abstract class BaseAgent {
   protected async updateLog(logData: Partial<AgentLogData>): Promise<void> {
     if (!this.logId) return
 
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('ai_agent_logs')
-      .update({
-        ...logData,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', this.logId)
-
-    if (error) {
+    try {
+      await sql`
+        UPDATE ai_agent_logs SET
+          status = COALESCE(${logData.status ?? null}, status),
+          resources_processed = COALESCE(${logData.resources_processed ?? null}, resources_processed),
+          resources_added = COALESCE(${logData.resources_added ?? null}, resources_added),
+          resources_updated = COALESCE(${logData.resources_updated ?? null}, resources_updated),
+          error_message = COALESCE(${logData.error_message ?? null}, error_message),
+          metadata = COALESCE(${logData.metadata ? JSON.stringify(logData.metadata) : null}::jsonb, metadata),
+          cost_cents = COALESCE(${logData.cost_cents ?? null}, cost_cents),
+          completed_at = NOW()
+        WHERE id = ${this.logId}
+      `
+    } catch (error) {
       console.error('Failed to update agent log:', error)
     }
   }

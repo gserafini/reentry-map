@@ -12,10 +12,10 @@
  *   node scripts/verify-next-resource.mjs --help       # Show help
  *
  * Environment:
- *   Requires .env.local with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ *   Requires .env.local with DATABASE_URL
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { readFileSync } from 'fs'
@@ -40,16 +40,9 @@ try {
   console.error('⚠️  Could not load .env.local:', error.message)
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase credentials in .env.local')
-  console.error('   Required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 // Parse command line arguments
 const args = process.argv.slice(2)
@@ -81,16 +74,19 @@ Quality Gates:
 
 See: docs/VERIFICATION_PROTOCOL.md
 `)
+  await sql.end()
   process.exit(0)
 }
 
 if (showStatus) {
   await showQueueStatus()
+  await sql.end()
   process.exit(0)
 }
 
 // Main: Get next resource to verify
 await getNextResource()
+await sql.end()
 
 /**
  * Show verification queue statistics
@@ -99,31 +95,24 @@ async function showQueueStatus() {
   console.log('\n📊 Verification Queue Status\n')
 
   // Get total resources
-  const { count: totalResources } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
+  const [{ count: totalResources }] = await sql`
+    SELECT COUNT(*)::int AS count FROM resources WHERE status = 'active'
+  `
 
   // Get resources with email
-  const { count: withEmail } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .not('email', 'is', null)
+  const [{ count: withEmail }] = await sql`
+    SELECT COUNT(*)::int AS count FROM resources WHERE status = 'active' AND email IS NOT NULL
+  `
 
   // Get resources with verification source
-  const { count: withSource } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .not('verification_source', 'is', null)
+  const [{ count: withSource }] = await sql`
+    SELECT COUNT(*)::int AS count FROM resources WHERE status = 'active' AND verification_source IS NOT NULL
+  `
 
   // Get resources missing email
-  const { count: missingEmail } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .is('email', null)
+  const [{ count: missingEmail }] = await sql`
+    SELECT COUNT(*)::int AS count FROM resources WHERE status = 'active' AND email IS NULL
+  `
 
   // Calculate percentages
   const emailPercent = totalResources > 0 ? ((withEmail / totalResources) * 100).toFixed(1) : 0
@@ -139,20 +128,15 @@ async function showQueueStatus() {
   console.log('Priority Queue Breakdown:')
   console.log(`  🔴 Missing email:              ${missingEmail}`)
 
-  const { count: noSource } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .is('verification_source', null)
+  const [{ count: noSource }] = await sql`
+    SELECT COUNT(*)::int AS count FROM resources WHERE status = 'active' AND verification_source IS NULL
+  `
 
   console.log(`  🟡 No verification source:     ${noSource}`)
 
-  const { count: noContact } = await supabase
-    .from('resources')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .is('phone', null)
-    .is('email', null)
+  const [{ count: noContact }] = await sql`
+    SELECT COUNT(*)::int AS count FROM resources WHERE status = 'active' AND phone IS NULL AND email IS NULL
+  `
 
   console.log(`  🟠 No contact info at all:     ${noContact}`)
   console.log('')
@@ -171,10 +155,8 @@ async function getNextResource() {
   // 3. No contact info (priority: 70)
   // 4. Oldest verification (priority: 50)
 
-  const { data: resources, error } = await supabase
-    .from('resources')
-    .select(
-      `
+  const resources = await sql`
+    SELECT
       id,
       name,
       address,
@@ -191,22 +173,17 @@ async function getNextResource() {
       verification_source,
       last_verified_at,
       created_at
-    `
-    )
-    .eq('status', 'active')
-    .order('created_at', { ascending: true })
-    .limit(1)
-
-  if (error) {
-    console.error('❌ Error fetching resource:', error.message)
-    process.exit(1)
-  }
+    FROM resources
+    WHERE status = 'active'
+    ORDER BY created_at ASC
+    LIMIT 1
+  `
 
   if (!resources || resources.length === 0) {
     console.log('✅ No resources in queue!')
     console.log('')
     console.log('Run with --status to see verification metrics')
-    process.exit(0)
+    return
   }
 
   const resource = resources[0]

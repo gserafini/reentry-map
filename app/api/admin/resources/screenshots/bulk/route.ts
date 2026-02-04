@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { isNull, isNotNull, count, eq } from 'drizzle-orm'
 import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
 
 /**
@@ -14,38 +17,14 @@ import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    // Admin authentication (supports both session and API key via x-admin-api-key)
+    const auth = await checkAdminAuth(request)
 
-    // Check for service role key (for scripts) or user authentication
-    const authHeader = request.headers.get('authorization')
-    const apiKey = request.headers.get('apikey')
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const isServiceRole =
-      (authHeader &&
-        serviceRoleKey &&
-        authHeader.replace('Bearer ', '').trim() === serviceRoleKey) ||
-      (apiKey && serviceRoleKey && apiKey.trim() === serviceRoleKey)
-
-    if (!isServiceRole) {
-      // Regular user authentication
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-
-      // Check admin status
-      const { data: userData } = await supabase
-        .from('users')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single()
-
-      if (!userData?.is_admin) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Get query parameters
@@ -54,34 +33,46 @@ export async function POST(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const force = searchParams.get('force') === 'true'
 
-    // Fetch resources with websites
-    let query = supabase
-      .from('resources')
-      .select('id, name, website, screenshot_url', { count: 'exact' })
-      .not('website', 'is', null)
-      .order('name')
-
-    // If not forcing, only fetch resources without screenshots
+    // Fetch total count first
+    const countConditions = [isNotNull(resources.website)]
     if (!force) {
-      query = query.is('screenshot_url', null)
+      countConditions.push(isNull(resources.screenshotUrl))
     }
 
-    const {
-      data: resources,
-      error: fetchError,
-      count,
-    } = await query.range(offset, offset + limit - 1)
+    const [totalResult] = await db
+      .select({ value: count() })
+      .from(resources)
+      .where(
+        force
+          ? isNotNull(resources.website)
+          : isNotNull(resources.website) && isNull(resources.screenshotUrl)
+      )
 
-    if (fetchError) {
-      console.error('Error fetching resources:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch resources' }, { status: 500 })
-    }
+    const totalCount = totalResult?.value || 0
+
+    // Fetch resources with websites
+    const fetchedResources = await db
+      .select({
+        id: resources.id,
+        name: resources.name,
+        website: resources.website,
+        screenshotUrl: resources.screenshotUrl,
+      })
+      .from(resources)
+      .where(
+        force
+          ? isNotNull(resources.website)
+          : isNotNull(resources.website) && isNull(resources.screenshotUrl)
+      )
+      .orderBy(resources.name)
+      .limit(limit)
+      .offset(offset)
 
     const results = []
     const errors = []
 
     // Process each resource
-    for (const resource of resources || []) {
+    for (const resource of fetchedResources || []) {
       try {
         console.log(`Capturing screenshot for: ${resource.name}`)
 
@@ -89,13 +80,14 @@ export async function POST(request: NextRequest) {
 
         if (screenshotResult) {
           // Update resource with screenshot
-          await supabase
-            .from('resources')
-            .update({
-              screenshot_url: screenshotResult.url,
-              screenshot_captured_at: screenshotResult.capturedAt.toISOString(),
+          await db
+            .update(resources)
+            .set({
+              screenshotUrl: screenshotResult.url,
+              screenshotCapturedAt: screenshotResult.capturedAt,
+              updatedAt: new Date(),
             })
-            .eq('id', resource.id)
+            .where(eq(resources.id, resource.id))
 
           results.push({
             id: resource.id,
@@ -125,13 +117,13 @@ export async function POST(request: NextRequest) {
       processed: results.length + errors.length,
       successful: results.length,
       failed: errors.length,
-      total: count || 0,
+      total: totalCount,
       results,
       errors,
       pagination: {
         limit,
         offset,
-        hasMore: offset + limit < (count || 0),
+        hasMore: offset + limit < totalCount,
         nextOffset: offset + limit,
       },
     })

@@ -24,7 +24,7 @@ import {
 import { Flag as FlagIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
-import { getPendingUpdates, updateUpdateStatus } from '@/lib/api/updates'
+import { getPendingUpdates, updateUpdateStatus } from '@/lib/api/updates-client'
 import type { Database } from '@/lib/types/database'
 
 type ResourceUpdate = Database['public']['Tables']['resource_updates']['Row'] & {

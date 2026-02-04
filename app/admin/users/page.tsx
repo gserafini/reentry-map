@@ -32,7 +32,6 @@ import {
   AdminPanelSettings as AdminIcon,
   Person as PersonIcon,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 
 interface UserWithAuth {
   id: string
@@ -59,11 +58,8 @@ export default function UsersListPage() {
   })
   const [saving, setSaving] = useState(false)
 
-  const supabase = createClient()
-
   useEffect(() => {
     loadUsers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function loadUsers() {
@@ -71,29 +67,14 @@ export default function UsersListPage() {
       setLoading(true)
       setError(null)
 
-      // Use database function to fetch users with emails efficiently
-      const { data: usersData, error: usersError } = await supabase.rpc(
-        'admin_get_users_with_emails'
-      )
+      const response = await fetch('/api/admin/users')
+      if (!response.ok) throw new Error('Failed to fetch users')
 
-      if (usersError) throw usersError
-
+      const usersData = (await response.json()) as UserWithAuth[]
       setUsers(usersData || [])
     } catch (err) {
       console.error('Error loading users:', err)
       setError('Failed to load users. Make sure you have admin privileges.')
-      // Fallback: load users without emails
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      setUsers(
-        (usersData || []).map((user) => ({
-          ...user,
-          email: null,
-        }))
-      )
     } finally {
       setLoading(false)
     }
@@ -117,12 +98,13 @@ export default function UsersListPage() {
     setError(null)
 
     try {
-      const { error: updateError } = await supabase
-        .from('users')
-        .update(editFormData)
-        .eq('id', selectedUser.id)
+      const response = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUser.id, updates: editFormData }),
+      })
 
-      if (updateError) throw updateError
+      if (!response.ok) throw new Error('Failed to update user')
 
       // Update local state
       setUsers(
@@ -156,12 +138,13 @@ export default function UsersListPage() {
     }
 
     try {
-      // Note: This only deletes from public.users table
-      // To fully delete auth.users entry, you need to use auth.admin.deleteUser()
-      // which requires service role key
-      const { error: deleteError } = await supabase.from('users').delete().eq('id', user.id)
+      const response = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
 
-      if (deleteError) throw deleteError
+      if (!response.ok) throw new Error('Failed to delete user')
 
       setUsers(users.filter((u) => u.id !== user.id))
     } catch (err) {

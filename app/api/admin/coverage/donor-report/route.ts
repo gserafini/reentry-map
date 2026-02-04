@@ -1,5 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
+
+type MetricRow = {
+  geography_type: string
+  geography_id: string
+  geography_name: string
+  coverage_score: number
+  total_resources: number
+  verified_resources: number
+  categories_covered: number
+  unique_resources: number
+  avg_completeness_score: number
+  avg_verification_score: number
+  resources_with_reviews: number
+  reentry_population: number
+  last_updated: string
+}
+
+type Tier1CountyRow = {
+  fips_code: string
+  county_name: string
+  state_code: string
+  priority_tier: number
+  estimated_annual_releases: number
+}
 
 /**
  * GET /api/admin/coverage/donor-report
@@ -20,60 +45,35 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    const auth = await checkAdminAuth(request)
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     const format = request.nextUrl.searchParams.get('format') || 'json'
 
     // Fetch coverage metrics
-    const { data: metrics, error: metricsError } = await supabase
-      .from('coverage_metrics')
-      .select('*')
-      .order('coverage_score', { ascending: false })
-
-    if (metricsError) throw metricsError
+    const metrics = await sql<MetricRow[]>`SELECT * FROM coverage_metrics ORDER BY coverage_score DESC`
 
     // Get national metrics
-    const national = metrics?.find((m) => m.geography_type === 'national')
+    const national = metrics.find((m) => m.geography_type === 'national')
 
     // Get state metrics
-    const states = metrics?.filter((m) => m.geography_type === 'state') || []
+    const states = metrics.filter((m) => m.geography_type === 'state')
 
     // Get county metrics
-    const counties = metrics?.filter((m) => m.geography_type === 'county') || []
+    const counties = metrics.filter((m) => m.geography_type === 'county')
 
     // Get tier 1 county coverage
-    const { data: tier1Counties, error: tier1Error } = await supabase
-      .from('county_data')
-      .select('fips_code, county_name, state_code, priority_tier, estimated_annual_releases')
-      .eq('priority_tier', 1)
+    const tier1Counties = await sql<Tier1CountyRow[]>`SELECT fips_code, county_name, state_code, priority_tier, estimated_annual_releases FROM county_data WHERE priority_tier = 1`
 
-    if (tier1Error) throw tier1Error
-
-    const tier1Count = tier1Counties?.length || 0
-    const tier1WithCoverage =
-      tier1Counties?.filter((county) => metrics?.some((m) => m.geography_id === county.fips_code && m.total_resources > 0))
-        .length || 0
+    const tier1Count = tier1Counties.length
+    const tier1WithCoverage = tier1Counties.filter((county) =>
+      metrics.some((m) => m.geography_id === county.fips_code && m.total_resources > 0)
+    ).length
 
     const tier1CoveragePercent = tier1Count > 0 ? (tier1WithCoverage / tier1Count) * 100 : 0
 

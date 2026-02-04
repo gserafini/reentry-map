@@ -25,10 +25,8 @@ import {
   Settings,
   Warning,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { RealtimeVerificationViewer } from '@/components/admin/RealtimeVerificationViewer'
-import { getAISystemStatus } from '@/lib/api/settings'
 import type { AISystemStatus } from '@/lib/types/settings'
 
 interface ExpansionPriority {
@@ -94,8 +92,6 @@ export default function CommandCenterPage() {
       rejected: number
     }
   } | null>(null)
-
-  const supabase = createClient()
 
   // Helper function to copy to clipboard
   const handleCopyPrompt = async () => {
@@ -164,15 +160,27 @@ export default function CommandCenterPage() {
         setPendingImports({ fileCount: 0, files: [] })
 
         // Refresh the suggestions list
-        const { data: suggestions } = await supabase
-          .from('resource_suggestions')
-          .select('id, name, city, state, status, created_at, category')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(50)
-
-        if (suggestions) {
-          setSubmittedResources(suggestions)
+        const suggestionsRes = await fetch('/api/admin/dashboard/stats?section=pendingSuggestions')
+        if (suggestionsRes.ok) {
+          const suggestionsData = (await suggestionsRes.json()) as {
+            pendingSuggestions?: Array<{
+              id: string
+              name: string
+              city: string
+              state: string
+              status: string
+              created_at: string
+              primary_category: string
+            }>
+          }
+          if (suggestionsData.pendingSuggestions) {
+            setSubmittedResources(
+              suggestionsData.pendingSuggestions.map((s) => ({
+                ...s,
+                category: s.primary_category,
+              }))
+            )
+          }
         }
       } else {
         setImportResult({
@@ -488,14 +496,15 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
   useEffect(() => {
     async function fetchInitialData() {
       try {
-        // Fetch expansion priorities (nationwide)
-        const { data: priorities } = await supabase
-          .from('expansion_priorities')
-          .select('*')
-          .order('priority_score', { ascending: false })
-          .limit(10)
-
-        if (priorities) {
+        // Fetch expansion priorities via API
+        const prioritiesRes = await fetch(
+          '/api/admin/expansion-priorities?limit=10&sort_field=priority_score&sort_direction=desc'
+        )
+        if (prioritiesRes.ok) {
+          const prioritiesData = (await prioritiesRes.json()) as {
+            data: ExpansionPriority[]
+          }
+          const priorities = prioritiesData.data || []
           setCoverageData(priorities)
           // Find next expansion target (highest priority not yet completed)
           const next = priorities.find(
@@ -509,32 +518,42 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
           }
         }
 
-        // Fetch pending suggestions
-        const { data: suggestions } = await supabase
-          .from('resource_suggestions')
-          .select('id, name, city, state, status, created_at, category')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(50)
+        // Fetch pending suggestions and active agent sessions via dashboard stats
+        const statsRes = await fetch(
+          '/api/admin/dashboard/stats?section=pendingSuggestions,activeAgentSessions,aiSystemStatus'
+        )
+        if (statsRes.ok) {
+          const statsData = (await statsRes.json()) as {
+            pendingSuggestions?: Array<{
+              id: string
+              name: string
+              city: string
+              state: string
+              status: string
+              created_at: string
+              primary_category: string
+            }>
+            activeAgentSessions?: AgentSession[]
+            aiSystemStatus?: AISystemStatus
+          }
 
-        if (suggestions) {
-          setSubmittedResources(suggestions)
+          if (statsData.pendingSuggestions) {
+            setSubmittedResources(
+              statsData.pendingSuggestions.map((s) => ({
+                ...s,
+                category: s.primary_category,
+              }))
+            )
+          }
+
+          if (statsData.activeAgentSessions) {
+            setAgentSessions(statsData.activeAgentSessions)
+          }
+
+          if (statsData.aiSystemStatus) {
+            setAiSystemStatus(statsData.aiSystemStatus)
+          }
         }
-
-        // Fetch active agent sessions
-        const { data: sessions } = await supabase
-          .from('agent_sessions')
-          .select('*')
-          .is('ended_at', null)
-          .order('last_activity_at', { ascending: false })
-
-        if (sessions) {
-          setAgentSessions(sessions)
-        }
-
-        // Fetch AI system status
-        const aiStatus = await getAISystemStatus()
-        setAiSystemStatus(aiStatus)
 
         // Check for pending import files
         await checkForImportFiles()
@@ -556,129 +575,6 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
       setAgentPrompt(generateAgentPrompt(nextExpansion, agentType))
     }
   }, [agentType, nextExpansion])
-
-  // Set up Realtime subscriptions
-  useEffect(() => {
-    // Subscribe to resource_suggestions changes
-    const suggestionsChannel = supabase
-      .channel('resource_suggestions_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resource_suggestions',
-        },
-        (payload) => {
-          console.log('Resource suggestion change:', payload)
-
-          if (payload.eventType === 'INSERT') {
-            const newSuggestion = payload.new as ResourceSuggestion
-            if (newSuggestion.status === 'pending') {
-              setSubmittedResources((prev) => [newSuggestion, ...prev])
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as ResourceSuggestion
-            setSubmittedResources((prev) =>
-              prev
-                .map((s) => (s.id === updated.id ? updated : s))
-                .filter((s) => s.status === 'pending')
-            )
-          } else if (payload.eventType === 'DELETE') {
-            setSubmittedResources((prev) => prev.filter((s) => s.id !== payload.old.id))
-          }
-        }
-      )
-      .subscribe()
-
-    // Subscribe to agent_sessions changes
-    const sessionsChannel = supabase
-      .channel('agent_sessions_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sessions',
-        },
-        (payload) => {
-          console.log('Agent session change:', payload)
-
-          if (payload.eventType === 'INSERT') {
-            setAgentSessions((prev) => [payload.new as AgentSession, ...prev])
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as AgentSession
-            setAgentSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
-          }
-        }
-      )
-      .subscribe()
-
-    // Subscribe to expansion_priorities changes
-    const prioritiesChannel = supabase
-      .channel('expansion_priorities_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'expansion_priorities',
-        },
-        (payload) => {
-          console.log('Expansion priority change:', payload)
-          const updated = payload.new as ExpansionPriority
-          setCoverageData((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-
-          // Update next expansion if needed
-          setNextExpansion((prev) => {
-            if (prev?.id === updated.id) {
-              // Check if this target is still incomplete
-              const isIncomplete =
-                (updated.resource_count || 0) < (updated.target_resource_count || 50)
-              if (isIncomplete) {
-                // Update the prompt with new progress
-                setAgentPrompt(generateAgentPrompt(updated))
-                return updated
-              } else {
-                // Target completed, clear it and find next target
-                setAgentPrompt('')
-                return null
-              }
-            }
-            return prev
-          })
-        }
-      )
-      .subscribe()
-
-    // Subscribe to resources table changes (for verification status updates)
-    // This ensures the page stays in sync with verification activities
-    const resourcesChannel = supabase
-      .channel('resources_verification_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'resources',
-        },
-        (payload) => {
-          console.log('Resource verification status change:', payload)
-          // When resources get flagged or verified during periodic checks, this fires
-          // The actual flagged resources are shown in /admin/flagged-resources
-          // This subscription ensures the Command Center stays in sync
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(suggestionsChannel)
-      supabase.removeChannel(sessionsChannel)
-      supabase.removeChannel(prioritiesChannel)
-      supabase.removeChannel(resourcesChannel)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   if (loading) {
     return (

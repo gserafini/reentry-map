@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 
-export const runtime = 'edge'
 export const maxDuration = 10 // Allow longer for health check
+
+interface CountResult {
+  count: number
+}
 
 /**
  * Analytics Health Check Endpoint
@@ -18,66 +21,63 @@ export const maxDuration = 10 // Allow longer for health check
  */
 export async function GET() {
   try {
-    const supabase = await createClient()
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const yesterdayIso = yesterday.toISOString()
 
-    // Get event counts by table (last 24 hours)
-    const [
-      pageViews,
-      searches,
-      resourceEvents,
-      mapEvents,
-      featureEvents,
-      performanceEvents,
-      sessions,
-    ] = await Promise.all([
-      supabase
-        .from('analytics_page_views')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', yesterday.toISOString()),
-      supabase
-        .from('analytics_search_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', yesterday.toISOString()),
-      supabase
-        .from('analytics_resource_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', yesterday.toISOString()),
-      supabase
-        .from('analytics_map_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', yesterday.toISOString()),
-      supabase
-        .from('analytics_feature_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', yesterday.toISOString()),
-      supabase
-        .from('analytics_performance_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', yesterday.toISOString()),
-      supabase
-        .from('analytics_sessions')
-        .select('*', { count: 'exact', head: true })
-        .gte('started_at', yesterday.toISOString()),
-    ])
+    // Get event counts by table (last 24 hours) using raw SQL
+    const [pageViews] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_page_views
+      WHERE timestamp >= ${yesterdayIso}::timestamptz
+    `
+    const [searches] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_search_events
+      WHERE timestamp >= ${yesterdayIso}::timestamptz
+    `
+    const [resourceEvents] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_resource_events
+      WHERE timestamp >= ${yesterdayIso}::timestamptz
+    `
+    const [mapEvents] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_map_events
+      WHERE timestamp >= ${yesterdayIso}::timestamptz
+    `
+    const [featureEvents] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_feature_events
+      WHERE timestamp >= ${yesterdayIso}::timestamptz
+    `
+    const [performanceEvents] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_performance_events
+      WHERE timestamp >= ${yesterdayIso}::timestamptz
+    `
+    const [sessions] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_sessions
+      WHERE started_at >= ${yesterdayIso}::timestamptz
+    `
 
     // Get admin vs non-admin split
-    const adminPageViews = await supabase
-      .from('analytics_page_views')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_admin', true)
-      .gte('timestamp', yesterday.toISOString())
+    const [adminPageViews] = await sql<CountResult[]>`
+      SELECT COUNT(*)::int as count FROM analytics_page_views
+      WHERE is_admin = true AND timestamp >= ${yesterdayIso}::timestamptz
+    `
+
+    const pageViewCount = pageViews?.count || 0
+    const searchCount = searches?.count || 0
+    const resourceEventCount = resourceEvents?.count || 0
+    const mapEventCount = mapEvents?.count || 0
+    const featureEventCount = featureEvents?.count || 0
+    const performanceEventCount = performanceEvents?.count || 0
+    const sessionCount = sessions?.count || 0
 
     const totalEvents =
-      (pageViews.count || 0) +
-      (searches.count || 0) +
-      (resourceEvents.count || 0) +
-      (mapEvents.count || 0) +
-      (featureEvents.count || 0) +
-      (performanceEvents.count || 0)
+      pageViewCount +
+      searchCount +
+      resourceEventCount +
+      mapEventCount +
+      featureEventCount +
+      performanceEventCount
 
-    const adminEvents = adminPageViews.count || 0
+    const adminEvents = adminPageViews?.count || 0
     const adminPercentage = totalEvents > 0 ? (adminEvents / totalEvents) * 100 : 0
 
     // Determine health status
@@ -99,8 +99,6 @@ export async function GET() {
     }
 
     // Warning: Very low session count relative to page views
-    const sessionCount = sessions.count || 0
-    const pageViewCount = pageViews.count || 0
     if (sessionCount > 0 && pageViewCount > 0) {
       const pagesPerSession = pageViewCount / sessionCount
       if (pagesPerSession > 100) {
@@ -122,12 +120,12 @@ export async function GET() {
         pages_per_session: sessionCount > 0 ? (pageViewCount / sessionCount).toFixed(1) : '0',
       },
       events_by_type: {
-        page_views: pageViews.count || 0,
-        searches: searches.count || 0,
-        resource_events: resourceEvents.count || 0,
-        map_events: mapEvents.count || 0,
-        feature_events: featureEvents.count || 0,
-        performance_events: performanceEvents.count || 0,
+        page_views: pageViewCount,
+        searches: searchCount,
+        resource_events: resourceEventCount,
+        map_events: mapEventCount,
+        feature_events: featureEventCount,
+        performance_events: performanceEventCount,
       },
       admin_filtering: {
         admin_events: adminEvents,
@@ -141,9 +139,9 @@ export async function GET() {
               : 'good: mostly real users',
       },
       performance: {
-        error_count: performanceEvents.count || 0,
+        error_count: performanceEventCount,
         error_rate:
-          totalEvents > 0 ? (((performanceEvents.count || 0) / totalEvents) * 100).toFixed(2) : '0',
+          totalEvents > 0 ? ((performanceEventCount / totalEvents) * 100).toFixed(2) : '0',
       },
     })
   } catch (error) {

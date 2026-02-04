@@ -4,16 +4,15 @@
  * Run Coverage Tracking System Migrations
  *
  * This script executes the coverage tracking database migrations
- * in the correct order on your Supabase database.
+ * in the correct order on your database.
  *
  * Usage: node scripts/run-coverage-migrations.mjs
  *
  * Environment Variables Required:
- * - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL
- * - SUPABASE_SERVICE_ROLE_KEY
+ * - DATABASE_URL
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -22,21 +21,34 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const projectRoot = join(__dirname, '..')
 
-// Load environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Load environment variables from .env.local
+function loadEnv() {
+  try {
+    const envPath = join(projectRoot, '.env.local')
+    const envFile = readFileSync(envPath, 'utf-8')
+    const lines = envFile.split('\n')
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required environment variables:')
-  console.error('   - NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL)')
-  console.error('   - SUPABASE_SERVICE_ROLE_KEY')
-  console.error('')
-  console.error('💡 Make sure these are set in your .env.local file')
-  process.exit(1)
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+
+      const [key, ...valueParts] = trimmed.split('=')
+      const value = valueParts.join('=').trim()
+
+      if (key && value && !process.env[key]) {
+        process.env[key] = value
+      }
+    }
+  } catch (_error) {
+    // .env.local may not exist
+  }
 }
 
-// Create Supabase client with service role key
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+loadEnv()
+
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 // Migration files in order
 const migrations = [
@@ -49,41 +61,17 @@ async function runMigration(filename) {
 
   try {
     const filepath = join(projectRoot, 'supabase', 'migrations', filename)
-    const sql = readFileSync(filepath, 'utf-8')
+    const migrationSql = readFileSync(filepath, 'utf-8')
 
-    // Execute the SQL
-    const { error } = await supabase.rpc('exec_sql', { sql_query: sql }).single()
-
-    if (error) {
-      // If exec_sql RPC doesn't exist, try direct execution via REST API
-      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
-        method: 'POST',
-        headers: {
-          apikey: supabaseServiceKey,
-          Authorization: `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sql_query: sql }),
-      })
-
-      if (!response.ok) {
-        // Fallback: try to execute via the SQL editor endpoint
-        console.log('   ⚠️  Direct SQL execution not available via RPC')
-        console.log('   ℹ️  Please run this migration manually in Supabase SQL Editor:')
-        console.log(`   📍 ${filepath}`)
-        console.log('')
-        console.log('   Steps:')
-        console.log('   1. Go to https://supabase.com/dashboard/project/YOUR_PROJECT/sql/new')
-        console.log('   2. Copy the contents of the migration file')
-        console.log('   3. Paste and run in SQL Editor')
-        return false
-      }
-    }
+    // Execute the SQL directly
+    await sql.unsafe(migrationSql)
 
     console.log(`   ✅ Migration completed successfully`)
     return true
-  } catch (error) {
+  } catch (_error) {
     console.error(`   ❌ Error running migration:`, error.message)
+    console.log('   ℹ️  You may need to run this migration manually:')
+    console.log(`   📍 ${join(projectRoot, 'supabase', 'migrations', filename)}`)
     return false
   }
 }
@@ -96,16 +84,10 @@ async function verifyTables() {
 
   for (const table of tables) {
     try {
-      const { error } = await supabase.from(table).select('id').limit(1)
-
-      if (error) {
-        console.log(`   ❌ Table '${table}' not found`)
-        allExist = false
-      } else {
-        console.log(`   ✅ Table '${table}' exists`)
-      }
-    } catch (error) {
-      console.log(`   ❌ Error checking table '${table}':`, error.message)
+      await sql.unsafe(`SELECT id FROM ${table} LIMIT 1`)
+      console.log(`   ✅ Table '${table}' exists`)
+    } catch (_error) {
+      console.log(`   ❌ Table '${table}' not found`)
       allExist = false
     }
   }
@@ -114,9 +96,11 @@ async function verifyTables() {
 }
 
 async function main() {
+  const databaseUrl =
+    process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
   console.log('🚀 Coverage Tracking System - Database Migration')
   console.log('='.repeat(60))
-  console.log(`📍 Supabase URL: ${supabaseUrl}`)
+  console.log(`📍 Database: ${databaseUrl.replace(/:[^:@]+@/, ':***@')}`)
   console.log(`📦 Migrations to run: ${migrations.length}`)
 
   let successCount = 0
@@ -143,16 +127,17 @@ async function main() {
     console.log('   3. Calculate initial coverage metrics via admin dashboard')
   } else {
     console.log('\n⚠️  Some migrations may need to be run manually.')
-    console.log('   Check the Supabase SQL Editor for any errors.')
+    console.log('   Check the migration files for any errors.')
     console.log('\n📍 Manual migration instructions:')
-    console.log('   1. Go to: https://supabase.com/dashboard')
-    console.log('   2. Navigate to: SQL Editor → New Query')
-    console.log('   3. Copy contents from: supabase/migrations/')
-    console.log('   4. Execute each migration file in order')
+    console.log('   1. Check migration files in: supabase/migrations/')
+    console.log('   2. Execute each migration file in order against your database')
   }
+
+  await sql.end()
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('\n❌ Fatal error:', error)
+  await sql.end()
   process.exit(1)
 })

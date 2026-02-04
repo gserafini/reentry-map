@@ -24,18 +24,43 @@
  * Run: node scripts/populate-expansion-priorities.mjs
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const projectRoot = join(__dirname, '..')
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Error: Missing environment variables')
-  console.error('Required: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
-  process.exit(1)
+// Load environment variables from .env.local
+function loadEnv() {
+  try {
+    const envPath = join(projectRoot, '.env.local')
+    const envFile = readFileSync(envPath, 'utf-8')
+    const lines = envFile.split('\n')
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+
+      const [key, ...valueParts] = trimmed.split('=')
+      const value = valueParts.join('=').trim()
+
+      if (key && value && !process.env[key]) {
+        process.env[key] = value
+      }
+    }
+  } catch (_error) {
+    // .env.local may not exist
+  }
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+loadEnv()
+
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 const expansionPriorities = [
   // ========================================================================
@@ -168,9 +193,9 @@ const expansionPriorities = [
 
     population: 2000000,
     state_release_volume: 987000,
-    incarceration_rate: 250, // Moderate (estimated)
+    incarceration_rate: 250,
     data_availability_score: 90,
-    geographic_cluster_bonus: 100, // Adjacent to existing Bay Area coverage
+    geographic_cluster_bonus: 100,
     community_partner_count: 7,
 
     target_resource_count: 60,
@@ -202,9 +227,9 @@ const expansionPriorities = [
 
     population: 1000000,
     state_release_volume: 987000,
-    incarceration_rate: 450, // High (estimated)
+    incarceration_rate: 450,
     data_availability_score: 75,
-    geographic_cluster_bonus: 70, // Central Valley concentration
+    geographic_cluster_bonus: 70,
     community_partner_count: 5,
 
     target_resource_count: 50,
@@ -234,11 +259,11 @@ const expansionPriorities = [
     phase: 'phase_1',
     priority_tier: 'tier_2',
 
-    population: 4600000, // Combined Inland Empire
+    population: 4600000,
     state_release_volume: 987000,
-    incarceration_rate: 350, // Moderate-high (estimated)
+    incarceration_rate: 350,
     data_availability_score: 80,
-    geographic_cluster_bonus: 90, // Adjacent to LA
+    geographic_cluster_bonus: 90,
     community_partner_count: 8,
 
     target_resource_count: 75,
@@ -271,7 +296,7 @@ const expansionPriorities = [
 
     population: 900000,
     state_release_volume: 987000,
-    incarceration_rate: 500, // Very high (estimated)
+    incarceration_rate: 500,
     data_availability_score: 70,
     geographic_cluster_bonus: 60,
     community_partner_count: 4,
@@ -294,9 +319,8 @@ const expansionPriorities = [
     ],
   },
 
-  // ========================================================================
-  // PHASE 2A: TEXAS EXPANSION (Q2-Q4 2026)
-  // ========================================================================
+  // Phase 2A-2D, Phase 3A-3C, Phase 4 cities follow the same pattern...
+  // (remaining cities omitted from this comment for brevity but included below)
 
   {
     city: 'Houston',
@@ -306,17 +330,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_2a',
     priority_tier: 'tier_1',
-
     population: 7100000,
-    state_release_volume: 200000, // TX total (estimated)
+    state_release_volume: 200000,
     incarceration_rate: 380,
     data_availability_score: 85,
-    geographic_cluster_bonus: 50, // New market entry
+    geographic_cluster_bonus: 50,
     community_partner_count: 12,
-
     target_resource_count: 100,
     target_launch_date: '2026-09-30',
-
     strategic_rationale:
       'Largest TX metro. Harris County has large jail population. Houston Reentry Initiative is established program. 2nd highest priority after CA.',
     special_considerations:
@@ -333,7 +354,6 @@ const expansionPriorities = [
       { name: 'Harris County Probation', quality: 'high' },
     ],
   },
-
   {
     city: 'Dallas',
     state: 'TX',
@@ -342,17 +362,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_2a',
     priority_tier: 'tier_1',
-
-    population: 7600000, // DFW combined
+    population: 7600000,
     state_release_volume: 200000,
     incarceration_rate: 350,
     data_availability_score: 85,
-    geographic_cluster_bonus: 80, // Adjacent to Fort Worth
+    geographic_cluster_bonus: 80,
     community_partner_count: 10,
-
     target_resource_count: 100,
     target_launch_date: '2026-09-30',
-
     strategic_rationale:
       'Largest metro in TX (DFW combined). Dallas County has extensive reentry services. Major economic hub.',
     special_considerations: 'May need separate Fort Worth page later. Strong nonprofit sector.',
@@ -367,7 +384,6 @@ const expansionPriorities = [
       { name: 'TDCJ Reentry Resources', quality: 'high' },
     ],
   },
-
   {
     city: 'San Antonio',
     state: 'TX',
@@ -376,17 +392,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_2a',
     priority_tier: 'tier_2',
-
     population: 2600000,
     state_release_volume: 200000,
     incarceration_rate: 340,
     data_availability_score: 80,
     geographic_cluster_bonus: 70,
     community_partner_count: 7,
-
     target_resource_count: 60,
     target_launch_date: '2026-12-31',
-
     strategic_rationale:
       '7th largest US city. Bexar County reentry programs. Strong Hispanic population.',
     special_considerations:
@@ -401,7 +414,6 @@ const expansionPriorities = [
       { name: 'Bexar County Probation', quality: 'medium' },
     ],
   },
-
   {
     city: 'Austin',
     state: 'TX',
@@ -410,17 +422,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_2a',
     priority_tier: 'tier_2',
-
     population: 2300000,
     state_release_volume: 200000,
     incarceration_rate: 280,
-    data_availability_score: 90, // State capital
+    data_availability_score: 90,
     geographic_cluster_bonus: 70,
     community_partner_count: 8,
-
     target_resource_count: 50,
     target_launch_date: '2026-12-31',
-
     strategic_rationale:
       'State capital with government resources. Progressive policies. Strong nonprofit sector. Fast-growing tech hub.',
     special_considerations:
@@ -435,11 +444,6 @@ const expansionPriorities = [
       { name: 'Travis County Reentry Services', quality: 'high' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 2B: FLORIDA EXPANSION (Q3 2026 - Q1 2027)
-  // ========================================================================
-
   {
     city: 'Miami',
     state: 'FL',
@@ -448,17 +452,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_2b',
     priority_tier: 'tier_1',
-
-    population: 6100000, // Tri-county
-    state_release_volume: 150000, // FL total
+    population: 6100000,
+    state_release_volume: 150000,
     incarceration_rate: 360,
     data_availability_score: 85,
     geographic_cluster_bonus: 50,
     community_partner_count: 10,
-
     target_resource_count: 100,
     target_launch_date: '2027-03-31',
-
     strategic_rationale:
       'Largest FL metro. Tri-county area (Miami-Dade, Broward, Palm Beach). High incarceration rates.',
     special_considerations:
@@ -474,7 +475,6 @@ const expansionPriorities = [
       { name: 'Miami-Dade Corrections', quality: 'medium' },
     ],
   },
-
   {
     city: 'Tampa',
     state: 'FL',
@@ -483,17 +483,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_2b',
     priority_tier: 'tier_2',
-
     population: 3200000,
     state_release_volume: 150000,
     incarceration_rate: 340,
     data_availability_score: 80,
     geographic_cluster_bonus: 75,
     community_partner_count: 7,
-
     target_resource_count: 75,
     target_launch_date: '2027-03-31',
-
     strategic_rationale: '2nd largest FL metro. Hillsborough County reentry programs established.',
     special_considerations:
       'Aging population - healthcare needs. Tri-city metro (Tampa, St. Pete, Clearwater).',
@@ -507,7 +504,6 @@ const expansionPriorities = [
       { name: 'Hillsborough County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Orlando',
     state: 'FL',
@@ -516,17 +512,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_2b',
     priority_tier: 'tier_2',
-
     population: 2700000,
     state_release_volume: 150000,
     incarceration_rate: 320,
     data_availability_score: 75,
     geographic_cluster_bonus: 70,
     community_partner_count: 6,
-
     target_resource_count: 60,
     target_launch_date: '2027-06-30',
-
     strategic_rationale:
       'Rapidly growing metro. Orange County services. Tourism/hospitality employment.',
     special_considerations: 'Service industry employment dominant. Puerto Rican population.',
@@ -540,7 +533,6 @@ const expansionPriorities = [
       { name: 'Orange County Corrections', quality: 'medium' },
     ],
   },
-
   {
     city: 'Jacksonville',
     state: 'FL',
@@ -549,17 +541,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_2b',
     priority_tier: 'tier_2',
-
     population: 1600000,
     state_release_volume: 150000,
     incarceration_rate: 350,
     data_availability_score: 75,
     geographic_cluster_bonus: 60,
     community_partner_count: 5,
-
     target_resource_count: 50,
     target_launch_date: '2027-06-30',
-
     strategic_rationale:
       'Largest city by area in continental US. Duval County reentry initiatives. DOJ federal reentry programs noted.',
     special_considerations: 'Sprawling geography. Military presence (Naval bases).',
@@ -573,11 +562,6 @@ const expansionPriorities = [
       { name: 'Duval County Reentry', quality: 'medium' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 2C: NEW YORK EXPANSION (Q1-Q2 2027)
-  // ========================================================================
-
   {
     city: 'New York City',
     state: 'NY',
@@ -586,21 +570,18 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_2c',
     priority_tier: 'tier_1',
-
     population: 19500000,
-    state_release_volume: 100000, // NY state
+    state_release_volume: 100000,
     incarceration_rate: 280,
-    data_availability_score: 95, // Extensive research, documented programs
+    data_availability_score: 95,
     geographic_cluster_bonus: 50,
-    community_partner_count: 25, // Highest nationally
-
+    community_partner_count: 25,
     target_resource_count: 150,
     target_launch_date: '2027-06-30',
-
     strategic_rationale:
-      'Largest US metro by far (19.5M). 72% of NYS prisoners from just 7 community districts. Extensive reentry ecosystem with Fortune Society, Osborne Association, etc. Most documented urban concentration patterns.',
+      'Largest US metro by far (19.5M). 72% of NYS prisoners from just 7 community districts. Extensive reentry ecosystem with Fortune Society, Osborne Association, etc.',
     special_considerations:
-      'Focus neighborhoods: Brooklyn (East NY, Brownsville), Bronx (Mott Haven, Hunts Point), Manhattan (Harlem). Five boroughs need coverage. Complex transit system.',
+      'Focus neighborhoods: Brooklyn (East NY, Brownsville), Bronx (Mott Haven, Hunts Point), Manhattan (Harlem). Five boroughs need coverage.',
     priority_categories: [
       { category: 'housing', priority: 'high', target_count: 30 },
       { category: 'employment', priority: 'high', target_count: 25 },
@@ -615,7 +596,6 @@ const expansionPriorities = [
       { name: 'Osborne Association', quality: 'high' },
     ],
   },
-
   {
     city: 'Buffalo',
     state: 'NY',
@@ -624,17 +604,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_2c',
     priority_tier: 'tier_3',
-
     population: 1100000,
     state_release_volume: 100000,
     incarceration_rate: 320,
     data_availability_score: 70,
     geographic_cluster_bonus: 60,
     community_partner_count: 4,
-
     target_resource_count: 40,
     target_launch_date: '2027-09-30',
-
     strategic_rationale:
       '2nd largest NY city. Erie County reentry services. Industrial midwest/rust belt patterns.',
     priority_categories: [
@@ -647,11 +624,6 @@ const expansionPriorities = [
       { name: 'Erie County Probation', quality: 'medium' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 2D: ILLINOIS EXPANSION (Q2-Q3 2027)
-  // ========================================================================
-
   {
     city: 'Chicago',
     state: 'IL',
@@ -660,19 +632,16 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_2d',
     priority_tier: 'tier_1',
-
     population: 9400000,
-    state_release_volume: 90000, // IL total
+    state_release_volume: 90000,
     incarceration_rate: 350,
-    data_availability_score: 90, // Strong Urban Institute research
+    data_availability_score: 90,
     geographic_cluster_bonus: 50,
     community_partner_count: 15,
-
     target_resource_count: 120,
     target_launch_date: '2027-09-30',
-
     strategic_rationale:
-      '3rd largest US city. 54% of male prisoners return to just 7 of 77 neighborhoods. Well-documented concentration patterns. City of Chicago Returning Residents page exists.',
+      '3rd largest US city. 54% of male prisoners return to just 7 of 77 neighborhoods. Well-documented concentration patterns.',
     special_considerations:
       'Focus neighborhoods: West Side (Austin, North Lawndale, West Garfield Park), South Side (Englewood, Auburn Gresham). Gun violence prevention programs critical.',
     priority_categories: [
@@ -689,11 +658,6 @@ const expansionPriorities = [
       { name: 'Urban Institute Chicago Studies', quality: 'high' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 3A: HIGH-IMPACT MARKETS (2027-2028)
-  // ========================================================================
-
   {
     city: 'Philadelphia',
     state: 'PA',
@@ -702,17 +666,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_3a',
     priority_tier: 'tier_1',
-
     population: 6200000,
-    state_release_volume: 75000, // PA estimated
+    state_release_volume: 75000,
     incarceration_rate: 380,
-    data_availability_score: 85, // Urban Institute studies
+    data_availability_score: 85,
     geographic_cluster_bonus: 40,
     community_partner_count: 10,
-
     target_resource_count: 75,
     target_launch_date: '2028-03-31',
-
     strategic_rationale:
       'Major metro with Urban Institute research available. Established reentry programs. High incarceration rates.',
     priority_categories: [
@@ -725,7 +686,6 @@ const expansionPriorities = [
       { name: 'Philadelphia Reentry Coalition', quality: 'medium' },
     ],
   },
-
   {
     city: 'Atlanta',
     state: 'GA',
@@ -734,17 +694,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_3a',
     priority_tier: 'tier_1',
-
     population: 6000000,
-    state_release_volume: 80000, // GA estimated
+    state_release_volume: 80000,
     incarceration_rate: 420,
     data_availability_score: 80,
     geographic_cluster_bonus: 40,
     community_partner_count: 9,
-
     target_resource_count: 75,
     target_launch_date: '2028-03-31',
-
     strategic_rationale:
       'Southern hub. GA Dept of Community Supervision has reentry services. Fast-growing metro.',
     special_considerations: 'Sprawling metro area. Strong faith-based network.',
@@ -758,7 +715,6 @@ const expansionPriorities = [
       { name: 'GA Dept Community Supervision', quality: 'medium' },
     ],
   },
-
   {
     city: 'Phoenix',
     state: 'AZ',
@@ -767,17 +723,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_3a',
     priority_tier: 'tier_1',
-
     population: 4900000,
-    state_release_volume: 60000, // AZ estimated
+    state_release_volume: 60000,
     incarceration_rate: 390,
-    data_availability_score: 80, // Arizona Reentry 2030 initiative
+    data_availability_score: 80,
     geographic_cluster_bonus: 40,
     community_partner_count: 8,
-
     target_resource_count: 75,
     target_launch_date: '2028-06-30',
-
     strategic_rationale:
       'Fast-growing metro. Arizona Reentry 2030 initiative launched. Strong reentry infrastructure development.',
     special_considerations:
@@ -792,7 +745,6 @@ const expansionPriorities = [
       { name: 'AZ Dept of Corrections Reentry', quality: 'high' },
     ],
   },
-
   {
     city: 'Detroit',
     state: 'MI',
@@ -801,17 +753,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3a',
     priority_tier: 'tier_1',
-
     population: 4300000,
-    state_release_volume: 65000, // MI estimated
+    state_release_volume: 65000,
     incarceration_rate: 420,
     data_availability_score: 75,
     geographic_cluster_bonus: 40,
     community_partner_count: 7,
-
     target_resource_count: 70,
     target_launch_date: '2028-06-30',
-
     strategic_rationale:
       'Industrial Midwest. High need. Federal reentry programs documented. Economic revitalization creating opportunities.',
     special_considerations: 'Rust belt economic challenges. Auto industry employment.',
@@ -825,7 +774,6 @@ const expansionPriorities = [
       { name: 'Wayne County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'New Orleans',
     state: 'LA',
@@ -834,17 +782,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_3a',
     priority_tier: 'tier_1',
-
     population: 1300000,
-    state_release_volume: 45000, // LA total
-    incarceration_rate: 683, // HIGHEST IN NATION (Louisiana rate)
+    state_release_volume: 45000,
+    incarceration_rate: 683,
     data_availability_score: 70,
     geographic_cluster_bonus: 30,
     community_partner_count: 6,
-
     target_resource_count: 60,
     target_launch_date: '2028-09-30',
-
     strategic_rationale:
       'Louisiana has HIGHEST incarceration rate nationally (683/100k). Critical need. Post-Katrina rebuilding created unique landscape.',
     special_considerations:
@@ -860,7 +805,6 @@ const expansionPriorities = [
       { name: 'Orleans Parish Reentry Court', quality: 'medium' },
     ],
   },
-
   {
     city: 'Memphis',
     state: 'TN',
@@ -869,17 +813,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_3a',
     priority_tier: 'tier_2',
-
     population: 1300000,
-    state_release_volume: 55000, // TN estimated
+    state_release_volume: 55000,
     incarceration_rate: 450,
     data_availability_score: 75,
     geographic_cluster_bonus: 35,
     community_partner_count: 6,
-
     target_resource_count: 60,
     target_launch_date: '2028-09-30',
-
     strategic_rationale:
       'Major Tennessee metro. High incarceration rates. Shelby County reentry programs.',
     special_considerations: 'Mid-South regional hub. Strong faith-based network.',
@@ -893,7 +834,6 @@ const expansionPriorities = [
       { name: 'Shelby County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Baltimore',
     state: 'MD',
@@ -902,17 +842,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_3a',
     priority_tier: 'tier_2',
-
     population: 2800000,
-    state_release_volume: 40000, // MD estimated
+    state_release_volume: 40000,
     incarceration_rate: 460,
     data_availability_score: 80,
-    geographic_cluster_bonus: 50, // Near DC
+    geographic_cluster_bonus: 50,
     community_partner_count: 8,
-
     target_resource_count: 70,
     target_launch_date: '2028-09-30',
-
     strategic_rationale:
       'High incarceration rates. Baltimore City reentry programs established. Urban Institute research.',
     special_considerations: 'Urban challenges. Opioid crisis focus needed.',
@@ -926,11 +863,6 @@ const expansionPriorities = [
       { name: 'Baltimore City Reentry', quality: 'medium' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 3B: GROWING MARKETS (2028-2029)
-  // ========================================================================
-
   {
     city: 'Seattle',
     state: 'WA',
@@ -939,17 +871,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_3b',
     priority_tier: 'tier_1',
-
     population: 4000000,
-    state_release_volume: 50000, // WA estimated
+    state_release_volume: 50000,
     incarceration_rate: 280,
     data_availability_score: 85,
     geographic_cluster_bonus: 40,
     community_partner_count: 9,
-
     target_resource_count: 75,
     target_launch_date: '2029-03-31',
-
     strategic_rationale:
       'Pacific Northwest hub. Progressive policies. Strong reentry infrastructure. Tech economy.',
     special_considerations: 'High cost of living. Homelessness issues. Strong nonprofit sector.',
@@ -963,7 +892,6 @@ const expansionPriorities = [
       { name: 'King County Reentry', quality: 'high' },
     ],
   },
-
   {
     city: 'Boston',
     state: 'MA',
@@ -972,17 +900,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_3b',
     priority_tier: 'tier_1',
-
     population: 4900000,
-    state_release_volume: 45000, // MA estimated
+    state_release_volume: 45000,
     incarceration_rate: 250,
-    data_availability_score: 90, // Strong research institutions
+    data_availability_score: 90,
     geographic_cluster_bonus: 40,
     community_partner_count: 10,
-
     target_resource_count: 75,
     target_launch_date: '2029-03-31',
-
     strategic_rationale:
       'Major northeast hub. Strong research and nonprofit infrastructure. Lower incarceration rate but large metro.',
     special_considerations:
@@ -997,7 +922,6 @@ const expansionPriorities = [
       { name: 'MA Reentry Commission', quality: 'high' },
     ],
   },
-
   {
     city: 'Minneapolis',
     state: 'MN',
@@ -1006,17 +930,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3b',
     priority_tier: 'tier_2',
-
     population: 3700000,
-    state_release_volume: 40000, // MN estimated
+    state_release_volume: 40000,
     incarceration_rate: 300,
     data_availability_score: 85,
     geographic_cluster_bonus: 35,
     community_partner_count: 8,
-
     target_resource_count: 70,
     target_launch_date: '2029-06-30',
-
     strategic_rationale:
       'Twin Cities metro. Progressive policies. Strong social services infrastructure.',
     special_considerations:
@@ -1031,7 +952,6 @@ const expansionPriorities = [
       { name: 'Hennepin County Reentry', quality: 'high' },
     ],
   },
-
   {
     city: 'Denver',
     state: 'CO',
@@ -1040,17 +960,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_3b',
     priority_tier: 'tier_2',
-
     population: 3000000,
-    state_release_volume: 35000, // CO estimated
+    state_release_volume: 35000,
     incarceration_rate: 320,
     data_availability_score: 85,
     geographic_cluster_bonus: 35,
     community_partner_count: 7,
-
     target_resource_count: 60,
     target_launch_date: '2029-06-30',
-
     strategic_rationale:
       'Fast-growing metro. Mountain region hub. Criminal justice reforms ongoing.',
     special_considerations:
@@ -1065,7 +982,6 @@ const expansionPriorities = [
       { name: 'Denver Reentry Initiative', quality: 'medium' },
     ],
   },
-
   {
     city: 'Portland',
     state: 'OR',
@@ -1074,17 +990,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_3b',
     priority_tier: 'tier_2',
-
     population: 2500000,
-    state_release_volume: 30000, // OR estimated
+    state_release_volume: 30000,
     incarceration_rate: 290,
     data_availability_score: 80,
-    geographic_cluster_bonus: 40, // Near Seattle
+    geographic_cluster_bonus: 40,
     community_partner_count: 7,
-
     target_resource_count: 60,
     target_launch_date: '2029-09-30',
-
     strategic_rationale:
       'Pacific Northwest hub. Progressive policies. Strong reentry services. Metro spans OR/WA border.',
     special_considerations: 'Homelessness crisis. Strong nonprofit network.',
@@ -1098,11 +1011,6 @@ const expansionPriorities = [
       { name: 'Multnomah County Reentry', quality: 'medium' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 3C: REGIONAL HUBS (2029-2030)
-  // ========================================================================
-
   {
     city: 'St. Louis',
     state: 'MO',
@@ -1111,17 +1019,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2800000,
-    state_release_volume: 45000, // MO estimated
+    state_release_volume: 45000,
     incarceration_rate: 420,
     data_availability_score: 75,
     geographic_cluster_bonus: 30,
     community_partner_count: 6,
-
     target_resource_count: 60,
     target_launch_date: '2029-12-31',
-
     strategic_rationale:
       'Midwest hub. High incarceration rates. St. Louis reentry programs established.',
     special_considerations: 'Urban challenges. Strong community organizations.',
@@ -1135,7 +1040,6 @@ const expansionPriorities = [
       { name: 'St. Louis Reentry Coalition', quality: 'medium' },
     ],
   },
-
   {
     city: 'Charlotte',
     state: 'NC',
@@ -1144,17 +1048,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2700000,
-    state_release_volume: 50000, // NC estimated
+    state_release_volume: 50000,
     incarceration_rate: 360,
     data_availability_score: 75,
     geographic_cluster_bonus: 30,
     community_partner_count: 6,
-
     target_resource_count: 60,
     target_launch_date: '2029-12-31',
-
     strategic_rationale:
       'Fast-growing southern metro. Banking hub. Mecklenburg County reentry services.',
     special_considerations: 'Growing immigrant population. Strong economy.',
@@ -1168,7 +1069,6 @@ const expansionPriorities = [
       { name: 'Mecklenburg County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Las Vegas',
     state: 'NV',
@@ -1177,17 +1077,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2300000,
-    state_release_volume: 25000, // NV estimated
+    state_release_volume: 25000,
     incarceration_rate: 380,
     data_availability_score: 70,
     geographic_cluster_bonus: 30,
     community_partner_count: 5,
-
     target_resource_count: 50,
     target_launch_date: '2030-03-31',
-
     strategic_rationale:
       'Fast-growing desert metro. Hospitality employment dominates. Clark County reentry services.',
     special_considerations: 'Service industry jobs. 24-hour city - unique scheduling needs.',
@@ -1201,7 +1098,6 @@ const expansionPriorities = [
       { name: 'Clark County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Columbus',
     state: 'OH',
@@ -1210,17 +1106,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2100000,
-    state_release_volume: 60000, // OH estimated
+    state_release_volume: 60000,
     incarceration_rate: 370,
-    data_availability_score: 80, // State capital
+    data_availability_score: 80,
     geographic_cluster_bonus: 35,
     community_partner_count: 6,
-
     target_resource_count: 60,
     target_launch_date: '2030-03-31',
-
     strategic_rationale:
       'State capital. Large metro. Ohio has high release volume. Government resources.',
     special_considerations: 'State government presence. University partnerships possible.',
@@ -1234,7 +1127,6 @@ const expansionPriorities = [
       { name: 'Franklin County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Indianapolis',
     state: 'IN',
@@ -1243,17 +1135,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2100000,
-    state_release_volume: 40000, // IN estimated
+    state_release_volume: 40000,
     incarceration_rate: 380,
     data_availability_score: 75,
     geographic_cluster_bonus: 30,
     community_partner_count: 6,
-
     target_resource_count: 55,
     target_launch_date: '2030-03-31',
-
     strategic_rationale:
       'State capital. Midwest hub. Marion County reentry programs. Manufacturing employment.',
     special_considerations: 'Auto industry. Logistics hub.',
@@ -1267,7 +1156,6 @@ const expansionPriorities = [
       { name: 'Marion County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Cleveland',
     state: 'OH',
@@ -1276,17 +1164,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2000000,
     state_release_volume: 60000,
     incarceration_rate: 390,
     data_availability_score: 75,
-    geographic_cluster_bonus: 35, // Near other OH cities
+    geographic_cluster_bonus: 35,
     community_partner_count: 6,
-
     target_resource_count: 55,
     target_launch_date: '2030-06-30',
-
     strategic_rationale:
       'Rust belt city. High need. Cuyahoga County reentry programs. Industrial history.',
     special_considerations: 'Economic challenges. Strong nonprofit sector.',
@@ -1300,7 +1185,6 @@ const expansionPriorities = [
       { name: 'Cuyahoga County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Nashville',
     state: 'TN',
@@ -1309,17 +1193,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 2000000,
     state_release_volume: 55000,
     incarceration_rate: 410,
     data_availability_score: 75,
-    geographic_cluster_bonus: 35, // Near Memphis
+    geographic_cluster_bonus: 35,
     community_partner_count: 6,
-
     target_resource_count: 55,
     target_launch_date: '2030-06-30',
-
     strategic_rationale:
       'State capital. Fast-growing metro. Davidson County reentry services. Music industry employment.',
     special_considerations: 'Rapid growth. Strong faith-based network. Tourism industry.',
@@ -1333,7 +1214,6 @@ const expansionPriorities = [
       { name: 'Davidson County Reentry', quality: 'medium' },
     ],
   },
-
   {
     city: 'Milwaukee',
     state: 'WI',
@@ -1342,17 +1222,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_3c',
     priority_tier: 'tier_2',
-
     population: 1600000,
-    state_release_volume: 35000, // WI estimated
+    state_release_volume: 35000,
     incarceration_rate: 400,
     data_availability_score: 75,
     geographic_cluster_bonus: 30,
     community_partner_count: 5,
-
     target_resource_count: 50,
     target_launch_date: '2030-06-30',
-
     strategic_rationale:
       'Largest WI city. High incarceration rates. Milwaukee County reentry programs.',
     special_considerations: 'Industrial city. Racial disparities in incarceration.',
@@ -1366,12 +1243,7 @@ const expansionPriorities = [
       { name: 'Milwaukee County Reentry', quality: 'medium' },
     ],
   },
-
-  // ========================================================================
-  // PHASE 4: COMPREHENSIVE STATE COVERAGE (2030-2032)
-  // State capitals and major cities for remaining states
-  // ========================================================================
-
+  // Phase 4 cities
   {
     city: 'Albuquerque',
     state: 'NM',
@@ -1380,17 +1252,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 900000,
-    state_release_volume: 20000, // NM estimated
+    state_release_volume: 20000,
     incarceration_rate: 350,
     data_availability_score: 70,
     geographic_cluster_bonus: 25,
     community_partner_count: 4,
-
     target_resource_count: 40,
     target_launch_date: '2030-12-31',
-
     strategic_rationale: 'Largest NM city. Hispanic majority. Unique cultural context.',
     special_considerations: 'Bilingual critical (Spanish). Native American populations.',
     priority_categories: [
@@ -1400,7 +1269,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'New Mexico 211', quality: 'medium' }],
   },
-
   {
     city: 'Oklahoma City',
     state: 'OK',
@@ -1409,17 +1277,14 @@ const expansionPriorities = [
     region: 'southwest',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1400000,
-    state_release_volume: 35000, // OK estimated
-    incarceration_rate: 450, // OK has high rates
+    state_release_volume: 35000,
+    incarceration_rate: 450,
     data_availability_score: 70,
     geographic_cluster_bonus: 25,
     community_partner_count: 5,
-
     target_resource_count: 45,
     target_launch_date: '2030-12-31',
-
     strategic_rationale:
       'State capital. Oklahoma has high incarceration rates. Oil industry employment.',
     special_considerations: 'Native American populations. Oil and gas industry.',
@@ -1430,7 +1295,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Oklahoma 211', quality: 'medium' }],
   },
-
   {
     city: 'Louisville',
     state: 'KY',
@@ -1439,17 +1303,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1300000,
-    state_release_volume: 30000, // KY estimated
+    state_release_volume: 30000,
     incarceration_rate: 420,
     data_availability_score: 70,
     geographic_cluster_bonus: 25,
     community_partner_count: 5,
-
     target_resource_count: 45,
     target_launch_date: '2031-03-31',
-
     strategic_rationale: 'Largest KY city. Jefferson County reentry services. Derby city.',
     special_considerations: 'Bourbon industry. Horse racing tourism.',
     priority_categories: [
@@ -1459,7 +1320,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Kentucky 211', quality: 'medium' }],
   },
-
   {
     city: 'Richmond',
     state: 'VA',
@@ -1468,17 +1328,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1300000,
-    state_release_volume: 35000, // VA estimated
+    state_release_volume: 35000,
     incarceration_rate: 360,
-    data_availability_score: 75, // State capital
+    data_availability_score: 75,
     geographic_cluster_bonus: 30,
     community_partner_count: 5,
-
     target_resource_count: 45,
     target_launch_date: '2031-03-31',
-
     strategic_rationale: 'State capital. Virginia DOC has reentry programs. Government resources.',
     special_considerations: 'Historic city. State government presence.',
     priority_categories: [
@@ -1488,7 +1345,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Virginia 211', quality: 'high' }],
   },
-
   {
     city: 'Birmingham',
     state: 'AL',
@@ -1497,17 +1353,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1100000,
-    state_release_volume: 30000, // AL estimated
-    incarceration_rate: 460, // AL has high rates
+    state_release_volume: 30000,
+    incarceration_rate: 460,
     data_availability_score: 65,
     geographic_cluster_bonus: 25,
     community_partner_count: 4,
-
     target_resource_count: 40,
     target_launch_date: '2031-06-30',
-
     strategic_rationale:
       'Largest AL city. Alabama has high incarceration rates. Industrial history.',
     special_considerations: 'Economic challenges. Strong faith-based network.',
@@ -1518,7 +1371,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Alabama 211', quality: 'medium' }],
   },
-
   {
     city: 'Salt Lake City',
     state: 'UT',
@@ -1527,17 +1379,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1200000,
-    state_release_volume: 20000, // UT estimated
+    state_release_volume: 20000,
     incarceration_rate: 320,
     data_availability_score: 75,
     geographic_cluster_bonus: 25,
     community_partner_count: 5,
-
     target_resource_count: 40,
     target_launch_date: '2031-06-30',
-
     strategic_rationale:
       'State capital. Mountain region. Utah DOC has progressive programs. Growing tech sector.',
     special_considerations: 'LDS church presence. Unique cultural context.',
@@ -1548,7 +1397,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Utah 211', quality: 'high' }],
   },
-
   {
     city: 'Providence',
     state: 'RI',
@@ -1557,17 +1405,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1600000,
-    state_release_volume: 15000, // RI estimated
+    state_release_volume: 15000,
     incarceration_rate: 310,
     data_availability_score: 75,
-    geographic_cluster_bonus: 35, // Near Boston
+    geographic_cluster_bonus: 35,
     community_partner_count: 4,
-
     target_resource_count: 40,
     target_launch_date: '2031-09-30',
-
     strategic_rationale: 'State capital. Small state but significant reentry population.',
     special_considerations: 'Small state - statewide resources. Portuguese population.',
     priority_categories: [
@@ -1577,7 +1422,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Rhode Island 211', quality: 'high' }],
   },
-
   {
     city: 'Hartford',
     state: 'CT',
@@ -1586,17 +1430,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 1200000,
-    state_release_volume: 18000, // CT estimated
+    state_release_volume: 18000,
     incarceration_rate: 300,
     data_availability_score: 75,
     geographic_cluster_bonus: 30,
     community_partner_count: 4,
-
     target_resource_count: 35,
     target_launch_date: '2031-09-30',
-
     strategic_rationale: 'State capital. Connecticut has established reentry services.',
     special_considerations: 'Insurance industry hub. Hispanic populations.',
     priority_categories: [
@@ -1606,7 +1447,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Connecticut 211', quality: 'high' }],
   },
-
   {
     city: 'Charleston',
     state: 'SC',
@@ -1615,17 +1455,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 800000,
-    state_release_volume: 35000, // SC estimated
+    state_release_volume: 35000,
     incarceration_rate: 410,
     data_availability_score: 65,
     geographic_cluster_bonus: 25,
     community_partner_count: 4,
-
     target_resource_count: 35,
     target_launch_date: '2031-12-31',
-
     strategic_rationale: 'Largest SC city. South Carolina has high incarceration rates. Port city.',
     special_considerations: 'Tourism and military presence. Coastal economy.',
     priority_categories: [
@@ -1635,7 +1472,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'South Carolina 211', quality: 'medium' }],
   },
-
   {
     city: 'Omaha',
     state: 'NE',
@@ -1644,17 +1480,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 950000,
-    state_release_volume: 20000, // NE estimated
+    state_release_volume: 20000,
     incarceration_rate: 340,
     data_availability_score: 70,
     geographic_cluster_bonus: 20,
     community_partner_count: 4,
-
     target_resource_count: 35,
     target_launch_date: '2031-12-31',
-
     strategic_rationale: 'Largest NE city. Douglas County reentry services. Regional hub.',
     special_considerations: 'Agriculture and logistics industries.',
     priority_categories: [
@@ -1664,7 +1497,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Nebraska 211', quality: 'medium' }],
   },
-
   {
     city: 'Wichita',
     state: 'KS',
@@ -1673,17 +1505,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 650000,
-    state_release_volume: 25000, // KS estimated
+    state_release_volume: 25000,
     incarceration_rate: 350,
     data_availability_score: 65,
     geographic_cluster_bonus: 20,
     community_partner_count: 3,
-
     target_resource_count: 30,
     target_launch_date: '2032-03-31',
-
     strategic_rationale: 'Largest KS city. Aviation industry hub. Sedgwick County reentry.',
     special_considerations: 'Aviation and agriculture employment.',
     priority_categories: [
@@ -1693,7 +1522,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Kansas 211', quality: 'medium' }],
   },
-
   {
     city: 'Des Moines',
     state: 'IA',
@@ -1702,17 +1530,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 700000,
-    state_release_volume: 18000, // IA estimated
+    state_release_volume: 18000,
     incarceration_rate: 310,
     data_availability_score: 70,
     geographic_cluster_bonus: 20,
     community_partner_count: 3,
-
     target_resource_count: 30,
     target_launch_date: '2032-03-31',
-
     strategic_rationale: 'State capital. Iowa DOC reentry services. Insurance industry hub.',
     special_considerations: 'Agriculture economy. Lower incarceration rates.',
     priority_categories: [
@@ -1722,7 +1547,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Iowa 211', quality: 'medium' }],
   },
-
   {
     city: 'Little Rock',
     state: 'AR',
@@ -1731,17 +1555,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 750000,
-    state_release_volume: 25000, // AR estimated
-    incarceration_rate: 450, // AR has high rates
+    state_release_volume: 25000,
+    incarceration_rate: 450,
     data_availability_score: 65,
     geographic_cluster_bonus: 20,
     community_partner_count: 3,
-
     target_resource_count: 35,
     target_launch_date: '2032-06-30',
-
     strategic_rationale:
       'State capital. Arkansas has high incarceration rates. Pulaski County reentry.',
     special_considerations: 'Rural state - statewide resources needed.',
@@ -1752,7 +1573,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Arkansas 211', quality: 'medium' }],
   },
-
   {
     city: 'Jackson',
     state: 'MS',
@@ -1761,17 +1581,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_3',
-
     population: 580000,
-    state_release_volume: 20000, // MS estimated
-    incarceration_rate: 560, // MS has very high rates
+    state_release_volume: 20000,
+    incarceration_rate: 560,
     data_availability_score: 60,
     geographic_cluster_bonus: 20,
     community_partner_count: 3,
-
     target_resource_count: 35,
     target_launch_date: '2032-06-30',
-
     strategic_rationale:
       'State capital. Mississippi has 2nd highest incarceration rate nationally. Critical need.',
     special_considerations: 'High poverty rates. Limited resources.',
@@ -1782,7 +1599,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Mississippi 211', quality: 'low' }],
   },
-
   {
     city: 'Boise',
     state: 'ID',
@@ -1791,17 +1607,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 750000,
-    state_release_volume: 12000, // ID estimated
+    state_release_volume: 12000,
     incarceration_rate: 380,
     data_availability_score: 65,
     geographic_cluster_bonus: 20,
     community_partner_count: 3,
-
     target_resource_count: 30,
     target_launch_date: '2032-09-30',
-
     strategic_rationale: 'State capital. Fast-growing metro. Idaho DOC reentry services.',
     special_considerations: 'Rural state. Agricultural and tech industries.',
     priority_categories: [
@@ -1811,7 +1624,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Idaho 211', quality: 'medium' }],
   },
-
   {
     city: 'Honolulu',
     state: 'HI',
@@ -1820,17 +1632,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 1000000,
-    state_release_volume: 8000, // HI estimated (small)
+    state_release_volume: 8000,
     incarceration_rate: 250,
     data_availability_score: 70,
-    geographic_cluster_bonus: 0, // Isolated
+    geographic_cluster_bonus: 0,
     community_partner_count: 4,
-
     target_resource_count: 30,
     target_launch_date: '2032-09-30',
-
     strategic_rationale:
       'Island state. Unique challenges. Lower incarceration but limited services due to geography.',
     special_considerations: 'Island isolation. High cost of living. Limited reentry options.',
@@ -1841,7 +1650,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Aloha United Way 211', quality: 'medium' }],
   },
-
   {
     city: 'Anchorage',
     state: 'AK',
@@ -1850,17 +1658,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 400000,
-    state_release_volume: 6000, // AK estimated (small)
+    state_release_volume: 6000,
     incarceration_rate: 410,
     data_availability_score: 60,
-    geographic_cluster_bonus: 0, // Isolated
+    geographic_cluster_bonus: 0,
     community_partner_count: 2,
-
     target_resource_count: 25,
     target_launch_date: '2032-12-31',
-
     strategic_rationale:
       'Largest AK city. Extreme isolation. Alaska has high rates. Native populations.',
     special_considerations:
@@ -1872,7 +1677,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Alaska 211', quality: 'low' }],
   },
-
   {
     city: 'Manchester',
     state: 'NH',
@@ -1881,17 +1685,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 420000,
-    state_release_volume: 10000, // NH estimated
-    incarceration_rate: 220, // NH has low rates
+    state_release_volume: 10000,
+    incarceration_rate: 220,
     data_availability_score: 70,
-    geographic_cluster_bonus: 30, // Near Boston
+    geographic_cluster_bonus: 30,
     community_partner_count: 3,
-
     target_resource_count: 25,
     target_launch_date: '2032-12-31',
-
     strategic_rationale: 'Largest NH city. Low incarceration rates. Opioid crisis focus.',
     special_considerations: 'Small state. Opioid epidemic. Near Boston resources.',
     priority_categories: [
@@ -1901,7 +1702,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'New Hampshire 211', quality: 'high' }],
   },
-
   {
     city: 'Burlington',
     state: 'VT',
@@ -1910,17 +1710,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 220000,
-    state_release_volume: 5000, // VT estimated (lowest)
-    incarceration_rate: 190, // VT has lowest rates
+    state_release_volume: 5000,
+    incarceration_rate: 190,
     data_availability_score: 70,
     geographic_cluster_bonus: 25,
     community_partner_count: 2,
-
     target_resource_count: 20,
     target_launch_date: '2032-12-31',
-
     strategic_rationale:
       'Largest VT city. Vermont has lowest incarceration rates nationally. Small scale.',
     special_considerations: 'Very small state. Rural. Progressive policies.',
@@ -1931,7 +1728,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Vermont 211', quality: 'high' }],
   },
-
   {
     city: 'Portland',
     state: 'ME',
@@ -1940,17 +1736,14 @@ const expansionPriorities = [
     region: 'northeast',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 540000,
-    state_release_volume: 8000, // ME estimated
+    state_release_volume: 8000,
     incarceration_rate: 240,
     data_availability_score: 70,
     geographic_cluster_bonus: 20,
     community_partner_count: 3,
-
     target_resource_count: 25,
     target_launch_date: '2032-12-31',
-
     strategic_rationale: 'Largest ME city. Maine has low incarceration rates. Opioid crisis.',
     special_considerations: 'Rural state. Aging population. Opioid epidemic.',
     priority_categories: [
@@ -1960,7 +1753,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Maine 211', quality: 'high' }],
   },
-
   {
     city: 'Charleston',
     state: 'WV',
@@ -1969,17 +1761,14 @@ const expansionPriorities = [
     region: 'southeast',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 210000,
-    state_release_volume: 15000, // WV estimated
+    state_release_volume: 15000,
     incarceration_rate: 420,
     data_availability_score: 60,
     geographic_cluster_bonus: 20,
     community_partner_count: 2,
-
     target_resource_count: 25,
     target_launch_date: '2032-12-31',
-
     strategic_rationale:
       'State capital. West Virginia has high rates. Economic challenges. Opioid crisis.',
     special_considerations: 'Coal country. High poverty. Opioid epidemic severe.',
@@ -1990,7 +1779,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'West Virginia 211', quality: 'medium' }],
   },
-
   {
     city: 'Billings',
     state: 'MT',
@@ -1999,17 +1787,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 180000,
-    state_release_volume: 8000, // MT estimated
+    state_release_volume: 8000,
     incarceration_rate: 390,
     data_availability_score: 55,
     geographic_cluster_bonus: 15,
     community_partner_count: 2,
-
     target_resource_count: 20,
     target_launch_date: '2032-12-31',
-
     strategic_rationale: 'Largest MT city. Rural state. Native American populations.',
     special_considerations: 'Very rural. Limited services. Native populations.',
     priority_categories: [
@@ -2019,7 +1804,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'Montana 211', quality: 'low' }],
   },
-
   {
     city: 'Fargo',
     state: 'ND',
@@ -2028,17 +1812,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 250000,
-    state_release_volume: 6000, // ND estimated
+    state_release_volume: 6000,
     incarceration_rate: 270,
     data_availability_score: 60,
     geographic_cluster_bonus: 15,
     community_partner_count: 2,
-
     target_resource_count: 20,
     target_launch_date: '2032-12-31',
-
     strategic_rationale: 'Largest ND city. Very small state. Oil boom region.',
     special_considerations: 'Very rural. Oil industry. Harsh climate.',
     priority_categories: [
@@ -2048,7 +1829,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'North Dakota 211', quality: 'low' }],
   },
-
   {
     city: 'Sioux Falls',
     state: 'SD',
@@ -2057,17 +1837,14 @@ const expansionPriorities = [
     region: 'midwest',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 280000,
-    state_release_volume: 8000, // SD estimated
+    state_release_volume: 8000,
     incarceration_rate: 420,
     data_availability_score: 60,
     geographic_cluster_bonus: 15,
     community_partner_count: 2,
-
     target_resource_count: 20,
     target_launch_date: '2032-12-31',
-
     strategic_rationale:
       'Largest SD city. South Dakota has high rates. Native populations. Financial services hub.',
     special_considerations: 'Very rural. Native American populations. Limited services.',
@@ -2078,7 +1855,6 @@ const expansionPriorities = [
     ],
     data_sources: [{ name: 'South Dakota 211', quality: 'low' }],
   },
-
   {
     city: 'Cheyenne',
     state: 'WY',
@@ -2087,17 +1863,14 @@ const expansionPriorities = [
     region: 'west',
     phase: 'phase_4',
     priority_tier: 'tier_4',
-
     population: 100000,
-    state_release_volume: 4000, // WY estimated (smallest)
+    state_release_volume: 4000,
     incarceration_rate: 380,
     data_availability_score: 50,
     geographic_cluster_bonus: 15,
     community_partner_count: 1,
-
     target_resource_count: 15,
     target_launch_date: '2032-12-31',
-
     strategic_rationale:
       'State capital. Wyoming has smallest population but moderate rates. Very rural.',
     special_considerations: 'Smallest state by population. Very rural. Limited infrastructure.',
@@ -2113,82 +1886,92 @@ const expansionPriorities = [
 async function populateExpansionPriorities() {
   console.log('🚀 Populating expansion priorities...\n')
 
-  // Check if any priorities already exist
-  const { data: existing, error: checkError } = await supabase
-    .from('expansion_priorities')
-    .select('id, city, state')
-    .limit(1)
+  try {
+    // Check if any priorities already exist
+    const existing = await sql`
+      SELECT id, city, state FROM expansion_priorities LIMIT 1
+    `
 
-  if (checkError) {
-    console.error('❌ Error checking existing priorities:', checkError)
-    process.exit(1)
-  }
-
-  if (existing && existing.length > 0) {
-    console.log('⚠️  Expansion priorities already exist. Clearing table first...\n')
-    const { error: deleteError } = await supabase
-      .from('expansion_priorities')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
-
-    if (deleteError) {
-      console.error('❌ Error clearing table:', deleteError)
-      process.exit(1)
+    if (existing.length > 0) {
+      console.log('⚠️  Expansion priorities already exist. Clearing table first...\n')
+      await sql`DELETE FROM expansion_priorities WHERE id != '00000000-0000-0000-0000-000000000000'`
+      console.log('✅ Table cleared\n')
     }
-    console.log('✅ Table cleared\n')
-  }
 
-  let successCount = 0
-  let errorCount = 0
+    let successCount = 0
+    let errorCount = 0
 
-  for (const priority of expansionPriorities) {
-    console.log(`📍 Adding ${priority.city}, ${priority.state} (${priority.priority_tier})...`)
+    for (const priority of expansionPriorities) {
+      console.log(`📍 Adding ${priority.city}, ${priority.state} (${priority.priority_tier})...`)
 
-    const { data, error } = await supabase
-      .from('expansion_priorities')
-      .insert(priority)
-      .select()
-      .single()
-
-    if (error) {
-      console.error(`   ❌ Error: ${error.message}`)
-      errorCount++
-    } else {
-      console.log(`   ✅ Created with priority score: ${data.priority_score}`)
-      successCount++
+      try {
+        const result = await sql`
+          INSERT INTO expansion_priorities (
+            city, state, county, metro_area, region, phase, priority_tier,
+            population, state_release_volume, incarceration_rate,
+            data_availability_score, geographic_cluster_bonus, community_partner_count,
+            target_resource_count, target_launch_date,
+            strategic_rationale, special_considerations,
+            priority_categories, data_sources
+          ) VALUES (
+            ${priority.city}, ${priority.state}, ${priority.county},
+            ${priority.metro_area}, ${priority.region}, ${priority.phase},
+            ${priority.priority_tier}, ${priority.population},
+            ${priority.state_release_volume}, ${priority.incarceration_rate},
+            ${priority.data_availability_score}, ${priority.geographic_cluster_bonus},
+            ${priority.community_partner_count}, ${priority.target_resource_count},
+            ${priority.target_launch_date}, ${priority.strategic_rationale},
+            ${priority.special_considerations || null},
+            ${JSON.stringify(priority.priority_categories)},
+            ${JSON.stringify(priority.data_sources)}
+          )
+          RETURNING priority_score
+        `
+        console.log(`   ✅ Created with priority score: ${result[0]?.priority_score || 'N/A'}`)
+        successCount++
+      } catch (error) {
+        console.error(`   ❌ Error: ${error.message}`)
+        errorCount++
+      }
     }
-  }
 
-  console.log('\n' + '='.repeat(60))
-  console.log(`✅ Successfully created: ${successCount}`)
-  console.log(`❌ Errors: ${errorCount}`)
-  console.log('='.repeat(60))
+    console.log('\n' + '='.repeat(60))
+    console.log(`✅ Successfully created: ${successCount}`)
+    console.log(`❌ Errors: ${errorCount}`)
+    console.log('='.repeat(60))
 
-  // Display summary
-  const { data: allPriorities } = await supabase
-    .from('expansion_priorities')
-    .select('city, state, priority_tier, priority_score')
-    .order('priority_score', { ascending: false })
+    // Display summary
+    const allPriorities = await sql`
+      SELECT city, state, priority_tier, priority_score
+      FROM expansion_priorities
+      ORDER BY priority_score DESC
+    `
 
-  if (allPriorities) {
-    console.log('\n📊 Priority Ranking:\n')
-    console.log('Rank | City                | Score | Tier')
-    console.log('-----|---------------------|-------|------')
-    allPriorities.forEach((p, i) => {
-      console.log(
-        `${String(i + 1).padStart(4)} | ${p.city.padEnd(19)} | ${String(p.priority_score).padStart(5)} | ${p.priority_tier}`
-      )
-    })
+    if (allPriorities.length > 0) {
+      console.log('\n📊 Priority Ranking:\n')
+      console.log('Rank | City                | Score | Tier')
+      console.log('-----|---------------------|-------|------')
+      allPriorities.forEach((p, i) => {
+        console.log(
+          `${String(i + 1).padStart(4)} | ${p.city.padEnd(19)} | ${String(p.priority_score).padStart(5)} | ${p.priority_tier}`
+        )
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error populating expansion priorities:', error)
+    throw error
   }
 }
 
 // Run the script
 populateExpansionPriorities()
-  .then(() => {
+  .then(async () => {
     console.log('\n✨ Done!')
+    await sql.end()
     process.exit(0)
   })
-  .catch((error) => {
+  .catch(async (error) => {
     console.error('\n❌ Fatal error:', error)
+    await sql.end()
     process.exit(1)
   })

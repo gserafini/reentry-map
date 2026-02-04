@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import { Box } from '@mui/material'
 import { env } from '@/lib/env'
-import { createClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
 import { Providers } from './providers'
 import { ClientAppBar } from '@/components/layout/ClientAppBar'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -66,52 +67,22 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
-  const userEmail = data?.claims?.email
-  const isAuthenticated = !!userEmail
-
-  // Fetch user profile to check admin status
-  // Gracefully fail if profile can't be loaded - admin menu just won't show
-  let isAdmin = false
-  if (isAuthenticated) {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('is_admin')
-          .eq('id', user.id)
-          .maybeSingle()
-
-        // Only log errors if they're meaningful (not empty objects or PGRST116 not found)
-        if (profileError && profileError.code !== 'PGRST116') {
-          if (Object.keys(profileError).length > 0) {
-            console.warn('Could not fetch admin status:', profileError.message || profileError)
-          }
-        }
-
-        isAdmin = profile?.is_admin ?? false
-      }
-    } catch {
-      // Silently fail - admin menu just won't show on first load
-      // User can still access /admin directly if they are admin
-    }
-  }
+  const session = await getServerSession(authOptions)
+  const userEmail = session?.user?.email ?? undefined
+  const isAuthenticated = !!session?.user
+  const isAdmin = session?.user?.isAdmin ?? false
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
         <Providers>
-          <AdminStatusBar />
+          {isAdmin && <AdminStatusBar />}
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
               minHeight: '100vh',
-              pt: isAdmin ? { xs: '32px', md: '32px' } : 0, // Top padding only when admin status bar is visible
+              pt: isAdmin ? '32px' : 0, // Top padding only when admin status bar is visible
             }}
           >
             <ClientAppBar

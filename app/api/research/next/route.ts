@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
+
+interface ExpansionPriorityWithProgress {
+  id: string
+  city: string
+  state: string
+  priority_score: number
+  target_resource_count: number
+  current_resource_count: number
+  priority_categories: string[] | null
+}
 
 /**
  * GET /api/research/next
@@ -45,19 +56,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = auth.getClient()
-
-    // Get highest-priority incomplete expansion target
-    const { data: priorities, error: fetchError } = await supabase
-      .from('expansion_priorities_with_progress')
-      .select('*')
-      .order('priority_score', { ascending: false })
-      .limit(100)
-
-    if (fetchError) {
-      console.error('Error fetching expansion priorities:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch expansion priorities' }, { status: 500 })
-    }
+    // Get highest-priority incomplete expansion target using raw SQL for the view
+    const priorities = await sql<ExpansionPriorityWithProgress[]>`
+      SELECT * FROM expansion_priorities_with_progress
+      ORDER BY priority_score DESC
+      LIMIT 100
+    `
 
     if (!priorities || priorities.length === 0) {
       return NextResponse.json({

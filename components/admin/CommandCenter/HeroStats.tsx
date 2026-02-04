@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Box, Card, CardContent, Typography, Grid, Chip } from '@mui/material'
 import {
@@ -11,7 +11,6 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material'
-import { createClient } from '@/lib/supabase/client'
 
 interface HeroStat {
   title: string
@@ -36,6 +35,13 @@ interface DashboardStats {
   monthlyBudget: number
 }
 
+interface DashboardStatsResponse {
+  resources?: { total: number; active: number }
+  suggestions?: { pending: number; recent_pending: number }
+  costs?: { monthly_cost: number; weekly_cost: number; daily_cost: number }
+  activeSessions?: number
+}
+
 export function HeroStats() {
   const router = useRouter()
   const [stats, setStats] = useState<DashboardStats>({
@@ -49,223 +55,38 @@ export function HeroStats() {
   })
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
-
-  // Initial fetch of all stats
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        // Fetch all stats in parallel
-        const [
-          resourcesCount,
-          activeResourcesCount,
-          suggestionsCount,
-          activeSessionsCount,
-          monthlyCostData,
-        ] = await Promise.all([
-          // Total resources
-          supabase.from('resources').select('*', { count: 'exact', head: true }),
-
-          // Active resources
-          supabase
-            .from('resources')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'active'),
-
-          // Pending suggestions
-          supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending'),
-
-          // Active verification sessions (no ended_at)
-          supabase
-            .from('agent_sessions')
-            .select('*', { count: 'exact', head: true })
-            .is('ended_at', null),
-
-          // Monthly cost (current month)
-          supabase
-            .from('ai_usage_logs')
-            .select('total_cost_usd')
-            .gte(
-              'created_at',
-              new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-            ),
-        ])
-
-        // Calculate monthly cost
-        const totalCost = monthlyCostData.data?.reduce(
-          (sum, log) => sum + (log.total_cost_usd || 0),
-          0
-        )
-
-        // Calculate daily trend for suggestions (last 24 hours)
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        const { count: recentSuggestions } = await supabase
-          .from('resource_suggestions')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .gte('created_at', oneDayAgo)
-
-        setStats({
-          totalResources: resourcesCount.count || 0,
-          activeResources: activeResourcesCount.count || 0,
-          pendingSuggestions: suggestionsCount.count || 0,
-          suggestionsTrend: recentSuggestions || 0,
-          activeProcesses: activeSessionsCount.count || 0,
-          monthlyCost: totalCost || 0,
-          monthlyBudget: 25, // TODO: Make configurable
-        })
-      } catch (error) {
-        console.error('Error fetching hero stats:', error)
-      } finally {
-        setLoading(false)
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch(
+        '/api/admin/dashboard/stats?section=resources,suggestions,costs,sessions'
+      )
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats')
       }
-    }
+      const data = (await response.json()) as DashboardStatsResponse
 
+      setStats({
+        totalResources: data.resources?.total || 0,
+        activeResources: data.resources?.active || 0,
+        pendingSuggestions: data.suggestions?.pending || 0,
+        suggestionsTrend: data.suggestions?.recent_pending || 0,
+        activeProcesses: data.activeSessions || 0,
+        monthlyCost: data.costs?.monthly_cost || 0,
+        monthlyBudget: 25, // TODO: Make configurable
+      })
+    } catch (error) {
+      console.error('Error fetching hero stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Initial fetch + polling every 10 seconds (replaces real-time subscriptions)
+  useEffect(() => {
     fetchStats()
-  }, [supabase])
-
-  // Real-time subscription for resources
-  useEffect(() => {
-    const resourcesChannel = supabase
-      .channel('herostats_resources')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resources',
-        },
-        async () => {
-          // Re-fetch resource counts
-          const [resourcesCount, activeCount] = await Promise.all([
-            supabase.from('resources').select('*', { count: 'exact', head: true }),
-            supabase
-              .from('resources')
-              .select('*', { count: 'exact', head: true })
-              .eq('status', 'active'),
-          ])
-
-          setStats((prev) => ({
-            ...prev,
-            totalResources: resourcesCount.count || 0,
-            activeResources: activeCount.count || 0,
-          }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(resourcesChannel)
-    }
-  }, [supabase])
-
-  // Real-time subscription for suggestions
-  useEffect(() => {
-    const suggestionsChannel = supabase
-      .channel('herostats_suggestions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resource_suggestions',
-        },
-        async () => {
-          const { count } = await supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-
-          // Also update trend
-          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-          const { count: recentCount } = await supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-            .gte('created_at', oneDayAgo)
-
-          setStats((prev) => ({
-            ...prev,
-            pendingSuggestions: count || 0,
-            suggestionsTrend: recentCount || 0,
-          }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(suggestionsChannel)
-    }
-  }, [supabase])
-
-  // Real-time subscription for active sessions
-  useEffect(() => {
-    const sessionsChannel = supabase
-      .channel('herostats_sessions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sessions',
-        },
-        async () => {
-          const { count } = await supabase
-            .from('agent_sessions')
-            .select('*', { count: 'exact', head: true })
-            .is('ended_at', null)
-
-          setStats((prev) => ({
-            ...prev,
-            activeProcesses: count || 0,
-          }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(sessionsChannel)
-    }
-  }, [supabase])
-
-  // Real-time subscription for AI costs
-  useEffect(() => {
-    const costsChannel = supabase
-      .channel('herostats_costs')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'ai_usage_logs',
-        },
-        async () => {
-          // Re-fetch monthly cost
-          const { data } = await supabase
-            .from('ai_usage_logs')
-            .select('total_cost_usd')
-            .gte(
-              'created_at',
-              new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-            )
-
-          const totalCost = data?.reduce((sum, log) => sum + (log.total_cost_usd || 0), 0)
-
-          setStats((prev) => ({
-            ...prev,
-            monthlyCost: totalCost || 0,
-          }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(costsChannel)
-    }
-  }, [supabase])
+    const interval = setInterval(fetchStats, 10000)
+    return () => clearInterval(interval)
+  }, [fetchStats])
 
   // Build hero stats array
   const heroStats: HeroStat[] = [

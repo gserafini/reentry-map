@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   AppBar,
   Box,
@@ -37,8 +37,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
-import { createClient } from '@/lib/supabase/client'
-import { getAISystemStatus, updateAppSettings } from '@/lib/api/settings'
+import { getAISystemStatus, updateAppSettings } from '@/lib/api/settings-client'
 import type { AISystemStatus } from '@/lib/types/settings'
 
 interface StatusBarStats {
@@ -49,8 +48,14 @@ interface StatusBarStats {
   pendingCount: number
 }
 
+interface DashboardStatsResponse {
+  costs?: { monthly_cost: number; weekly_cost: number; daily_cost: number }
+  suggestions?: { pending: number; recent_pending: number }
+  activeSessions?: number
+}
+
 export function AdminStatusBar() {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { user, isAuthenticated, isLoading, signOut } = useAuth()
   const router = useRouter()
   const [isAdmin, setIsAdmin] = useState(false)
   const [stats, setStats] = useState<StatusBarStats>({
@@ -86,153 +91,49 @@ export function AdminStatusBar() {
   }, [user, isAuthenticated, isLoading])
 
   // Fetch stats for admin status bar
-  useEffect(() => {
-    async function fetchStats() {
-      if (!isAdmin) return
+  const fetchStats = useCallback(async () => {
+    if (!isAdmin) return
 
-      const supabase = createClient()
+    try {
+      // Fetch AI system status
+      const aiSystemStatus = await getAISystemStatus()
+      setAiStatus(aiSystemStatus)
 
-      try {
-        // Fetch AI system status
-        const aiSystemStatus = await getAISystemStatus()
-        setAiStatus(aiSystemStatus)
+      // Determine system status
+      const systemStatus = aiSystemStatus.masterEnabled ? 'online' : 'issues'
 
-        // Determine system status
-        const systemStatus = aiSystemStatus.masterEnabled ? 'online' : 'issues'
-
-        // Fetch active agent sessions (verification running)
-        const { count: activeCount } = await supabase
-          .from('agent_sessions')
-          .select('*', { count: 'exact', head: true })
-          .is('ended_at', null)
-
-        // Fetch pending suggestions
-        const { count: pendingCount } = await supabase
-          .from('resource_suggestions')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-
-        // Fetch AI usage costs (this month)
-        const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          .toISOString()
-          .split('T')[0]
-
-        const { data: usageData } = await supabase
-          .from('ai_usage_logs')
-          .select('total_cost_usd')
-          .gte('created_at', firstOfMonth)
-
-        const monthlySpent =
-          usageData?.reduce((sum, log) => sum + (log.total_cost_usd || 0), 0) || 0
-
-        setStats({
-          systemStatus,
-          activeProcesses: activeCount || 0,
-          monthlyBudget: 25.0, // TODO: Get from settings
-          monthlySpent,
-          pendingCount: pendingCount || 0,
-        })
-      } catch (error) {
-        console.error('Error fetching admin status bar stats:', error)
+      // Fetch dashboard stats via API
+      const response = await fetch('/api/admin/dashboard/stats?section=costs,suggestions,sessions')
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats')
       }
-    }
+      const data = (await response.json()) as DashboardStatsResponse
 
+      setStats({
+        systemStatus,
+        activeProcesses: data.activeSessions || 0,
+        monthlyBudget: 25.0, // TODO: Get from settings
+        monthlySpent: data.costs?.monthly_cost || 0,
+        pendingCount: data.suggestions?.pending || 0,
+      })
+    } catch (error) {
+      console.error('Error fetching admin status bar stats:', error)
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
     if (isAdmin) {
       fetchStats()
 
-      // Refresh stats every 30 seconds
+      // Refresh stats every 30 seconds (replaces real-time subscriptions)
       const interval = setInterval(fetchStats, 30000)
       return () => clearInterval(interval)
     }
-  }, [isAdmin])
+  }, [isAdmin, fetchStats])
 
-  // Set up real-time subscriptions for live updates
-  useEffect(() => {
-    if (!isAdmin) return
-
-    const supabase = createClient()
-
-    // Subscribe to agent_sessions for active process count
-    const sessionsChannel = supabase
-      .channel('statusbar_sessions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sessions',
-        },
-        async () => {
-          const { count } = await supabase
-            .from('agent_sessions')
-            .select('*', { count: 'exact', head: true })
-            .is('ended_at', null)
-
-          setStats((prev) => ({ ...prev, activeProcesses: count || 0 }))
-        }
-      )
-      .subscribe()
-
-    // Subscribe to resource_suggestions for pending count
-    const suggestionsChannel = supabase
-      .channel('statusbar_suggestions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'resource_suggestions',
-        },
-        async () => {
-          const { count } = await supabase
-            .from('resource_suggestions')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-
-          setStats((prev) => ({ ...prev, pendingCount: count || 0 }))
-        }
-      )
-      .subscribe()
-
-    // Subscribe to ai_usage_logs for cost updates
-    const usageChannel = supabase
-      .channel('statusbar_usage')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'ai_usage_logs',
-        },
-        async () => {
-          const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-            .toISOString()
-            .split('T')[0]
-
-          const { data: usageData } = await supabase
-            .from('ai_usage_logs')
-            .select('total_cost_usd')
-            .gte('created_at', firstOfMonth)
-
-          const monthlySpent =
-            usageData?.reduce((sum, log) => sum + (log.total_cost_usd || 0), 0) || 0
-
-          setStats((prev) => ({ ...prev, monthlySpent }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(sessionsChannel)
-      supabase.removeChannel(suggestionsChannel)
-      supabase.removeChannel(usageChannel)
-    }
-  }, [isAdmin])
-
-  // Handle logout
+  // Handle logout using NextAuth signOut from useAuth hook
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut()
     router.push('/')
   }
 
@@ -303,7 +204,7 @@ export function AdminStatusBar() {
             <Link href="/admin" style={{ textDecoration: 'none', color: 'inherit' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" fontWeight="600" sx={{ color: '#fff' }}>
-                  🎯 Reentry Map Admin
+                  Reentry Map Admin
                 </Typography>
               </Box>
             </Link>
@@ -535,7 +436,7 @@ export function AdminStatusBar() {
                       variant="caption"
                       color={aiStatus.isVerificationActive ? 'success.main' : 'text.secondary'}
                     >
-                      {aiStatus.isVerificationActive ? '✅ Active' : '⏸️ Paused'}
+                      {aiStatus.isVerificationActive ? 'Active' : 'Paused'}
                     </Typography>
                     <Switch
                       size="small"
@@ -561,7 +462,7 @@ export function AdminStatusBar() {
                       variant="caption"
                       color={aiStatus.realtimeMonitoringEnabled ? 'success.main' : 'text.secondary'}
                     >
-                      {aiStatus.realtimeMonitoringEnabled ? '✅ Active' : '⏸️ Paused'}
+                      {aiStatus.realtimeMonitoringEnabled ? 'Active' : 'Paused'}
                     </Typography>
                     <Switch
                       size="small"
@@ -587,7 +488,7 @@ export function AdminStatusBar() {
                       variant="caption"
                       color={aiStatus.isDiscoveryActive ? 'success.main' : 'text.secondary'}
                     >
-                      {aiStatus.isDiscoveryActive ? '✅ Active' : '⏸️ Paused'}
+                      {aiStatus.isDiscoveryActive ? 'Active' : 'Paused'}
                     </Typography>
                     <Switch
                       size="small"
@@ -612,7 +513,7 @@ export function AdminStatusBar() {
                       variant="caption"
                       color={aiStatus.isEnrichmentActive ? 'success.main' : 'text.secondary'}
                     >
-                      {aiStatus.isEnrichmentActive ? '✅ Active' : '⏸️ Paused'}
+                      {aiStatus.isEnrichmentActive ? 'Active' : 'Paused'}
                     </Typography>
                     <Switch
                       size="small"
@@ -651,7 +552,7 @@ export function AdminStatusBar() {
           </Typography>
           <Box sx={{ mt: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              🔄 Verification: {stats.activeProcesses} active
+              Verification: {stats.activeProcesses} active
             </Typography>
           </Box>
           <Divider sx={{ my: 1 }} />
@@ -660,7 +561,7 @@ export function AdminStatusBar() {
             href="/admin/command-center"
             onClick={() => setProcessMenuAnchor(null)}
           >
-            <ListItemText primary="View Details →" />
+            <ListItemText primary="View Details" />
           </MenuItem>
         </Box>
       </Menu>
@@ -745,7 +646,7 @@ export function AdminStatusBar() {
             <>
               <Box sx={{ mt: 1 }}>
                 <Typography variant="body2" color="text.secondary">
-                  🔴 {stats.pendingCount} resource{stats.pendingCount > 1 ? 's' : ''} pending review
+                  {stats.pendingCount} resource{stats.pendingCount > 1 ? 's' : ''} pending review
                 </Typography>
               </Box>
               <Divider sx={{ my: 1 }} />
@@ -754,7 +655,7 @@ export function AdminStatusBar() {
                 href="/admin/flagged-resources"
                 onClick={() => setNotifMenuAnchor(null)}
               >
-                <ListItemText primary="Review Now →" />
+                <ListItemText primary="Review Now" />
               </MenuItem>
             </>
           ) : (

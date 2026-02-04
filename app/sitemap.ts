@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next'
 import { getCityPages, getCategoryInCityPages } from '@/lib/api/seo-pages'
-import { createStaticClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import {
   generateResourceUrl,
   generateStateUrl,
@@ -29,7 +29,6 @@ import type { ResourceCategory } from '@/lib/types/database'
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://reentrymap.org'
-  const supabase = createStaticClient()
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -57,38 +56,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   // National tag pages (e.g., /tag/veterans)
-  const { data: tags } = await supabase
-    .from('resources')
-    .select('tags')
-    .eq('status', 'active')
-    .not('tags', 'is', null)
+  const tagRows = await sql<{ tags: string[] }[]>`
+    SELECT tags FROM resources
+    WHERE status = 'active' AND tags IS NOT NULL
+  `
 
   const uniqueTags = [
     ...new Set(
-      tags
-        ?.flatMap((r) => r.tags || [])
+      tagRows
+        .flatMap((r) => r.tags || [])
         .filter(Boolean)
-        .filter((tag) => tag.trim() !== '') || []
+        .filter((tag) => tag.trim() !== '')
     ),
   ]
 
   const nationalTagPages: MetadataRoute.Sitemap = uniqueTags.map((tag) => ({
-    url: `${baseUrl}${generateNationalTagUrl(tag!)}`,
+    url: `${baseUrl}${generateNationalTagUrl(tag)}`,
     lastModified: new Date(),
     changeFrequency: 'weekly',
     priority: 0.9,
   }))
 
   // State landing pages (e.g., /ca, /ny)
-  const { data: states } = await supabase
-    .from('resources')
-    .select('state')
-    .eq('status', 'active')
-    .not('state', 'is', null)
+  const stateRows = await sql<{ state: string }[]>`
+    SELECT DISTINCT state FROM resources
+    WHERE status = 'active' AND state IS NOT NULL
+  `
 
-  const uniqueStates = [...new Set(states?.map((r) => r.state).filter(Boolean) || [])]
-  const statePagesSitemap: MetadataRoute.Sitemap = uniqueStates.map((state) => ({
-    url: `${baseUrl}${generateStateUrl(state!)}`,
+  const statePagesSitemap: MetadataRoute.Sitemap = stateRows.map((row) => ({
+    url: `${baseUrl}${generateStateUrl(row.state)}`,
     lastModified: new Date(),
     changeFrequency: 'weekly',
     priority: 0.95,
@@ -113,21 +109,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   // Individual resource pages (e.g., /oakland-ca/oakland-job-center)
-  const { data: resources } = await supabase
-    .from('resources')
-    .select('id, name, city, state, updated_at, created_at')
-    .eq('status', 'active')
-    .not('city', 'is', null)
-    .not('state', 'is', null)
-    .limit(10000) // Increased limit for comprehensive sitemap
+  const resources = await sql<
+    {
+      id: string
+      name: string
+      city: string
+      state: string
+      updated_at: string | null
+      created_at: string
+    }[]
+  >`
+    SELECT id, name, city, state, updated_at, created_at FROM resources
+    WHERE status = 'active' AND city IS NOT NULL AND state IS NOT NULL
+    LIMIT 10000
+  `
 
-  const resourcePagesSitemap: MetadataRoute.Sitemap =
-    resources?.map((resource) => ({
-      url: `${baseUrl}${generateResourceUrl(resource)}`,
-      lastModified: new Date(resource.updated_at || resource.created_at || Date.now()),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    })) || []
+  const resourcePagesSitemap: MetadataRoute.Sitemap = resources.map((resource) => ({
+    url: `${baseUrl}${generateResourceUrl(resource)}`,
+    lastModified: new Date(resource.updated_at || resource.created_at || Date.now()),
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }))
 
   return [
     ...staticPages,

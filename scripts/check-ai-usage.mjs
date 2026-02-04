@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -19,44 +19,46 @@ for (const line of envFile.split('\n')) {
   }
 }
 
-const supabase = createClient(
-  envVars.NEXT_PUBLIC_SUPABASE_URL,
-  envVars.SUPABASE_SERVICE_ROLE_KEY || envVars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+const sql = postgres(
+  envVars.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
 )
 
-const { data, error } = await supabase
-  .from('ai_usage_logs')
-  .select('*')
-  .order('created_at', { ascending: false })
-  .limit(10)
+try {
+  const data = await sql`
+    SELECT * FROM ai_usage_logs
+    ORDER BY created_at DESC
+    LIMIT 10
+  `
 
-if (error) {
+  console.log(`AI Usage Tracking (last 10 entries):`)
+  console.log('='.repeat(80))
+
+  if (data.length === 0) {
+    console.log('No API usage tracked yet.')
+  } else {
+    let totalCost = 0
+    for (const entry of data) {
+      console.log(`\n${entry.created_at}`)
+      console.log(`  Operation: ${entry.operation_type}`)
+      console.log(`  Provider: ${entry.provider}`)
+      console.log(`  Model: ${entry.model}`)
+      console.log(
+        `  Tokens: ${entry.input_tokens} in + ${entry.output_tokens} out = ${entry.total_tokens} total`
+      )
+      console.log(`  Cost: $${parseFloat(entry.total_cost_usd).toFixed(6)}`)
+      if (entry.suggestion_id) console.log(`  Suggestion: ${entry.suggestion_id}`)
+      if (entry.resource_id) console.log(`  Resource: ${entry.resource_id}`)
+      if (entry.duration_ms) console.log(`  Duration: ${entry.duration_ms}ms`)
+      totalCost += parseFloat(entry.total_cost_usd)
+    }
+
+    console.log('\n' + '='.repeat(80))
+    console.log(`Total cost (last 10): $${totalCost.toFixed(6)}`)
+  }
+} catch (error) {
   console.error('Error:', error.message)
+  await sql.end()
   process.exit(1)
 }
 
-console.log(`AI Usage Tracking (last 10 entries):`)
-console.log('='.repeat(80))
-
-if (data.length === 0) {
-  console.log('No API usage tracked yet.')
-} else {
-  let totalCost = 0
-  for (const entry of data) {
-    console.log(`\n${entry.created_at}`)
-    console.log(`  Operation: ${entry.operation_type}`)
-    console.log(`  Provider: ${entry.provider}`)
-    console.log(`  Model: ${entry.model}`)
-    console.log(
-      `  Tokens: ${entry.input_tokens} in + ${entry.output_tokens} out = ${entry.total_tokens} total`
-    )
-    console.log(`  Cost: $${parseFloat(entry.total_cost_usd).toFixed(6)}`)
-    if (entry.suggestion_id) console.log(`  Suggestion: ${entry.suggestion_id}`)
-    if (entry.resource_id) console.log(`  Resource: ${entry.resource_id}`)
-    if (entry.duration_ms) console.log(`  Duration: ${entry.duration_ms}ms`)
-    totalCost += parseFloat(entry.total_cost_usd)
-  }
-
-  console.log('\n' + '='.repeat(80))
-  console.log(`Total cost (last 10): $${totalCost.toFixed(6)}`)
-}
+await sql.end()

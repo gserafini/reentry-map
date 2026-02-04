@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { env } from '@/lib/env'
+import { db } from '@/lib/db/client'
+import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
 
 /**
@@ -8,7 +11,7 @@ import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
  * Approve a flagged resource with corrections applied
  *
  * Authentication:
- * - Session-based (browser/Claude Web): Automatic via Supabase auth
+ * - Session-based (browser/Claude Web): Automatic via NextAuth
  * - API key (Claude Code/scripts): Include header `x-admin-api-key: your-key`
  *
  * Body:
@@ -42,7 +45,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    const supabase = auth.getClient()
     const { id } = await params
     const body = (await request.json()) as {
       corrections?: Record<string, unknown>
@@ -95,46 +97,46 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Fetch suggestion
-    const { data: suggestion, error: fetchError } = await supabase
-      .from('resource_suggestions')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const [suggestion] = await db
+      .select()
+      .from(resourceSuggestions)
+      .where(eq(resourceSuggestions.id, id))
+      .limit(1)
 
-    if (fetchError || !suggestion) {
+    if (!suggestion) {
       return NextResponse.json({ error: 'Suggestion not found' }, { status: 404 })
     }
 
     // Merge corrections with original suggestion data
     const mergedData = {
-      name: corrections.name || suggestion.name,
-      description: corrections.description || suggestion.description,
-      primary_category:
-        corrections.primary_category ||
-        suggestion.primary_category ||
+      name: (corrections.name as string) || suggestion.name,
+      description: (corrections.description as string) || suggestion.description,
+      primaryCategory:
+        (corrections.primary_category as string) ||
+        suggestion.primaryCategory ||
         suggestion.category ||
         'general_support',
-      categories: corrections.categories || suggestion.categories,
-      tags: corrections.tags || suggestion.tags,
-      address: corrections.address || suggestion.address,
-      city: corrections.city || suggestion.city,
-      state: corrections.state || suggestion.state,
-      zip: corrections.zip || suggestion.zip,
-      phone: corrections.phone || suggestion.phone,
-      email: corrections.email || suggestion.email,
-      website: corrections.website || suggestion.website,
+      categories: (corrections.categories as string[]) || suggestion.categories,
+      tags: (corrections.tags as string[]) || suggestion.tags,
+      address: (corrections.address as string) || suggestion.address,
+      city: (corrections.city as string) || suggestion.city,
+      state: (corrections.state as string) || suggestion.state,
+      zip: (corrections.zip as string) || suggestion.zip,
+      phone: (corrections.phone as string) || suggestion.phone,
+      email: (corrections.email as string) || suggestion.email,
+      website: (corrections.website as string) || suggestion.website,
       hours: corrections.hours || suggestion.hours,
-      services_offered: corrections.services_offered || suggestion.services_offered,
-      eligibility_requirements:
-        corrections.eligibility_requirements || suggestion.eligibility_requirements,
-      languages: corrections.languages || suggestion.languages,
-      accessibility_features:
-        corrections.accessibility_features || suggestion.accessibility_features,
+      servicesOffered: (corrections.services_offered as string[]) || suggestion.servicesOffered,
+      eligibilityRequirements:
+        (corrections.eligibility_requirements as string) || suggestion.eligibilityRequirements,
+      languages: (corrections.languages as string[]) || suggestion.languages,
+      accessibilityFeatures:
+        (corrections.accessibility_features as string[]) || suggestion.accessibilityFeatures,
     }
 
     // Handle coordinates based on address_type
-    let latitude = corrections.latitude || suggestion.latitude
-    let longitude = corrections.longitude || suggestion.longitude
+    let latitude = (corrections.latitude as number) || suggestion.latitude
+    let longitude = (corrections.longitude as number) || suggestion.longitude
 
     if (address_type === 'physical') {
       // Physical addresses require valid coordinates
@@ -247,15 +249,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         : 'WebSearch'
 
     // Create resource from corrected data
-    const { data: resource, error: createError } = await supabase
-      .from('resources')
-      .insert({
+    const [resource] = await db
+      .insert(resources)
+      .values({
         name: mergedData.name,
         description: mergedData.description,
-        primary_category: mergedData.primary_category,
+        primaryCategory: mergedData.primaryCategory,
         categories: mergedData.categories,
         tags: mergedData.tags,
-        address: mergedData.address,
+        address: mergedData.address || '',
         city: mergedData.city,
         state: mergedData.state,
         zip: mergedData.zip,
@@ -265,56 +267,60 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         email: mergedData.email,
         website: mergedData.website,
         hours: mergedData.hours,
-        services_offered: mergedData.services_offered,
-        eligibility_requirements: mergedData.eligibility_requirements,
+        servicesOffered: mergedData.servicesOffered,
+        eligibilityRequirements: mergedData.eligibilityRequirements,
         languages: mergedData.languages,
-        accessibility_features: mergedData.accessibility_features,
-        address_type,
-        service_area,
-        closure_status,
-        correction_notes,
-        verification_source: verificationSource,
-        last_verified_at: new Date().toISOString(),
-        verified_by: auth.userId || null, // null for API key auth
+        accessibilityFeatures: mergedData.accessibilityFeatures,
+        addressType: address_type,
+        serviceArea: service_area,
+        closureStatus: closure_status,
+        correctionNotes: correction_notes,
+        verificationSource,
+        lastVerifiedAt: new Date(),
+        verifiedBy: auth.userId || null, // null for API key auth
         status: 'active',
         verified: true,
         source: 'admin_approved',
-        verification_status: 'verified',
+        verificationStatus: 'verified',
       })
-      .select('id')
-      .single()
+      .returning({ id: resources.id })
 
-    if (createError) {
-      console.error('Failed to create resource:', createError)
-      return NextResponse.json(
-        { error: 'Failed to create resource', details: createError.message },
-        { status: 500 }
-      )
+    if (!resource) {
+      console.error('Failed to create resource')
+      return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 })
     }
 
     // Mark suggestion as approved
-    await supabase
-      .from('resource_suggestions')
-      .update({
+    await db
+      .update(resourceSuggestions)
+      .set({
         status: 'approved',
-        reviewed_by: auth.userId || null,
-        reviewed_at: new Date().toISOString(),
-        review_notes: `${auth.authMethod === 'api_key' ? 'Approved via API key (Claude Code)' : 'Approved via web'}\n\nCorrections applied:\n${correction_notes}`,
-        correction_notes,
+        reviewedBy: auth.userId || null,
+        reviewedAt: new Date(),
+        reviewNotes: `${auth.authMethod === 'api_key' ? 'Approved via API key (Claude Code)' : 'Approved via web'}\n\nCorrections applied:\n${correction_notes}`,
+        correctionNotes: correction_notes,
       })
-      .eq('id', id)
+      .where(eq(resourceSuggestions.id, id))
 
     // Update verification log to mark as human reviewed
-    await supabase
-      .from('verification_logs')
-      .update({
-        human_reviewed: true,
-        human_reviewer_id: auth.userId || null,
-        human_decision: 'approved_with_corrections',
-      })
-      .eq('suggestion_id', id)
-      .order('created_at', { ascending: false })
+    // First find the most recent log for this suggestion
+    const [latestLog] = await db
+      .select({ id: verificationLogs.id })
+      .from(verificationLogs)
+      .where(eq(verificationLogs.suggestionId, id))
+      .orderBy(desc(verificationLogs.createdAt))
       .limit(1)
+
+    if (latestLog) {
+      await db
+        .update(verificationLogs)
+        .set({
+          humanReviewed: true,
+          humanReviewerId: auth.userId || null,
+          humanDecision: 'approved_with_corrections',
+        })
+        .where(eq(verificationLogs.id, latestLog.id))
+    }
 
     return NextResponse.json({
       success: true,

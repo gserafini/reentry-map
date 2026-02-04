@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
 
 /**
  * GET /api/admin/coverage/county/[fips]
@@ -20,105 +21,132 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ fips: string }> }) {
   try {
     const { fips } = await params
-    const supabase = await createClient()
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Check admin authentication
+    const auth = await checkAdminAuth(request)
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
-    // Check admin status
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+    // Row types for query results
+    interface CountyRow {
+      fips_code: string
+      state_fips: string
+      county_name: string
+      state_name: string
+      state_code: string
+      total_population: number | null
+      estimated_annual_releases: number | null
+      priority_tier: number | null
+      priority_reason: string | null
+      center_lat: number | null
+      center_lng: number | null
+    }
 
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    interface CoverageMetricRow {
+      id: string
+      geography_type: string
+      geography_id: string
+      geography_name: string
+      coverage_score: number
+      resource_count_score: number
+      category_coverage_score: number
+      population_coverage_score: number
+      verification_score: number
+      total_resources: number
+      verified_resources: number
+      categories_covered: number
+      unique_resources: number
+      total_population: number | null
+      reentry_population: number | null
+      resources_in_211: number
+      comprehensiveness_ratio: number
+      avg_completeness_score: number | null
+      avg_verification_score: number | null
+      resources_with_reviews: number
+      review_coverage_pct: number
+      calculated_at: string
+      last_updated: string
+    }
+
+    interface ResourceRow {
+      id: string
+      name: string
+      primary_category: string
+      city: string
+      is_unique: boolean
+      completeness_score: number | null
+      verification_score: number | null
+      review_count: number
+    }
+
+    interface CountyRankRow {
+      geography_id: string
+      coverage_score: number
     }
 
     // Get county reference data
-    const { data: county, error: countyError } = await supabase
-      .from('county_data')
-      .select('*')
-      .eq('fips_code', fips)
-      .single()
+    const countyRows = await sql<CountyRow[]>`
+      SELECT * FROM county_data WHERE fips_code = ${fips} LIMIT 1
+    `
 
-    if (countyError || !county) {
+    if (countyRows.length === 0) {
       return NextResponse.json({ error: 'County not found' }, { status: 404 })
     }
 
-    // Get coverage metrics for this county
-    const { data: metrics, error: metricsError } = await supabase
-      .from('coverage_metrics')
-      .select('*')
-      .eq('geography_type', 'county')
-      .eq('geography_id', fips)
-      .single()
+    const county = countyRows[0]
 
-    if (metricsError && metricsError.code !== 'PGRST116') {
-      // PGRST116 = no rows returned (county has no metrics yet)
-      throw metricsError
-    }
+    // Get coverage metrics for this county
+    const metricsRows = await sql<CoverageMetricRow[]>`
+      SELECT * FROM coverage_metrics
+      WHERE geography_type = 'county' AND geography_id = ${fips}
+      LIMIT 1
+    `
+    const metrics = metricsRows[0] || null
 
     // Get resources in this county
-    const { data: resources, error: resourcesError } = await supabase
-      .from('resources')
-      .select('id, name, primary_category, city, is_unique, completeness_score, verification_score, review_count')
-      .eq('county_fips', fips)
-      .eq('status', 'active')
-      .order('name')
-
-    if (resourcesError) throw resourcesError
+    const resources = await sql<ResourceRow[]>`
+      SELECT id, name, primary_category, city, is_unique, completeness_score, verification_score, review_count
+      FROM resources
+      WHERE county_fips = ${fips} AND status = 'active'
+      ORDER BY name
+    `
 
     // Group resources by category
     const categoryCounts: Record<string, number> = {}
-    resources?.forEach((r) => {
+    resources.forEach((r) => {
       categoryCounts[r.primary_category] = (categoryCounts[r.primary_category] || 0) + 1
     })
 
     // Get state-level comparison
-    const { data: stateMetrics, error: stateError } = await supabase
-      .from('coverage_metrics')
-      .select('*')
-      .eq('geography_type', 'state')
-      .eq('geography_id', county.state_code)
-      .single()
-
-    if (stateError && stateError.code !== 'PGRST116') {
-      throw stateError
-    }
+    const stateMetricsRows = await sql<CoverageMetricRow[]>`
+      SELECT * FROM coverage_metrics
+      WHERE geography_type = 'state' AND geography_id = ${county.state_code}
+      LIMIT 1
+    `
+    const stateMetrics = stateMetricsRows[0] || null
 
     // Get national comparison
-    const { data: nationalMetrics, error: nationalError } = await supabase
-      .from('coverage_metrics')
-      .select('*')
-      .eq('geography_type', 'national')
-      .eq('geography_id', 'US')
-      .single()
-
-    if (nationalError && nationalError.code !== 'PGRST116') {
-      throw nationalError
-    }
+    const nationalMetricsRows = await sql<CoverageMetricRow[]>`
+      SELECT * FROM coverage_metrics
+      WHERE geography_type = 'national' AND geography_id = 'US'
+      LIMIT 1
+    `
+    const nationalMetrics = nationalMetricsRows[0] || null
 
     // Calculate county rank within state
-    const { data: stateCounties, error: stateCountiesError } = await supabase
-      .from('coverage_metrics')
-      .select('geography_id, coverage_score')
-      .eq('geography_type', 'county')
-      .like('geography_id', `${county.state_fips}%`)
-      .order('coverage_score', { ascending: false })
+    const stateCounties = await sql<CountyRankRow[]>`
+      SELECT geography_id, coverage_score
+      FROM coverage_metrics
+      WHERE geography_type = 'county' AND geography_id LIKE ${county.state_fips + '%'}
+      ORDER BY coverage_score DESC
+    `
 
-    if (stateCountiesError) throw stateCountiesError
-
-    const countyRank = stateCounties?.findIndex((c) => c.geography_id === fips) + 1 || null
-    const totalCountiesInState = stateCounties?.length || 0
+    const countyRank = stateCounties.findIndex((c) => c.geography_id === fips) + 1 || null
+    const totalCountiesInState = stateCounties.length
 
     return NextResponse.json({
       county: {
@@ -141,11 +169,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         unique_resources: 0,
       },
       resources: {
-        total: resources?.length || 0,
+        total: resources.length,
         by_category: categoryCounts,
-        unique_count: resources?.filter((r) => r.is_unique).length || 0,
-        with_reviews: resources?.filter((r) => r.review_count > 0).length || 0,
-        list: resources || [],
+        unique_count: resources.filter((r) => r.is_unique).length,
+        with_reviews: resources.filter((r) => r.review_count > 0).length,
+        list: resources,
       },
       comparison: {
         state: {

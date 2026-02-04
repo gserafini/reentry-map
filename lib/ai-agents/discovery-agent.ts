@@ -1,5 +1,5 @@
 import { BaseAgent } from './base-agent'
-import { createClient } from '@/lib/supabase/client'
+import { sql } from '@/lib/db/client'
 
 interface DiscoveredResource {
   name: string
@@ -112,46 +112,45 @@ export class DiscoveryAgent extends BaseAgent {
    * Check if a resource already exists in the database
    */
   private async resourceExists(resource: DiscoveredResource): Promise<boolean> {
-    const supabase = createClient()
-
-    // Check by name and address similarity
-    const { data, error } = await supabase
-      .from('resources')
-      .select('id')
-      .ilike('name', `%${resource.name}%`)
-      .limit(1)
-
-    if (error) {
+    try {
+      const rows = await sql`
+        SELECT id FROM resources
+        WHERE name ILIKE ${'%' + resource.name + '%'}
+        LIMIT 1
+      `
+      return rows.length > 0
+    } catch (error) {
       console.error('Error checking resource existence:', error)
       return false
     }
-
-    return data && data.length > 0
   }
 
   /**
    * Add a discovered resource to the database
    */
   private async addResource(resource: DiscoveredResource): Promise<void> {
-    const supabase = createClient()
-
-    const { error } = await supabase.from('resources').insert({
-      name: resource.name,
-      description: resource.description,
-      primary_category: resource.category,
-      address: resource.address,
-      phone: resource.phone || null,
-      email: resource.email || null,
-      website: resource.website || null,
-      hours: resource.hours || null,
-      services: resource.services || null,
-      eligibility_requirements: resource.eligibility || null,
-      status: 'pending', // Requires admin review
-      ai_enriched: true,
-      source: null,
-    })
-
-    if (error) {
+    try {
+      await sql`
+        INSERT INTO resources (
+          name, description, primary_category, address, phone, email, website,
+          hours, services_offered, eligibility_requirements, status, ai_enriched, source
+        ) VALUES (
+          ${resource.name},
+          ${resource.description},
+          ${resource.category},
+          ${resource.address},
+          ${resource.phone || null},
+          ${resource.email || null},
+          ${resource.website || null},
+          ${resource.hours || null},
+          ${resource.services || null},
+          ${resource.eligibility || null},
+          'pending',
+          true,
+          ${null}
+        )
+      `
+    } catch (error) {
       console.error('Error adding resource:', error)
       throw error
     }

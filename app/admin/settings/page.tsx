@@ -32,7 +32,7 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   Visibility as VisibilityIcon,
 } from '@mui/icons-material'
-import { getAppSettings, updateAppSettings, getAISystemStatus } from '@/lib/api/settings'
+import { getAppSettings, updateAppSettings, getAISystemStatus } from '@/lib/api/settings-client'
 import type { AppSettings, AISystemStatus } from '@/lib/types/settings'
 
 export default function AdminSettingsPage() {
@@ -212,8 +212,8 @@ export default function AdminSettingsPage() {
             {!settings.sms_provider_configured && (
               <Alert severity="warning" icon={<InfoIcon />} sx={{ mb: 2 }}>
                 <AlertTitle>SMS Provider Not Configured</AlertTitle>
-                You need to configure an SMS provider in Supabase before enabling phone
-                authentication.
+                You need to configure Twilio SMS credentials in your environment variables before
+                enabling phone authentication.
               </Alert>
             )}
 
@@ -230,15 +230,15 @@ export default function AdminSettingsPage() {
                   </Typography>
                 </ListItemIcon>
                 <ListItemText
-                  primary="Go to Supabase Dashboard"
+                  primary="Sign up for Twilio"
                   secondary={
                     <MuiLink
-                      href="https://app.supabase.com"
+                      href="https://www.twilio.com/try-twilio"
                       target="_blank"
                       rel="noopener"
                       sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
                     >
-                      Open Supabase Dashboard
+                      Create a Twilio account
                       <OpenInNewIcon fontSize="small" />
                     </MuiLink>
                   }
@@ -252,8 +252,8 @@ export default function AdminSettingsPage() {
                   </Typography>
                 </ListItemIcon>
                 <ListItemText
-                  primary="Navigate to Authentication → Providers"
-                  secondary="Find 'Phone' in the list of authentication providers"
+                  primary="Get your Twilio credentials"
+                  secondary="Find your Account SID, Auth Token, and phone number in the Twilio Console"
                 />
               </ListItem>
 
@@ -264,8 +264,8 @@ export default function AdminSettingsPage() {
                   </Typography>
                 </ListItemIcon>
                 <ListItemText
-                  primary="Choose an SMS provider"
-                  secondary="Options: Twilio, MessageBird, Vonage, or Textlocal"
+                  primary="Add credentials to environment variables"
+                  secondary="Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env.local"
                 />
               </ListItem>
 
@@ -276,8 +276,8 @@ export default function AdminSettingsPage() {
                   </Typography>
                 </ListItemIcon>
                 <ListItemText
-                  primary="Enter your provider credentials"
-                  secondary="Account SID, Auth Token, and Phone Number from your SMS provider"
+                  primary="Restart the development server"
+                  secondary="Environment variable changes require a server restart to take effect"
                 />
               </ListItem>
 
@@ -285,18 +285,6 @@ export default function AdminSettingsPage() {
                 <ListItemIcon>
                   <Typography variant="body2" fontWeight="bold">
                     5.
-                  </Typography>
-                </ListItemIcon>
-                <ListItemText
-                  primary="Enable Phone provider in Supabase"
-                  secondary="Toggle the Phone provider to 'Enabled' and save"
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <Typography variant="body2" fontWeight="bold">
-                    6.
                   </Typography>
                 </ListItemIcon>
                 <ListItemText
@@ -308,7 +296,7 @@ export default function AdminSettingsPage() {
               <ListItem>
                 <ListItemIcon>
                   <Typography variant="body2" fontWeight="bold">
-                    7.
+                    6.
                   </Typography>
                 </ListItemIcon>
                 <ListItemText

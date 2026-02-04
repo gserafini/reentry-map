@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Container, Typography, Box, Grid, CircularProgress, Alert, Button } from '@mui/material'
 import { FavoriteBorder as FavoriteBorderIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { getUserFavorites } from '@/lib/api/favorites'
 import { ResourceCard } from '@/components/resources/ResourceCard'
 import type { Database } from '@/lib/types/database'
 
@@ -40,13 +39,19 @@ export default function FavoritesPage() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await getUserFavorites(user.id)
+      try {
+        const response = await fetch('/api/favorites')
+        const result = (await response.json()) as { data?: ResourceWithFavorite[]; error?: string }
 
-      if (fetchError) {
+        if (!response.ok) {
+          setError('Failed to load favorites. Please try again.')
+          console.error(result.error)
+        } else {
+          setFavorites(result.data || [])
+        }
+      } catch (fetchError) {
         setError('Failed to load favorites. Please try again.')
         console.error(fetchError)
-      } else {
-        setFavorites((data as ResourceWithFavorite[]) || [])
       }
 
       setLoading(false)

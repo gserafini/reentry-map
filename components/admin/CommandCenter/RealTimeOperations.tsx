@@ -1,49 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Box, Card, CardContent, Typography, IconButton, Collapse, Chip } from '@mui/material'
 import { ExpandMore, Psychology as AIIcon } from '@mui/icons-material'
 import { RealtimeVerificationViewer } from '../RealtimeVerificationViewer'
-import { createClient } from '@/lib/supabase/client'
+
+interface SessionCountResponse {
+  activeSessions?: number
+}
 
 export function RealTimeOperations() {
   const [expanded, setExpanded] = useState(true)
   const [activeCount, setActiveCount] = useState(0)
-  const supabase = createClient()
 
-  // Subscribe to active sessions count
+  const fetchActiveCount = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/dashboard/stats?section=sessions')
+      if (!response.ok) return
+      const data = (await response.json()) as SessionCountResponse
+      setActiveCount(data.activeSessions || 0)
+    } catch (error) {
+      console.error('Error fetching active session count:', error)
+    }
+  }, [])
+
+  // Initial fetch + polling every 5 seconds (replaces real-time subscription)
   useEffect(() => {
-    async function fetchActiveCount() {
-      const { count } = await supabase
-        .from('agent_sessions')
-        .select('*', { count: 'exact', head: true })
-        .is('ended_at', null)
-
-      setActiveCount(count || 0)
-    }
-
     fetchActiveCount()
-
-    // Subscribe to session changes
-    const sessionsChannel = supabase
-      .channel('realtime_ops_sessions')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sessions',
-        },
-        () => {
-          fetchActiveCount()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(sessionsChannel)
-    }
-  }, [supabase])
+    const interval = setInterval(fetchActiveCount, 5000)
+    return () => clearInterval(interval)
+  }, [fetchActiveCount])
 
   // Auto-expand when there are active processes
   useEffect(() => {

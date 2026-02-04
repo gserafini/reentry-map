@@ -7,7 +7,7 @@
  * google_place_id, location_type, formatted_address, county_fips
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -31,21 +31,16 @@ try {
   console.error('⚠️  Could not load .env.local file')
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const googleMapsKey = process.env.GOOGLE_MAPS_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing Supabase credentials')
-  process.exit(1)
-}
 
 if (!googleMapsKey) {
   console.error('❌ Missing GOOGLE_MAPS_KEY environment variable')
   process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 /**
  * Clean county name by removing suffixes
@@ -100,7 +95,7 @@ async function geocodeAddress(address) {
       placeId: result.place_id,
       locationType: result.geometry.location_type,
     }
-  } catch (_error) {
+  } catch (error) {
     console.error(`  ❌ Geocoding error:`, error.message)
     return null
   }
@@ -112,15 +107,14 @@ async function geocodeAddress(address) {
 async function lookupCountyFips(countyName, stateCode) {
   if (!countyName || !stateCode) return null
 
-  const { data, error } = await supabase
-    .from('county_data')
-    .select('fips_code')
-    .eq('county_name', countyName)
-    .eq('state_code', stateCode.toUpperCase())
-    .single()
+  const result = await sql`
+    SELECT fips_code FROM county_data
+    WHERE county_name = ${countyName} AND state_code = ${stateCode.toUpperCase()}
+    LIMIT 1
+  `
 
-  if (error || !data) return null
-  return data.fips_code
+  if (result.length === 0) return null
+  return result[0].fips_code
 }
 
 /**
@@ -129,16 +123,15 @@ async function lookupCountyFips(countyName, stateCode) {
 async function determineCountyFromCoordinates(latitude, longitude) {
   if (!latitude || !longitude) return null
 
-  const { data, error } = await supabase.rpc('find_county_for_point', {
-    lat: latitude,
-    lng: longitude,
-  })
+  const result = await sql`
+    SELECT county_name, fips_code FROM find_county_for_point(${latitude}, ${longitude})
+  `
 
-  if (error || !data || data.length === 0) return null
+  if (result.length === 0) return null
 
   return {
-    county: data[0].county_name,
-    county_fips: data[0].fips_code,
+    county: result[0].county_name,
+    county_fips: result[0].fips_code,
   }
 }
 
@@ -148,105 +141,109 @@ async function determineCountyFromCoordinates(latitude, longitude) {
 async function main() {
   console.log('🔄 Re-geocoding all resources...\n')
 
-  // Fetch all resources with addresses
-  const { data: resources, error } = await supabase
-    .from('resources')
-    .select('id, name, address, city, state, latitude, longitude')
-    .not('address', 'is', null)
-    .order('name')
+  try {
+    // Fetch all resources with addresses
+    const resources = await sql`
+      SELECT id, name, address, city, state, latitude, longitude
+      FROM resources
+      WHERE address IS NOT NULL
+      ORDER BY name
+    `
 
-  if (error) {
-    console.error('❌ Error fetching resources:', error)
-    process.exit(1)
-  }
+    console.log(`📋 Found ${resources.length} resources with addresses\n`)
 
-  console.log(`📋 Found ${resources.length} resources with addresses\n`)
+    let successCount = 0
+    let skipCount = 0
+    let errorCount = 0
 
-  let successCount = 0
-  let skipCount = 0
-  let errorCount = 0
+    for (let i = 0; i < resources.length; i++) {
+      const resource = resources[i]
+      const progress = `[${i + 1}/${resources.length}]`
 
-  for (let i = 0; i < resources.length; i++) {
-    const resource = resources[i]
-    const progress = `[${i + 1}/${resources.length}]`
+      console.log(`${progress} ${resource.name}`)
+      console.log(`  📍 ${resource.address}, ${resource.city}, ${resource.state}`)
 
-    console.log(`${progress} ${resource.name}`)
-    console.log(`  📍 ${resource.address}, ${resource.city}, ${resource.state}`)
+      // Construct full address for geocoding
+      const fullAddress = `${resource.address}, ${resource.city}, ${resource.state}`
 
-    // Construct full address for geocoding
-    const fullAddress = `${resource.address}, ${resource.city}, ${resource.state}`
+      // Geocode the address
+      const geocodeResult = await geocodeAddress(fullAddress)
 
-    // Geocode the address
-    const geocodeResult = await geocodeAddress(fullAddress)
+      if (!geocodeResult) {
+        console.log(`  ⚠️  Skipping - geocoding failed\n`)
+        skipCount++
+        continue
+      }
 
-    if (!geocodeResult) {
-      console.log(`  ⚠️  Skipping - geocoding failed\n`)
-      skipCount++
-      continue
-    }
+      // Determine county FIPS
+      let countyFips = null
+      if (geocodeResult.county && geocodeResult.state) {
+        countyFips = await lookupCountyFips(geocodeResult.county, geocodeResult.state)
+      }
 
-    // Determine county FIPS
-    let countyFips = null
-    if (geocodeResult.county && geocodeResult.state) {
-      countyFips = await lookupCountyFips(geocodeResult.county, geocodeResult.state)
-    }
-
-    // Fallback to coordinate-based lookup if no FIPS yet
-    if (!countyFips && geocodeResult.latitude && geocodeResult.longitude) {
-      const countyData = await determineCountyFromCoordinates(
-        geocodeResult.latitude,
-        geocodeResult.longitude
-      )
-      if (countyData) {
-        countyFips = countyData.county_fips
-        if (!geocodeResult.county) {
-          geocodeResult.county = countyData.county
+      // Fallback to coordinate-based lookup if no FIPS yet
+      if (!countyFips && geocodeResult.latitude && geocodeResult.longitude) {
+        const countyData = await determineCountyFromCoordinates(
+          geocodeResult.latitude,
+          geocodeResult.longitude
+        )
+        if (countyData) {
+          countyFips = countyData.county_fips
+          if (!geocodeResult.county) {
+            geocodeResult.county = countyData.county
+          }
         }
       }
+
+      // Update resource with all geocoding metadata
+      try {
+        await sql`
+          UPDATE resources
+          SET latitude = ${geocodeResult.latitude},
+              longitude = ${geocodeResult.longitude},
+              city = ${geocodeResult.city || resource.city},
+              state = ${geocodeResult.state || resource.state},
+              zip = ${geocodeResult.zip},
+              county = ${geocodeResult.county},
+              county_fips = ${countyFips},
+              neighborhood = ${geocodeResult.neighborhood},
+              google_place_id = ${geocodeResult.placeId},
+              location_type = ${geocodeResult.locationType},
+              formatted_address = ${geocodeResult.formattedAddress}
+          WHERE id = ${resource.id}
+        `
+
+        console.log(`  ✅ Updated with:`)
+        console.log(`     - Coordinates: ${geocodeResult.latitude}, ${geocodeResult.longitude}`)
+        console.log(
+          `     - County: ${geocodeResult.county || 'N/A'} (FIPS: ${countyFips || 'N/A'})`
+        )
+        console.log(`     - Neighborhood: ${geocodeResult.neighborhood || 'N/A'}`)
+        console.log(`     - Place ID: ${geocodeResult.placeId}`)
+        console.log(`     - Accuracy: ${geocodeResult.locationType}`)
+        successCount++
+      } catch (updateError) {
+        console.log(`  ❌ Update failed:`, updateError.message)
+        errorCount++
+      }
+
+      console.log()
+
+      // Rate limiting: Google allows 50 requests/second, but let's be conservative
+      await new Promise((resolve) => setTimeout(resolve, 100)) // 10 requests/second
     }
 
-    // Update resource with all geocoding metadata
-    const { error: updateError } = await supabase
-      .from('resources')
-      .update({
-        latitude: geocodeResult.latitude,
-        longitude: geocodeResult.longitude,
-        city: geocodeResult.city || resource.city,
-        state: geocodeResult.state || resource.state,
-        zip: geocodeResult.zip,
-        county: geocodeResult.county,
-        county_fips: countyFips,
-        neighborhood: geocodeResult.neighborhood,
-        google_place_id: geocodeResult.placeId,
-        location_type: geocodeResult.locationType,
-        formatted_address: geocodeResult.formattedAddress,
-      })
-      .eq('id', resource.id)
-
-    if (updateError) {
-      console.log(`  ❌ Update failed:`, updateError.message)
-      errorCount++
-    } else {
-      console.log(`  ✅ Updated with:`)
-      console.log(`     - Coordinates: ${geocodeResult.latitude}, ${geocodeResult.longitude}`)
-      console.log(`     - County: ${geocodeResult.county || 'N/A'} (FIPS: ${countyFips || 'N/A'})`)
-      console.log(`     - Neighborhood: ${geocodeResult.neighborhood || 'N/A'}`)
-      console.log(`     - Place ID: ${geocodeResult.placeId}`)
-      console.log(`     - Accuracy: ${geocodeResult.locationType}`)
-      successCount++
-    }
-
-    console.log()
-
-    // Rate limiting: Google allows 50 requests/second, but let's be conservative
-    await new Promise((resolve) => setTimeout(resolve, 100)) // 10 requests/second
+    console.log('\n✅ Re-geocoding complete!')
+    console.log(`   - Success: ${successCount}`)
+    console.log(`   - Skipped: ${skipCount}`)
+    console.log(`   - Errors: ${errorCount}`)
+    console.log(`   - Total: ${resources.length}`)
+  } catch (error) {
+    console.error('❌ Error fetching resources:', error)
+    process.exit(1)
+  } finally {
+    await sql.end()
   }
-
-  console.log('\n✅ Re-geocoding complete!')
-  console.log(`   - Success: ${successCount}`)
-  console.log(`   - Skipped: ${skipCount}`)
-  console.log(`   - Errors: ${errorCount}`)
-  console.log(`   - Total: ${resources.length}`)
 }
 
 main().catch(console.error)

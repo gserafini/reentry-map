@@ -18,7 +18,7 @@ import {
 } from '@mui/material'
 import { Close as CloseIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { submitUpdate } from '@/lib/api/updates'
+import { submitUpdate } from '@/lib/api/updates-client'
 import { useRouter } from 'next/navigation'
 import type { Database } from '@/lib/types/database'
 

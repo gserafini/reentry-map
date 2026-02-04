@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { ilike, eq, and } from 'drizzle-orm'
 
 /**
  * GET /api/resources/check-duplicate?name=...&address=...&city=...&state=...
@@ -25,44 +27,50 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient()
-
-    // Build query based on available parameters
-    let query = supabase
-      .from('resources')
-      .select('id, name, address, city, state, primary_category')
+    // Build conditions
+    const conditions = []
 
     // Exact name match (case-insensitive)
     if (name) {
-      query = query.ilike('name', name)
+      conditions.push(ilike(resources.name, name))
     }
 
     // Exact address match (case-insensitive)
     if (address) {
-      query = query.ilike('address', address)
+      conditions.push(ilike(resources.address, address))
     }
 
     // Filter by city and state if provided
     if (city) {
-      query = query.eq('city', city)
+      conditions.push(eq(resources.city, city))
     }
     if (state) {
-      query = query.eq('state', state)
+      conditions.push(eq(resources.state, state))
     }
 
-    const { data: matches, error } = await query.limit(5)
-
-    if (error) {
-      console.error('Error checking duplicate:', error)
-      return NextResponse.json({ error: 'Failed to check for duplicates' }, { status: 500 })
-    }
+    const matches = await db
+      .select({
+        id: resources.id,
+        name: resources.name,
+        address: resources.address,
+        city: resources.city,
+        state: resources.state,
+        primaryCategory: resources.primaryCategory,
+      })
+      .from(resources)
+      .where(conditions.length > 1 ? and(...conditions) : conditions[0])
+      .limit(5)
 
     const isDuplicate = matches && matches.length > 0
 
     return NextResponse.json({
       isDuplicate,
       matchCount: matches?.length || 0,
-      matches: matches || [],
+      matches:
+        matches?.map((m) => ({
+          ...m,
+          primary_category: m.primaryCategory,
+        })) || [],
       message: isDuplicate
         ? `Found ${matches.length} potential duplicate(s)`
         : 'No duplicates found - safe to add',

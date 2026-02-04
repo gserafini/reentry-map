@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { Box, Typography } from '@mui/material'
 import { ResourceForm } from '@/components/admin/ResourceForm'
-import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types/database'
 
 type Resource = Database['public']['Tables']['resources']['Row']
@@ -15,15 +14,18 @@ interface EditResourceClientProps {
 
 export function EditResourceClient({ resource }: EditResourceClientProps) {
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleSubmit(data: Partial<ResourceInsert>) {
     try {
-      const { error } = await supabase.from('resources').update(data).eq('id', resource.id)
+      const response = await fetch(`/api/admin/resources/${resource.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
 
-      if (error) {
-        console.error('Error updating resource:', error)
-        return { success: false, error: error.message }
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string }
+        return { success: false, error: result.error || 'Failed to update resource' }
       }
 
       return { success: true }

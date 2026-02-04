@@ -1,7 +1,8 @@
 import { Container } from '@mui/material'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import type { Metadata } from 'next'
+import type { Resource } from '@/lib/types/database'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 
 interface ResourceDetailPageProps {
@@ -28,7 +29,6 @@ interface ResourceDetailPageProps {
  */
 export default async function ResourceDetailPage({ params }: ResourceDetailPageProps) {
   const { segments } = await params
-  const supabase = await createClient()
 
   let resource
 
@@ -36,31 +36,23 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
   if (segments.length === 1) {
     // UUID format: /resources/{id}
     const [id] = segments
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('id', id)
-      .eq('status', 'active')
-      .single()
-
-    resource = data
-    if (error) {
+    const rows = await sql<Resource[]>`
+      SELECT * FROM resources WHERE id = ${id} AND status = 'active' LIMIT 1
+    `
+    resource = rows[0]
+    if (!resource) {
       notFound()
     }
   } else if (segments.length === 3) {
     // SEO format: /resources/{state}/{city}/{slug}
     const [state, city, slug] = segments
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('slug', slug)
-      .eq('state', state)
-      .eq('city', city)
-      .eq('status', 'active')
-      .single()
-
-    resource = data
-    if (error) {
+    const rows = await sql<Resource[]>`
+      SELECT * FROM resources
+      WHERE slug = ${slug} AND state = ${state} AND city = ${city} AND status = 'active'
+      LIMIT 1
+    `
+    resource = rows[0]
+    if (!resource) {
       notFound()
     }
   } else {
@@ -82,34 +74,26 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
 // Generate metadata for SEO
 export async function generateMetadata({ params }: ResourceDetailPageProps): Promise<Metadata> {
   const { segments } = await params
-  const supabase = await createClient()
 
   let resourceName = 'Resource'
 
   // Fetch resource name based on URL format
   if (segments.length === 1) {
     const [id] = segments
-    const { data } = await supabase
-      .from('resources')
-      .select('name, primary_category')
-      .eq('id', id)
-      .eq('status', 'active')
-      .single()
-
-    resourceName = data?.name || 'Resource'
+    const rows = await sql<{ name: string; primary_category: string }[]>`
+      SELECT name, primary_category FROM resources
+      WHERE id = ${id} AND status = 'active' LIMIT 1
+    `
+    resourceName = rows[0]?.name || 'Resource'
   } else if (segments.length === 3) {
     const [state, city, slug] = segments
-    const { data } = await supabase
-      .from('resources')
-      .select('name, primary_category')
-      .eq('slug', slug)
-      .eq('state', state)
-      .eq('city', city)
-      .eq('status', 'active')
-      .single()
-
+    const rows = await sql<{ name: string; primary_category: string }[]>`
+      SELECT name, primary_category FROM resources
+      WHERE slug = ${slug} AND state = ${state} AND city = ${city} AND status = 'active'
+      LIMIT 1
+    `
     resourceName =
-      data?.name ||
+      rows[0]?.name ||
       slug
         .split('-')
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 
 /**
  * Analytics Integration Tests - Authenticated User
@@ -11,14 +11,9 @@ import { createClient } from '@supabase/supabase-js'
  * 4. Session tracking with user context
  */
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      persistSession: false,
-    },
-  }
+// Initialize postgres.js client for database verification
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
 )
 
 test.describe('Analytics - Authenticated User', () => {
@@ -27,29 +22,26 @@ test.describe('Analytics - Authenticated User', () => {
 
   test.beforeAll(async () => {
     // Get a non-admin test user from database
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('is_admin', false)
-      .limit(1)
+    const users = await sql`
+      SELECT id, email FROM users
+      WHERE is_admin = false
+      LIMIT 1
+    `
 
     if (!users || users.length === 0) {
       // Create a test user if none exists
-      const { data: newUser, error } = await supabase
-        .from('users')
-        .insert({
-          email: 'test-analytics@example.com',
-          is_admin: false,
-        })
-        .select()
-        .single()
+      const newUsers = await sql`
+        INSERT INTO users (email, is_admin)
+        VALUES ('test-analytics@example.com', false)
+        RETURNING *
+      `
 
-      if (error || !newUser) {
+      if (!newUsers || newUsers.length === 0) {
         throw new Error('Could not create test user')
       }
 
-      testUserId = newUser.id
-      console.log(`[Test] Created test user: ${newUser.email} (${testUserId})`)
+      testUserId = newUsers[0].id
+      console.log(`[Test] Created test user: ${newUsers[0].email} (${testUserId})`)
     } else {
       testUserId = users[0].id
       console.log(`[Test] Using existing test user: ${users[0].email} (${testUserId})`)
@@ -70,10 +62,15 @@ test.describe('Analytics - Authenticated User', () => {
 
   test.afterEach(async () => {
     // Clean up test data
-    await supabase.from('analytics_page_views').delete().eq('session_id', testSessionId)
-    await supabase.from('analytics_search_events').delete().eq('session_id', testSessionId)
-    await supabase.from('analytics_resource_events').delete().eq('session_id', testSessionId)
-    await supabase.from('analytics_sessions').delete().eq('session_id', testSessionId)
+    await sql`DELETE FROM analytics_page_views WHERE session_id = ${testSessionId}`
+    await sql`DELETE FROM analytics_search_events WHERE session_id = ${testSessionId}`
+    await sql`DELETE FROM analytics_resource_events WHERE session_id = ${testSessionId}`
+    await sql`DELETE FROM analytics_sessions WHERE session_id = ${testSessionId}`
+  })
+
+  test.afterAll(async () => {
+    // Close the database connection
+    await sql.end()
   })
 
   test('should identify user on sign-in', async ({ page }) => {
@@ -114,18 +111,18 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Verify page view has user_id
-    const { data: pageViews } = await supabase
-      .from('analytics_page_views')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('page_path', '/')
-      .order('timestamp', { ascending: false })
-      .limit(1)
+    const pageViews = await sql`
+      SELECT * FROM analytics_page_views
+      WHERE session_id = ${testSessionId}
+        AND page_path = '/'
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
 
     expect(pageViews).not.toBeNull()
-    expect(pageViews!.length).toBe(1)
+    expect(pageViews.length).toBe(1)
 
-    const pageView = pageViews![0]
+    const pageView = pageViews[0]
     expect(pageView.user_id).toBe(testUserId) // ⭐ User ID should be attached
     expect(pageView.is_admin).toBe(false) // Non-admin user
     expect(pageView.anonymous_id).toBeTruthy() // Anonymous ID still exists
@@ -156,20 +153,20 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000) // Final batch
 
     // Verify all page views have the same user_id
-    const { data: allPageViews } = await supabase
-      .from('analytics_page_views')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .order('timestamp', { ascending: false })
+    const allPageViews = await sql`
+      SELECT * FROM analytics_page_views
+      WHERE session_id = ${testSessionId}
+      ORDER BY timestamp DESC
+    `
 
     expect(allPageViews).not.toBeNull()
-    expect(allPageViews!.length).toBeGreaterThanOrEqual(3)
+    expect(allPageViews.length).toBeGreaterThanOrEqual(3)
 
     // Check every page view has user_id
-    allPageViews!.forEach((pageView, index) => {
+    allPageViews.forEach((pageView, index) => {
       expect(pageView.user_id).toBe(testUserId)
       console.log(
-        `[Test] ✅ Page ${index + 1}/${allPageViews!.length}: ${pageView.page_path} - user_id = ${testUserId}`
+        `[Test] Page ${index + 1}/${allPageViews.length}: ${pageView.page_path} - user_id = ${testUserId}`
       )
     })
   })
@@ -219,16 +216,16 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Verify session was created with user_id
-    const { data: sessions } = await supabase
-      .from('analytics_sessions')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .limit(1)
+    const sessions = await sql`
+      SELECT * FROM analytics_sessions
+      WHERE session_id = ${testSessionId}
+      LIMIT 1
+    `
 
     expect(sessions).not.toBeNull()
-    expect(sessions!.length).toBe(1)
+    expect(sessions.length).toBe(1)
 
-    const session = sessions![0]
+    const session = sessions[0]
     expect(session.user_id).toBe(testUserId) // ⭐ Session should have user_id
     expect(session.is_admin).toBe(false)
     expect(session.anonymous_id).toBeTruthy()
@@ -258,18 +255,18 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Verify resource view has user_id
-    const { data: resourceViews } = await supabase
-      .from('analytics_resource_events')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('event_type', 'view')
-      .order('timestamp', { ascending: false })
-      .limit(1)
+    const resourceViews = await sql`
+      SELECT * FROM analytics_resource_events
+      WHERE session_id = ${testSessionId}
+        AND event_type = 'view'
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
 
     expect(resourceViews).not.toBeNull()
-    expect(resourceViews!.length).toBe(1)
+    expect(resourceViews.length).toBe(1)
 
-    const resourceView = resourceViews![0]
+    const resourceView = resourceViews[0]
     expect(resourceView.user_id).toBe(testUserId)
     expect(resourceView.is_admin).toBe(false)
 
@@ -311,11 +308,11 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Get anonymous page views
-    const { data: anonPageViews } = await supabase
-      .from('analytics_page_views')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .is('user_id', null)
+    const anonPageViews = await sql`
+      SELECT * FROM analytics_page_views
+      WHERE session_id = ${testSessionId}
+        AND user_id IS NULL
+    `
 
     const anonCount = anonPageViews?.length || 0
 
@@ -334,11 +331,11 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000)
 
     // Get authenticated page views
-    const { data: authPageViews } = await supabase
-      .from('analytics_page_views')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .eq('user_id', testUserId)
+    const authPageViews = await sql`
+      SELECT * FROM analytics_page_views
+      WHERE session_id = ${testSessionId}
+        AND user_id = ${testUserId}
+    `
 
     const authCount = authPageViews?.length || 0
 
@@ -381,18 +378,18 @@ test.describe('Analytics - Authenticated User', () => {
     await page.waitForTimeout(6000) // Final batch
 
     // Get all events for this session
-    const { data: allEvents } = await supabase
-      .from('analytics_page_views')
-      .select('*')
-      .eq('session_id', testSessionId)
-      .order('timestamp', { ascending: true })
+    const allEvents = await sql`
+      SELECT * FROM analytics_page_views
+      WHERE session_id = ${testSessionId}
+      ORDER BY timestamp ASC
+    `
 
     expect(allEvents).not.toBeNull()
-    expect(allEvents!.length).toBeGreaterThan(0)
+    expect(allEvents.length).toBeGreaterThan(0)
 
     // Verify journey: starts as anonymous, becomes authenticated
-    const anonymousEvents = allEvents!.filter((e) => e.user_id === null)
-    const authenticatedEvents = allEvents!.filter((e) => e.user_id === testUserId)
+    const anonymousEvents = allEvents.filter((e) => e.user_id === null)
+    const authenticatedEvents = allEvents.filter((e) => e.user_id === testUserId)
 
     console.log(`[Test] Journey breakdown:`)
     console.log(`  Anonymous events: ${anonymousEvents.length}`)

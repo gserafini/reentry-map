@@ -3,7 +3,7 @@
  * Reset flagged resources for re-verification
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -27,20 +27,9 @@ try {
   console.error('⚠️  Could not load .env.local file')
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase credentials')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 async function main() {
   console.log('🔄 Resetting flagged resources for re-verification...\n')
@@ -49,25 +38,30 @@ async function main() {
   const oneHourAgo = new Date()
   oneHourAgo.setHours(oneHourAgo.getHours() - 1)
 
-  const { data, error } = await supabase
-    .from('resources')
-    .update({
-      verification_status: 'verified',
-      human_review_required: false,
-      next_verification_at: oneHourAgo.toISOString(),
-    })
-    .eq('verification_status', 'flagged')
-    .select('id')
+  try {
+    const data = await sql`
+      UPDATE resources
+      SET verification_status = 'verified',
+          human_review_required = false,
+          next_verification_at = ${oneHourAgo.toISOString()}
+      WHERE verification_status = 'flagged'
+      RETURNING id
+    `
 
-  if (error) {
+    console.log(`✅ Reset ${data.length} resources`)
+    console.log(
+      '   All flagged resources are now marked as verified and due for immediate re-verification\n'
+    )
+  } catch (error) {
     console.error('❌ Error:', error)
+    await sql.end()
     process.exit(1)
   }
 
-  console.log(`✅ Reset ${data.length} resources`)
-  console.log(
-    '   All flagged resources are now marked as verified and due for immediate re-verification\n'
-  )
+  await sql.end()
 }
 
-main().catch(console.error)
+main().catch(async (err) => {
+  console.error(err)
+  await sql.end()
+})

@@ -1,42 +1,36 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { expansionPriorities, expansionMilestones } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 import type { CreateMilestoneRequest } from '@/lib/types/expansion'
 
+interface RouteParams {
+  params: Promise<{
+    id: string
+  }>
+}
+
 // GET /api/admin/expansion-priorities/[id]/milestones - Get all milestones for expansion
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await checkAdminAuth(request)
+
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
+    }
+
     const { id } = await params
-    const supabase = await createClient()
-
-    // Check admin auth
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
 
     // Fetch milestones
-    const { data, error } = await supabase
-      .from('expansion_milestones')
-      .select('*')
-      .eq('expansion_id', id)
-      .order('milestone_date', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching milestones:', error)
-      return NextResponse.json({ error: 'Failed to fetch milestones' }, { status: 500 })
-    }
+    const data = await db
+      .select()
+      .from(expansionMilestones)
+      .where(eq(expansionMilestones.expansionId, id))
+      .orderBy(desc(expansionMilestones.milestoneDate))
 
     return NextResponse.json(data || [])
   } catch (error) {
@@ -46,29 +40,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // POST /api/admin/expansion-priorities/[id]/milestones - Create milestone
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await checkAdminAuth(request)
+
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
+    }
+
     const { id } = await params
-    const supabase = await createClient()
-
-    // Check admin auth
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const body = (await request.json()) as Omit<CreateMilestoneRequest, 'expansion_id'>
 
     // Validate required fields
@@ -77,45 +60,51 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Verify expansion priority exists
-    const { data: expansion, error: expansionError } = await supabase
-      .from('expansion_priorities')
-      .select('id')
-      .eq('id', id)
-      .single()
+    const [expansion] = await db
+      .select({ id: expansionPriorities.id })
+      .from(expansionPriorities)
+      .where(eq(expansionPriorities.id, id))
+      .limit(1)
 
-    if (expansionError || !expansion) {
+    if (!expansion) {
       return NextResponse.json({ error: 'Expansion priority not found' }, { status: 404 })
     }
 
     // Create milestone
-    const { data, error } = await supabase
-      .from('expansion_milestones')
-      .insert({
-        expansion_id: id,
-        milestone_type: body.milestone_type,
+    const [data] = await db
+      .insert(expansionMilestones)
+      .values({
+        expansionId: id,
+        milestoneType: body.milestone_type,
         notes: body.notes,
         metadata: body.metadata || {},
-        achieved_by: user.id,
+        achievedBy: auth.userId || null,
       })
-      .select()
-      .single()
+      .returning()
 
-    if (error) {
-      console.error('Error creating milestone:', error)
+    if (!data) {
       return NextResponse.json({ error: 'Failed to create milestone' }, { status: 500 })
     }
 
     // Auto-update expansion priority based on milestone type
-    const updates: Record<string, string> = {}
+    const updates: Partial<{
+      researchStatus: string
+      researchAgentAssignedAt: Date
+      researchAgentCompletedAt: Date
+      status: string
+      launchedBy: string | null
+      actualLaunchDate: Date
+      updatedAt: Date
+    }> = { updatedAt: new Date() }
 
     switch (body.milestone_type) {
       case 'research_started':
-        updates.research_status = 'in_progress'
-        updates.research_agent_assigned_at = new Date().toISOString()
+        updates.researchStatus = 'in_progress'
+        updates.researchAgentAssignedAt = new Date()
         break
       case 'research_completed':
-        updates.research_status = 'completed'
-        updates.research_agent_completed_at = new Date().toISOString()
+        updates.researchStatus = 'completed'
+        updates.researchAgentCompletedAt = new Date()
         break
       case 'ready_for_review':
         updates.status = 'ready_for_launch'
@@ -125,15 +114,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         break
       case 'launched':
         updates.status = 'launched'
-        updates.launched_by = user.id
-        if (!updates.actual_launch_date) {
-          updates.actual_launch_date = new Date().toISOString()
-        }
+        updates.launchedBy = auth.userId || null
+        updates.actualLaunchDate = new Date()
         break
     }
 
-    if (Object.keys(updates).length > 0) {
-      await supabase.from('expansion_priorities').update(updates).eq('id', id)
+    if (Object.keys(updates).length > 1) {
+      await db.update(expansionPriorities).set(updates).where(eq(expansionPriorities.id, id))
     }
 
     return NextResponse.json(data, { status: 201 })

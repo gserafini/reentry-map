@@ -1,43 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
+
+interface RouteParams {
+  params: Promise<{
+    id: string
+  }>
+}
 
 /**
  * POST /api/admin/resources/[id]/screenshot
  * Capture screenshot of resource website (admin only)
  */
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id } = await params
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Fetch resource
-    const { data: resource, error: fetchError } = await supabase
-      .from('resources')
-      .select('id, name, website')
-      .eq('id', id)
-      .single()
+    const [resource] = await db
+      .select({
+        id: resources.id,
+        name: resources.name,
+        website: resources.website,
+      })
+      .from(resources)
+      .where(eq(resources.id, id))
+      .limit(1)
 
-    if (fetchError || !resource) {
+    if (!resource) {
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
     }
 
@@ -53,18 +55,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Update resource with screenshot URL
-    const { error: updateError } = await supabase
-      .from('resources')
-      .update({
-        screenshot_url: screenshotResult.url,
-        screenshot_captured_at: screenshotResult.capturedAt.toISOString(),
+    await db
+      .update(resources)
+      .set({
+        screenshotUrl: screenshotResult.url,
+        screenshotCapturedAt: screenshotResult.capturedAt,
+        updatedAt: new Date(),
       })
-      .eq('id', id)
-
-    if (updateError) {
-      console.error('Error updating resource with screenshot:', updateError)
-      return NextResponse.json({ error: 'Failed to update resource' }, { status: 500 })
-    }
+      .where(eq(resources.id, id))
 
     return NextResponse.json({
       success: true,

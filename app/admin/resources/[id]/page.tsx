@@ -1,17 +1,15 @@
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
+import type { Resource } from '@/lib/types/database'
 import { EditResourceClient } from './EditResourceClient'
 
 export default async function EditResourcePage({ params }: { params: { id: string } }) {
-  const supabase = await createClient()
+  const rows = await sql<Resource[]>`
+    SELECT * FROM resources WHERE id = ${params.id} LIMIT 1
+  `
+  const resource = rows[0]
 
-  const { data: resource, error } = await supabase
-    .from('resources')
-    .select('*')
-    .eq('id', params.id)
-    .single()
-
-  if (error || !resource) {
+  if (!resource) {
     notFound()
   }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -19,22 +19,31 @@ for (const line of envFile.split('\n')) {
   }
 }
 
-const supabase = createClient(
-  envVars.NEXT_PUBLIC_SUPABASE_URL,
-  envVars.SUPABASE_SERVICE_ROLE_KEY || envVars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+const sql = postgres(
+  envVars.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
 )
 
-const { data, error } = await supabase
-  .from('resources')
-  .select('name, change_log')
-  .eq('id', '49530977-9a34-40ef-83f6-ee7815b413b1')
-  .single()
+try {
+  const data = await sql`
+    SELECT name, change_log
+    FROM resources
+    WHERE id = '49530977-9a34-40ef-83f6-ee7815b413b1'
+    LIMIT 1
+  `
 
-if (error) {
+  if (data.length === 0) {
+    console.error('Error: Resource not found')
+    await sql.end()
+    process.exit(1)
+  }
+
+  console.log(`Resource: ${data[0].name}`)
+  console.log('\nChange Log:')
+  console.log(JSON.stringify(data[0].change_log, null, 2))
+} catch (error) {
   console.error('Error:', error.message)
+  await sql.end()
   process.exit(1)
 }
 
-console.log(`Resource: ${data.name}`)
-console.log('\nChange Log:')
-console.log(JSON.stringify(data.change_log, null, 2))
+await sql.end()

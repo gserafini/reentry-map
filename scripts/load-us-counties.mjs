@@ -6,11 +6,10 @@
  * Usage: node scripts/load-us-counties.mjs
  *
  * Environment Variables Required:
- * - NEXT_PUBLIC_SUPABASE_URL
- * - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ * - DATABASE_URL
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -44,15 +43,9 @@ function loadEnv() {
 
 loadEnv()
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing required environment variables')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 // State name mapping
 const stateNames = {
@@ -242,10 +235,9 @@ async function loadCounties() {
         state_code: stateCode,
         state_name: stateName,
         county_name: `${props.NAME} ${props.LSAD}`,
-        geometry: feature.geometry,
+        geometry: JSON.stringify(feature.geometry),
         center_lat: centroid.lat,
         center_lng: centroid.lng,
-        // Placeholder values - can be filled in later
         total_population: null,
         population_year: 2020,
         estimated_annual_releases: null,
@@ -262,14 +254,7 @@ async function loadCounties() {
 
     // Delete existing counties
     console.log('🗑️  Deleting existing counties...')
-    const { error: deleteError } = await supabase
-      .from('county_data')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000')
-
-    if (deleteError) {
-      console.error('Error deleting existing counties:', deleteError)
-    }
+    await sql`DELETE FROM county_data WHERE id != '00000000-0000-0000-0000-000000000000'`
 
     // Insert in batches of 500
     const batchSize = 500
@@ -278,47 +263,61 @@ async function loadCounties() {
     for (let i = 0; i < counties.length; i += batchSize) {
       const batch = counties.slice(i, i + batchSize)
 
-      const { error } = await supabase.from('county_data').insert(batch)
-
-      if (error) {
+      try {
+        for (const county of batch) {
+          await sql`
+            INSERT INTO county_data (
+              fips_code, state_fips, county_fips, state_code, state_name, county_name,
+              geometry, center_lat, center_lng, total_population, population_year,
+              estimated_annual_releases, reentry_data_source, reentry_data_year,
+              priority_tier, priority_weight, priority_reason
+            ) VALUES (
+              ${county.fips_code}, ${county.state_fips}, ${county.county_fips},
+              ${county.state_code}, ${county.state_name}, ${county.county_name},
+              ${county.geometry}::jsonb, ${county.center_lat}, ${county.center_lng},
+              ${county.total_population}, ${county.population_year},
+              ${county.estimated_annual_releases}, ${county.reentry_data_source},
+              ${county.reentry_data_year}, ${county.priority_tier},
+              ${county.priority_weight}, ${county.priority_reason}
+            )
+          `
+        }
+        inserted += batch.length
+        console.log(`   ✅ Inserted ${inserted}/${counties.length} counties`)
+      } catch (error) {
         console.error(`❌ Error inserting batch ${i / batchSize + 1}:`, error.message)
         continue
       }
-
-      inserted += batch.length
-      console.log(`   ✅ Inserted ${inserted}/${counties.length} counties`)
     }
 
     console.log(`\n✅ Successfully loaded ${inserted} US counties!`)
 
     // Show some stats
-    const { count: totalCount } = await supabase
-      .from('county_data')
-      .select('*', { count: 'exact', head: true })
+    const [{ count: totalCount }] = await sql`SELECT COUNT(*)::int AS count FROM county_data`
 
-    const { data: stateStats } = await supabase
-      .from('county_data')
-      .select('state_code')
-      .neq('state_code', null)
-
-    const stateCount = new Set(stateStats?.map((s) => s.state_code)).size
+    const stateStats = await sql`
+      SELECT DISTINCT state_code FROM county_data WHERE state_code IS NOT NULL
+    `
+    const stateCount = stateStats.length
 
     console.log('\n📊 Database Statistics')
     console.log('='.repeat(60))
     console.log(`Total counties in database: ${totalCount}`)
     console.log(`States/territories represented: ${stateCount}`)
-  } catch (_error) {
+  } catch (error) {
     console.error('❌ Error loading counties:', error)
     throw error
   }
 }
 
 loadCounties()
-  .then(() => {
+  .then(async () => {
     console.log('\n✅ County data load complete!')
+    await sql.end()
     process.exit(0)
   })
-  .catch((error) => {
+  .catch(async (error) => {
     console.error('\n❌ Fatal error:', error)
+    await sql.end()
     process.exit(1)
   })

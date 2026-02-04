@@ -21,7 +21,7 @@ import {
 import type { ResourceCategory } from '@/lib/types/database'
 import { PageViewTracker } from '@/components/analytics/PageViewTracker'
 
-// Force dynamic rendering since we fetch data with Supabase server client
+// Force dynamic rendering since we fetch data from database
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {

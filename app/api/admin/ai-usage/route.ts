@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { sql } from '@/lib/db/client'
+
+interface UsageSummary {
+  date: string
+  total_requests: number
+  total_tokens: number
+  total_cost: number
+  agent_type: string
+}
+
+interface BudgetStatus {
+  month: string
+  budget: number
+  spent: number
+  remaining: number
+}
 
 /**
  * GET /api/admin/ai-usage
@@ -7,24 +23,13 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Get query parameters
@@ -35,27 +40,19 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // Fetch usage summary
-    const { data: usage, error: usageError } = await supabase
-      .from('ai_usage_summary')
-      .select('*')
-      .gte('date', startDate.toISOString())
-      .order('date', { ascending: false })
+    // Fetch usage summary using raw SQL (for view)
+    const usage = await sql<UsageSummary[]>`
+      SELECT * FROM ai_usage_summary
+      WHERE date >= ${startDate.toISOString()}
+      ORDER BY date DESC
+    `
 
-    if (usageError) {
-      throw usageError
-    }
-
-    // Fetch budget status
-    const { data: budget, error: budgetError } = await supabase
-      .from('ai_budget_status')
-      .select('*')
-      .order('month', { ascending: false })
-      .limit(6) // Last 6 months
-
-    if (budgetError) {
-      throw budgetError
-    }
+    // Fetch budget status using raw SQL (for view)
+    const budget = await sql<BudgetStatus[]>`
+      SELECT * FROM ai_budget_status
+      ORDER BY month DESC
+      LIMIT 6
+    `
 
     return NextResponse.json({
       usage: usage || [],

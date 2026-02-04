@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Box, Rating, Typography, CircularProgress, Tooltip } from '@mui/material'
 import { Star as StarIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { submitRating, getUserRating } from '@/lib/api/ratings'
 import { useRouter } from 'next/navigation'
 
 interface RatingStarsProps {
@@ -58,8 +57,14 @@ export function RatingStars({
     async function loadRating() {
       if (user && resourceId && !readOnly) {
         setChecking(true)
-        const userRating = await getUserRating(user.id, resourceId)
-        setRating(userRating)
+        try {
+          const response = await fetch(`/api/ratings?resourceId=${resourceId}`)
+          const data = (await response.json()) as { rating?: number | null }
+          setRating(data.rating ?? null)
+        } catch (error) {
+          console.error('Error loading rating:', error)
+          setRating(null)
+        }
         setChecking(false)
       } else {
         setChecking(false)
@@ -85,10 +90,15 @@ export function RatingStars({
     setLoading(true)
 
     try {
-      const { error } = await submitRating(user.id, resourceId, newValue)
+      const response = await fetch('/api/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resourceId, rating: newValue }),
+      })
 
-      if (error) {
-        console.error('Failed to submit rating:', error)
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string }
+        console.error('Failed to submit rating:', data.error)
         // Keep the old rating on error
       } else {
         setRating(newValue)

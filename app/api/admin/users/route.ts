@@ -1,70 +1,66 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { users } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await checkAdminAuth(request)
 
-    // Check if user is admin
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+    // Fetch all users
+    const allUsers = await db.select().from(users).orderBy(desc(users.createdAt))
 
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
-    }
-
-    // Fetch all users from public.users
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (usersError) {
-      throw usersError
-    }
-
-    // Note: Email addresses are stored in auth.users which requires special handling
-    // For now, return user profiles without emails
-    // Frontend will need to fetch emails separately or we can create a view/function
-    return NextResponse.json(users)
+    // Note: Email addresses are stored in the users table now (after NextAuth migration)
+    return NextResponse.json(allUsers)
   } catch (error) {
     console.error('Error fetching users:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-export async function PATCH(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await checkAdminAuth(request)
 
-    // Check if user is admin
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+    const body = (await request.json()) as { userId?: string }
 
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    if (!body.userId) {
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    }
+
+    await db.delete(users).where(eq(users.id, body.userId))
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = await checkAdminAuth(request)
+
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Parse request body
@@ -76,10 +72,10 @@ export async function PATCH(request: Request) {
     }
 
     // Update user
-    const { data, error } = await supabase.from('users').update(updates).eq('id', userId).select()
+    const [data] = await db.update(users).set(updates).where(eq(users.id, userId)).returning()
 
-    if (error) {
-      throw error
+    if (!data) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     return NextResponse.json(data)

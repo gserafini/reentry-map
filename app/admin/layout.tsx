@@ -1,28 +1,19 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
 import { Box, Container } from '@mui/material'
 import { AdminNav } from '@/components/admin/AdminNav'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
+  const session = await getServerSession(authOptions)
 
   // Check authentication
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     redirect('/auth/login?redirect=/admin')
   }
 
-  // Check admin status
-  const { data: profile } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.is_admin) {
+  // Check admin status (from JWT token populated by NextAuth callbacks)
+  if (!session.user.isAdmin) {
     redirect('/')
   }
 

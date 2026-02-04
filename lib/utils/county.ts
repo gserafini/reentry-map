@@ -5,7 +5,7 @@
  * Uses Google geocoding county data first, falls back to PostGIS
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 
 export interface CountyResult {
   county: string // Clean name without " County" suffix (e.g., "Alameda")
@@ -25,18 +25,16 @@ export async function lookupCountyFips(
   if (!countyName || !stateCode) return null
 
   try {
-    const supabase = await createClient()
+    const rows = await sql<{ fips_code: string }[]>`
+      SELECT fips_code FROM county_data
+      WHERE county_name = ${countyName}
+        AND state_code = ${stateCode.toUpperCase()}
+      LIMIT 1
+    `
 
-    const { data, error } = await supabase
-      .from('county_data')
-      .select('fips_code')
-      .eq('county_name', countyName)
-      .eq('state_code', stateCode.toUpperCase())
-      .single()
+    if (!rows.length) return null
 
-    if (error || !data) return null
-
-    return data.fips_code
+    return rows[0].fips_code
   } catch (error) {
     console.error('Error looking up county FIPS:', error)
     return null
@@ -56,24 +54,17 @@ export async function determineCountyFromCoordinates(
   if (!latitude || !longitude) return null
 
   try {
-    const supabase = await createClient()
-
     // Use PostGIS ST_Contains for accurate point-in-polygon testing
     // This is a database query, so it's slower than city lookup but more accurate
-    const { data, error } = await supabase.rpc('find_county_for_point', {
-      lat: latitude,
-      lng: longitude,
-    })
+    const rows = await sql<{ county_name: string; fips_code: string }[]>`
+      SELECT county_name, fips_code
+      FROM find_county_for_point(${latitude}, ${longitude})
+    `
 
-    if (error) {
-      console.error('Error finding county for coordinates:', error)
-      return null
-    }
-
-    if (data && data.length > 0) {
+    if (rows.length > 0) {
       return {
-        county: data[0].county_name,
-        county_fips: data[0].fips_code,
+        county: rows[0].county_name,
+        county_fips: rows[0].fips_code,
         method: 'coordinates',
       }
     }

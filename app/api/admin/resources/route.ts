@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { eq, desc, ilike, or, sql, count } from 'drizzle-orm'
 import { determineCounty } from '@/lib/utils/county'
 import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
 
@@ -9,24 +12,13 @@ import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Get query parameters for filtering/pagination
@@ -36,36 +28,51 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const search = searchParams.get('search')
 
-    const from = (page - 1) * limit
-    const to = from + limit - 1
+    const offset = (page - 1) * limit
 
-    let query = supabase.from('resources').select('*', { count: 'exact' })
-
-    // Apply filters
+    // Build where conditions
+    const conditions = []
     if (status) {
-      query = query.eq('status', status)
+      conditions.push(eq(resources.status, status))
     }
-
     if (search) {
-      query = query.or(`name.ilike.%${search}%,address.ilike.%${search}%`)
+      conditions.push(
+        or(ilike(resources.name, `%${search}%`), ilike(resources.address, `%${search}%`))
+      )
     }
 
-    // Apply pagination and sorting
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to)
+    // Get total count
+    const [countResult] = await db
+      .select({ value: count() })
+      .from(resources)
+      .where(
+        conditions.length > 0
+          ? conditions.length === 1
+            ? conditions[0]
+            : sql`${conditions[0]} AND ${conditions[1]}`
+          : undefined
+      )
 
-    if (error) {
-      throw error
+    const total = countResult?.value || 0
+
+    // Get paginated data
+    let query = db.select().from(resources)
+
+    if (conditions.length > 0) {
+      query = query.where(
+        conditions.length === 1 ? conditions[0] : sql`${conditions[0]} AND ${conditions[1]}`
+      ) as typeof query
     }
+
+    const data = await query.orderBy(desc(resources.createdAt)).limit(limit).offset(offset)
 
     return NextResponse.json({
       data,
       pagination: {
         page,
         limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     })
   } catch (error) {
@@ -80,24 +87,13 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,12 +111,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert resource
-    const { data, error } = await supabase
-      .from('resources')
-      .insert({
+    const [data] = await db
+      .insert(resources)
+      .values({
         name: body.name,
         description: body.description || null,
-        primary_category: body.primary_category,
+        primaryCategory: body.primary_category,
         categories: body.categories || null,
         tags: body.tags || null,
         address: body.address,
@@ -130,31 +126,30 @@ export async function POST(request: NextRequest) {
         latitude: body.latitude || null,
         longitude: body.longitude || null,
         county: countyData?.county || null,
-        county_fips: countyData?.county_fips || null,
+        countyFips: countyData?.county_fips || null,
         phone: body.phone || null,
         email: body.email || null,
         website: body.website || null,
         hours: body.hours || null,
-        services: body.services || null,
-        eligibility_requirements: body.eligibility_requirements || null,
-        required_documents: body.required_documents || null,
+        servicesOffered: body.services || null,
+        eligibilityRequirements: body.eligibility_requirements || null,
+        requiredDocuments: body.required_documents || null,
         fees: body.fees || null,
         languages: body.languages || null,
-        accessibility_features: body.accessibility_features || null,
+        accessibilityFeatures: body.accessibility_features || null,
         status: body.status || 'active',
         verified: body.verified || false,
         source: 'admin',
         // Geocoding metadata (from Google Maps Geocoding API)
-        google_place_id: body.placeId || null,
-        location_type: body.locationType || null,
+        googlePlaceId: body.placeId || null,
+        locationType: body.locationType || null,
         neighborhood: body.neighborhood || null,
-        formatted_address: body.formattedAddress || null,
+        formattedAddress: body.formattedAddress || null,
       })
-      .select()
-      .single()
+      .returning()
 
-    if (error) {
-      throw error
+    if (!data) {
+      return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 })
     }
 
     // Capture website screenshot asynchronously (non-blocking)
@@ -163,13 +158,13 @@ export async function POST(request: NextRequest) {
         .then(async (screenshotResult) => {
           if (screenshotResult) {
             // Update resource with screenshot URL
-            await supabase
-              .from('resources')
-              .update({
-                screenshot_url: screenshotResult.url,
-                screenshot_captured_at: screenshotResult.capturedAt.toISOString(),
+            await db
+              .update(resources)
+              .set({
+                screenshotUrl: screenshotResult.url,
+                screenshotCapturedAt: screenshotResult.capturedAt,
               })
-              .eq('id', data.id)
+              .where(eq(resources.id, data.id))
             console.log(`Screenshot captured for resource ${data.id}`)
           }
         })

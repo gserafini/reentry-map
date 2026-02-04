@@ -31,7 +31,6 @@ import {
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
-import { createClient } from '@/lib/supabase/client'
 
 interface AgentLog {
   id: string
@@ -78,26 +77,24 @@ export default function AgentsPage() {
     checkAdmin()
   }, [user, authLoading, isAuthenticated, router])
 
-  // Fetch agent logs
-  useEffect(() => {
-    async function fetchLogs() {
-      if (!isAdmin) return
-
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from('ai_agent_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20)
-
-      if (!error && data) {
-        setLogs(data as AgentLog[])
+  // Fetch agent logs via API
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/dashboard/stats?section=logs')
+      if (res.ok) {
+        const data = (await res.json()) as { recentLogs?: AgentLog[] }
+        if (data.recentLogs) {
+          setLogs(data.recentLogs)
+        }
       }
-
+    } catch (error) {
+      console.error('Error fetching agent logs:', error)
+    } finally {
       setLoading(false)
     }
+  }
 
+  useEffect(() => {
     if (isAdmin && !checkingAdmin) {
       fetchLogs()
     }
@@ -115,17 +112,8 @@ export default function AgentsPage() {
         throw new Error('Failed to run agent')
       }
 
-      // Refresh logs
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('ai_agent_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20)
-
-      if (data) {
-        setLogs(data as AgentLog[])
-      }
+      // Refresh logs via API
+      await fetchLogs()
 
       alert(`${agentType} agent completed successfully!`)
     } catch (error) {

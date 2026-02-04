@@ -16,7 +16,7 @@ import {
 } from '@mui/material'
 import { Lightbulb as LightbulbIcon, Add as AddIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { getUserSuggestions } from '@/lib/api/suggestions'
+import { getUserSuggestions } from '@/lib/api/suggestions-client'
 import type { Database } from '@/lib/types/database'
 
 type ResourceSuggestion = Database['public']['Tables']['resource_suggestions']['Row']
@@ -43,7 +43,7 @@ export default function MySuggestionsPage() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await getUserSuggestions(user.id)
+      const { data, error: fetchError } = await getUserSuggestions()
 
       if (fetchError) {
         setError('Failed to load suggestions. Please try again.')

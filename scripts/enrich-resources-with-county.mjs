@@ -9,11 +9,10 @@
  * Usage: node scripts/enrich-resources-with-county.mjs
  *
  * Environment Variables Required:
- * - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL
- * - SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ * - DATABASE_URL
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -47,19 +46,9 @@ function loadEnv() {
 
 loadEnv()
 
-// Load environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required environment variables')
-  console.error('   Required: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
-  console.error('   (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY as fallback)')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 /**
  * Simple point-in-polygon test to determine if a point is in a county
@@ -110,16 +99,15 @@ async function enrichResources() {
 
   try {
     // Get all resources that don't have county_fips set
-    const { data: resources, error: resourcesError } = await supabase
-      .from('resources')
-      .select('id, name, address, city, state, latitude, longitude, county_fips')
-      .or('county_fips.is.null,county_fips.eq.')
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
+    const resources = await sql`
+      SELECT id, name, address, city, state, latitude, longitude, county_fips
+      FROM resources
+      WHERE (county_fips IS NULL OR county_fips = '')
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL
+    `
 
-    if (resourcesError) throw resourcesError
-
-    if (!resources || resources.length === 0) {
+    if (resources.length === 0) {
       console.log('✅ All resources already have county_fips assigned')
       return
     }
@@ -127,11 +115,10 @@ async function enrichResources() {
     console.log(`📊 Found ${resources.length} resources to enrich`)
 
     // Get all counties
-    const { data: counties, error: countiesError } = await supabase
-      .from('county_data')
-      .select('fips_code, state_code, county_name, center_lat, center_lng')
-
-    if (countiesError) throw countiesError
+    const counties = await sql`
+      SELECT fips_code, state_code, county_name, center_lat, center_lng
+      FROM county_data
+    `
 
     console.log(`📍 Loaded ${counties.length} counties for matching`)
 
@@ -163,19 +150,17 @@ async function enrichResources() {
 
       if (countyFips) {
         // Update resource with county_fips
-        const { error: updateError } = await supabase
-          .from('resources')
-          .update({ county_fips: countyFips })
-          .eq('id', resource.id)
-
-        if (updateError) {
-          console.error(`   ❌ Error updating resource ${resource.id}:`, updateError.message)
-          skipped++
-        } else {
+        try {
+          await sql`
+            UPDATE resources SET county_fips = ${countyFips} WHERE id = ${resource.id}
+          `
           enriched++
           if (enriched % 10 === 0) {
             console.log(`   ✅ Enriched ${enriched}/${resources.length} resources`)
           }
+        } catch (updateError) {
+          console.error(`   ❌ Error updating resource ${resource.id}:`, updateError.message)
+          skipped++
         }
       } else {
         console.log(
@@ -200,24 +185,20 @@ async function showStats() {
 
   try {
     // Total resources
-    const { count: totalCount } = await supabase
-      .from('resources')
-      .select('*', { count: 'exact', head: true })
+    const [{ count: totalCount }] = await sql`SELECT COUNT(*)::int AS count FROM resources`
 
     // Resources with county_fips
-    const { count: withCounty } = await supabase
-      .from('resources')
-      .select('*', { count: 'exact', head: true })
-      .not('county_fips', 'is', null)
+    const [{ count: withCounty }] = await sql`
+      SELECT COUNT(*)::int AS count FROM resources WHERE county_fips IS NOT NULL
+    `
 
     // Resources by county
-    const { data: countyData } = await supabase
-      .from('resources')
-      .select('county_fips')
-      .not('county_fips', 'is', null)
+    const countyData = await sql`
+      SELECT county_fips FROM resources WHERE county_fips IS NOT NULL
+    `
 
     const countyCounts = {}
-    countyData?.forEach((row) => {
+    countyData.forEach((row) => {
       countyCounts[row.county_fips] = (countyCounts[row.county_fips] || 0) + 1
     })
 
@@ -236,13 +217,14 @@ async function showStats() {
     console.log('\nTop 10 Counties by Resource Count:')
     for (const [fips, count] of topCounties) {
       // Get county name
-      const { data: county } = await supabase
-        .from('county_data')
-        .select('county_name, state_code')
-        .eq('fips_code', fips)
-        .single()
+      const countyResult = await sql`
+        SELECT county_name, state_code FROM county_data WHERE fips_code = ${fips} LIMIT 1
+      `
 
-      const name = county ? `${county.county_name}, ${county.state_code}` : fips
+      const name =
+        countyResult.length > 0
+          ? `${countyResult[0].county_name}, ${countyResult[0].state_code}`
+          : fips
       console.log(`  ${name}: ${count} resources`)
     }
   } catch (error) {
@@ -254,21 +236,26 @@ async function main() {
   console.log('🚀 Resource County Enrichment Script')
   console.log('='.repeat(60))
 
-  await enrichResources()
-  await showStats()
+  try {
+    await enrichResources()
+    await showStats()
 
-  console.log('\n' + '='.repeat(60))
-  console.log('✅ Resource enrichment complete!')
-  console.log('\n📍 Next steps:')
-  console.log('   1. Go to /admin/coverage-map in your app')
-  console.log('   2. Click "Recalculate All Metrics" to generate coverage scores')
-  console.log('   3. View coverage statistics and maps')
-  console.log('\n💡 Note: This script uses a simple nearest-neighbor algorithm.')
-  console.log('   For production accuracy, consider using PostGIS ST_Contains')
-  console.log('   with actual county boundary polygons (GeoJSON).')
+    console.log('\n' + '='.repeat(60))
+    console.log('✅ Resource enrichment complete!')
+    console.log('\n📍 Next steps:')
+    console.log('   1. Go to /admin/coverage-map in your app')
+    console.log('   2. Click "Recalculate All Metrics" to generate coverage scores')
+    console.log('   3. View coverage statistics and maps')
+    console.log('\n💡 Note: This script uses a simple nearest-neighbor algorithm.')
+    console.log('   For production accuracy, consider using PostGIS ST_Contains')
+    console.log('   with actual county boundary polygons (GeoJSON).')
+  } finally {
+    await sql.end()
+  }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('\n❌ Fatal error:', error)
+  await sql.end()
   process.exit(1)
 })

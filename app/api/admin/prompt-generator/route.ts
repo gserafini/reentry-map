@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db/client'
+import { resources } from '@/lib/db/schema'
+import { eq, count } from 'drizzle-orm'
 
 /**
  * GET /api/admin/prompt-generator?city=Oakland&state=CA
  * Returns existing resources for a city (for Claude Web to avoid duplicates)
+ * Public endpoint - no authentication required
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
   const searchParams = request.nextUrl.searchParams
   const city = searchParams.get('city')
   const state = searchParams.get('state')
@@ -15,25 +17,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing city or state parameter' }, { status: 400 })
   }
 
-  // Fetch existing resources for this city
-  const { data: resources, error } = await supabase
-    .from('resources')
-    .select('name, address, city, state, zip, primary_category')
-    .eq('city', city)
-    .eq('state', state)
-    .order('name')
+  try {
+    // Fetch existing resources for this city
+    const resourceList = await db
+      .select({
+        name: resources.name,
+        address: resources.address,
+        city: resources.city,
+        state: resources.state,
+        zip: resources.zip,
+        primaryCategory: resources.primaryCategory,
+      })
+      .from(resources)
+      .where(eq(resources.city, city) && eq(resources.state, state))
+      .orderBy(resources.name)
 
-  if (error) {
+    return NextResponse.json({
+      city,
+      state,
+      count: resourceList?.length || 0,
+      resources:
+        resourceList?.map((r) => ({
+          name: r.name,
+          address: r.address,
+          city: r.city,
+          state: r.state,
+          zip: r.zip,
+          primary_category: r.primaryCategory,
+        })) || [],
+    })
+  } catch (error) {
     console.error('Error fetching resources:', error)
     return NextResponse.json({ error: 'Failed to fetch resources' }, { status: 500 })
   }
-
-  return NextResponse.json({
-    city,
-    state,
-    count: resources?.length || 0,
-    resources: resources || [],
-  })
 }
 
 /**
@@ -43,8 +59,6 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
     const body = (await request.json()) as {
       city: string
       state: string
@@ -64,12 +78,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Get existing resources for the city
-    const { data: existingResources, count: currentCount } = await supabase
-      .from('resources')
-      .select('name, address, city, state, zip, primary_category')
-      .eq('city', city)
-      .eq('state', state)
-      .order('name')
+    const existingResources = await db
+      .select({
+        name: resources.name,
+        address: resources.address,
+        city: resources.city,
+        state: resources.state,
+        zip: resources.zip,
+        primaryCategory: resources.primaryCategory,
+      })
+      .from(resources)
+      .where(eq(resources.city, city) && eq(resources.state, state))
+      .orderBy(resources.name)
+
+    const [countResult] = await db
+      .select({ value: count() })
+      .from(resources)
+      .where(eq(resources.city, city) && eq(resources.state, state))
+
+    const currentCount = countResult?.value || 0
 
     const categoriesList =
       categories && categories.length > 0
@@ -79,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Build "already found" list
     const alreadyFoundList =
       existingResources && existingResources.length > 0
-        ? `\n## ⚠️ Already Found (Skip These)\nDo NOT include these resources - they're already in the database:\n\n${existingResources.map((r) => `- **${r.name}** - ${r.address}, ${r.city}, ${r.state} ${r.zip} (${r.primary_category})`).join('\n')}\n`
+        ? `\n## ⚠️ Already Found (Skip These)\nDo NOT include these resources - they're already in the database:\n\n${existingResources.map((r) => `- **${r.name}** - ${r.address}, ${r.city}, ${r.state} ${r.zip} (${r.primaryCategory})`).join('\n')}\n`
         : ''
 
     const prompt = `# Reentry Resource Discovery: ${city}, ${state}

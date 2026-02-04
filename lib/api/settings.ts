@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { sql } from '@/lib/db/client'
 import type { AppSettings, FeatureFlags, AISystemStatus } from '@/lib/types/settings'
 
 /**
@@ -6,17 +6,9 @@ import type { AppSettings, FeatureFlags, AISystemStatus } from '@/lib/types/sett
  * Cached for 5 minutes to reduce database queries
  */
 export async function getAppSettings(): Promise<AppSettings | null> {
-  const supabase = createClient()
-
   try {
-    const { data, error } = await supabase.from('app_settings').select('*').single()
-
-    if (error) {
-      console.error('Error fetching app settings:', error)
-      return null
-    }
-
-    return data
+    const rows = await sql<AppSettings[]>`SELECT * FROM app_settings LIMIT 1`
+    return rows[0] ?? null
   } catch (error) {
     console.error('Error in getAppSettings:', error)
     return null
@@ -80,22 +72,17 @@ export async function getAISystemStatus(): Promise<AISystemStatus> {
 export async function updateAppSettings(
   updates: Partial<Omit<AppSettings, 'id' | 'created_at' | 'updated_at'>>
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient()
-
   try {
     // Get current settings to update
-    const { data: current } = await supabase.from('app_settings').select('id').single()
+    const rows = await sql<{ id: string }[]>`SELECT id FROM app_settings LIMIT 1`
+    const current = rows[0]
 
     if (!current) {
       return { success: false, error: 'Settings not found' }
     }
 
-    const { error } = await supabase.from('app_settings').update(updates).eq('id', current.id)
-
-    if (error) {
-      console.error('Error updating settings:', error)
-      return { success: false, error: error.message }
-    }
+    const updateData: Record<string, unknown> = { ...updates, updated_at: new Date().toISOString() }
+    await sql`UPDATE app_settings SET ${sql(updateData)} WHERE id = ${current.id}`
 
     return { success: true }
   } catch (error) {

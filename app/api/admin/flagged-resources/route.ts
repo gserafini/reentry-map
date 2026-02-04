@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resourceSuggestions, verificationLogs } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * GET /api/admin/flagged-resources
@@ -7,68 +10,66 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const auth = await checkAdminAuth(request)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check admin status
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status') || 'pending'
 
-    // Fetch flagged suggestions with latest verification log
-    const { data: suggestions, error } = await supabase
-      .from('resource_suggestions')
-      .select(
-        `
-        id,
-        name,
-        address,
-        city,
-        state,
-        phone,
-        website,
-        status,
-        admin_notes,
-        created_at
-      `
-      )
-      .eq('status', status)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw error
-    }
+    // Fetch flagged suggestions
+    const suggestions = await db
+      .select({
+        id: resourceSuggestions.id,
+        name: resourceSuggestions.name,
+        address: resourceSuggestions.address,
+        city: resourceSuggestions.city,
+        state: resourceSuggestions.state,
+        phone: resourceSuggestions.phone,
+        website: resourceSuggestions.website,
+        status: resourceSuggestions.status,
+        adminNotes: resourceSuggestions.adminNotes,
+        createdAt: resourceSuggestions.createdAt,
+      })
+      .from(resourceSuggestions)
+      .where(eq(resourceSuggestions.status, status))
+      .orderBy(desc(resourceSuggestions.createdAt))
 
     // For each suggestion, fetch latest verification log
     const suggestionsWithLogs = await Promise.all(
-      (suggestions || []).map(async (suggestion) => {
-        const { data: log } = await supabase
-          .from('verification_logs')
-          .select('overall_score, decision_reason, checks_performed, conflicts_found, created_at')
-          .eq('suggestion_id', suggestion.id)
-          .order('created_at', { ascending: false })
+      suggestions.map(async (suggestion) => {
+        const [log] = await db
+          .select({
+            overallScore: verificationLogs.overallScore,
+            decisionReason: verificationLogs.decisionReason,
+            checksPerformed: verificationLogs.checksPerformed,
+            conflictsFound: verificationLogs.conflictsFound,
+            createdAt: verificationLogs.createdAt,
+          })
+          .from(verificationLogs)
+          .where(eq(verificationLogs.suggestionId, suggestion.id))
+          .orderBy(desc(verificationLogs.createdAt))
           .limit(1)
-          .single()
 
         return {
           ...suggestion,
-          verification_log: log || null,
+          admin_notes: suggestion.adminNotes,
+          created_at: suggestion.createdAt,
+          verification_log: log
+            ? {
+                overall_score: log.overallScore,
+                decision_reason: log.decisionReason,
+                checks_performed: log.checksPerformed,
+                conflicts_found: log.conflictsFound,
+                created_at: log.createdAt,
+              }
+            : null,
         }
       })
     )

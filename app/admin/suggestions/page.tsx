@@ -23,7 +23,7 @@ import {
 import { Lightbulb as LightbulbIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
-import { getPendingSuggestions, updateSuggestionStatus } from '@/lib/api/suggestions'
+import { getPendingSuggestions, updateSuggestionStatus } from '@/lib/api/suggestions-client'
 import type { Database } from '@/lib/types/database'
 
 type ResourceSuggestion = Database['public']['Tables']['resource_suggestions']['Row']

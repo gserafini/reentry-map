@@ -40,6 +40,7 @@
     "vitest.setup.ts",
     "vitest.config.mts",
     "playwright.config.ts",
-    "e2e/**/*"
+    "e2e/**/*",
+    "scripts/**/*"
   ]
 }

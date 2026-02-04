@@ -10,7 +10,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase/server'
+import { sql } from '@/lib/db/client'
 import { env } from '@/lib/env'
 import {
   checkUrlReachable,
@@ -572,11 +572,8 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
   async updateResourceWithVerificationResults(
     resourceId: string,
     suggestion: ResourceSuggestion,
-    result: VerificationResult,
-    supabaseClient?: Awaited<ReturnType<typeof createClient>>
+    result: VerificationResult
   ): Promise<void> {
-    const supabase = supabaseClient || (await createClient())
-
     // Build change log entry
     const changes: string[] = []
     if (suggestion.website) {
@@ -597,37 +594,28 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
       decision: result.decision,
     }
 
-    // Fetch current change_log
-    const { data: currentResource } = await supabase
-      .from('resources')
-      .select('change_log')
-      .eq('id', resourceId)
-      .single()
+    try {
+      // Fetch current change_log
+      const currentRows = await sql<{ change_log: unknown[] }[]>`
+        SELECT change_log FROM resources WHERE id = ${resourceId} LIMIT 1
+      `
+      const currentChangeLog = (currentRows[0]?.change_log as unknown[]) || []
+      const updatedChangeLog = [...currentChangeLog, changeLogEntry]
 
-    const currentChangeLog = (currentResource?.change_log as unknown[]) || []
-    const updatedChangeLog = [...currentChangeLog, changeLogEntry]
+      // Update resource
+      await sql`
+        UPDATE resources SET
+          ai_last_verified = ${new Date().toISOString()},
+          ai_verification_score = ${result.overall_score},
+          ${suggestion.website ? sql`website = ${suggestion.website},` : sql``}
+          change_log = ${JSON.stringify(updatedChangeLog)}::jsonb
+        WHERE id = ${resourceId}
+      `
 
-    // Update resource
-    const { error } = await supabase
-      .from('resources')
-      .update({
-        // Update verification metadata
-        ai_last_verified: new Date().toISOString(),
-        ai_verification_score: result.overall_score,
-
-        // Update auto-fixed fields (only if they were actually fixed)
-        ...(suggestion.website && { website: suggestion.website }),
-
-        // Append to change log
-        change_log: updatedChangeLog,
-      })
-      .eq('id', resourceId)
-
-    if (error) {
+      console.log(`Updated resource ${resourceId} with verification results`)
+    } catch (error) {
       console.error('Failed to update resource:', error)
       // Don't throw - updating resource shouldn't break verification
-    } else {
-      console.log(`✅ Updated resource ${resourceId} with verification results`)
     }
   }
 
@@ -640,28 +628,28 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
     verificationType: 'initial' | 'periodic' | 'triggered',
     result: VerificationResult
   ): Promise<void> {
-    const supabase = await createClient()
-
-    const { error } = await supabase.from('verification_logs').insert({
-      resource_id: resourceId,
-      suggestion_id: suggestionId,
-      verification_type: verificationType,
-      agent_version: this.agentVersion,
-      overall_score: result.overall_score,
-      checks_performed: result.checks,
-      conflicts_found: result.conflicts,
-      changes_detected: result.changes_detected,
-      decision: result.decision,
-      decision_reason: result.decision_reason,
-      auto_approved: result.decision === 'auto_approve',
-      started_at: new Date(this.startTime).toISOString(),
-      completed_at: new Date().toISOString(),
-      duration_ms: result.duration_ms,
-      api_calls_made: result.api_calls_made,
-      estimated_cost_usd: result.estimated_cost_usd,
-    })
-
-    if (error) {
+    try {
+      await sql`
+        INSERT INTO verification_logs (
+          resource_id, suggestion_id, verification_type, agent_version,
+          overall_score, checks_performed, conflicts_found, changes_detected,
+          decision, decision_reason, auto_approved,
+          started_at, completed_at, duration_ms,
+          api_calls_made, estimated_cost_usd
+        ) VALUES (
+          ${resourceId}, ${suggestionId}, ${verificationType}, ${this.agentVersion},
+          ${result.overall_score},
+          ${JSON.stringify(result.checks)}::jsonb,
+          ${JSON.stringify(result.conflicts)}::jsonb,
+          ${JSON.stringify(result.changes_detected)}::jsonb,
+          ${result.decision}, ${result.decision_reason},
+          ${result.decision === 'auto_approve'},
+          ${new Date(this.startTime).toISOString()}, ${new Date().toISOString()},
+          ${result.duration_ms},
+          ${result.api_calls_made}, ${result.estimated_cost_usd}
+        )
+      `
+    } catch (error) {
       console.error('Failed to log verification:', error)
       throw error
     }
@@ -671,92 +659,79 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
    * Auto-approve a suggestion and convert to resource
    */
   async autoApprove(suggestion: ResourceSuggestion): Promise<string> {
-    const supabase = await createClient()
-
     // Create resource from suggestion
-    const { data: resource, error: createError } = await supabase
-      .from('resources')
-      .insert({
-        name: suggestion.name,
-        description: suggestion.description,
-        primary_category: suggestion.primary_category,
-        categories: suggestion.categories,
-        tags: suggestion.tags,
-        address: suggestion.address,
-        city: suggestion.city,
-        state: suggestion.state,
-        zip: suggestion.zip,
-        latitude: suggestion.latitude,
-        longitude: suggestion.longitude,
-        phone: suggestion.phone,
-        email: suggestion.email,
-        website: suggestion.website,
-        hours: suggestion.hours,
-        services_offered: suggestion.services_offered,
-        eligibility_requirements: suggestion.eligibility_requirements,
-        required_documents: suggestion.required_documents,
-        fees: suggestion.fees,
-        languages: suggestion.languages,
-        accessibility_features: suggestion.accessibility_features,
-        status: 'active',
-        verified: true,
-        source: 'ai_verified',
-        verification_status: 'verified',
-      })
-      .select('id')
-      .single()
+    const rows = await sql<{ id: string }[]>`
+      INSERT INTO resources (
+        name, description, primary_category, categories, tags,
+        address, city, state, zip, latitude, longitude,
+        phone, email, website, hours,
+        services_offered, eligibility_requirements, required_documents,
+        fees, languages, accessibility_features,
+        status, verified, source, verification_status
+      ) VALUES (
+        ${suggestion.name}, ${suggestion.description || null},
+        ${suggestion.primary_category || null},
+        ${suggestion.categories ? sql`${suggestion.categories}::text[]` : sql`NULL`},
+        ${suggestion.tags ? sql`${suggestion.tags}::text[]` : sql`NULL`},
+        ${suggestion.address || null}, ${suggestion.city || null},
+        ${suggestion.state || null}, ${suggestion.zip || null},
+        ${suggestion.latitude || null}, ${suggestion.longitude || null},
+        ${suggestion.phone || null}, ${suggestion.email || null},
+        ${suggestion.website || null},
+        ${suggestion.hours ? sql`${JSON.stringify(suggestion.hours)}::jsonb` : sql`NULL`},
+        ${suggestion.services_offered ? sql`${suggestion.services_offered}::text[]` : sql`NULL`},
+        ${suggestion.eligibility_requirements || null},
+        ${suggestion.required_documents ? sql`${suggestion.required_documents}::text[]` : sql`NULL`},
+        ${suggestion.fees || null},
+        ${suggestion.languages ? sql`${suggestion.languages}::text[]` : sql`NULL`},
+        ${suggestion.accessibility_features ? sql`${suggestion.accessibility_features}::text[]` : sql`NULL`},
+        'active', true, 'ai_verified', 'verified'
+      ) RETURNING id
+    `
 
-    if (createError) {
-      console.error('Failed to create resource:', createError)
-      throw createError
+    if (!rows[0]?.id) {
+      throw new Error('Failed to create resource: no ID returned')
     }
 
     // Mark suggestion as approved
-    await supabase
-      .from('resource_suggestions')
-      .update({
-        status: 'approved',
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq('id', suggestion.id)
+    await sql`
+      UPDATE resource_suggestions SET
+        status = 'approved',
+        reviewed_at = ${new Date().toISOString()}
+      WHERE id = ${suggestion.id}
+    `
 
-    console.log(`✅ Auto-approved and created resource: ${resource.id}`)
-    return resource.id
+    console.log(`Auto-approved and created resource: ${rows[0].id}`)
+    return rows[0].id
   }
 
   /**
    * Flag a suggestion for human review
    */
   async flagForHuman(suggestion: ResourceSuggestion, reason: string): Promise<void> {
-    const supabase = await createClient()
+    await sql`
+      UPDATE resource_suggestions SET
+        status = 'pending',
+        admin_notes = ${reason}
+      WHERE id = ${suggestion.id}
+    `
 
-    await supabase
-      .from('resource_suggestions')
-      .update({
-        status: 'pending',
-        admin_notes: reason,
-      })
-      .eq('id', suggestion.id)
-
-    console.log(`⚠️ Flagged for human review: ${reason}`)
+    console.log(`Flagged for human review: ${reason}`)
   }
 
   /**
    * Auto-reject a suggestion
    */
   async autoReject(suggestion: ResourceSuggestion, reason: string): Promise<void> {
-    const supabase = await createClient()
+    await sql`
+      UPDATE resource_suggestions SET
+        status = 'rejected',
+        admin_notes = ${'Auto-rejected: ' + reason},
+        reviewed_at = ${new Date().toISOString()}
+      WHERE id = ${suggestion.id}
+    `
 
-    await supabase
-      .from('resource_suggestions')
-      .update({
-        status: 'rejected',
-        admin_notes: `Auto-rejected: ${reason}`,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq('id', suggestion.id)
-
-    console.log(`❌ Auto-rejected: ${reason}`)
+    console.log(`Auto-rejected: ${reason}`)
   }
 
   /**
@@ -771,28 +746,29 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
     _costUsd: number
   ): Promise<void> {
     try {
-      const supabase = await createClient()
-
       // Calculate input/output costs separately for accurate tracking
       // Claude Haiku 4.5: Input $0.80/1M, Output $4.00/1M
       const inputCostUsd = (inputTokens / 1_000_000) * 0.8
       const outputCostUsd = (outputTokens / 1_000_000) * 4.0
 
-      await supabase.from('ai_usage_logs').insert({
-        operation_type: operationType,
-        resource_id: resourceId,
-        suggestion_id: suggestionId,
-        provider: 'anthropic',
-        model: env.ANTHROPIC_ENRICHMENT_MODEL,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        input_cost_usd: inputCostUsd,
-        output_cost_usd: outputCostUsd,
-        duration_ms: null, // We track this at verification level
-        operation_context: {
-          agent_version: this.agentVersion,
-        },
+      const operationContext = JSON.stringify({
+        agent_version: this.agentVersion,
       })
+
+      await sql`
+        INSERT INTO ai_usage_logs (
+          operation_type, resource_id, suggestion_id,
+          provider, model, input_tokens, output_tokens,
+          input_cost_usd, output_cost_usd, duration_ms,
+          operation_context
+        ) VALUES (
+          ${operationType}, ${resourceId}, ${suggestionId},
+          'anthropic', ${env.ANTHROPIC_ENRICHMENT_MODEL},
+          ${inputTokens}, ${outputTokens},
+          ${inputCostUsd}, ${outputCostUsd}, ${null},
+          ${operationContext}::jsonb
+        )
+      `
     } catch (error) {
       console.error('Failed to log AI usage:', error)
       // Don't throw - logging failure shouldn't break verification

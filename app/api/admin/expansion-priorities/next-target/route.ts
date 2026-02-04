@@ -1,5 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { expansionPriorities, expansionMilestones } from '@/lib/db/schema'
+import { eq, inArray, desc } from 'drizzle-orm'
 import type {
   NextResearchTargetRequest,
   ExpansionStatus,
@@ -11,24 +14,13 @@ import type {
 // Returns the highest-priority location(s) ready for research by AI agents
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await checkAdminAuth(request)
 
-    // Check admin auth
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Parse query parameters
@@ -42,41 +34,38 @@ export async function GET(request: NextRequest) {
       limit: parseInt(searchParams.get('limit') || '1'),
     }
 
-    // Build query for next research target
-    let query = supabase
-      .from('expansion_priorities')
-      .select('*')
-      .order('priority_score', { ascending: false })
-
     // Default filters for research-ready targets
-    if (!filters.status || filters.status.length === 0) {
-      query = query.in('status', ['identified', 'researching'])
-    } else {
-      query = query.in('status', filters.status)
+    const statusValues = filters.status?.length ? filters.status : ['identified', 'researching']
+    const researchStatusValues = filters.research_status?.length
+      ? filters.research_status
+      : ['not_started', 'blocked']
+
+    // Execute query with Drizzle
+    let query = db
+      .select()
+      .from(expansionPriorities)
+      .where(inArray(expansionPriorities.status, statusValues))
+      .orderBy(desc(expansionPriorities.priorityScore))
+      .$dynamic()
+
+    // Filter by research status
+    if (researchStatusValues.length > 0) {
+      query = query.where(inArray(expansionPriorities.researchStatus, researchStatusValues))
     }
 
-    if (!filters.research_status || filters.research_status.length === 0) {
-      query = query.in('research_status', ['not_started', 'blocked'])
-    } else {
-      query = query.in('research_status', filters.research_status)
-    }
-
+    // Filter by phase if provided
     if (filters.phase && filters.phase.length > 0) {
-      query = query.in('phase', filters.phase)
+      query = query.where(inArray(expansionPriorities.phase, filters.phase))
     }
 
-    // Apply limit (default to 1 if not provided or invalid)
-    query = query.limit(filters.limit || 1)
+    // Apply limit
+    const limit = filters.limit || 1
+    query = query.limit(limit)
 
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Error fetching next research target:', error)
-      return NextResponse.json({ error: 'Failed to fetch next research target' }, { status: 500 })
-    }
+    const data = await query
 
     // Return single object if limit=1, array otherwise
-    if (filters.limit === 1) {
+    if (limit === 1) {
       return NextResponse.json(data?.[0] || null)
     }
 
@@ -91,60 +80,49 @@ export async function GET(request: NextRequest) {
 // Claims the next research target and marks it as in_progress
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await checkAdminAuth(request)
 
-    // Check admin auth
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
     }
 
     // Parse request body for filters
     const body = (await request.json()) as NextResearchTargetRequest
 
-    // Build query for next research target
-    let query = supabase
-      .from('expansion_priorities')
-      .select('*')
-      .order('priority_score', { ascending: false })
+    // Build query conditions
+    const statusValues = body.status?.length ? body.status : ['identified']
+    const researchStatusValues = body.research_status?.length
+      ? body.research_status
+      : ['not_started']
 
-    // Default filters for research-ready targets
-    if (!body.status || body.status.length === 0) {
-      query = query.in('status', ['identified'])
-    } else {
-      query = query.in('status', body.status)
+    // Execute query with Drizzle
+    let query = db
+      .select()
+      .from(expansionPriorities)
+      .where(inArray(expansionPriorities.status, statusValues))
+      .orderBy(desc(expansionPriorities.priorityScore))
+      .$dynamic()
+
+    // Filter by research status
+    if (researchStatusValues.length > 0) {
+      if (researchStatusValues.length === 1) {
+        query = query.where(eq(expansionPriorities.researchStatus, researchStatusValues[0]))
+      } else {
+        query = query.where(inArray(expansionPriorities.researchStatus, researchStatusValues))
+      }
     }
 
-    if (!body.research_status || body.research_status.length === 0) {
-      query = query.eq('research_status', 'not_started')
-    } else {
-      query = query.in('research_status', body.research_status)
-    }
-
+    // Filter by phase if provided
     if (body.phase && body.phase.length > 0) {
-      query = query.in('phase', body.phase)
+      query = query.where(inArray(expansionPriorities.phase, body.phase))
     }
 
     query = query.limit(1)
 
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Error fetching next research target:', error)
-      return NextResponse.json({ error: 'Failed to fetch next research target' }, { status: 500 })
-    }
+    const data = await query
 
     if (!data || data.length === 0) {
       return NextResponse.json({ error: 'No research targets available' }, { status: 404 })
@@ -153,28 +131,27 @@ export async function POST(request: NextRequest) {
     const target = data[0]
 
     // Update to mark as in_progress and set assigned timestamp
-    const { data: updated, error: updateError } = await supabase
-      .from('expansion_priorities')
-      .update({
+    const [updated] = await db
+      .update(expansionPriorities)
+      .set({
         status: 'researching',
-        research_status: 'in_progress',
-        research_agent_assigned_at: new Date().toISOString(),
+        researchStatus: 'in_progress',
+        researchAgentAssignedAt: new Date(),
+        updatedAt: new Date(),
       })
-      .eq('id', target.id)
-      .select()
-      .single()
+      .where(eq(expansionPriorities.id, target.id))
+      .returning()
 
-    if (updateError) {
-      console.error('Error claiming research target:', updateError)
+    if (!updated) {
       return NextResponse.json({ error: 'Failed to claim research target' }, { status: 500 })
     }
 
     // Create milestone for research started
-    await supabase.from('expansion_milestones').insert({
-      expansion_id: target.id,
-      milestone_type: 'research_started',
+    await db.insert(expansionMilestones).values({
+      expansionId: target.id,
+      milestoneType: 'research_started',
       notes: 'Research agent assigned and started',
-      achieved_by: user.id,
+      achievedBy: auth.userId || null,
     })
 
     return NextResponse.json(updated)

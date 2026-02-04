@@ -94,26 +94,6 @@ export function LoginFormNextAuth({
         size={minimal ? 'small' : 'medium'}
       />
       <Box>
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 1,
-          }}
-        >
-          {!minimal && <Typography variant="body2">Password</Typography>}
-          <NextLink
-            href="/auth/forgot-password"
-            style={{
-              fontSize: '0.875rem',
-              textDecoration: 'underline',
-              marginLeft: minimal ? 'auto' : 0,
-            }}
-          >
-            Forgot password?
-          </NextLink>
-        </Box>
         <TextField
           label={minimal ? 'Password' : undefined}
           type={showPassword ? 'text' : 'password'}

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db } from '@/lib/db/client'
+import { resourceSuggestions, verificationLogs } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * POST /api/admin/flagged-resources/[id]/reject
  * Reject a flagged resource suggestion or flag for further attention (admin only)
  *
  * Authentication:
- * - Session-based (browser/Claude Web): Automatic via Supabase auth
+ * - Session-based (browser/Claude Web): Automatic via NextAuth
  * - API key (Claude Code/scripts): Include header `x-admin-api-key: your-key`
  *
  * Body:
@@ -32,7 +35,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    const supabase = auth.getClient()
     const { id } = await params
     const body = (await request.json()) as {
       reason: string
@@ -86,35 +88,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .join('\n')
 
     // Update suggestion with structured rejection/attention flag
-    const { error: updateError } = await supabase
-      .from('resource_suggestions')
-      .update({
+    await db
+      .update(resourceSuggestions)
+      .set({
         status,
-        rejection_reason: reason,
-        closure_status: closure_status || null,
-        correction_notes: notes || null,
-        reviewed_by: auth.userId || null,
-        reviewed_at: new Date().toISOString(),
-        review_notes: reviewNotes,
+        rejectionReason: reason,
+        closureStatus: closure_status || null,
+        correctionNotes: notes || null,
+        reviewedBy: auth.userId || null,
+        reviewedAt: new Date(),
+        reviewNotes,
       })
-      .eq('id', id)
-
-    if (updateError) {
-      console.error('Failed to update suggestion:', updateError)
-      return NextResponse.json({ error: 'Failed to update suggestion' }, { status: 500 })
-    }
+      .where(eq(resourceSuggestions.id, id))
 
     // Update verification log to mark as human reviewed
-    await supabase
-      .from('verification_logs')
-      .update({
-        human_reviewed: true,
-        human_reviewer_id: auth.userId || null,
-        human_decision: status,
-      })
-      .eq('suggestion_id', id)
-      .order('created_at', { ascending: false })
+    // First find the most recent log for this suggestion
+    const [latestLog] = await db
+      .select({ id: verificationLogs.id })
+      .from(verificationLogs)
+      .where(eq(verificationLogs.suggestionId, id))
+      .orderBy(desc(verificationLogs.createdAt))
       .limit(1)
+
+    if (latestLog) {
+      await db
+        .update(verificationLogs)
+        .set({
+          humanReviewed: true,
+          humanReviewerId: auth.userId || null,
+          humanDecision: status,
+        })
+        .where(eq(verificationLogs.id, latestLog.id))
+    }
 
     return NextResponse.json({
       success: true,

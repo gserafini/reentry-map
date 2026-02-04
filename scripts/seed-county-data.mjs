@@ -9,11 +9,10 @@
  * Usage: node scripts/seed-county-data.mjs
  *
  * Environment Variables Required:
- * - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL
- * - SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ * - DATABASE_URL
  */
 
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -47,19 +46,9 @@ function loadEnv() {
 
 loadEnv()
 
-// Load environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required environment variables')
-  console.error('   Required: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
-  console.error('   (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY as fallback)')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const sql = postgres(
+  process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+)
 
 /**
  * Initial seed data for California Bay Area counties (Tier 1 priority)
@@ -185,9 +174,9 @@ async function seedCounties() {
 
   try {
     // Check if counties already exist
-    const { data: existingCounties } = await supabase.from('county_data').select('fips_code')
+    const existingCounties = await sql`SELECT fips_code FROM county_data`
 
-    const existingFips = new Set((existingCounties || []).map((c) => c.fips_code))
+    const existingFips = new Set(existingCounties.map((c) => c.fips_code))
 
     // Filter out counties that already exist
     const newCounties = initialCounties.filter((c) => !existingFips.has(c.fips_code))
@@ -199,23 +188,28 @@ async function seedCounties() {
 
     console.log(`📥 Inserting ${newCounties.length} new counties...`)
 
-    // Insert counties in batches of 100
-    const batchSize = 100
+    // Insert counties one at a time
     let inserted = 0
 
-    for (let i = 0; i < newCounties.length; i += batchSize) {
-      const batch = newCounties.slice(i, i + batchSize)
-
-      const { data, error } = await supabase.from('county_data').insert(batch).select()
-
-      if (error) {
-        console.error(`❌ Error inserting batch ${i / batchSize + 1}:`, error.message)
-        throw error
-      }
-
-      inserted += data.length
-      console.log(`   ✅ Inserted ${inserted}/${newCounties.length} counties`)
+    for (const county of newCounties) {
+      await sql`
+        INSERT INTO county_data (
+          fips_code, state_fips, county_fips, state_code, state_name, county_name,
+          total_population, population_year, estimated_annual_releases,
+          reentry_data_source, reentry_data_year, priority_tier,
+          priority_weight, priority_reason, center_lat, center_lng
+        ) VALUES (
+          ${county.fips_code}, ${county.state_fips}, ${county.county_fips},
+          ${county.state_code}, ${county.state_name}, ${county.county_name},
+          ${county.total_population}, ${county.population_year}, ${county.estimated_annual_releases},
+          ${county.reentry_data_source}, ${county.reentry_data_year}, ${county.priority_tier},
+          ${county.priority_weight}, ${county.priority_reason}, ${county.center_lat}, ${county.center_lng}
+        )
+      `
+      inserted++
     }
+
+    console.log(`   ✅ Inserted ${inserted}/${newCounties.length} counties`)
 
     console.log(`\n✅ Successfully seeded ${inserted} counties`)
   } catch (error) {
@@ -230,18 +224,15 @@ async function showStats() {
 
   try {
     // Total counties
-    const { count: totalCount } = await supabase
-      .from('county_data')
-      .select('*', { count: 'exact', head: true })
+    const [{ count: totalCount }] = await sql`SELECT COUNT(*)::int AS count FROM county_data`
 
     // Counties by priority tier
-    const { data: tierData } = await supabase
-      .from('county_data')
-      .select('priority_tier')
-      .not('priority_tier', 'is', null)
+    const tierData = await sql`
+      SELECT priority_tier FROM county_data WHERE priority_tier IS NOT NULL
+    `
 
     const tierCounts = {}
-    tierData?.forEach((row) => {
+    tierData.forEach((row) => {
       tierCounts[row.priority_tier] = (tierCounts[row.priority_tier] || 0) + 1
     })
 
@@ -252,10 +243,10 @@ async function showStats() {
     }
 
     // Counties by state
-    const { data: stateData } = await supabase.from('county_data').select('state_code, state_name')
+    const stateData = await sql`SELECT state_code, state_name FROM county_data`
 
     const stateCounts = {}
-    stateData?.forEach((row) => {
+    stateData.forEach((row) => {
       stateCounts[row.state_code] = (stateCounts[row.state_code] || 0) + 1
     })
 
@@ -276,23 +267,28 @@ async function main() {
   console.log('🚀 County Data Seeding Script')
   console.log('='.repeat(60))
 
-  await seedCounties()
-  await showStats()
+  try {
+    await seedCounties()
+    await showStats()
 
-  console.log('\n' + '='.repeat(60))
-  console.log('✅ County data seeding complete!')
-  console.log('\n📍 Next steps:')
-  console.log('   1. Add more counties from full US Census data (optional)')
-  console.log('   2. Run: node scripts/enrich-resources-with-county.mjs')
-  console.log('   3. Calculate coverage metrics via admin dashboard')
-  console.log('\n💡 To load full US county data:')
-  console.log(
-    '   - Download from: https://www.census.gov/geographies/reference-files/2020/demo/popest/2020-fips.html'
-  )
-  console.log('   - Or use this script as a template to bulk import your data')
+    console.log('\n' + '='.repeat(60))
+    console.log('✅ County data seeding complete!')
+    console.log('\n📍 Next steps:')
+    console.log('   1. Add more counties from full US Census data (optional)')
+    console.log('   2. Run: node scripts/enrich-resources-with-county.mjs')
+    console.log('   3. Calculate coverage metrics via admin dashboard')
+    console.log('\n💡 To load full US county data:')
+    console.log(
+      '   - Download from: https://www.census.gov/geographies/reference-files/2020/demo/popest/2020-fips.html'
+    )
+    console.log('   - Or use this script as a template to bulk import your data')
+  } finally {
+    await sql.end()
+  }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('\n❌ Fatal error:', error)
+  await sql.end()
   process.exit(1)
 })
