@@ -40,23 +40,33 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // Fetch usage summary using raw SQL (for view)
-    const usage = await sql<UsageSummary[]>`
-      SELECT * FROM ai_usage_summary
-      WHERE date >= ${startDate.toISOString()}
-      ORDER BY date DESC
-    `
+    // Fetch usage summary (ai_usage_summary view may not exist — return empty)
+    let usage: UsageSummary[] = []
+    try {
+      usage = await sql<UsageSummary[]>`
+        SELECT * FROM ai_usage_summary
+        WHERE date >= ${startDate.toISOString()}
+        ORDER BY date DESC
+      `
+    } catch {
+      console.warn('ai_usage_summary view not available')
+    }
 
-    // Fetch budget status using raw SQL (for view)
-    const budget = await sql<BudgetStatus[]>`
-      SELECT * FROM ai_budget_status
-      ORDER BY month DESC
-      LIMIT 6
-    `
+    // Fetch budget status (ai_budget_status view may not exist — return empty)
+    let budget: BudgetStatus[] = []
+    try {
+      budget = await sql<BudgetStatus[]>`
+        SELECT * FROM ai_budget_status
+        ORDER BY month DESC
+        LIMIT 6
+      `
+    } catch {
+      console.warn('ai_budget_status view not available')
+    }
 
     return NextResponse.json({
-      usage: usage || [],
-      budget: budget || [],
+      usage,
+      budget,
     })
   } catch (error) {
     console.error('Error fetching AI usage:', error)

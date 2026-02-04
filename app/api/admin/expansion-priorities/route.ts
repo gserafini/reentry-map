@@ -120,10 +120,16 @@ export async function GET(request: NextRequest) {
     const limitClause = `LIMIT ${limit} OFFSET ${offset}`
 
     // Execute query (using raw SQL for view)
-    const data = await sql.unsafe<ExpansionPriorityWithProgress[]>(
-      `SELECT * FROM expansion_priorities_with_progress ${whereClause} ${orderClause} ${limitClause}`,
-      params
-    )
+    // expansion_priorities_with_progress view may not exist yet — return empty
+    let data: ExpansionPriorityWithProgress[] = []
+    try {
+      data = await sql.unsafe<ExpansionPriorityWithProgress[]>(
+        `SELECT * FROM expansion_priorities_with_progress ${whereClause} ${orderClause} ${limitClause}`,
+        params
+      )
+    } catch (queryError) {
+      console.warn('expansion_priorities_with_progress view not available:', queryError)
+    }
 
     return NextResponse.json({
       data,
@@ -158,7 +164,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'city and state are required' }, { status: 400 })
     }
 
-    // Insert expansion priority
+    // Insert expansion priority (table may not exist yet)
     try {
       const [data] = await db
         .insert(expansionPriorities)
@@ -189,10 +195,16 @@ export async function POST(request: NextRequest) {
     } catch (insertError) {
       const errorCode = (insertError as { code?: string }).code
       if (errorCode === '23505') {
-        // Unique constraint violation
         return NextResponse.json(
           { error: 'Expansion priority for this city/state already exists' },
           { status: 409 }
+        )
+      }
+      if (errorCode === '42P01') {
+        // Table doesn't exist
+        return NextResponse.json(
+          { error: 'Expansion priorities feature not yet deployed' },
+          { status: 501 }
         )
       }
       throw insertError

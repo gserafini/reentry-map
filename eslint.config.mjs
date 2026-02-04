@@ -17,7 +17,7 @@ const eslintConfig = [
       '**/out/**',
       '**/build/**',
       '**/dist/**',
-      '**/coverage/**',
+      'coverage/**',
       '**/playwright-report/**',
       '**/test-results/**',
       '**/.cache/**',

@@ -53,14 +53,20 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100')
 
     // Build query with conditional filters
-    const metrics =
-      geographyType && minScore
-        ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE geography_type = ${geographyType} AND coverage_score >= ${parseFloat(minScore)} ORDER BY coverage_score DESC LIMIT ${limit}`
-        : geographyType
-          ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE geography_type = ${geographyType} ORDER BY coverage_score DESC LIMIT ${limit}`
-          : minScore
-            ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE coverage_score >= ${parseFloat(minScore)} ORDER BY coverage_score DESC LIMIT ${limit}`
-            : await sql<MetricRow[]>`SELECT * FROM coverage_metrics ORDER BY coverage_score DESC LIMIT ${limit}`
+    // coverage_metrics table/view may not exist yet — return empty metrics gracefully
+    let metrics: MetricRow[] = []
+    try {
+      metrics =
+        geographyType && minScore
+          ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE geography_type = ${geographyType} AND coverage_score >= ${parseFloat(minScore)} ORDER BY coverage_score DESC LIMIT ${limit}`
+          : geographyType
+            ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE geography_type = ${geographyType} ORDER BY coverage_score DESC LIMIT ${limit}`
+            : minScore
+              ? await sql<MetricRow[]>`SELECT * FROM coverage_metrics WHERE coverage_score >= ${parseFloat(minScore)} ORDER BY coverage_score DESC LIMIT ${limit}`
+              : await sql<MetricRow[]>`SELECT * FROM coverage_metrics ORDER BY coverage_score DESC LIMIT ${limit}`
+    } catch (metricsError) {
+      console.warn('coverage_metrics table not available:', metricsError)
+    }
 
     // Get national metrics
     const national = metrics.find((m) => m.geography_type === 'national') || null
