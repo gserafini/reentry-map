@@ -1,14 +1,15 @@
 # Reentry Map - Canonical Database Schema
 
-**Last Updated**: 2025-11-12
+**Last Updated**: 2026-02-20
 **Source of Truth**: This document reflects the ACTUAL current database schema as of the last update date.
 
 > ⚠️ **IMPORTANT**: When making database schema changes:
 >
-> 1. Update the migration files in `/supabase/migrations/`
-> 2. Apply the migration to the database
+> 1. Update the migration files in `lib/db/migrations/`
+> 2. Apply the migration to the production database on dc3-1
 > 3. Update THIS document to reflect the changes
 > 4. Update any relevant TypeScript types in `/lib/types/`
+> 5. Update the Drizzle schema in `lib/db/schema.ts`
 
 ---
 
@@ -294,16 +295,19 @@ When updating this schema, also update:
 
 ## Migration History
 
-| Date       | Migration                                            | Changes                                                                  |
-| ---------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
-| 2024-10-24 | `20250101000000_initial_schema.sql`                  | Initial resources table (41 columns)                                     |
-| 2024-11-08 | `20251108104349_add_missing_resource_columns.sql`    | Added county, languages, accessibility_features, source                  |
-| 2024-11-08 | `20251108112026_parent_child_resources.sql`          | Added parent-child relationship fields                                   |
-| 2024-11-09 | `20250109000000_verification_system.sql`             | Added verification tracking fields                                       |
-| 2024-11-09 | `20250109000002_support_non_addressed_resources.sql` | Added address_type, service_area, closure_status                         |
-| 2024-11-10 | `20251110203158_geocoding_metadata.sql`              | Added geocoding quality fields                                           |
-| 2024-11-10 | `20251110211500_website_screenshots_columns.sql`     | Added screenshot_url, screenshot_captured_at                             |
-| 2025-11-12 | `20251112082913_add_missing_resource_columns.sql`    | Added fees, required_documents; changed accessibility_features to TEXT[] |
+| Date       | Migration                                               | Changes                                                                                                                                            |
+| ---------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2024-10-24 | `20250101000000_initial_schema.sql`                     | Initial resources table (41 columns)                                                                                                               |
+| 2024-11-08 | `20251108104349_add_missing_resource_columns.sql`       | Added county, languages, accessibility_features, source                                                                                            |
+| 2024-11-08 | `20251108112026_parent_child_resources.sql`             | Added parent-child relationship fields                                                                                                             |
+| 2024-11-09 | `20250109000000_verification_system.sql`                | Added verification tracking fields                                                                                                                 |
+| 2024-11-09 | `20250109000002_support_non_addressed_resources.sql`    | Added address_type, service_area, closure_status                                                                                                   |
+| 2024-11-10 | `20251110203158_geocoding_metadata.sql`                 | Added geocoding quality fields                                                                                                                     |
+| 2024-11-10 | `20251110211500_website_screenshots_columns.sql`        | Added screenshot_url, screenshot_captured_at                                                                                                       |
+| 2025-11-12 | `20251112082913_add_missing_resource_columns.sql`       | Added fees, required_documents; changed accessibility_features to TEXT[]                                                                           |
+| 2026-01-12 | `20250112000000_expand_resource_suggestions_schema.sql` | Expanded resource_suggestions with 16+ columns for full resource data                                                                              |
+| 2026-02-04 | `001-003_create_*.sql` (Drizzle)                        | Self-hosted PostgreSQL migration: core tables, functions, triggers                                                                                 |
+| 2026-02-20 | `004_create_missing_tables.sql` (Drizzle)               | Added 7 tables: review_helpfulness, verification_events, expansion_priorities, expansion_milestones, county_data, coverage_metrics, research_tasks |
 
 ---
 
