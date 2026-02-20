@@ -2,714 +2,425 @@
 
 ## Overview
 
-This guide covers deploying Reentry Map to production using Vercel and Supabase.
+Reentry Map is self-hosted on dc3-1.serafinihosting.com using PM2 + Apache reverse proxy. The Next.js app and PostgreSQL database both run on the same server.
 
-## Prerequisites
+## Infrastructure
 
-- [ ] GitHub account
-- [ ] Vercel account (free tier is fine)
-- [ ] Supabase account (free tier is fine)
-- [ ] Google Cloud account (for Maps API)
-- [ ] OpenAI account (for AI features)
-- [ ] Domain name (optional but recommended)
+```
+┌─────────────────────────────────────────────────────┐
+│          dc3-1.serafinihosting.com                  │
+│                                                     │
+│  ┌──────────────┐     ┌──────────────────────────┐  │
+│  │    Apache     │────▶│  PM2: reentry-map-prod   │  │
+│  │  (port 443)  │     │  Next.js (port 3007)     │  │
+│  │  SSL + proxy  │     │  /home/reentrymap/       │  │
+│  └──────────────┘     │  reentry-map-prod/       │  │
+│                        └──────────┬───────────────┘  │
+│                                   │                  │
+│                        ┌──────────▼───────────────┐  │
+│                        │  PostgreSQL (port 5432)   │  │
+│                        │  Database: reentry_map    │  │
+│                        │  User: reentrymap         │  │
+│                        └──────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+### Key Details
+
+| Component            | Detail                                                     |
+| -------------------- | ---------------------------------------------------------- |
+| **Production URL**   | https://reentrymap.org                                     |
+| **Domain aliases**   | reentrymap.com, www.reentrymap.org, www.reentrymap.com     |
+| **Server**           | dc3-1.serafinihosting.com (cPanel)                         |
+| **SSH**              | `ssh -p 22022 root@dc3-1.serafinihosting.com`              |
+| **cPanel user**      | `reentrymap`                                               |
+| **App directory**    | `/home/reentrymap/reentry-map-prod`                        |
+| **Node.js**          | v20.20.0 (via nvm)                                         |
+| **Process manager**  | PM2 (app: `reentry-map-prod`, port 3007)                   |
+| **Web server**       | Apache reverse proxy → localhost:3007                      |
+| **Database**         | PostgreSQL localhost:5432, database `reentry_map`          |
+| **Git remote**       | https://github.com/gserafini/reentry-map.git (main branch) |
+| **Ecosystem config** | `/home/reentrymap/ecosystem.config.js`                     |
+| **Logs**             | `/home/reentrymap/logs/reentry-map-prod-{out,error}.log`   |
 
 ---
 
-## Production Infrastructure
+## Deploying Changes
 
-```
-┌─────────────────────────────────────────┐
-│           Vercel (Hosting)              │
-│  - Next.js application                  │
-│  - Serverless functions                 │
-│  - CDN                                  │
-│  - SSL certificates                     │
-└──────────────┬──────────────────────────┘
-               │
-               ├─────────► Supabase (Database)
-               │           - PostgreSQL
-               │           - Auth
-               │           - Storage
-               │
-               ├─────────► Google Cloud
-               │           - Maps API
-               │           - Geocoding API
-               │
-               └─────────► OpenAI
-                           - GPT-4o-mini
-```
-
----
-
-## Step 1: Prepare Repository
-
-### 1.1 Create GitHub Repository
+### Standard Deploy (from local machine)
 
 ```bash
-# Initialize git (if not already done)
-git init
+# 1. Push code to GitHub
+git push origin main
 
-# Add remote
-git remote add origin https://github.com/gserafini/reentry-map.git
+# 2. SSH to server and deploy as reentrymap user
+ssh -p 22022 root@dc3-1.serafinihosting.com
 
-# Commit all changes
-git add .
-git commit -m "Initial commit - Phase 1 MVP"
-
-# Push to GitHub
-git push -u origin main
+su - reentrymap
+cd ~/reentry-map-prod
+git pull origin main
+npm install
+npm run build
+pm2 restart reentry-map-prod
 ```
 
-### 1.2 Create Branches
+### One-liner Deploy (from local machine)
 
 ```bash
-# Create staging branch
-git checkout -b staging
-git push -u origin staging
-
-# Switch back to main
-git checkout main
+# Push first, then deploy remotely
+git push origin main && \
+ssh -p 22022 root@dc3-1.serafinihosting.com \
+  'su - reentrymap -c "cd ~/reentry-map-prod && git pull origin main && npm install && npm run build && pm2 restart reentry-map-prod"'
 ```
 
-**Branch strategy**:
+### Verify Deploy
 
-- `main` → Production environment
-- `staging` → Staging environment
-- `feature/*` → Feature branches (merge to staging first)
+```bash
+# Check PM2 status
+ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "pm2 status"'
+
+# Check recent logs
+ssh -p 22022 root@dc3-1.serafinihosting.com 'tail -20 /home/reentrymap/logs/reentry-map-prod-out.log'
+
+# Check deployed commit
+ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "cd ~/reentry-map-prod && git log --oneline -1"'
+
+# Verify site is up
+curl -sI https://reentrymap.org | head -5
+```
 
 ---
 
-## Step 2: Set Up Production Database
+## PM2 Management
 
-### 2.1 Create Production Supabase Project
+```bash
+# All commands run as reentrymap user on dc3-1
 
-1. Go to [supabase.com](https://supabase.com)
-2. Click "New project"
-3. Settings:
-   - **Name**: reentry-map-prod
-   - **Database Password**: Generate strong password (save securely!)
-   - **Region**: Choose closest to users (us-west-1 for Oakland)
-   - **Plan**: Free tier to start
+# Status
+pm2 status
 
-### 2.2 Run Database Migrations
+# Restart
+pm2 restart reentry-map-prod
 
-1. Go to SQL Editor in Supabase dashboard
-2. Run each migration file in order:
-   - `supabase/migrations/20250101000000_initial_schema.sql`
-   - `supabase/migrations/20250101000001_rls_policies.sql`
-   - `supabase/migrations/20250101000002_functions_triggers.sql`
-   - `supabase/migrations/20250101000003_seed_data.sql`
+# Stop
+pm2 stop reentry-map-prod
 
-3. Verify tables created:
-   - Go to Database > Tables
-   - Should see: resources, users, favorites, reviews, etc.
+# Start (if stopped)
+pm2 start ecosystem.config.js
 
-### 2.3 Configure Auth
+# View logs (live)
+pm2 logs reentry-map-prod
 
-1. Go to Authentication > Settings
-2. Enable Phone provider
-3. Configure Twilio (or use Supabase's default SMS provider)
-4. Set rate limits:
-   - Max SMS per hour: 10
-   - Max verification attempts: 3
+# View last 100 log lines
+pm2 logs reentry-map-prod --lines 100
 
-### 2.4 Configure Storage
+# Save PM2 process list (survives reboot)
+pm2 save
 
-1. Go to Storage
-2. Create bucket: `resource-photos`
-3. Set policy: Public read, authenticated write
+# Reload without downtime
+pm2 reload reentry-map-prod
+```
+
+### Ecosystem Config
+
+Located at `/home/reentrymap/ecosystem.config.js`:
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: 'reentry-map-prod',
+      cwd: '/home/reentrymap/reentry-map-prod',
+      script: 'node_modules/next/dist/bin/next',
+      args: 'start -p 3007',
+      instances: 1,
+      exec_mode: 'cluster',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3007,
+        NO_AT_BRIDGE: '1',
+      },
+      error_file: '/home/reentrymap/logs/reentry-map-prod-error.log',
+      out_file: '/home/reentrymap/logs/reentry-map-prod-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      time: true,
+      restart_delay: 4000,
+      max_restarts: 10,
+      min_uptime: '10s',
+    },
+  ],
+}
+```
 
 ---
 
-## Step 3: Deploy to Vercel
+## Apache Configuration
 
-### 3.1 Connect GitHub Repository
+Apache reverse proxies HTTPS traffic to PM2 on port 3007.
 
-1. Go to [vercel.com](https://vercel.com)
-2. Click "Add New Project"
-3. Import `gserafini/reentry-map`
-4. Configure:
-   - **Framework Preset**: Next.js
-   - **Root Directory**: `./`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `.next`
+**Config location**: `/etc/apache2/conf.d/userdata/ssl/2_4/reentrymap/reentrymap.org/proxy.conf`
 
-### 3.2 Configure Environment Variables
+```apache
+ProxyPreserveHost On
+ProxyPass / http://127.0.0.1:3007/
+ProxyPassReverse / http://127.0.0.1:3007/
 
-Add these in Vercel dashboard (Settings > Environment Variables):
+# WebSocket support
+RewriteEngine On
+RewriteCond %{HTTP:Upgrade} websocket [NC]
+RewriteCond %{HTTP:Connection} upgrade [NC]
+RewriteRule ^/?(.*) ws://127.0.0.1:3007/ [P,L]
+
+# Don't proxy .well-known (SSL cert renewal)
+ProxyPassMatch ^/\.well-known !
+```
+
+Same config exists for HTTP (std) at `/etc/apache2/conf.d/userdata/std/2_4/reentrymap/reentrymap.org/proxy.conf`.
+
+**After modifying Apache configs**:
 
 ```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
+# As root on dc3-1
+/usr/local/cpanel/scripts/rebuildhttpdconf
+httpd -t  # Test config
+systemctl restart httpd
+```
+
+---
+
+## Database
+
+### Connection Details
+
+| Setting  | Value                                                        |
+| -------- | ------------------------------------------------------------ |
+| Host     | localhost (from server) / dc3-1.serafinihosting.com (remote) |
+| Port     | 5432                                                         |
+| Database | reentry_map                                                  |
+| User     | reentrymap                                                   |
+| Password | (in `.env.local`)                                            |
+
+### From Server
+
+```bash
+su - reentrymap
+psql -U reentrymap reentry_map
+```
+
+### From Local Machine
+
+```bash
+# Direct connection (requires SSL)
+psql "postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map?sslmode=require"
+```
+
+### From Scripts
+
+All scripts in `scripts/` use `DATABASE_URL` from `.env.local` with automatic SSL detection:
+
+```javascript
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+const sql = postgres(databaseUrl, {
+  ssl: isLocalhost ? false : 'require',
+})
+```
+
+**Important**: On the server, the database is `localhost` so SSL is disabled. From local dev machines, SSL is required.
+
+### Environment Variables
+
+`.env.local` on server (`/home/reentrymap/reentry-map-prod/.env.local`):
+
+```bash
+# Database (localhost on same server, no SSL needed)
+DATABASE_URL=postgresql://reentrymap:PASSWORD@localhost:5432/reentry_map
+DIRECT_DATABASE_URL=postgresql://reentrymap:PASSWORD@localhost:5432/reentry_map
+```
+
+`.env.local` on local dev machine:
+
+```bash
+# Database (remote, SSL required)
+DATABASE_URL=postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map
+DIRECT_DATABASE_URL=postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map
+```
+
+---
+
+## Environment Variables
+
+Full list of required environment variables (set in `.env.local`):
+
+```bash
+# Database
+DATABASE_URL=postgresql://reentrymap:PASSWORD@...
+DIRECT_DATABASE_URL=postgresql://reentrymap:PASSWORD@...
+
+# NextAuth.js
+NEXTAUTH_URL=https://reentrymap.org
+NEXTAUTH_SECRET=your-secret
 
 # Google Maps
 NEXT_PUBLIC_GOOGLE_MAPS_KEY=AIza...
 GOOGLE_MAPS_KEY=AIza...
 
-# OpenAI
+# AI (Anthropic Claude for verification agents)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI (for enrichment)
 OPENAI_API_KEY=sk-...
 
+# Admin API key (for Claude Code / automated scripts)
+ADMIN_API_KEY=your-key
+
 # App URL
-NEXT_PUBLIC_APP_URL=https://reentry-map.vercel.app
-
-# Cron Secret (generate random string)
-CRON_SECRET=your-random-secret-here
-
-# Optional: Analytics
-NEXT_PUBLIC_VERCEL_ANALYTICS_ID=auto
-```
-
-**Important**: Set environment variables for **both** Production and Preview environments.
-
-### 3.3 Deploy
-
-1. Click "Deploy"
-2. Wait for deployment (2-3 minutes)
-3. Visit your site: `https://reentry-map.vercel.app`
-
----
-
-## Step 4: Configure Custom Domain (Optional)
-
-### 4.1 Add Domain to Vercel
-
-1. Go to Project Settings > Domains
-2. Add domain: `reentrymap.org`
-3. Vercel will provide DNS records
-
-### 4.2 Configure DNS
-
-Add these records to your domain registrar:
-
-```
-Type: A
-Name: @
-Value: 76.76.21.21
-
-Type: CNAME
-Name: www
-Value: cname.vercel-dns.com
-```
-
-### 4.3 Wait for DNS Propagation
-
-- Usually takes 5-30 minutes
-- Vercel will automatically provision SSL certificate
-- Site will be accessible at `https://reentrymap.org`
-
-### 4.4 Update Environment Variables
-
-```bash
 NEXT_PUBLIC_APP_URL=https://reentrymap.org
-```
-
----
-
-## Step 5: Configure Cron Jobs
-
-### 5.1 Create Cron Configuration
-
-Already in `vercel.json`:
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/agents",
-      "schedule": "0 2 * * 0"
-    }
-  ]
-}
-```
-
-This runs AI agents every Sunday at 2am.
-
-### 5.2 Test Cron Endpoint
-
-```bash
-curl -X GET https://reentry-map.vercel.app/api/cron/agents \
-  -H "Authorization: Bearer your-cron-secret"
-```
-
-Should return:
-
-```json
-{
-  "success": true,
-  "jobs_run": ["discovery", "verification"]
-}
-```
-
----
-
-## Step 6: Set Up Monitoring
-
-### 6.1 Vercel Analytics
-
-Already enabled if you added `NEXT_PUBLIC_VERCEL_ANALYTICS_ID=auto`.
-
-Access at: Project > Analytics
-
-Tracks:
-
-- Page views
-- User sessions
-- Core Web Vitals
-- Performance metrics
-
-### 6.2 Error Monitoring
-
-Vercel automatically captures errors.
-
-Access at: Project > Logs
-
-Filter by:
-
-- Error level
-- Time range
-- Function/route
-
-### 6.3 Set Up Alerts
-
-1. Go to Project > Settings > Notifications
-2. Add email for:
-   - Deployment failures
-   - Error rate spikes
-   - Performance degradation
-
----
-
-## Step 7: Populate Production Data
-
-### 7.1 Add Initial Resources
-
-Two options:
-
-**Option A: Manual Entry** (Recommended for first 50)
-
-1. Sign in as admin
-2. Go to Admin > Resources
-3. Add resources one by one
-
-**Option B: Bulk Import**
-
-```bash
-# Prepare CSV: resources.csv
-# Run import script
-npm run import-resources -- --file resources.csv --env production
-```
-
-### 7.2 Run AI Enrichment
-
-```bash
-# From admin dashboard
-POST /api/agents/enrich
-```
-
-Or use admin UI: Admin > AI Agents > "Enrich All Resources"
-
-### 7.3 Verify Data Quality
-
-1. Spot check 10 random resources
-2. Verify geocoding correct
-3. Check photos loaded
-4. Verify categories assigned
-5. Test search functionality
-
----
-
-## Step 8: Security Checklist
-
-### 8.1 Environment Variables
-
-- [ ] All secrets in Vercel environment variables (not in code)
-- [ ] `.env.local` in `.gitignore`
-- [ ] Service role key only in server-side code
-- [ ] API keys restricted to specific domains
-
-### 8.2 Supabase Security
-
-- [ ] RLS enabled on all tables
-- [ ] Policies tested and working
-- [ ] Service role key kept secret
-- [ ] Database backups enabled
-
-### 8.3 API Security
-
-- [ ] Rate limiting configured
-- [ ] CORS restricted to your domain
-- [ ] Input validation on all endpoints
-- [ ] SQL injection prevention (using Supabase client)
-- [ ] XSS protection (React escapes by default)
-
-### 8.4 Authentication
-
-- [ ] Phone authentication working
-- [ ] Session cookies HTTP-only
-- [ ] HTTPS enforced
-- [ ] OTP expiration set (10 minutes)
-- [ ] Rate limiting on OTP requests
-
----
-
-## Step 9: Performance Optimization
-
-### 9.1 Enable Caching
-
-Already configured in Next.js:
-
-- Static pages cached automatically
-- API routes can set Cache-Control headers
-- Images optimized with next/image
-
-### 9.2 Configure CDN
-
-Vercel CDN enabled by default. No configuration needed.
-
-### 9.3 Database Optimization
-
-```sql
--- Add indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_resources_category_rating
-ON resources(primary_category, rating_average DESC);
-
-CREATE INDEX IF NOT EXISTS idx_resources_location_category
-ON resources USING GIST (ST_MakePoint(longitude, latitude)::geography)
-WHERE primary_category IS NOT NULL;
-
--- Analyze tables
-ANALYZE resources;
-ANALYZE resource_reviews;
-```
-
-### 9.4 Monitor Performance
-
-Run Lighthouse audit:
-
-```bash
-npm run lighthouse
-```
-
-Target scores:
-
-- Performance: > 90
-- Accessibility: > 90
-- Best Practices: > 90
-- SEO: > 90
-
----
-
-## Step 10: Backup Strategy
-
-### 10.1 Database Backups
-
-Supabase Pro includes daily backups. On free tier:
-
-**Manual Backups**:
-
-```bash
-# Weekly manual backup
-pg_dump "postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres" > backup-$(date +%Y%m%d).sql
-```
-
-Store backups securely (encrypted cloud storage).
-
-### 10.2 Code Backups
-
-GitHub is your code backup. Ensure:
-
-- [ ] All code committed
-- [ ] Tags for releases
-- [ ] README up to date
-
-### 10.3 Environment Variables Backup
-
-Keep secure copy of all environment variables:
-
-```bash
-# Save to password manager
-# Or encrypted file
-```
-
----
-
-## Step 11: Launch Checklist
-
-### Pre-Launch (Day Before)
-
-- [ ] All features working in staging
-- [ ] Content reviewed (no typos, accurate info)
-- [ ] 50+ resources added and verified
-- [ ] Test user flows manually
-- [ ] Performance tested (Lighthouse > 90)
-- [ ] Mobile tested (iOS and Android)
-- [ ] Accessibility tested
-- [ ] Security reviewed
-- [ ] Backups configured
-- [ ] Monitoring enabled
-- [ ] Support email set up
-- [ ] Privacy policy published
-- [ ] Terms of service published
-
-### Launch Day
-
-- [ ] Final smoke test in production
-- [ ] Monitor error logs
-- [ ] Watch analytics for traffic
-- [ ] Be ready to respond to issues
-- [ ] Announce launch
-- [ ] Share with initial users
-
-### Post-Launch (First Week)
-
-- [ ] Daily monitoring
-- [ ] Respond to feedback quickly
-- [ ] Fix critical bugs immediately
-- [ ] Document issues and learnings
-- [ ] Thank early users
-
----
-
-## Troubleshooting
-
-### Deployment Fails
-
-**Error**: Build fails
-
-```bash
-# Check build logs in Vercel
-# Common issues:
-- TypeScript errors
-- Missing environment variables
-- Dependency issues
-
-# Fix:
-npm run type-check
-npm run build
-```
-
-**Error**: Runtime errors after deployment
-
-```bash
-# Check Vercel logs
-# Common issues:
-- Environment variables not set
-- API endpoint 404s
-- Database connection issues
-
-# Verify env vars in Vercel dashboard
-```
-
-### Database Connection Issues
-
-**Error**: Supabase connection fails
-
-```bash
-# Check:
-- NEXT_PUBLIC_SUPABASE_URL correct
-- NEXT_PUBLIC_SUPABASE_ANON_KEY correct
-- Supabase project not paused
-
-# Test connection:
-curl https://your-project.supabase.co/rest/v1/resources \
-  -H "apikey: your-anon-key"
-```
-
-### Performance Issues
-
-**Problem**: Slow page loads
-
-```bash
-# Run Lighthouse
-npm run lighthouse
-
-# Common causes:
-- Large images not optimized
-- Too many API calls
-- Missing indexes
-
-# Fix:
-- Use next/image for all images
-- Implement pagination
-- Add database indexes
 ```
 
 ---
 
 ## Rollback Procedure
 
-If critical bug in production:
-
-### Option 1: Revert Deployment (Fast)
-
-1. Go to Vercel Dashboard > Deployments
-2. Find last working deployment
-3. Click "..." > "Promote to Production"
-4. Takes effect immediately
-
-### Option 2: Revert Code (Thorough)
+### Quick Rollback (Revert to Previous Build)
 
 ```bash
+ssh -p 22022 root@dc3-1.serafinihosting.com
+su - reentrymap
+cd ~/reentry-map-prod
+
 # Find last good commit
-git log
+git log --oneline -10
 
-# Revert to that commit
-git revert <commit-hash>
+# Reset to specific commit
+git checkout <commit-hash>
+npm run build
+pm2 restart reentry-map-prod
+```
 
-# Push to trigger new deployment
+### Code Revert (Git)
+
+```bash
+# From local machine
+git revert <bad-commit>
 git push origin main
+
+# Then deploy normally
 ```
 
 ---
 
-## Scaling Considerations
+## Monitoring
 
-### When to Upgrade
+### Logs
 
-**Supabase**:
+```bash
+# Live application logs
+ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "pm2 logs reentry-map-prod"'
 
-- Free tier: 500MB database, 2GB bandwidth/month
-- Upgrade when: > 400MB used or > 1.5GB bandwidth
+# Error log
+ssh -p 22022 root@dc3-1.serafinihosting.com 'tail -50 /home/reentrymap/logs/reentry-map-prod-error.log'
 
-**Vercel**:
+# Apache access logs
+ssh -p 22022 root@dc3-1.serafinihosting.com 'tail -50 /etc/apache2/logs/domlogs/reentrymap/reentrymap.org'
+```
 
-- Free tier: 100GB bandwidth/month, 100 function invocations/day
-- Upgrade when: Approaching limits
+### Health Check
 
-### Performance at Scale
+```bash
+# Quick check site is responding
+curl -sI https://reentrymap.org | head -3
 
-**1,000 users**:
-
-- Current setup handles easily
-- No changes needed
-
-**10,000 users**:
-
-- May need Supabase Pro ($25/month)
-- May need Vercel Pro ($20/month)
-- Add Redis caching
-
-**100,000 users**:
-
-- Definitely need paid tiers
-- Add CDN for assets
-- Implement advanced caching
-- Consider database read replicas
+# Check resource count in database
+ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "psql -U reentrymap reentry_map -c \"SELECT count(*) FROM resources;\""'
+```
 
 ---
 
-## Maintenance Schedule
+## Troubleshooting
 
-### Daily
+### PM2 Process Not Starting
 
-- Check error logs
-- Monitor user feedback
-- Respond to support requests
+```bash
+su - reentrymap
+cd ~/reentry-map-prod
 
-### Weekly
+# Check for build errors
+npm run build
 
-- Review analytics
-- Check performance metrics
-- Update content as needed
+# Check PM2 error log
+cat ~/logs/reentry-map-prod-error.log | tail -50
 
-### Monthly
+# Try starting manually to see errors
+node node_modules/next/dist/bin/next start -p 3007
+```
 
-- Security updates (dependencies)
-- Database maintenance (vacuum, analyze)
-- Review and respond to user suggestions
-- Generate reports for stakeholders
+### Database Connection Issues
 
-### Quarterly
+```bash
+# Test local connection (from server)
+psql -U reentrymap reentry_map -c "SELECT 1;"
 
-- Comprehensive security audit
-- Performance optimization review
-- Feature prioritization planning
-- User survey
+# Test remote connection (from local machine)
+psql "postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map?sslmode=require" -c "SELECT 1;"
 
----
+# Check PostgreSQL is running
+systemctl status postgresql
+```
 
-## Support & Escalation
+### Apache Proxy Issues
 
-### Support Channels
+```bash
+# Test Apache config
+httpd -t
 
-**User Support**:
+# Check if port 3007 is listening
+ss -tlnp | grep 3007
 
-- Email: support@reentrymap.org
-- Response time: 24 hours
+# Check Apache error log
+tail -50 /var/log/apache2/error_log
+```
 
-**Technical Issues**:
+### Build Failures
 
-- Email: gserafini@gmail.com
-- GitHub Issues: github.com/gserafini/reentry-map/issues
+```bash
+# On server as reentrymap user
+cd ~/reentry-map-prod
 
-### Escalation Path
+# Check TypeScript
+npx tsc --noEmit
 
-**Critical (Site Down)**:
+# Check for missing deps
+npm install
 
-1. Check Vercel status
-2. Check Supabase status
-3. Review recent deployments
-4. Rollback if needed
-
-**High (Feature Broken)**:
-
-1. Reproduce issue
-2. Check error logs
-3. Create hotfix branch
-4. Deploy fix
-5. Verify resolution
-
-**Medium (Bug Report)**:
-
-1. Document issue
-2. Add to backlog
-3. Prioritize in next sprint
+# Clear Next.js cache and rebuild
+rm -rf .next
+npm run build
+```
 
 ---
 
-## Success Metrics Post-Launch
+## Backups
 
-Track these weekly:
+### Database
 
-### User Metrics
+```bash
+# Manual backup (as reentrymap user on dc3-1)
+pg_dump -U reentrymap reentry_map > ~/backups/reentry_map_$(date +%Y%m%d).sql
 
-- Active users (DAU/MAU)
-- New signups
-- Retention rate
+# Restore from backup
+psql -U reentrymap reentry_map < ~/backups/reentry_map_YYYYMMDD.sql
+```
 
-### Engagement
+### Code
 
-- Searches per user
-- Resources viewed
-- Favorites added
-- Reviews written
-
-### Quality
-
-- Error rate < 0.1%
-- Performance score > 90
-- User satisfaction > 4/5
-
-### Business
-
-- Resources in database
-- Data accuracy rate
-- Support ticket volume
+GitHub is the code backup. All production code is on the `main` branch.
 
 ---
 
-## Conclusion
+## WordPress (reentrymap.org marketing site)
 
-You're now live! 🎉
-
-Remember:
-
-- Monitor closely first week
-- Respond to feedback quickly
-- Iterate based on user needs
-- Don't stress over small bugs
-- Celebrate the launch!
-
-This is just the beginning. Phase 2 awaits! 🚀
+There is also a WordPress installation at `/home/reentrymap/public_html/` that was the original marketing site. The Apache proxy config routes all traffic to the Next.js app, so WordPress is effectively bypassed. The WordPress files remain but are not actively used.

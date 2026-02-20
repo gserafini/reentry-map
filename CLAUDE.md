@@ -290,12 +290,12 @@ node scripts/check-console.mjs /path/to/page
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4.0
 - **UI Components**: Material UI v7 (@mui/material, @mui/icons-material) + Lucide React icons
-- **Backend**: Next.js API Routes, Supabase (PostgreSQL 16, Auth, Storage, Realtime)
+- **Backend**: Next.js API Routes, Self-hosted PostgreSQL 16 (Drizzle ORM), NextAuth.js
 - **Maps**: Google Maps JavaScript API (@googlemaps/js-api-loader)
 - **AI**: OpenAI SDK (gpt-4o-mini for cost-effectiveness)
 - **PWA**: @ducanh2912/next-pwa
 - **Forms**: react-hook-form + zod
-- **Hosting**: Vercel with Supabase Cloud
+- **Hosting**: Self-hosted on dc3-1.serafinihosting.com (PM2 + Apache)
 - **Testing**: Vitest (unit), Playwright (E2E), @vitest/coverage-v8
 - **Code Quality**: Prettier, ESLint, husky, lint-staged, @total-typescript/ts-reset
 - **Environment**: @t3-oss/env-nextjs (type-safe env vars)
@@ -853,6 +853,39 @@ npm run build:analyze        # Build with bundle size analysis
 - **E2E tests run headless by default** - Use for troubleshooting and CI/CD
 - **Only show UI tests when demoing** - Avoid interrupting workflow
 - **Test before demo** - Verify everything works before showing to user
+
+---
+
+## Deployment (Self-Hosted on dc3-1)
+
+**This project is NOT on Vercel.** It runs on dc3-1.serafinihosting.com with PM2 + Apache.
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for full details.
+
+### Quick Deploy
+
+```bash
+# Push to GitHub, then deploy
+git push origin main && \
+ssh -p 22022 root@dc3-1.serafinihosting.com \
+  'su - reentrymap -c "cd ~/reentry-map-prod && git pull origin main && npm install && npm run build && pm2 restart reentry-map-prod"'
+```
+
+### Key Details
+
+- **URL**: https://reentrymap.org
+- **Server**: dc3-1.serafinihosting.com, cPanel user `reentrymap`
+- **App dir**: `/home/reentrymap/reentry-map-prod`
+- **PM2 app**: `reentry-map-prod` on port 3007
+- **Database**: PostgreSQL localhost:5432 (same server), database `reentry_map`
+- **Logs**: `/home/reentrymap/logs/reentry-map-prod-{out,error}.log`
+- **Node**: v20.20.0 (via nvm)
+
+### Database Connections
+
+- **On server** (localhost, no SSL): `postgresql://reentrymap:PASSWORD@localhost:5432/reentry_map`
+- **From local dev** (remote, SSL required): `postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map`
+- **All scripts** in `scripts/` auto-detect localhost vs remote and set SSL accordingly
 
 ---
 
