@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
     const createdResources: Resource[] = []
     const skippedResources: string[] = []
     const updatedResources: string[] = []
+    const errorDetails: string[] = []
 
     // Auto-detect parent-child relationships
     const multiLocationOrgs = await detectParentChildRelationships(validResources)
@@ -152,8 +153,11 @@ export async function POST(request: NextRequest) {
             updated++
             updatedResources.push(resource.name)
           } catch (updateError) {
+            const updErrMsg =
+              updateError instanceof Error ? updateError.message : String(updateError)
             console.error(`Error updating ${resource.name}:`, updateError)
             errors++
+            errorDetails.push(`${resource.name} (update): ${updErrMsg}`)
           }
           continue
         }
@@ -202,7 +206,10 @@ export async function POST(request: NextRequest) {
 
               parentId = newParent?.id || null
             } catch (parentError) {
+              const parErrMsg =
+                parentError instanceof Error ? parentError.message : String(parentError)
               console.error(`Error creating parent for ${parentOrgName}:`, parentError)
+              errorDetails.push(`${resource.name} (parent create): ${parErrMsg}`)
             }
           } else {
             parentId = existingParent.id
@@ -238,13 +245,18 @@ export async function POST(request: NextRequest) {
               createdResources.push(newData)
             }
           } catch (insertError) {
+            const insErrMsg =
+              insertError instanceof Error ? insertError.message : String(insertError)
             console.error(`Error inserting ${resource.name}:`, insertError)
             errors++
+            errorDetails.push(`${resource.name} (insert): ${insErrMsg}`)
           }
         }
       } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error)
         console.error(`Error processing ${resource.name}:`, error)
         errors++
+        errorDetails.push(`${resource.name}: ${errMsg}`)
       }
     }
 
@@ -263,6 +275,7 @@ export async function POST(request: NextRequest) {
         updated: updatedResources,
       },
       multiLocationOrgs: Array.from(multiLocationOrgs.keys()),
+      ...(errorDetails.length > 0 && { error_details: errorDetails }),
     })
   } catch (error) {
     console.error('Error importing resources:', error)
