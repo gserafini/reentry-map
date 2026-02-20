@@ -12,9 +12,15 @@ import { Pool } from 'pg'
 let pool: Pool | null = null
 function getPool(): Pool {
   if (!pool) {
+    const connectionString = process.env.DATABASE_URL
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is required')
+    }
+    const isLocalhost =
+      connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
     pool = new Pool({
-      connectionString:
-        process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:6432/reentry_map',
+      connectionString,
+      ssl: isLocalhost ? false : { rejectUnauthorized: false },
     })
   }
   return pool

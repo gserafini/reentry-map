@@ -92,3 +92,9 @@ www.heroui.com/
 data-imports/*.json
 data-imports/archived/*.json
 
+# Backup files
+*.bak
+
+# Data files (keep directory but ignore large data)
+data/*.json
+

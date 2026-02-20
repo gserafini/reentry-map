@@ -11,71 +11,10 @@ Before you begin, ensure you have:
 - npm 10.x or pnpm 9.x
 - Git ([download](https://git-scm.com))
 - A code editor (VS Code recommended)
-- A Supabase account ([sign up](https://supabase.com))
+- Access to the self-hosted PostgreSQL database on dc3-1 (or a local PostgreSQL instance)
 - A Google Cloud account for Maps API ([sign up](https://console.cloud.google.com))
-- An OpenAI account for AI features ([sign up](https://platform.openai.com))
 
-## Step 1: Create Supabase Project
-
-1. Go to [https://supabase.com](https://supabase.com)
-2. Click "Start your project"
-3. Create a new project:
-   - **Name**: reentry-map
-   - **Database Password**: (generate and save securely)
-   - **Region**: Choose closest to your users
-   - **Pricing Plan**: Free (for development)
-
-4. Wait for project to provision (~2 minutes)
-
-5. Get your project credentials:
-   - Go to Project Settings > API
-   - Copy **Project URL** (looks like: `https://xxxxx.supabase.co`)
-   - Copy **anon/public key** (starts with `eyJ...`)
-   - Copy **service_role key** (starts with `eyJ...`) - keep this secret!
-
-## Step 2: Set Up Database
-
-1. In Supabase dashboard, go to SQL Editor
-2. Click "New query"
-3. Copy the entire contents of `supabase/migrations/20250101000000_initial_schema.sql`
-4. Paste into editor and click "Run"
-5. Verify tables created: Go to Database > Tables
-6. Repeat for other migration files in order:
-   - `20250101000001_rls_policies.sql`
-   - `20250101000002_functions_triggers.sql`
-   - `20250101000003_seed_data.sql`
-
-## Step 3: Configure Google Maps API
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project: "Reentry Map"
-3. Enable APIs:
-   - Go to APIs & Services > Library
-   - Enable "Maps JavaScript API"
-   - Enable "Geocoding API"
-   - Enable "Places API"
-
-4. Create API credentials:
-   - Go to APIs & Services > Credentials
-   - Click "Create Credentials" > "API Key"
-   - Copy the API key
-   - Click "Edit API key"
-   - Under "API restrictions", select "Restrict key"
-   - Check: Maps JavaScript API, Geocoding API, Places API
-   - Under "Application restrictions", select "HTTP referrers"
-   - Add: `localhost:3003/*` and your production domain
-   - Save
-
-## Step 4: Configure OpenAI API
-
-1. Go to [OpenAI Platform](https://platform.openai.com)
-2. Navigate to API keys
-3. Click "Create new secret key"
-4. Name it "Reentry Map Development"
-5. Copy the key (starts with `sk-...`)
-6. **Important**: Save this key securely - you can't view it again
-
-## Step 5: Clone and Install
+## Step 1: Clone and Install
 
 ```bash
 # Clone the repository
@@ -84,14 +23,14 @@ cd reentry-map
 
 # Install dependencies
 npm install
-# or if using pnpm:
-# pnpm install
+```
 
+## Step 2: Configure Environment Variables
+
+```bash
 # Copy environment variables template
 cp .env.example .env.local
 ```
-
-## Step 6: Configure Environment Variables
 
 Edit `.env.local` with your credentials:
 
@@ -100,23 +39,29 @@ Edit `.env.local` with your credentials:
 # REQUIRED FOR DEVELOPMENT
 # ============================================================================
 
-# Supabase (get from: https://app.supabase.com/project/_/settings/api)
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJhbGc...your-anon-key
+# PostgreSQL connection (self-hosted on dc3-1)
+DATABASE_URL=postgresql://reentrymap:yourpassword@dc3-1.serafinihosting.com:5432/reentry_map
+DIRECT_DATABASE_URL=postgresql://reentrymap:yourpassword@dc3-1.serafinihosting.com:5432/reentry_map
+
+# NextAuth.js configuration
+NEXTAUTH_URL=http://localhost:3003
+NEXTAUTH_SECRET=your-generated-secret
 
 # ============================================================================
 # OPTIONAL (Can add later when needed)
 # ============================================================================
 
-# Supabase service role (only needed for admin operations that bypass RLS)
-# SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your-service-role-key
-
-# Google Maps (needed for Phase 4: Location Features)
+# Google Maps (for map display and geocoding)
 # NEXT_PUBLIC_GOOGLE_MAPS_KEY=AIza...your-maps-key
 # GOOGLE_MAPS_KEY=AIza...your-maps-key
 
-# OpenAI (needed for Phase 10: AI Agents)
-# OPENAI_API_KEY=sk-...your-openai-key
+# Anthropic (for AI verification agents)
+# ANTHROPIC_API_KEY=sk-ant-...your-key
+
+# Twilio (for phone OTP authentication)
+# TWILIO_ACCOUNT_SID=your-account-sid
+# TWILIO_AUTH_TOKEN=your-auth-token
+# TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
 
 # App URL (auto-detects localhost:3003 in development)
 # NEXT_PUBLIC_APP_URL=http://localhost:3003
@@ -142,21 +87,62 @@ This project uses [T3 Env](https://env.t3.gg) for type-safe, validated environme
 **Example usage**:
 
 ```typescript
-// ❌ DON'T do this:
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+// Don't do this:
+const url = process.env.DATABASE_URL
 
-// ✅ DO this instead:
+// Do this instead:
 import { env } from '@/lib/env'
-const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe, validated
+const url = env.DATABASE_URL // Type-safe, validated
 ```
 
 **Required vs Optional**:
 
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are required
+- `DATABASE_URL`, `NEXTAUTH_URL`, and `NEXTAUTH_SECRET` are required
 - All others are optional and only needed for specific features
 - See `.env.example` for complete list and when each is needed
 
-## Step 7: Run Development Server
+## Step 3: Set Up Database
+
+The database uses PostgreSQL with Drizzle ORM. Migrations are in `lib/db/migrations/`.
+
+If setting up a fresh database:
+
+```bash
+# Run migrations (applies schema from lib/db/migrations/)
+npx tsx lib/db/migrate.ts
+```
+
+The migrations create:
+
+- `resources` - Primary resource directory (76 columns)
+- `users` - User profiles with admin flags
+- `user_favorites`, `resource_ratings`, `resource_reviews` - User interactions
+- `resource_suggestions`, `resource_updates` - Community contributions
+- `ai_agent_logs`, `verification_events` - AI agent tracking
+- `expansion_priorities`, `county_data`, `coverage_metrics` - Growth tracking
+
+## Step 4: Configure Google Maps API
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project: "Reentry Map"
+3. Enable APIs:
+   - Go to APIs & Services > Library
+   - Enable "Maps JavaScript API"
+   - Enable "Geocoding API"
+   - Enable "Places API"
+
+4. Create API credentials:
+   - Go to APIs & Services > Credentials
+   - Click "Create Credentials" > "API Key"
+   - Copy the API key
+   - Click "Edit API key"
+   - Under "API restrictions", select "Restrict key"
+   - Check: Maps JavaScript API, Geocoding API, Places API
+   - Under "Application restrictions", select "HTTP referrers"
+   - Add: `localhost:3003/*` and your production domain
+   - Save
+
+## Step 5: Run Development Server
 
 ```bash
 npm run dev
@@ -166,30 +152,25 @@ Open [http://localhost:3003](http://localhost:3003) in your browser.
 
 You should see the Reentry Map home page with the map and search interface.
 
-## Step 8: Create Admin User
+## Step 6: Create Admin User
 
 1. Sign up through the app using your phone number
 2. Verify with OTP code
-3. In Supabase dashboard:
-   - Go to Authentication > Users
-   - Find your user
-   - Copy the User UID
-   - Go to SQL Editor
-   - Run this query (replace with your UID):
+3. Connect to the database and promote your user:
 
 ```sql
-   UPDATE users SET is_admin = true WHERE id = 'your-user-uid';
+UPDATE users SET is_admin = true WHERE email = 'your-email@example.com';
 ```
 
 4. Refresh the app - you should now see "Admin" in navigation
 
-## Step 9: Verify Installation
+## Step 7: Verify Installation
 
 Test each feature:
 
 - [ ] Home page loads with map
 - [ ] Search bar works
-- [ ] Can browse resources (should see 10 seed resources)
+- [ ] Can browse resources
 - [ ] Can view resource details
 - [ ] Can click "Get Directions" (opens Google Maps)
 - [ ] Can sign in with phone number
@@ -197,7 +178,7 @@ Test each feature:
 - [ ] Can write a review (after sign in)
 - [ ] Admin dashboard accessible (if admin)
 
-## Step 10: Optional - Install Recommended VS Code Extensions
+## Step 8: Optional - Install Recommended VS Code Extensions
 
 ```json
 {
@@ -205,8 +186,7 @@ Test each feature:
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
     "bradlc.vscode-tailwindcss",
-    "ms-vscode.vscode-typescript-next",
-    "supabase.supabase-vscode"
+    "ms-vscode.vscode-typescript-next"
   ]
 }
 ```
@@ -215,9 +195,9 @@ Test each feature:
 
 ### Database Connection Fails
 
-- Check Supabase project is running
-- Verify `NEXT_PUBLIC_SUPABASE_URL` is correct
-- Check firewall isn't blocking Supabase
+- Verify `DATABASE_URL` is correct and accessible
+- Check that PostgreSQL is running on the target server
+- Verify network connectivity (VPN/firewall may block dc3-1)
 
 ### Map Doesn't Load
 
@@ -228,15 +208,16 @@ Test each feature:
 
 ### Authentication Fails
 
-- Check Supabase Auth is enabled
-- Verify phone auth is configured in Supabase
-- Check you have phone credits (Supabase gives free credits)
+- Verify `NEXTAUTH_SECRET` is set and at least 16 characters
+- Check `NEXTAUTH_URL` matches your dev server URL
+- For phone OTP: verify Twilio credentials are correct
+- Check you have Twilio SMS credits
 
 ### AI Agents Fail
 
-- Verify OpenAI API key is correct
+- Verify Anthropic API key is correct
 - Check you have API credits
-- Check OpenAI API status
+- Check Anthropic API status
 
 ### Build Errors
 
@@ -252,7 +233,7 @@ Now that your environment is set up:
 1. Read through the codebase structure in `TECHNICAL_ARCHITECTURE.md`
 2. Review the PRD in `PRODUCT_REQUIREMENTS.md`
 3. Start building features following the `DEVELOPMENT_PLAN.md`
-4. Test thoroughly using `TESTING_GUIDE.md`
+4. Test thoroughly using `TESTING_STRATEGY.md`
 
 ## Getting Help
 

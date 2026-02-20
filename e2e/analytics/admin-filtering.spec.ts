@@ -21,10 +21,7 @@ test.describe('Analytics - Admin Filtering (CRITICAL)', () => {
 
   test.beforeAll(async () => {
     try {
-      sql = postgres(
-        process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map',
-        { connect_timeout: 3 }
-      )
+      sql = postgres(process.env.DATABASE_URL!, { connect_timeout: 3 })
       // Verify DB connection and analytics tables exist
       await sql`SELECT 1 FROM analytics_page_views LIMIT 0`
       dbAvailable = true

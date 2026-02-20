@@ -2,7 +2,6 @@
 
 ## Session Summary
 
-
 Migrated all API routes, user components, and data access layer from Supabase client to Drizzle ORM with postgres.js. Added new API routes for favorites/ratings/reviews, Drizzle schema/migrations, and removed Supabase client dependency from admin auth.
 
 ## What Was Done

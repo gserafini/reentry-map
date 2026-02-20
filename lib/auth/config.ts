@@ -18,8 +18,10 @@ import bcrypt from 'bcryptjs'
 let pool: Pool | null = null
 function getPool(): Pool {
   if (!pool) {
-    const connectionString =
-      process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
+    const connectionString = process.env.DATABASE_URL
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is required')
+    }
 
     pool = new Pool({
       connectionString,

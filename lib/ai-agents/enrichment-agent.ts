@@ -1,13 +1,28 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BaseAgent } from './base-agent'
 import { sql } from '@/lib/db/client'
 import { geocodeAddress } from '@/lib/utils/geocoding'
 
-interface _EnrichmentResult {
-  resourceId: string
-  fieldsEnriched: string[]
-  success: boolean
-  error?: string
+/** Resource row shape returned by enrichment queries */
+interface EnrichmentResourceRow {
+  id: string
+  name: string
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  description: string | null
+  hours: Record<string, string> | null
+  website: string | null
+  services_offered: string[] | null
+  status: string
+  ai_enriched: boolean
+}
+
+/** Result of extracting data from a website via AI */
+interface WebsiteExtractionResult {
+  hours?: string
+  description?: string
+  services?: string[]
+  costCents: number
 }
 
 /**
@@ -71,10 +86,12 @@ export class EnrichmentAgent extends BaseAgent {
   /**
    * Get resources that need enrichment (missing key fields)
    */
-  private async getResourcesNeedingEnrichment(): Promise<any[]> {
+  private async getResourcesNeedingEnrichment(): Promise<EnrichmentResourceRow[]> {
     try {
-      const rows = await sql`
-        SELECT * FROM resources
+      const rows = await sql<EnrichmentResourceRow[]>`
+        SELECT id, name, address, latitude, longitude, description, hours,
+               website, services_offered, status, ai_enriched
+        FROM resources
         WHERE status = 'active'
         AND (latitude IS NULL OR longitude IS NULL OR description IS NULL OR hours IS NULL)
         LIMIT 20
@@ -89,7 +106,7 @@ export class EnrichmentAgent extends BaseAgent {
   /**
    * Enrich a single resource with missing data
    */
-  private async enrichResource(resource: any): Promise<{
+  private async enrichResource(resource: EnrichmentResourceRow): Promise<{
     success: boolean
     costCents?: number
     error?: string
@@ -194,12 +211,7 @@ export class EnrichmentAgent extends BaseAgent {
   private async extractWebsiteData(
     content: string,
     websiteUrl: string
-  ): Promise<{
-    hours?: string
-    description?: string
-    services?: string[]
-    costCents: number
-  }> {
+  ): Promise<WebsiteExtractionResult> {
     const prompt = `You are analyzing the website content from ${websiteUrl} for a reentry resource directory.
 
 Extract the following information if available:
@@ -226,8 +238,8 @@ Respond ONLY with valid JSON in this format:
         { role: 'user', content: prompt },
       ])
 
-      const parsed = JSON.parse(responseContent) as Record<string, unknown>
-      return { ...(parsed as object), costCents }
+      const parsed = JSON.parse(responseContent) as WebsiteExtractionResult
+      return { ...parsed, costCents }
     } catch (error) {
       console.error('Error extracting website data:', error)
       return { costCents: 0 }
