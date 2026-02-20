@@ -279,12 +279,12 @@ node scripts/check-console.mjs /path/to/page
 
 ## Project Context
 
-**Reentry Map** is a mobile-first web application helping individuals navigating reentry find resources in their community. The app uses Next.js 16, Supabase, and AI agents to maintain an accurate, up-to-date directory of services.
+**Reentry Map** is a mobile-first web application helping individuals navigating reentry find resources in their community. The app uses Next.js 16, self-hosted PostgreSQL (Drizzle ORM), NextAuth.js, and AI agents to maintain an accurate, up-to-date directory of services.
 
 - **Owner**: Gabriel Serafini (gserafini@gmail.com)
 - **Repository**: github.com/gserafini/reentry-map.git
-- **Timeline**: 5-week MVP development plan
-- **Target**: Oakland area initially, 50+ verified resources
+- **Production**: https://reentrymap.org (self-hosted on dc3-1)
+- **Resources**: 224+ active resources across Oakland CA and Boulder CO
 
 ## Tech Stack
 
@@ -302,29 +302,25 @@ node scripts/check-console.mjs /path/to/page
 
 ## Initial Setup
 
-This project has not been initialized yet. When starting development:
-
 ```bash
-# Initialize Next.js project with Supabase template
-npx create-next-app@latest reentry-map --example with-supabase --typescript --tailwind --app
+git clone https://github.com/gserafini/reentry-map.git
 cd reentry-map
-
-# Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.example .env.local
+cp .env.example .env.local  # Then fill in values
+npm run dev
 ```
 
-Required environment variables:
+Required environment variables (see `.env.example` and `SETUP_GUIDE.md`):
 
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (secret)
-- `NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Google Maps API key
-- `GOOGLE_MAPS_KEY` - Server-side Google Maps key
-- `OPENAI_API_KEY` - OpenAI API key
-- `NEXT_PUBLIC_APP_URL` - Application URL
+- `DATABASE_URL` - PostgreSQL connection string (SSL required for remote)
+- `DIRECT_DATABASE_URL` - Same as DATABASE_URL (for Drizzle)
+- `NEXTAUTH_URL` - App URL (e.g., `http://localhost:3003` or `https://reentrymap.org`)
+- `NEXTAUTH_SECRET` - NextAuth session encryption key
+- `NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Google Maps API key (client)
+- `GOOGLE_MAPS_KEY` - Google Maps API key (server)
+- `OPENAI_API_KEY` - OpenAI API key for AI agents
+- `ADMIN_API_KEY` - Admin API authentication key
+- `NEXT_PUBLIC_APP_URL` - Public application URL
 
 ## Database Architecture
 
@@ -340,10 +336,10 @@ Required environment variables:
 - AI metadata (ai_enriched, verification_score, completeness_score)
 - Community stats (rating_average, rating_count, review_count)
 
-**users** - Extended profile (integrates with auth.users)
+**users** - Extended profile (managed by NextAuth.js)
 
-- References Supabase Auth
-- Contains is_admin flag
+- Linked to NextAuth sessions
+- Contains is_admin flag, phone, name
 
 **user_favorites** - User-saved resources with optional notes
 
@@ -363,11 +359,11 @@ Required environment variables:
 
 ### Key Features
 
-- PostGIS for efficient geospatial queries
+- Haversine distance function for geospatial queries (`get_resources_near()`)
 - Full-text search indexes on name/description
-- Row Level Security (RLS) enabled on all tables
-- Database triggers for auto-updating aggregate counts
-- Auto-create user profile on auth signup
+- Database triggers for auto-updating aggregate counts (ratings, reviews)
+- Drizzle ORM schema in `lib/db/schema.ts` (source of truth for table definitions)
+- Migrations in `lib/db/migrations/` (applied directly to PostgreSQL on dc3-1)
 
 ## Project Structure
 
@@ -392,115 +388,66 @@ components/
 └── admin/                        # Admin components
 
 lib/
-├── supabase/
-│   ├── client.ts                 # Browser Supabase client
-│   └── server.ts                 # Server Supabase client
+├── db/
+│   ├── schema.ts                 # Drizzle ORM schema (source of truth)
+│   ├── index.ts                  # Database connection (postgres.js)
+│   └── migrations/               # SQL migration files
+├── api/                          # API helper functions (resources, auth)
 ├── ai-agents/                    # AI agent implementations
 ├── hooks/                        # Custom React hooks
 ├── utils/                        # Utility functions (geocoding, distance, formatting)
 └── types/                        # TypeScript type definitions
 ```
 
-## HeroUI Component Library
+## UI Component Library
 
-**HeroUI** (formerly NextUI) is our primary UI component library, chosen for its:
+**Material UI v7** (`@mui/material`) is the primary UI component library, with **Lucide React** for icons.
 
-- Built-in WCAG accessibility (critical for reentry population)
-- Zero runtime styles (Tailwind-based for performance)
-- Mobile-first design with proper touch targets
-- Comprehensive component set
-
-### Basic Usage
+### Common Patterns
 
 ```typescript
-'use client' // Most HeroUI components require client
-
-import { Button, Card, CardHeader, CardBody, Badge } from '@heroui/react'
-
-export function ResourceCard({ resource }) {
-  return (
-    <Card>
-      <CardHeader>
-        <h3>{resource.name}</h3>
-        <Badge color="primary">{resource.category}</Badge>
-      </CardHeader>
-      <CardBody>
-        <p>{resource.description}</p>
-        <Button color="primary" variant="flat">
-          View Details
-        </Button>
-      </CardBody>
-    </Card>
-  )
-}
+import { Button, Card, CardContent, Chip, Avatar } from '@mui/material'
+import { MapPin, Phone, Star } from 'lucide-react'
 ```
 
-### Common Components
-
-- **Button**: `<Button color="primary" variant="solid">Text</Button>`
-- **Card**: `<Card>`, `<CardHeader>`, `<CardBody>`, `<CardFooter>`
-- **Badge**: `<Badge color="success">Status</Badge>`
-- **Avatar**: `<Avatar src="/path" name="User" />`
-- **Input**: `<Input label="Name" placeholder="Enter name" />`
-- **Modal**: `<Modal>`, `<ModalContent>`, `<ModalHeader>`, etc.
-
-### Colors & Variants
-
-**Colors**: `default`, `primary`, `secondary`, `success`, `warning`, `danger`
-
-**Variants**: `solid`, `bordered`, `light`, `flat`, `faded`, `shadow`, `ghost`
-
-### Accessibility Features
+### Accessibility
 
 - Built-in ARIA labels and roles
 - Keyboard navigation (Tab, Enter, Arrow keys)
 - Screen reader compatible
-- Focus indicators
-- Proper contrast ratios
-
-### Theme Integration
-
-HeroUI works with `next-themes` for dark mode:
-
-- Components auto-adapt to theme
-- Use `className="dark:..."` for custom dark mode styles
-- Provider setup in `app/providers.tsx`
-
-**Example Test Page**: Visit `/heroui-test` to see components in action
+- Focus indicators and proper contrast ratios
 
 ## Development Patterns
 
-### Server Components (Default)
+### Database Queries (Drizzle ORM)
 
 ```typescript
-// app/resources/page.tsx
-import { createClient } from '@/lib/supabase/server';
+// Using Drizzle ORM for type-safe queries
+import { db } from '@/lib/db'
+import { resources } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
-export default async function ResourcesPage() {
-  const supabase = createClient();
-  const { data: resources } = await supabase
-    .from('resources')
-    .select('*')
-    .eq('status', 'active')
-    .order('name');
-
-  return <ResourceList resources={resources || []} />;
-}
+const activeResources = await db
+  .select()
+  .from(resources)
+  .where(eq(resources.status, 'active'))
+  .orderBy(resources.name)
 ```
 
-### Client Components (When Needed)
+### Raw SQL (postgres.js)
 
 ```typescript
-'use client'
+// For complex queries (distance calculations, etc.)
+import { getDb } from '@/lib/db'
 
-import { createClient } from '@/lib/supabase/client'
-
-export function ResourceList() {
-  const [resources, setResources] = useState([])
-  const supabase = createClient()
-
-  // Component logic...
-}
+const sql = getDb()
+const results = await sql`
+  SELECT *, calculate_distance(${lat}, ${lng}, latitude, longitude) AS distance
+  FROM resources
+  WHERE status = 'active'
+  ORDER BY distance ASC
+  LIMIT 20
+`
 ```
 
 ### API Routes
@@ -508,16 +455,15 @@ export function ResourceList() {
 ```typescript
 // app/api/resources/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
+import { resources } from '@/lib/db/schema'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase.from('resources').select('*')
-
-    if (error) throw error
+    const data = await db.select().from(resources)
     return NextResponse.json(data)
   } catch (error) {
+    console.error('Error fetching resources:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -525,53 +471,33 @@ export async function GET(request: NextRequest) {
 
 ### Error Handling
 
-Always handle Supabase errors explicitly:
+Always handle database errors explicitly:
 
 ```typescript
-const { data, error } = await supabase.from('resources').select('*')
-
-if (error) {
-  console.error('Error fetching resources:', error)
-  throw new Error('Failed to fetch resources')
+try {
+  const data = await db.select().from(resources).where(eq(resources.id, id))
+  if (!data.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(data[0])
+} catch (error) {
+  console.error('Database error:', error)
+  return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 }
 ```
 
 ### Environment Variables
 
-Always use type-safe environment variables via `@/lib/env`:
+Use `process.env` for environment variables. Key variables:
 
-```typescript
-// ❌ DON'T use process.env directly
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+- `DATABASE_URL` - PostgreSQL connection string
+- `NEXTAUTH_URL` - App URL for NextAuth.js
+- `NEXTAUTH_SECRET` - Session encryption key
+- `NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Client-side Maps key
+- `GOOGLE_MAPS_KEY` - Server-side Maps key
+- `OPENAI_API_KEY` - OpenAI API key
+- `ADMIN_API_KEY` - Admin API authentication
+- `NEXT_PUBLIC_APP_URL` - Public application URL
 
-// ✅ DO use the env import
-import { env } from '@/lib/env'
-const url = env.NEXT_PUBLIC_SUPABASE_URL // Type-safe, validated
-```
-
-**Benefits**:
-
-- Build fails immediately if required vars are missing
-- TypeScript autocomplete for all environment variables
-- Prevents exposing server secrets to client
-- Clear validation errors with helpful messages
-
-**Available Environment Variables**:
-
-- `env.NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (required)
-- `env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Supabase anon key (required)
-- `env.SUPABASE_SERVICE_ROLE_KEY` - Server-only admin key (optional)
-- `env.OPENAI_API_KEY` - OpenAI API key for AI agents (optional)
-- `env.GOOGLE_MAPS_KEY` - Server-side Google Maps key (optional)
-- `env.NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Client-side Maps key (optional)
-- `env.NEXT_PUBLIC_APP_URL` - Application URL for redirects (optional)
-
-**Adding New Environment Variables**:
-
-1. Add to schema in `lib/env.ts` (server or client section)
-2. Add to runtimeEnv mapping
-3. Add to `.env.example` with documentation
-4. Update `SETUP_GUIDE.md` if it's required
+See `.env.example` and `SETUP_GUIDE.md` for the full list.
 
 ## Code Quality Infrastructure
 
@@ -610,7 +536,7 @@ All commits must follow the [Conventional Commits](https://www.conventionalcommi
 **Examples:**
 
 ```bash
-feat: add user authentication with Supabase
+feat: add user authentication with NextAuth.js
 fix: resolve map marker clustering issue
 docs: update SETUP_GUIDE with database instructions
 test: add unit tests for ResourceCard component
@@ -691,8 +617,8 @@ All checks must pass before merging to main.
 
 **Required Secrets** (configure in GitHub repo settings):
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `DATABASE_URL`
+- `NEXTAUTH_SECRET`
 
 ## Key Implementation Guidelines
 
@@ -721,7 +647,7 @@ All checks must pass before merging to main.
 
 - Never expose secrets in client components
 - API keys only in API routes or server components
-- Row Level Security policies on all Supabase tables
+- Admin routes protected by NextAuth.js session + `is_admin` check
 - Input validation with Zod schemas
 - Rate limiting on API endpoints
 
@@ -845,7 +771,7 @@ npm run format:check         # Check if files need formatting
 npm run build                # Production build
 npm run build:analyze        # Build with bundle size analysis
 
-# Database - See Supabase MCP section below for migration execution
+# Database - See Database Operations section below
 ```
 
 **Testing Philosophy:**
@@ -889,118 +815,62 @@ ssh -p 22022 root@dc3-1.serafinihosting.com \
 
 ---
 
-## Database Operations with Supabase MCP
+## Database Operations
 
-**We have Supabase MCP (Model Context Protocol) integration** for programmatic database operations. This allows direct execution of migrations and SQL commands without requiring manual copy-paste into Supabase SQL Editor.
+The database is self-hosted PostgreSQL on dc3-1. Migrations are applied via SSH.
+
+### Schema Management
+
+- **Drizzle schema**: `lib/db/schema.ts` (TypeScript source of truth for table definitions)
+- **SQL migrations**: `lib/db/migrations/` (applied directly to PostgreSQL)
+- **Canonical docs**: `docs/DATABASE_SCHEMA_CANONICAL.md` (human-readable reference)
 
 ### Running Migrations
 
-**Preferred workflow:** Use MCP to execute migrations programmatically.
-
-When creating a database migration:
-
-1. **Create the migration file** in `supabase/migrations/` with a timestamped name
-2. **Suggest executing via MCP** - Tell the user: "I can run this migration using Supabase MCP"
-3. **Wait for user confirmation** before executing
-4. **Execute using MCP** after user approves
-5. **Update canonical schema** - After successful execution, update `docs/DATABASE_SCHEMA_CANONICAL.md` to reflect the changes
-
-**⚠️ CRITICAL**: Always keep the canonical schema document in sync with database changes:
-
-- Update `docs/DATABASE_SCHEMA_CANONICAL.md` with new/modified columns
-- Update the "Last Updated" date at the top
-- Add entry to the "Migration History" table at the bottom
-- Update any relevant TypeScript types in `/lib/types/`
-
-**Example workflow:**
-
-```
-Assistant: I've created the migration file to fix the view column naming issue:
-  supabase/migrations/20250111000000_fix_expansion_view_column_name.sql
-
-I can run this migration using Supabase MCP. Should I execute it now?
-
-User: yes
+```bash
+# SSH to server and run migration
+ssh -p 22022 root@dc3-1.serafinihosting.com \
+  'su - reentrymap -c "psql -U reentrymap reentry_map < ~/reentry-map-prod/lib/db/migrations/NNN_migration_name.sql"'
 ```
 
-Then execute: `mcp__supabase__execute_sql` with the migration SQL.
+**Migration workflow:**
 
-### Available MCP Operations
+1. Create migration file in `lib/db/migrations/`
+2. Update Drizzle schema in `lib/db/schema.ts`
+3. Apply migration to production database on dc3-1
+4. Update `docs/DATABASE_SCHEMA_CANONICAL.md`
+5. Verify with `psql` query
 
-The Supabase MCP provides these tools:
+### Querying Production Database
 
-- **`mcp__supabase__list_projects`** - Get project ID (needed for all operations)
-- **`mcp__supabase__execute_sql`** - Execute SQL directly (DDL, queries, etc.)
-- **`mcp__supabase__apply_migration`** - Apply named migration (creates migration record)
-- **`mcp__supabase__list_tables`** - List all tables in schema(s)
-- **`mcp__supabase__list_extensions`** - List installed PostgreSQL extensions
-- **`mcp__supabase__list_migrations`** - List migration history
+```bash
+# From local machine (SSL required)
+psql "postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map?sslmode=require"
 
-### Executing Migrations with MCP
-
-**Method 1: Execute SQL directly** (faster, for quick fixes)
-
-```typescript
-// 1. Get project ID
-mcp__supabase__list_projects() // Returns project_id
-
-// 2. Execute the migration SQL
-mcp__supabase__execute_sql({
-  project_id: 'scvshbntarpyjvdexpmp',
-  query: 'DROP VIEW IF EXISTS ...; CREATE VIEW ...',
-})
+# From server (localhost, no SSL)
+ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "psql -U reentrymap reentry_map"'
 ```
 
-**Method 2: Apply named migration** (preferred, tracks migration history)
+### Scripts
 
-```typescript
-mcp__supabase__apply_migration({
-  project_id: 'scvshbntarpyjvdexpmp',
-  name: 'fix_expansion_view_column_name',
-  query: 'DROP VIEW IF EXISTS ...; CREATE VIEW ...',
-})
+All scripts in `scripts/` use `DATABASE_URL` from `.env.local` with automatic SSL detection:
+
+```javascript
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+const sql = postgres(databaseUrl, { ssl: isLocalhost ? false : 'require' })
 ```
-
-### When to Use MCP vs Manual
-
-**Use Supabase MCP when:**
-
-- ✅ Creating/executing migrations
-- ✅ Querying database structure (tables, views, extensions)
-- ✅ Verifying migration results
-- ✅ Testing SQL changes before committing
-
-**Don't use MCP for:**
-
-- ❌ DML operations that user should trigger manually (bulk data changes)
-- ❌ Production data modifications without explicit user approval
-- ❌ Destructive operations (DROP DATABASE, etc.) unless explicitly requested
-
-### Best Practices
-
-1. **Always suggest, then confirm** - "I can run this migration using Supabase MCP. Should I execute it?"
-2. **Verify after execution** - Query the database to confirm changes worked
-3. **Save migration files** - Always create migration file before executing
-4. **Use comments** - Add clear comments in migration SQL explaining what and why
-5. **Test queries first** - For complex migrations, test SELECT queries before executing DDL
-
-### Project ID
-
-Our Supabase project ID: `scvshbntarpyjvdexpmp`
-
-You can always retrieve it with `mcp__supabase__list_projects` if needed.
 
 ---
 
 ## Authentication Flow
 
-Phone-based OTP via Supabase Auth:
+NextAuth.js with credentials provider:
 
-1. User enters phone number (US format)
-2. SMS OTP sent (6-digit code, 10-minute expiry)
-3. User enters code
-4. Auto-create user profile on first sign-in
-5. Session persists via HTTP-only cookies
+1. User enters email and password
+2. NextAuth validates credentials against `users` table
+3. JWT session created (HTTP-only cookies)
+4. Admin routes check `user.is_admin` flag
+5. Test credentials: `admin@example.com` / `AdminUser123!` (see `e2e/helpers/auth.ts`)
 
 ## Testing Requirements
 
@@ -1056,11 +926,11 @@ When working on this project, refer to:
 
 **Key Insights**:
 
-- Single server can handle **100k resources + 1M users/month** with proper optimization
-- **Redis caching is critical for launch** (80-90% DB query reduction, 5-10x speedup)
+- Single server (dc3-1) can handle **100k resources + 1M users/month** with proper optimization
+- **Redis caching is critical for scale** (80-90% DB query reduction, 5-10x speedup)
 - Estimated **75,000-100,000 resource pages** at 100% nationwide coverage
-- Stay on managed services until costs >$100/mo, then migrate database first
-- Next.js + PostgreSQL + PostGIS is the **correct architecture** (validated vs WordPress)
+- Already self-hosted on dc3-1 (PostgreSQL + Next.js + PM2)
+- Next.js + PostgreSQL is the **correct architecture** (validated vs WordPress)
 
 **Before Launch**:
 
@@ -1070,9 +940,7 @@ When working on this project, refer to:
 
 ## User Profile & Avatars
 
-**Strategy**: Hybrid approach with Gravatar + Supabase Storage (see ADR-011)
-
-### Avatar Display
+**Strategy**: Gravatar + initials fallback
 
 ```typescript
 import { Avatar } from '@mui/material'
@@ -1085,19 +953,10 @@ import { getAvatarUrl, getUserInitials } from '@/lib/utils/avatar'
 
 **Priority**:
 
-1. Custom uploaded avatar (Supabase Storage) - if `user.avatar_url` exists
-2. Gravatar (free, zero setup) - based on email MD5 hash
-3. Initials fallback - generated from `user.name`
+1. Gravatar (free, zero setup) - based on email MD5 hash
+2. Initials fallback - generated from `user.name`
 
-**Where Avatars Appear**:
-
-- AppBar (user menu, top-right when signed in)
-- Review cards (next to reviewer name)
-- User profile page (large 200x200px version)
-
-**Avatar Uploads**: Post-MVP feature (Phase 6.3) - users can upload custom 2MB max JPG/PNG/WebP
-
-See [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md#user-profile-features) for complete implementation details.
+**Where Avatars Appear**: AppBar user menu, review cards, user profile page.
 
 ---
 

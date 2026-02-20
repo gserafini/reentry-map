@@ -96,26 +96,37 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// Mock Supabase client
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-        })),
+// Mock database module
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve([])),
+        orderBy: vi.fn(() => Promise.resolve([])),
       })),
-      insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
-      update: vi.fn(() => Promise.resolve({ data: null, error: null })),
-      delete: vi.fn(() => Promise.resolve({ data: null, error: null })),
     })),
-    auth: {
-      getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
-      signInWithOtp: vi.fn(() => Promise.resolve({ error: null })),
-      verifyOtp: vi.fn(() => Promise.resolve({ error: null })),
-      signOut: vi.fn(() => Promise.resolve({ error: null })),
-    },
-  }),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        returning: vi.fn(() => Promise.resolve([])),
+      })),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve([])),
+      })),
+    })),
+    delete: vi.fn(() => ({
+      where: vi.fn(() => Promise.resolve([])),
+    })),
+  },
+  getDb: vi.fn(() => vi.fn()),
+}))
+
+// Mock NextAuth session
+vi.mock('next-auth/react', () => ({
+  useSession: vi.fn(() => ({ data: null, status: 'unauthenticated' })),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
 }))
 
 // Mock window.matchMedia
@@ -264,9 +275,9 @@ describe('ResourceCard', () => {
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useResources } from '@/lib/hooks/useResources'
-import { createClient } from '@/lib/supabase/client'
 
-vi.mock('@/lib/supabase/client')
+// Mock the fetch API (hooks call API routes, not DB directly)
+global.fetch = vi.fn()
 
 describe('useResources', () => {
   beforeEach(() => {
@@ -279,18 +290,10 @@ describe('useResources', () => {
       { id: '2', name: 'Resource 2', status: 'active' },
     ]
 
-    vi.mocked(createClient).mockReturnValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() =>
-            Promise.resolve({
-              data: mockResources,
-              error: null,
-            })
-          ),
-        })),
-      })),
-    } as any)
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(mockResources),
+    } as Response)
 
     const { result } = renderHook(() => useResources())
 
@@ -305,20 +308,11 @@ describe('useResources', () => {
   })
 
   it('handles fetch error', async () => {
-    const mockError = { message: 'Failed to fetch' }
-
-    vi.mocked(createClient).mockReturnValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() =>
-            Promise.resolve({
-              data: null,
-              error: mockError,
-            })
-          ),
-        })),
-      })),
-    } as any)
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: 'Internal server error' }),
+    } as Response)
 
     const { result } = renderHook(() => useResources())
 
@@ -327,7 +321,7 @@ describe('useResources', () => {
     })
 
     expect(result.current.resources).toEqual([])
-    expect(result.current.error).toBe('Failed to fetch')
+    expect(result.current.error).toBeTruthy()
   })
 })
 ```
@@ -479,19 +473,18 @@ describe('/api/resources', () => {
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
-
-// Use test database
-const supabase = createClient(process.env.TEST_SUPABASE_URL!, process.env.TEST_SUPABASE_KEY!)
+import { db } from '@/lib/db'
+import { resources } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 describe('resources database', () => {
   let testResourceId: string
 
   beforeEach(async () => {
-    // Insert test data
-    const { data } = await supabase
-      .from('resources')
-      .insert({
+    // Insert test data using Drizzle
+    const [inserted] = await db
+      .insert(resources)
+      .values({
         name: 'Test Resource',
         address: '123 Test St',
         latitude: 37.8044,
@@ -499,62 +492,35 @@ describe('resources database', () => {
         primary_category: 'employment',
         status: 'active',
       })
-      .select()
-      .single()
+      .returning()
 
-    testResourceId = data.id
+    testResourceId = inserted.id
   })
 
   afterEach(async () => {
     // Clean up test data
-    await supabase.from('resources').delete().eq('id', testResourceId)
+    await db.delete(resources).where(eq(resources.id, testResourceId))
   })
 
   it('fetches resource by id', async () => {
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('id', testResourceId)
-      .single()
+    const [data] = await db.select().from(resources).where(eq(resources.id, testResourceId))
 
-    expect(error).toBeNull()
+    expect(data).toBeDefined()
     expect(data.name).toBe('Test Resource')
   })
 
   it('updates resource', async () => {
-    const { error } = await supabase
-      .from('resources')
-      .update({ name: 'Updated Resource' })
-      .eq('id', testResourceId)
+    await db
+      .update(resources)
+      .set({ name: 'Updated Resource' })
+      .where(eq(resources.id, testResourceId))
 
-    expect(error).toBeNull()
-
-    const { data } = await supabase
-      .from('resources')
-      .select('name')
-      .eq('id', testResourceId)
-      .single()
+    const [data] = await db
+      .select({ name: resources.name })
+      .from(resources)
+      .where(eq(resources.id, testResourceId))
 
     expect(data.name).toBe('Updated Resource')
-  })
-
-  it('enforces unique constraint on favorites', async () => {
-    const userId = 'test-user-id'
-
-    // First favorite should succeed
-    const { error: error1 } = await supabase
-      .from('user_favorites')
-      .insert({ user_id: userId, resource_id: testResourceId })
-
-    expect(error1).toBeNull()
-
-    // Duplicate favorite should fail
-    const { error: error2 } = await supabase
-      .from('user_favorites')
-      .insert({ user_id: userId, resource_id: testResourceId })
-
-    expect(error2).not.toBeNull()
-    expect(error2?.code).toBe('23505') // Unique constraint violation
   })
 })
 ```
@@ -843,7 +809,7 @@ export let options = {
   },
 }
 
-const BASE_URL = 'https://your-staging-url.vercel.app'
+const BASE_URL = 'https://reentrymap.org'
 
 export default function () {
   // Test homepage
@@ -1108,8 +1074,8 @@ jobs:
       - name: Run integration tests
         run: npm run test:integration
         env:
-          SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.TEST_SUPABASE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
       - name: Build application
         run: npm run build
@@ -1143,8 +1109,8 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
         env:
-          SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.TEST_SUPABASE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
       - name: Upload test results
         if: always()
@@ -1186,84 +1152,46 @@ jobs:
 #### scripts/seed-test-data.ts
 
 ```typescript
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.TEST_SUPABASE_URL!,
-  process.env.TEST_SUPABASE_SERVICE_KEY!
-)
+import { db } from '@/lib/db'
+import { resources, resourceReviews } from '@/lib/db/schema'
+import { ilike } from 'drizzle-orm'
 
 async function seedTestData() {
   console.log('Seeding test data...')
 
   // Clear existing test data
-  await supabase.from('resources').delete().ilike('name', 'Test%')
+  await db.delete(resources).where(ilike(resources.name, 'Test%'))
 
   // Create test resources
-  const testResources = [
-    {
-      name: 'Test Employment Center',
-      address: '123 Test St, Oakland, CA 94612',
-      latitude: 37.8044,
-      longitude: -122.2712,
-      phone: '(555) 123-4567',
-      primary_category: 'employment',
-      categories: ['employment'],
-      description: 'Test employment services',
-      status: 'active',
-      verified: true,
-    },
-    {
-      name: 'Test Housing Services',
-      address: '456 Test Ave, Oakland, CA 94601',
-      latitude: 37.785,
-      longitude: -122.2364,
-      phone: '(555) 234-5678',
-      primary_category: 'housing',
-      categories: ['housing'],
-      description: 'Test housing services',
-      status: 'active',
-      verified: true,
-    },
-    // Add more test resources...
-  ]
+  const inserted = await db
+    .insert(resources)
+    .values([
+      {
+        name: 'Test Employment Center',
+        address: '123 Test St, Oakland, CA 94612',
+        latitude: 37.8044,
+        longitude: -122.2712,
+        phone: '(555) 123-4567',
+        primary_category: 'employment',
+        categories: ['employment'],
+        description: 'Test employment services',
+        status: 'active',
+      },
+      {
+        name: 'Test Housing Services',
+        address: '456 Test Ave, Oakland, CA 94601',
+        latitude: 37.785,
+        longitude: -122.2364,
+        phone: '(555) 234-5678',
+        primary_category: 'housing',
+        categories: ['housing'],
+        description: 'Test housing services',
+        status: 'active',
+      },
+    ])
+    .returning()
 
-  const { data: resources, error } = await supabase.from('resources').insert(testResources).select()
-
-  if (error) {
-    console.error('Error seeding resources:', error)
-    process.exit(1)
-  }
-
-  console.log(`Created ${resources.length} test resources`)
-
-  // Create test reviews
-  const testReviews = [
-    {
-      resource_id: resources[0].id,
-      user_id: 'test-user-1',
-      rating: 5,
-      review_text: 'Great service, very helpful staff!',
-      was_helpful: true,
-      approved: true,
-    },
-    {
-      resource_id: resources[0].id,
-      user_id: 'test-user-2',
-      rating: 4,
-      review_text: 'Good experience overall.',
-      was_helpful: true,
-      approved: true,
-    },
-  ]
-
-  const { error: reviewError } = await supabase.from('resource_reviews').insert(testReviews)
-
-  if (reviewError) {
-    console.error('Error seeding reviews:', reviewError)
-    process.exit(1)
-  }
-
+  console.log(`Created ${inserted.length} test resources`)
   console.log('Test data seeded successfully!')
 }
 
@@ -1275,24 +1203,15 @@ seedTestData()
 #### scripts/cleanup-test-data.ts
 
 ```typescript
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.TEST_SUPABASE_URL!,
-  process.env.TEST_SUPABASE_SERVICE_KEY!
-)
+import { db } from '@/lib/db'
+import { resources, resourceReviews, users } from '@/lib/db/schema'
+import { ilike } from 'drizzle-orm'
 
 async function cleanupTestData() {
   console.log('Cleaning up test data...')
 
-  // Delete test reviews
-  await supabase.from('resource_reviews').delete().ilike('review_text', '%test%')
-
-  // Delete test resources
-  await supabase.from('resources').delete().ilike('name', 'Test%')
-
-  // Delete test users
-  await supabase.from('users').delete().ilike('phone', '555%')
+  await db.delete(resourceReviews).where(ilike(resourceReviews.reviewText, '%test%'))
+  await db.delete(resources).where(ilike(resources.name, 'Test%'))
 
   console.log('Test data cleaned up!')
 }
@@ -1479,7 +1398,7 @@ Before deploying to production:
 After deployment:
 
 1. **Monitor error rates**
-   - Check Vercel logs
+   - Check PM2 logs on dc3-1 (`pm2 logs reentry-map-prod`)
    - Set up alerts for spikes
 
 2. **Monitor performance**
