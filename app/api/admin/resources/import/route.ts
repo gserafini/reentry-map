@@ -5,6 +5,39 @@ import { resources } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { checkForDuplicate, detectParentChildRelationships } from '@/lib/utils/deduplication'
 import type { NewResource, Resource } from '@/lib/db/schema'
+import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
+
+/**
+ * Server-side geocoding using Google Maps REST API
+ */
+async function geocodeResource(
+  address: string,
+  city: string | null,
+  state: string | null,
+  zip: string | null
+): Promise<{ latitude: number; longitude: number; formattedAddress: string } | null> {
+  const apiKey = process.env.GOOGLE_MAPS_KEY
+  if (!apiKey) return null
+
+  const fullAddress = [address, city, state, zip].filter(Boolean).join(', ')
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`
+
+  try {
+    const response = await fetch(url)
+    const data = (await response.json()) as GoogleMapsGeocodingResponse
+    if (data.status === 'OK' && data.results.length > 0) {
+      const loc = data.results[0].geometry.location
+      return {
+        latitude: loc.lat,
+        longitude: loc.lng,
+        formattedAddress: data.results[0].formatted_address,
+      }
+    }
+  } catch (err) {
+    console.error(`Geocoding failed for "${fullAddress}":`, err)
+  }
+  return null
+}
 
 /**
  * POST /api/admin/resources/import
@@ -260,6 +293,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-geocode resources that were created without coordinates
+    const ungeocodedResources = createdResources.filter(
+      (r) => r.latitude === null || r.longitude === null
+    )
+    let geocoded = 0
+    const geocodeErrors: string[] = []
+
+    if (ungeocodedResources.length > 0) {
+      for (const resource of ungeocodedResources) {
+        if (!resource.address) continue
+        try {
+          const result = await geocodeResource(
+            resource.address,
+            resource.city,
+            resource.state,
+            resource.zip
+          )
+          if (result) {
+            await db
+              .update(resources)
+              .set({
+                latitude: result.latitude,
+                longitude: result.longitude,
+                formattedAddress: result.formattedAddress,
+              })
+              .where(eq(resources.id, resource.id))
+            geocoded++
+          } else {
+            geocodeErrors.push(resource.name)
+          }
+          // Rate limit: 10 requests/second
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        } catch (err) {
+          geocodeErrors.push(resource.name)
+          console.error(`Geocode error for ${resource.name}:`, err)
+        }
+      }
+    }
+
+    // Build warnings for resources still missing coordinates
+    const warnings: string[] = []
+    if (geocodeErrors.length > 0) {
+      warnings.push(
+        `${geocodeErrors.length} resource(s) could not be geocoded and will not appear in location-based search: ${geocodeErrors.join(', ')}`
+      )
+    }
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -268,6 +348,7 @@ export async function POST(request: NextRequest) {
         updated,
         skipped,
         errors,
+        geocoded,
       },
       details: {
         created: createdResources.length,
@@ -276,6 +357,7 @@ export async function POST(request: NextRequest) {
       },
       multiLocationOrgs: Array.from(multiLocationOrgs.keys()),
       ...(errorDetails.length > 0 && { error_details: errorDetails }),
+      ...(warnings.length > 0 && { warnings }),
     })
   } catch (error) {
     console.error('Error importing resources:', error)

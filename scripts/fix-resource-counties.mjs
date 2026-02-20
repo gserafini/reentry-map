@@ -56,9 +56,12 @@ function loadEnv() {
 
 loadEnv()
 
-const sql = postgres(
+const databaseUrl =
   process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
-)
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+const sql = postgres(databaseUrl, {
+  ssl: isLocalhost ? false : 'require',
+})
 
 /**
  * Remove " County" suffix from county name for cleaner storage

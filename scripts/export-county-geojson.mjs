@@ -33,9 +33,12 @@ try {
   // .env.local may not exist
 }
 
-const sql = postgres(
+const databaseUrl =
   process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
-)
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+const sql = postgres(databaseUrl, {
+  ssl: isLocalhost ? false : 'require',
+})
 
 async function exportCountyGeoJSON() {
   console.log('Fetching county data from database...')

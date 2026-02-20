@@ -19,9 +19,12 @@ for (const line of envFile.split('\n')) {
   }
 }
 
-const sql = postgres(
+const databaseUrl =
   envVars.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
-)
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+const sql = postgres(databaseUrl, {
+  ssl: isLocalhost ? false : 'require',
+})
 
 try {
   const data = await sql`

@@ -27,9 +27,12 @@ try {
   console.error('⚠️  Could not load .env.local file')
 }
 
-const sql = postgres(
+const databaseUrl =
   process.env.DATABASE_URL || 'postgresql://reentrymap:password@localhost:5432/reentry_map'
-)
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+const sql = postgres(databaseUrl, {
+  ssl: isLocalhost ? false : 'require',
+})
 
 async function main() {
   console.log('🔄 Forcing re-verification for all resources with websites...\n')
