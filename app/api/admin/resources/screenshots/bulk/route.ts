@@ -74,8 +74,6 @@ export async function POST(request: NextRequest) {
     // Process each resource
     for (const resource of fetchedResources || []) {
       try {
-        console.log(`Capturing screenshot for: ${resource.name}`)
-
         const screenshotResult = await captureWebsiteScreenshot(resource.website!, resource.id)
 
         if (screenshotResult) {

@@ -67,7 +67,6 @@ export async function GET() {
       if (ipAddr.startsWith('::ffff:')) {
         // Extract the IPv4 address from the IPv6-mapped format
         checkAddr = ipAddr.substring(7) // Remove '::ffff:' prefix
-        console.log(`[GeoIP] Detected IPv4-mapped IPv6 address: ${ipAddr} -> ${checkAddr}`)
       }
 
       return (
@@ -112,10 +111,6 @@ export async function GET() {
       // If USE_EXTERNAL_IP_IN_DEV is enabled, fetch your actual external IP for testing
       if (env.USE_EXTERNAL_IP_IN_DEV) {
         try {
-          console.log(
-            `[GeoIP] Private IP detected (${ip}), checking external IP for development testing...`
-          )
-
           let externalIP = cachedExternalIP
 
           // Check if cache is valid (exists and not expired)
@@ -123,8 +118,6 @@ export async function GET() {
             externalIP && cacheTimestamp && Date.now() - cacheTimestamp < CACHE_DURATION_MS
 
           if (!isCacheValid) {
-            console.log('[GeoIP] Fetching fresh external IP from ipify.org...')
-
             // Use ipify.org to get the external IP (free, simple, returns just the IP as text)
             const ipifyResponse = await fetch('https://api.ipify.org?format=json', {
               next: { revalidate: 3600 }, // Cache for 1 hour
@@ -137,16 +130,10 @@ export async function GET() {
               // Update cache
               cachedExternalIP = externalIP
               cacheTimestamp = Date.now()
-
-              console.log(`[GeoIP] External IP cached: ${externalIP} (valid for 24 hours)`)
             }
-          } else {
-            console.log(`[GeoIP] Using cached external IP: ${externalIP}`)
           }
 
           if (externalIP) {
-            console.log(`[GeoIP] Using external IP ${externalIP} for GeoIP lookup`)
-
             // Use the external IP for GeoIP lookup
             const apiUrl = `https://ipapi.co/${externalIP}/json/`
             const response = await fetch(apiUrl, {
@@ -183,9 +170,6 @@ export async function GET() {
 
       // Default behavior: skip API call and return default location
       // This avoids wasting API calls and prevents "Reserved IP Address" errors
-      console.log(
-        `[GeoIP] Private/reserved IP (${ip}), using default location (set USE_EXTERNAL_IP_IN_DEV=true to test with your actual location)`
-      )
       return NextResponse.json({
         city: env.NEXT_PUBLIC_DEFAULT_CITY,
         region: env.NEXT_PUBLIC_DEFAULT_REGION,

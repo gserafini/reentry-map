@@ -89,7 +89,6 @@ export function useAuthNextAuth(): UseAuthResult {
       // Store admin status for analytics filtering
       if (user.isAdmin) {
         localStorage.setItem('analytics_user_role', 'admin')
-        console.log('[Analytics] Admin user identified - events will be marked as admin')
       } else {
         localStorage.removeItem('analytics_user_role')
       }

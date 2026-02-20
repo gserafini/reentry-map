@@ -340,10 +340,6 @@ export async function autoFixUrl(
   output_tokens?: number
 }> {
   try {
-    console.log(
-      `    🤖 Using Claude with web search to find correct URL for "${organizationName}"${city && state ? ` in ${city}, ${state}` : ''}...`
-    )
-
     const locationContext = city && state ? ` in ${city}, ${state}` : ''
 
     const prompt = `Find the CORRECT, WORKING website URL for "${organizationName}"${locationContext}.
@@ -400,12 +396,6 @@ If you cannot find a verified working URL, return exactly: NOT_FOUND`
     )
     const totalCost = input_cost_usd + output_cost_usd
 
-    console.log(
-      `    💰 Claude API cost: ${response.usage.input_tokens} in + ${response.usage.output_tokens} out = $${totalCost.toFixed(4)}`
-    )
-    console.log(`    🔍 Response content blocks:`, JSON.stringify(response.content, null, 2))
-    console.log(`    📝 Claude returned: "${foundUrl}"`)
-
     // Track cost to database (async, don't await to avoid slowing down verification)
     trackAICost({
       operation_type: 'url_autofix',
@@ -425,7 +415,6 @@ If you cannot find a verified working URL, return exactly: NOT_FOUND`
 
     // Check if URL was found
     if (foundUrl === 'NOT_FOUND' || !foundUrl.startsWith('http')) {
-      console.log(`    ❌ Claude could not find a working URL`)
       return {
         fixed: false,
         method: 'ai_web_search',
@@ -436,11 +425,9 @@ If you cannot find a verified working URL, return exactly: NOT_FOUND`
     }
 
     // Verify the URL Claude found is actually reachable
-    console.log(`    🔍 Verifying Claude's URL: ${foundUrl}`)
     const checkResult = await checkUrlReachable(foundUrl)
 
     if (checkResult.pass) {
-      console.log(`    ✅ Found working URL: ${foundUrl}`)
       return {
         fixed: true,
         new_url: foundUrl,
@@ -451,7 +438,6 @@ If you cannot find a verified working URL, return exactly: NOT_FOUND`
         output_tokens: response.usage.output_tokens,
       }
     } else {
-      console.log(`    ❌ Claude's URL is not reachable (${checkResult.status_code})`)
       return {
         fixed: false,
         method: 'ai_web_search',

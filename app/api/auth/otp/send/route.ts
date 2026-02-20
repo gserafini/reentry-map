@@ -115,7 +115,6 @@ export async function POST(request: NextRequest) {
     ) {
       // Development mode - return code in response
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[DEV] OTP for ${normalizedPhone}: ${code}`)
         return NextResponse.json({
           success: true,
           message: 'Verification code sent (dev mode)',

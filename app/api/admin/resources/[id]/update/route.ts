@@ -102,7 +102,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     await db.update(resources).set(updateData).where(eq(resources.id, id))
 
     // Log the verification notes (could add to audit log table in future)
-    console.log(`Resource ${id} updated:`, verification_notes)
 
     return NextResponse.json({
       success: true,

@@ -99,10 +99,6 @@ export async function POST(request: NextRequest) {
     //    - Update coverage metrics
     // 3. Admin receives notification when complete
 
-    console.log(`[RESEARCH REQUEST] County: ${county.county_name}, ${county.state_code}`)
-    console.log(`[RESEARCH REQUEST] Job ID: ${jobId}`)
-    console.log(`[RESEARCH REQUEST] Priority: ${researchPriority}`)
-    console.log(`[RESEARCH REQUEST] Categories: ${categories?.join(', ') || 'all'}`)
 
     return NextResponse.json({
       success: true,

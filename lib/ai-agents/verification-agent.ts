@@ -87,8 +87,6 @@ export class VerificationAgent {
     this.apiCallCount = 0
     this.totalCost = 0
 
-    console.log(`\n🔍 Starting ${verificationType} verification for: ${suggestion.name}`)
-
     // Emit started event for real-time monitoring
     await emitVerificationEvent({
       suggestion_id: suggestion.id,
@@ -109,8 +107,6 @@ export class VerificationAgent {
     // LEVEL 1: AUTOMATED CHECKS (10 seconds target)
     // ========================================================================
 
-    console.log('  📋 Level 1: Automated checks...')
-
     // Check URL reachability (with auto-fix)
     if (suggestion.website) {
       await emitProgress(suggestion.id, '🌐 Checking website URL', 'running').catch((err) =>
@@ -118,14 +114,9 @@ export class VerificationAgent {
       )
 
       checks.url_reachable = await checkUrlReachable(suggestion.website)
-      console.log(
-        `    ${checks.url_reachable.pass ? '✅' : '❌'} URL reachable: ${suggestion.website}`
-      )
 
       // Auto-fix broken URLs
       if (!checks.url_reachable.pass) {
-        console.log(`    🔧 Attempting to auto-fix URL with AI...`)
-
         await emitProgress(suggestion.id, '🔧 Auto-fixing broken URL with AI', 'running').catch(
           (err) => console.error('Failed to emit progress:', err)
         )
@@ -150,7 +141,6 @@ export class VerificationAgent {
         }
 
         if (fixedUrl.fixed && fixedUrl.new_url) {
-          console.log(`    ✅ Fixed URL: ${fixedUrl.new_url}`)
           suggestion.website = fixedUrl.new_url
           checks.url_reachable = await checkUrlReachable(fixedUrl.new_url)
 
@@ -159,8 +149,6 @@ export class VerificationAgent {
             new_url: fixedUrl.new_url,
           }).catch((err) => console.error('Failed to emit progress:', err))
         } else {
-          console.log(`    ❌ Could not auto-fix URL`)
-
           await emitProgress(suggestion.id, 'URL auto-fix failed', 'failed', {
             url: suggestion.website,
           }).catch((err) => console.error('Failed to emit progress:', err))
@@ -179,7 +167,6 @@ export class VerificationAgent {
       )
 
       checks.phone_valid = validatePhoneNumber(suggestion.phone)
-      console.log(`    ${checks.phone_valid.pass ? '✅' : '❌'} Phone valid: ${suggestion.phone}`)
 
       await emitProgress(
         suggestion.id,
@@ -204,7 +191,7 @@ export class VerificationAgent {
       )
 
       if (enrichedAddress.enriched) {
-        console.log(`    🔧 Enriched address with: ${enrichedAddress.added_fields.join(', ')}`)
+        // Address enriched with additional fields
       }
 
       checks.address_geocodable = await validateAddressGeocoding(
@@ -212,9 +199,6 @@ export class VerificationAgent {
         suggestion.city || undefined,
         suggestion.state || undefined,
         suggestion.zip || undefined
-      )
-      console.log(
-        `    ${checks.address_geocodable.pass ? '✅' : '❌'} Address geocodable: ${enrichedAddress.full_address}`
       )
 
       await emitProgress(
@@ -232,8 +216,6 @@ export class VerificationAgent {
     // ========================================================================
     // LEVEL 2: AI VERIFICATION (30 seconds target)
     // ========================================================================
-
-    console.log('  🤖 Level 2: AI content verification...')
 
     if (suggestion.website) {
       await emitProgress(suggestion.id, '🤖 Running AI content verification', 'running').catch(
@@ -261,12 +243,7 @@ export class VerificationAgent {
             verification.cost_usd
           )
 
-          console.log(
-            `    ${verification.pass ? '✅' : '❌'} Website content matches (confidence: ${(verification.confidence * 100).toFixed(0)}%)`
-          )
-          console.log(
-            `    💰 Claude API: ${verification.input_tokens} in + ${verification.output_tokens} out = $${verification.cost_usd.toFixed(4)}`
-          )
+          // Verification complete - confidence and cost tracked via emitProgress
 
           await emitProgress(
             suggestion.id,
@@ -289,8 +266,6 @@ export class VerificationAgent {
     // ========================================================================
     // LEVEL 3: CROSS-REFERENCING (60 seconds target)
     // ========================================================================
-
-    console.log('  🔗 Level 3: Cross-referencing external sources...')
 
     await emitProgress(
       suggestion.id,
@@ -352,11 +327,6 @@ export class VerificationAgent {
       conflicts,
     }
 
-    console.log(
-      `    ${crossRefSources.length > 0 ? '✅' : '⚠️'} Cross-referenced: ${crossRefSources.length} sources`
-    )
-    console.log(`    ${conflicts.length === 0 ? '✅' : '⚠️'} Conflicts: ${conflicts.length}`)
-
     await emitProgress(suggestion.id, 'Cross-referencing completed', 'completed', {
       sources_found: crossRefSources.length,
       conflicts_found: conflicts.length,
@@ -371,11 +341,6 @@ export class VerificationAgent {
     const decision = this.makeDecision(overall_score, conflicts, checks as VerificationChecks)
 
     const duration_ms = Date.now() - this.startTime
-
-    console.log(`\n  📊 Overall Score: ${(overall_score * 100).toFixed(0)}%`)
-    console.log(`  🎯 Decision: ${decision.decision}`)
-    console.log(`  ⏱️  Duration: ${duration_ms}ms`)
-    console.log(`  💰 Estimated Cost: $${this.totalCost.toFixed(4)}`)
 
     // Emit completed event for real-time monitoring
     await emitVerificationEvent({
@@ -611,8 +576,6 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
           change_log = ${JSON.stringify(updatedChangeLog)}::jsonb
         WHERE id = ${resourceId}
       `
-
-      console.log(`Updated resource ${resourceId} with verification results`)
     } catch (error) {
       console.error('Failed to update resource:', error)
       // Don't throw - updating resource shouldn't break verification
@@ -700,8 +663,6 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
         reviewed_at = ${new Date().toISOString()}
       WHERE id = ${suggestion.id}
     `
-
-    console.log(`Auto-approved and created resource: ${rows[0].id}`)
     return rows[0].id
   }
 
@@ -715,8 +676,6 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
         admin_notes = ${reason}
       WHERE id = ${suggestion.id}
     `
-
-    console.log(`Flagged for human review: ${reason}`)
   }
 
   /**
@@ -730,8 +689,6 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
         reviewed_at = ${new Date().toISOString()}
       WHERE id = ${suggestion.id}
     `
-
-    console.log(`Auto-rejected: ${reason}`)
   }
 
   /**

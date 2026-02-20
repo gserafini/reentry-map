@@ -96,7 +96,6 @@ ${alert.details ? `║ Details:    ${JSON.stringify(alert.details, null, 2)}` : 
           ${alert.details ? `<pre>${JSON.stringify(alert.details, null, 2)}</pre>` : ''}
         `,
       })
-      console.log(`[Dependency Monitor] Email alert sent to ${env.ADMIN_EMAIL}`)
     } catch (emailError) {
       console.error('[Dependency Monitor] Failed to send email alert:', emailError)
     }

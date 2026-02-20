@@ -96,8 +96,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await request.json()) as any
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      primary_category: string
+      categories?: string[]
+      tags?: string[]
+      address: string
+      city?: string
+      state?: string
+      zip?: string
+      latitude?: number
+      longitude?: number
+      county?: string
+      phone?: string
+      email?: string
+      website?: string
+      hours?: Record<string, string>
+      services?: string[]
+      eligibility_requirements?: string
+      required_documents?: string[]
+      fees?: string
+      languages?: string[]
+      accessibility_features?: string[]
+      status?: string
+      verified?: boolean
+      placeId?: string
+      locationType?: string
+      neighborhood?: string
+      formattedAddress?: string
+    }
 
     // Automatically determine county (use provided county from geocoding or lookup from coordinates)
     let countyData = null
@@ -165,7 +193,6 @@ export async function POST(request: NextRequest) {
                 screenshotCapturedAt: screenshotResult.capturedAt,
               })
               .where(eq(resources.id, data.id))
-            console.log(`Screenshot captured for resource ${data.id}`)
           }
         })
         .catch((err) => {

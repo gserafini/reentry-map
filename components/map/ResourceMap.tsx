@@ -94,22 +94,17 @@ export function ResourceMap({
 
     async function initMap() {
       if (!mapRef.current) {
-        console.log('[ResourceMap] mapRef.current is null, skipping init')
         return
       }
 
       try {
-        console.log('[ResourceMap] Starting map initialization...')
         setIsLoading(true)
         setError(null)
 
         // Load Google Maps libraries
-        console.log('[ResourceMap] Loading Google Maps libraries...')
         await initializeGoogleMaps()
-        console.log('[ResourceMap] Google Maps libraries loaded successfully')
 
         if (!isComponentMounted) {
-          console.log('[ResourceMap] Component unmounted during init, aborting')
           return
         }
 
@@ -117,10 +112,8 @@ export function ResourceMap({
         const center = userLocation
           ? { lat: userLocation.latitude, lng: userLocation.longitude }
           : DEFAULT_CENTER
-        console.log('[ResourceMap] Map center:', center)
 
         // Create map instance with Map ID for Advanced Markers
-        console.log('[ResourceMap] Creating map instance...')
         const map = new google.maps.Map(mapRef.current, {
           center,
           zoom: DEFAULT_ZOOM,
@@ -130,7 +123,6 @@ export function ResourceMap({
           fullscreenControl: true,
           zoomControl: true,
         })
-        console.log('[ResourceMap] Map instance created successfully')
 
         mapInstanceRef.current = map
 
@@ -163,7 +155,6 @@ export function ResourceMap({
         // Store cleanup for later
         ;(mapInstanceRef.current as MapWithCleanup).__cleanup = cleanup
 
-        console.log('[ResourceMap] Map initialization complete, setting isLoading=false')
         setIsLoading(false)
       } catch (err) {
         console.error('[ResourceMap] Error initializing Google Maps:', err)
@@ -196,7 +187,6 @@ export function ResourceMap({
     if (!mapInstanceRef.current || !userLocation) return
 
     const newCenter = { lat: userLocation.latitude, lng: userLocation.longitude }
-    console.log('[ResourceMap] User location changed, re-centering map to:', newCenter)
 
     // Smooth pan to new location with animation
     mapInstanceRef.current.panTo(newCenter)
@@ -204,22 +194,9 @@ export function ResourceMap({
 
   // Create markers when resources or map changes
   useEffect(() => {
-    console.log('[ResourceMap] Marker creation effect triggered', {
-      hasMap: !!mapInstanceRef.current,
-      isLoading,
-      resourceCount: resources.length,
-    })
-
     if (!mapInstanceRef.current || isLoading || resources.length === 0) {
-      console.log('[ResourceMap] Skipping marker creation:', {
-        noMap: !mapInstanceRef.current,
-        stillLoading: isLoading,
-        noResources: resources.length === 0,
-      })
       return
     }
-
-    console.log(`[ResourceMap] Creating markers for ${resources.length} resources`)
 
     // Clear existing markers and clusterer
     markersRef.current.forEach((marker) => {
@@ -342,7 +319,6 @@ export function ResourceMap({
     // Only auto-fit bounds when there's NO user location
     // If user explicitly selected a location, respect that choice
     if (markers.length > 0 && !userLocation) {
-      console.log('[ResourceMap] No user location, auto-fitting bounds to show all resources')
       map.fitBounds(bounds, {
         top: 50,
         right: 50,
@@ -362,7 +338,6 @@ export function ResourceMap({
         google.maps.event.removeListener(listener)
       }
     } else if (userLocation) {
-      console.log('[ResourceMap] User location set, keeping map centered on user selection')
     }
   }, [resources, userLocation, selectedResourceId, isLoading, onResourceClick])
 
@@ -405,8 +380,6 @@ export function ResourceMap({
       title: 'Your Location',
       zIndex: 1000, // Always on top of resource markers
     })
-
-    console.log('[ResourceMap] User location marker created at:', userLocation)
   }, [userLocation])
 
   // Draw radius circle around user location
@@ -442,8 +415,6 @@ export function ResourceMap({
       fillOpacity: 0.15,
       clickable: false,
     })
-
-    console.log('[ResourceMap] Radius circle created:', radiusMiles, 'miles')
   }, [userLocation, radiusMiles])
 
   // Open info window for selected resource
@@ -500,7 +471,6 @@ export function ResourceMap({
     const currentZoom = map.getZoom() || DEFAULT_ZOOM
     if (currentZoom !== targetZoom) {
       map.setZoom(targetZoom)
-      console.log('[ResourceMap] Adjusted zoom to', targetZoom, 'for radius', radiusMiles, 'miles')
     }
   }, [radiusMiles, userLocation])
 

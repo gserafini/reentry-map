@@ -124,7 +124,9 @@ export default function AgentsPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (
+    status: string
+  ): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (status) {
       case 'success':
         return 'success'
@@ -272,12 +274,7 @@ export default function AgentsPage() {
                     <Chip label={log.agent_type} size="small" />
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={log.status}
-                      size="small"
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      color={getStatusColor(log.status) as any}
-                    />
+                    <Chip label={log.status} size="small" color={getStatusColor(log.status)} />
                   </TableCell>
                   <TableCell align="right">{log.resources_processed || 0}</TableCell>
                   <TableCell align="right">{log.resources_added || 0}</TableCell>

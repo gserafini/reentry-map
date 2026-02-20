@@ -6,8 +6,8 @@ import 'leaflet/dist/leaflet.css'
 import { CountyData, CoverageMetrics } from './CoverageMap'
 
 // Fix for default marker icons in Leaflet with Next.js
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-delete (L.Icon.Default.prototype as any)._getIconUrl
+// _getIconUrl is a private Leaflet property not in @types/leaflet
+delete (L.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: string })._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',

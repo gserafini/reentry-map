@@ -75,7 +75,9 @@ export default function MySuggestionsPage() {
     return null
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (
+    status: string
+  ): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (status) {
       case 'approved':
         return 'success'
@@ -170,8 +172,7 @@ export default function MySuggestionsPage() {
                       <Chip
                         label={getStatusLabel(suggestion.status || 'pending')}
                         size="small"
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        color={getStatusColor(suggestion.status || 'pending') as any}
+                        color={getStatusColor(suggestion.status || 'pending')}
                       />
                     </Box>
                     <Typography variant="caption" color="text.secondary">

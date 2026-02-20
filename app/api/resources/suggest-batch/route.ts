@@ -4,6 +4,37 @@ import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import { getAISystemStatus } from '@/lib/api/settings'
 import type { ResourceSuggestion } from '@/lib/types/database'
 
+interface BatchResourceInput {
+  name?: string
+  address?: string
+  city?: string
+  state?: string
+  zip?: string
+  zip_code?: string
+  phone?: string
+  email?: string
+  website?: string
+  description?: string
+  hours?: string
+  services_offered?: string[]
+  services?: string[]
+  eligibility_requirements?: string
+  eligibility_criteria?: string
+  required_documents?: string[]
+  fees?: string
+  languages?: string[]
+  accessibility_features?: string[]
+  accessibility?: string[]
+  primary_category?: string
+  category?: string
+  categories?: string[]
+  tags?: string[]
+  latitude?: number
+  longitude?: number
+  discovered_via?: string
+  discovery_notes?: string
+}
+
 /**
  * POST /api/resources/suggest-batch
  *
@@ -71,8 +102,7 @@ export async function POST(request: NextRequest) {
     for (const resource of resources) {
       try {
         // Extract resource data
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const r = resource as any
+        const r = resource as BatchResourceInput
 
         // Validate required fields
         if (!r.name || !r.address || !r.city || !r.state) {
@@ -273,8 +303,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('Error processing resource:', error)
         results.errors++
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const resourceName = (resource as any)?.name || 'Unknown resource'
+        const resourceName = (resource as BatchResourceInput)?.name || 'Unknown resource'
         results.error_details.push(
           `${resourceName}: ${error instanceof Error ? error.message : 'Unknown error'}`
         )

@@ -25,13 +25,6 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
   // Fetch resources with filters
   const { data: resources, error } = await getResources({ search, categories, limit: 100 })
 
-  // Server-side logging
-  console.log('[ResourcesPage] Fetched resources:', {
-    count: resources?.length || 0,
-    hasError: !!error,
-    error: error?.message,
-  })
-
   // Fetch category counts for filter display
   const { data: categoryCounts } = await getCategoryCounts()
 

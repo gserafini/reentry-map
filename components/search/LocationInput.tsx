@@ -65,7 +65,6 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           timestamp: Date.now(),
         })
       )
-      console.log('[LocationInput] Saved user-selected location to localStorage:', locationName)
     },
     [setManualLocationBase]
   )
@@ -127,10 +126,6 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         if (userSelected) {
           try {
             const { coords, locationName } = JSON.parse(userSelected) as UserSelectedLocation
-            console.log(
-              '[LocationInput] Restoring user-selected location from localStorage:',
-              locationName
-            )
             setInputValue(locationName)
             setManualLocationBase(coords, locationName)
             // Don't update URL on restore - only when user manually selects

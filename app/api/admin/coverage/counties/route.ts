@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
       `
     }
 
-    console.log(`[Counties API] Fetched ${counties.length} counties total`)
 
     // Get coverage metrics for these counties
     const metrics = await sql<Pick<CoverageMetric, 'geography_id' | 'coverage_score' | 'total_resources'>[]>`

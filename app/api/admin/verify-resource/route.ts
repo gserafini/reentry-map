@@ -19,29 +19,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing resource_id or suggestion' }, { status: 400 })
     }
 
-    console.log(`\n🔍 Verifying resource: ${suggestion.name}`)
-    console.log(`   Resource ID: ${resource_id}`)
-    console.log(`   Address: ${suggestion.address}`)
-    console.log(`   Phone: ${suggestion.phone}`)
-    console.log(`   Website: ${suggestion.website}`)
-
     // Initialize verification agent
     const agent = new VerificationAgent()
 
     // Run verification
-    console.log(`\n🤖 Running verification agent...`)
     const result = await agent.verify(suggestion, 'triggered')
 
     // Log the verification
     // Note: For existing resources, suggestion_id is null since it's not from resource_suggestions table
-    console.log(`\n📝 Logging verification to database...`)
     await agent.logVerification(null, resource_id, 'triggered', result)
 
     // Update the resource with verification results
-    console.log(`\n📝 Updating resource with verification results...`)
     await agent.updateResourceWithVerificationResults(resource_id, suggestion, result)
-
-    console.log(`\n✅ Verification complete`)
 
     return NextResponse.json({
       success: true,

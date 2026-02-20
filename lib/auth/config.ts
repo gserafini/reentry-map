@@ -288,13 +288,11 @@ export const authOptions: NextAuthOptions = {
   },
 
   events: {
-    async signIn({ user, isNewUser }) {
-      // Log sign-in for analytics
-      console.log(`User ${user.id} signed in. New user: ${isNewUser}`)
+    async signIn({ user: _user, isNewUser: _isNewUser }) {
+      // Sign-in event - user and isNewUser available for future analytics
     },
-    async signOut({ token }) {
-      // Log sign-out
-      console.log(`User ${token?.sub} signed out`)
+    async signOut({ token: _token }) {
+      // Sign-out event - token available for future analytics
     },
   },
 
