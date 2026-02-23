@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { getInitials, getAvatarColor, getUserDisplayName, getGravatarUrl } from '@/lib/utils/avatar'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  getInitials,
+  getAvatarColor,
+  getUserDisplayName,
+  getGravatarUrl,
+  checkGravatarExists,
+} from '@/lib/utils/avatar'
 
 describe('avatar utilities', () => {
   describe('getInitials', () => {
@@ -29,6 +35,33 @@ describe('avatar utilities', () => {
 
     it('converts to uppercase', () => {
       expect(getInitials('lowercase.name@example.com')).toBe('LN')
+    })
+
+    // Branch: firstNameOrEmail is a name (not email) with lastName
+    it('extracts initials from first and last name', () => {
+      expect(getInitials('John', 'Doe')).toBe('JD')
+    })
+
+    // Branch: firstNameOrEmail is a name without lastName → uses second char
+    it('uses first two chars of first name when no last name', () => {
+      expect(getInitials('Jane')).toBe('JA')
+    })
+
+    it('uses first two chars of first name when lastName is null', () => {
+      expect(getInitials('Bob', null)).toBe('BO')
+    })
+
+    // Branch: null/undefined input → returns 'AU'
+    it('returns AU for null input', () => {
+      expect(getInitials(null)).toBe('AU')
+    })
+
+    it('returns AU for undefined input', () => {
+      expect(getInitials(undefined)).toBe('AU')
+    })
+
+    it('returns AU for empty string', () => {
+      expect(getInitials('')).toBe('AU')
     })
   })
 
@@ -163,6 +196,49 @@ describe('avatar utilities', () => {
       const url1 = getGravatarUrl('user1@example.com')
       const url2 = getGravatarUrl('user2@example.com')
       expect(url1).not.toBe(url2)
+    })
+  })
+
+  describe('checkGravatarExists', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('returns false for empty email', async () => {
+      expect(await checkGravatarExists('')).toBe(false)
+    })
+
+    it('returns true when gravatar exists', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ exists: true }),
+      })
+
+      expect(await checkGravatarExists('user@example.com')).toBe(true)
+      expect(global.fetch).toHaveBeenCalledWith('/api/gravatar/check?email=user%40example.com')
+    })
+
+    it('returns false when gravatar does not exist', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ exists: false }),
+      })
+
+      expect(await checkGravatarExists('noavatar@example.com')).toBe(false)
+    })
+
+    it('returns false when API returns non-ok response', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+      })
+
+      expect(await checkGravatarExists('user@example.com')).toBe(false)
+    })
+
+    it('returns false on fetch error', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      expect(await checkGravatarExists('user@example.com')).toBe(false)
     })
   })
 })

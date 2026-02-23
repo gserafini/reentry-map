@@ -335,6 +335,170 @@ describe('useLocation', () => {
 
     expect(mockGeolocation.getCurrentPosition).not.toHaveBeenCalled()
   })
+
+  it('handles corrupt cache data gracefully', () => {
+    vi.mocked(localStorage.getItem).mockReturnValue('not-valid-json{{{')
+
+    const { result } = renderHook(() => useLocation())
+
+    // Should default to null coordinates when cache parse fails
+    expect(result.current.coordinates).toBeNull()
+  })
+
+  it('handles null cache gracefully', () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+
+    const { result } = renderHook(() => useLocation())
+    expect(result.current.coordinates).toBeNull()
+  })
+
+  it('fetches GeoIP location when no cache', async () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          location: {
+            latitude: 40.7128,
+            longitude: -74.006,
+            city: 'New York',
+            region: 'NY',
+          },
+        }),
+    })
+    global.fetch = mockFetch
+
+    const { result } = renderHook(() => useLocation())
+
+    await waitFor(() => {
+      expect(result.current.coordinates).toEqual({
+        latitude: 40.7128,
+        longitude: -74.006,
+      })
+      expect(result.current.displayName).toBe('New York, NY')
+      expect(result.current.source).toBe('geoip')
+    })
+  })
+
+  it('handles GeoIP with city only (no region)', async () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          location: {
+            latitude: 40.7128,
+            longitude: -74.006,
+            city: 'New York',
+            region: undefined,
+          },
+        }),
+    })
+
+    const { result } = renderHook(() => useLocation())
+
+    await waitFor(() => {
+      expect(result.current.displayName).toBe('New York')
+    })
+  })
+
+  it('handles GeoIP with region only (no city)', async () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          location: {
+            latitude: 40.7128,
+            longitude: -74.006,
+            city: undefined,
+            region: 'California',
+          },
+        }),
+    })
+
+    const { result } = renderHook(() => useLocation())
+
+    await waitFor(() => {
+      expect(result.current.displayName).toBe('California')
+    })
+  })
+
+  it('handles GeoIP with no city or region', async () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          location: {
+            latitude: 40.7128,
+            longitude: -74.006,
+          },
+        }),
+    })
+
+    const { result } = renderHook(() => useLocation())
+
+    await waitFor(() => {
+      expect(result.current.displayName).toBe('Approximate Location')
+    })
+  })
+
+  it('handles GeoIP with null location', async () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve({ location: null }),
+    })
+
+    const { result } = renderHook(() => useLocation())
+
+    // Should remain null since location is null
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/location/ip')
+    })
+    expect(result.current.coordinates).toBeNull()
+  })
+
+  it('handles GeoIP fetch failure silently', async () => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+    const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+    const { result } = renderHook(() => useLocation())
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/location/ip')
+    })
+    // Should remain null and not crash
+    expect(result.current.coordinates).toBeNull()
+    consoleSpy.mockRestore()
+  })
+
+  it('handles unknown geolocation error code', async () => {
+    const mockError: GeolocationPositionError = {
+      code: 99, // Unknown code
+      message: 'Something weird happened',
+      PERMISSION_DENIED: 1,
+      POSITION_UNAVAILABLE: 2,
+      TIMEOUT: 3,
+    }
+
+    mockGeolocation.getCurrentPosition.mockImplementation((_, errorCallback) => {
+      errorCallback(mockError)
+    })
+
+    const { result } = renderHook(() => useLocation())
+
+    act(() => {
+      result.current.requestLocation()
+    })
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('unknown')
+    })
+  })
 })
 
 describe('getLocationErrorMessage', () => {

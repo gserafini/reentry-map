@@ -56,4 +56,100 @@ describe('ResourceCard', () => {
     const favoriteButtons = screen.getAllByRole('button')
     expect(favoriteButtons.length).toBeGreaterThan(0)
   })
+
+  it('shows "No ratings" when rating_average is null', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, rating_average: null, rating_count: 0 }} />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText('No ratings')).toBeInTheDocument()
+  })
+
+  it('shows rating count of 0 when rating_count is null', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, rating_count: null }} />
+      </LocationProvider>
+    )
+
+    // rating_count || 0 should show (0)
+    expect(screen.getByText('(0)')).toBeInTheDocument()
+  })
+
+  it('shows "No address" when address is not provided', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, address: null }} />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText('No address')).toBeInTheDocument()
+  })
+
+  it('renders city and state with comma separator', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, city: 'Oakland', state: 'CA', zip: '94612' }} />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText(/Oakland/)).toBeInTheDocument()
+    expect(screen.getByText(/CA/)).toBeInTheDocument()
+  })
+
+  it('renders city only without comma', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, city: 'Oakland', state: null, zip: null }} />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText(/Oakland/)).toBeInTheDocument()
+  })
+
+  it('renders state only without comma', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, city: null, state: 'CA', zip: null }} />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText(/CA/)).toBeInTheDocument()
+  })
+
+  it('renders without category badge when primary_category is null', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={{ ...mockResource, primary_category: null }} />
+      </LocationProvider>
+    )
+
+    expect(screen.queryByTestId('category-badge')).not.toBeInTheDocument()
+  })
+
+  it('uses provided userLocation instead of context', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard resource={mockResource} userLocation={{ lat: 37.8, lng: -122.2 }} />
+      </LocationProvider>
+    )
+
+    // Should render distance when userLocation provided and resource has coordinates
+    expect(screen.getByText('Test Resource')).toBeInTheDocument()
+  })
+
+  it('does not show distance when resource has no coordinates', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard
+          resource={{ ...mockResource, latitude: null, longitude: null }}
+          userLocation={{ lat: 37.8, lng: -122.2 }}
+        />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText('Test Resource')).toBeInTheDocument()
+  })
 })

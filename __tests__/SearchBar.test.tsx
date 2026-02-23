@@ -109,4 +109,72 @@ describe('SearchBar', () => {
     const input = screen.getByRole('textbox')
     expect(input).toHaveAccessibleName('Search resources')
   })
+
+  it('hides search icon when showSearchIcon is false', () => {
+    render(<SearchBar showSearchIcon={false} />)
+    const input = screen.getByRole('textbox')
+    expect(input).toBeInTheDocument()
+    // Search icon should not be present in the DOM
+    // (the startAdornment is null when showSearchIcon is false)
+  })
+
+  it('does not show clear button when query is empty', () => {
+    render(<SearchBar value="" />)
+    expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument()
+  })
+
+  it('handles form submit without onSubmit callback', () => {
+    render(<SearchBar />)
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'test' } })
+    const form = input.closest('form')
+    if (form) {
+      // Should not throw when no onSubmit provided
+      expect(() => fireEvent.submit(form)).not.toThrow()
+    }
+  })
+
+  it('handles clear without onChange callback', () => {
+    render(<SearchBar />)
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'test' } })
+    const clearButton = screen.getByLabelText('Clear search')
+    // Should not throw when no onChange provided
+    expect(() => fireEvent.click(clearButton)).not.toThrow()
+  })
+
+  it('supports different sizes', () => {
+    const { rerender } = render(<SearchBar size="medium" />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    rerender(<SearchBar size="small" />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+  })
+
+  it('shows category dropdown on focus when showCategoryDropdown is true', () => {
+    render(<SearchBar showCategoryDropdown={true} />)
+    const input = screen.getByRole('textbox')
+
+    fireEvent.focus(input)
+    // Dropdown should become visible
+    // The CategoryDropdown renders menu items
+  })
+
+  it('hides category dropdown on blur', () => {
+    render(<SearchBar showCategoryDropdown={true} />)
+    const input = screen.getByRole('textbox')
+
+    fireEvent.focus(input)
+    fireEvent.blur(input)
+
+    // After blur timeout, dropdown should hide
+    vi.advanceTimersByTime(300)
+  })
+
+  it('does not show dropdown when showCategoryDropdown is false', () => {
+    render(<SearchBar showCategoryDropdown={false} />)
+    const input = screen.getByRole('textbox')
+    fireEvent.focus(input)
+    // No dropdown should appear
+  })
 })

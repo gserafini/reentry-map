@@ -5,6 +5,8 @@ import {
   addFavorite,
   removeFavorite,
   getFavoriteCount,
+  getUserFavorites,
+  updateFavoriteNotes,
 } from '@/lib/api/favorites'
 
 // Mock postgres.js sql client (vi.hoisted ensures mockSql is available when vi.mock is hoisted)
@@ -141,6 +143,117 @@ describe('favorites API', () => {
 
       const count = await getFavoriteCount('res1')
       expect(count).toBe(0)
+    })
+
+    it('returns 0 when result is empty', async () => {
+      mockSql.mockResolvedValue([])
+
+      const count = await getFavoriteCount('res1')
+      expect(count).toBe(0)
+    })
+  })
+
+  describe('getUserFavorites', () => {
+    it('returns favorites for a user', async () => {
+      const mockFavorites = [
+        {
+          id: '1',
+          user_id: 'user1',
+          resource_id: 'res1',
+          notes: 'Good resource',
+          created_at: '2025-01-01',
+          resource: { id: 'res1', name: 'Test Resource' },
+        },
+      ]
+      mockSql.mockResolvedValue(mockFavorites)
+
+      const result = await getUserFavorites('user1')
+
+      expect(result.data).toEqual(mockFavorites)
+      expect(result.error).toBeNull()
+    })
+
+    it('returns empty array when user has no favorites', async () => {
+      mockSql.mockResolvedValue([])
+
+      const result = await getUserFavorites('user1')
+
+      expect(result.data).toEqual([])
+      expect(result.error).toBeNull()
+    })
+
+    it('returns error when database fails', async () => {
+      mockSql.mockRejectedValue(new Error('Connection refused'))
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const result = await getUserFavorites('user1')
+
+      expect(result.data).toBeNull()
+      expect(result.error).toBeInstanceOf(Error)
+      consoleSpy.mockRestore()
+    })
+  })
+
+  describe('updateFavoriteNotes', () => {
+    it('updates notes successfully', async () => {
+      mockSql.mockResolvedValue([
+        {
+          id: '1',
+          user_id: 'user1',
+          resource_id: 'res1',
+          notes: 'Updated notes',
+          created_at: '2025-01-01',
+        },
+      ])
+
+      const result = await updateFavoriteNotes('user1', 'res1', 'Updated notes')
+
+      expect(result.data).toBeDefined()
+      expect(result.data?.notes).toBe('Updated notes')
+      expect(result.error).toBeNull()
+    })
+
+    it('returns error when favorite not found', async () => {
+      mockSql.mockResolvedValue([])
+
+      const result = await updateFavoriteNotes('user1', 'res-nonexistent', 'Notes')
+
+      expect(result.data).toBeNull()
+      expect(result.error).toBeInstanceOf(Error)
+      expect(result.error?.message).toBe('Favorite not found')
+    })
+
+    it('returns error when database fails', async () => {
+      mockSql.mockRejectedValue(new Error('Database error'))
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const result = await updateFavoriteNotes('user1', 'res1', 'Notes')
+
+      expect(result.data).toBeNull()
+      expect(result.error).toBeInstanceOf(Error)
+      consoleSpy.mockRestore()
+    })
+  })
+
+  describe('addFavorite - branch: without notes', () => {
+    it('adds favorite without notes (null branch)', async () => {
+      mockSql.mockResolvedValue([
+        { id: '2', user_id: 'user1', resource_id: 'res2', notes: null, created_at: '2025-01-01' },
+      ])
+
+      const result = await addFavorite('user1', 'res2')
+
+      expect(result.data).toBeDefined()
+      expect(result.error).toBeNull()
+    })
+
+    it('handles empty result from INSERT', async () => {
+      mockSql.mockResolvedValue([])
+
+      const result = await addFavorite('user1', 'res1')
+
+      expect(result.data).toBeNull()
+      expect(result.error).toBeNull()
     })
   })
 })
