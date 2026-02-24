@@ -225,14 +225,18 @@ export async function generateMetadata({ params }: StatePageProps): Promise<Meta
 }
 
 // Generate static params for all states with resources (ISR)
+// Returns [] during CI build when DATABASE_URL is unavailable
 export async function generateStaticParams() {
-  // Get all unique states that have active resources
-  const states = await sql<{ state: string }[]>`
-    SELECT DISTINCT state FROM resources
-    WHERE status = 'active' AND state IS NOT NULL
-  `
+  try {
+    const states = await sql<{ state: string }[]>`
+      SELECT DISTINCT state FROM resources
+      WHERE status = 'active' AND state IS NOT NULL
+    `
 
-  return states.map((row) => ({
-    state: row.state.toLowerCase(),
-  }))
+    return states.map((row) => ({
+      state: row.state.toLowerCase(),
+    }))
+  } catch {
+    return []
+  }
 }

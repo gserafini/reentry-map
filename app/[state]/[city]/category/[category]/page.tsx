@@ -300,13 +300,18 @@ export async function generateMetadata({ params }: CategoryInCityPageProps): Pro
 }
 
 // Generate static params for all valid category/city combinations (ISR)
+// Returns [] during CI build when DATABASE_URL is unavailable
 export async function generateStaticParams() {
-  const { getCategoryInCityPages } = await import('@/lib/api/seo-pages')
-  const pages = await getCategoryInCityPages()
+  try {
+    const { getCategoryInCityPages } = await import('@/lib/api/seo-pages')
+    const pages = await getCategoryInCityPages()
 
-  return pages.map((page) => ({
-    state: page.state.toLowerCase(),
-    city: page.city.toLowerCase().replace(/\s+/g, '-'),
-    category: page.category,
-  }))
+    return pages.map((page) => ({
+      state: page.state.toLowerCase(),
+      city: page.city.toLowerCase().replace(/\s+/g, '-'),
+      category: page.category,
+    }))
+  } catch {
+    return []
+  }
 }

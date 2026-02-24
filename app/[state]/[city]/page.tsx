@@ -332,12 +332,17 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
 }
 
 // Generate static params for all valid city pages (ISR)
+// Returns [] during CI build when DATABASE_URL is unavailable
 export async function generateStaticParams() {
-  const { getCityPages } = await import('@/lib/api/seo-pages')
-  const cityPages = await getCityPages()
+  try {
+    const { getCityPages } = await import('@/lib/api/seo-pages')
+    const cityPages = await getCityPages()
 
-  return cityPages.map((page) => ({
-    state: page.state.toLowerCase(),
-    city: page.city.toLowerCase().replace(/\s+/g, '-'),
-  }))
+    return cityPages.map((page) => ({
+      state: page.state.toLowerCase(),
+      city: page.city.toLowerCase().replace(/\s+/g, '-'),
+    }))
+  } catch {
+    return []
+  }
 }

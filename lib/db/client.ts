@@ -1,52 +1,82 @@
 /**
  * Drizzle ORM Database Client
  *
- * Singleton database client for self-hosted PostgreSQL.
- * Direct database connection via postgres.js.
+ * Lazy-initialized singleton database client for self-hosted PostgreSQL.
+ * Both sql and db are created on first use, not at import time, so that
+ * `next build` can complete in CI without DATABASE_URL.
  *
  * @see https://orm.drizzle.team/docs/get-started-postgresql
  */
 
-import { drizzle } from 'drizzle-orm/postgres-js'
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-// Connection URL from environment
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is required. Set it in .env.local')
-}
-
-// Determine if we need SSL (not for localhost)
-const isLocalhost = connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
-
-// Create postgres.js client with connection pool
-// Using singleton pattern to avoid creating multiple connections
+// Singleton storage — survives hot reloads in development
 const globalForDb = globalThis as unknown as {
   sql: ReturnType<typeof postgres> | undefined
+  db: PostgresJsDatabase<typeof schema> | undefined
 }
 
-const sql =
-  globalForDb.sql ??
-  postgres(connectionString, {
-    // SSL required for remote connections
+function createSqlClient(): ReturnType<typeof postgres> {
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required. Set it in .env.local')
+  }
+
+  const isLocalhost =
+    connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
+
+  return postgres(connectionString, {
     ssl: isLocalhost ? false : 'require',
-    // Connection pool settings optimized for serverless
-    max: 10, // Maximum connections in pool
-    idle_timeout: 20, // Close idle connections after 20 seconds
-    connect_timeout: 10, // Timeout for new connections
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
   })
-
-// Preserve connection across hot reloads in development
-if (process.env.NODE_ENV !== 'production') {
-  globalForDb.sql = sql
 }
 
-// Create Drizzle ORM instance with schema
-export const db = drizzle(sql, { schema })
+function getSqlClient(): ReturnType<typeof postgres> {
+  if (globalForDb.sql) return globalForDb.sql
+  const client = createSqlClient()
+  globalForDb.sql = client
+  return client
+}
 
-// Export the raw sql client for advanced queries (PostGIS, etc.)
-export { sql }
+function getDbInstance(): PostgresJsDatabase<typeof schema> {
+  if (globalForDb.db) return globalForDb.db
+  const instance = drizzle(getSqlClient(), { schema })
+  globalForDb.db = instance
+  return instance
+}
 
-// Export types for use in other files
+/**
+ * Lazy-initialized postgres.js client.
+ *
+ * Supports tagged template literal usage: sql`SELECT ...`
+ * Connection is created on first query, not at import time.
+ */
+const sql: ReturnType<typeof postgres> = new Proxy(
+  function () {} as unknown as ReturnType<typeof postgres>,
+  {
+    apply(_target, thisArg, args) {
+      return Reflect.apply(getSqlClient() as unknown as (...a: unknown[]) => unknown, thisArg, args)
+    },
+    get(_target, prop) {
+      return Reflect.get(getSqlClient() as unknown as Record<string | symbol, unknown>, prop)
+    },
+  }
+)
+
+/**
+ * Lazy-initialized Drizzle ORM instance with full schema.
+ * Created on first property access, not at import time.
+ */
+const db: PostgresJsDatabase<typeof schema> = new Proxy({} as PostgresJsDatabase<typeof schema>, {
+  get(_target, prop) {
+    return Reflect.get(getDbInstance() as object, prop)
+  },
+})
+
+export { db, sql }
+
 export type Database = typeof db

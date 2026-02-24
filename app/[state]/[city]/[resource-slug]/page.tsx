@@ -132,24 +132,28 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
 }
 
 // Generate static params for ISR (top resources only to avoid excessive builds)
+// Returns [] during CI build when DATABASE_URL is unavailable
 export async function generateStaticParams() {
-  // Generate params for top 100 most viewed/rated resources
-  const topResources = await sql<{ name: string; city: string; state: string }[]>`
-    SELECT name, city, state FROM resources
-    WHERE status = 'active' AND city IS NOT NULL AND state IS NOT NULL
-    ORDER BY rating_average DESC NULLS LAST
-    LIMIT 100
-  `
+  try {
+    const topResources = await sql<{ name: string; city: string; state: string }[]>`
+      SELECT name, city, state FROM resources
+      WHERE status = 'active' AND city IS NOT NULL AND state IS NOT NULL
+      ORDER BY rating_average DESC NULLS LAST
+      LIMIT 100
+    `
 
-  return topResources.map((resource) => {
-    const stateSlug = resource.state.toLowerCase()
-    const citySlug = resource.city.toLowerCase().replace(/\s+/g, '-')
-    const resourceSlug = generateResourceSlug(resource.name)
+    return topResources.map((resource) => {
+      const stateSlug = resource.state.toLowerCase()
+      const citySlug = resource.city.toLowerCase().replace(/\s+/g, '-')
+      const resourceSlug = generateResourceSlug(resource.name)
 
-    return {
-      state: stateSlug,
-      city: citySlug,
-      'resource-slug': resourceSlug,
-    }
-  })
+      return {
+        state: stateSlug,
+        city: citySlug,
+        'resource-slug': resourceSlug,
+      }
+    })
+  } catch {
+    return []
+  }
 }
