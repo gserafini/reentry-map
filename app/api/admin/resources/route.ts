@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { db } from '@/lib/db/client'
 import { resources } from '@/lib/db/schema'
-import { eq, desc, ilike, or, sql, count } from 'drizzle-orm'
+import { eq, desc, ilike, or, and, count } from 'drizzle-orm'
 import { determineCounty } from '@/lib/utils/county'
 import { captureWebsiteScreenshot } from '@/lib/utils/screenshot'
 
@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const city = searchParams.get('city')
+    const state = searchParams.get('state')
 
     const offset = (page - 1) * limit
 
@@ -40,28 +42,25 @@ export async function GET(request: NextRequest) {
         or(ilike(resources.name, `%${search}%`), ilike(resources.address, `%${search}%`))
       )
     }
+    if (city) {
+      conditions.push(ilike(resources.city, city))
+    }
+    if (state) {
+      conditions.push(eq(resources.state, state))
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
     // Get total count
-    const [countResult] = await db
-      .select({ value: count() })
-      .from(resources)
-      .where(
-        conditions.length > 0
-          ? conditions.length === 1
-            ? conditions[0]
-            : sql`${conditions[0]} AND ${conditions[1]}`
-          : undefined
-      )
+    const [countResult] = await db.select({ value: count() }).from(resources).where(whereClause)
 
     const total = countResult?.value || 0
 
     // Get paginated data
     let query = db.select().from(resources)
 
-    if (conditions.length > 0) {
-      query = query.where(
-        conditions.length === 1 ? conditions[0] : sql`${conditions[0]} AND ${conditions[1]}`
-      ) as typeof query
+    if (whereClause) {
+      query = query.where(whereClause) as typeof query
     }
 
     const data = await query.orderBy(desc(resources.createdAt)).limit(limit).offset(offset)

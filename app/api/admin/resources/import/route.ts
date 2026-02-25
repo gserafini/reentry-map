@@ -62,6 +62,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const isPreview = request.nextUrl.searchParams.get('preview') === 'true'
+
     const body = (await request.json()) as { resources: unknown[] }
     const resourceList = body.resources
 
@@ -173,6 +175,12 @@ export async function POST(request: NextRequest) {
         }
 
         if (dupeCheck.isDuplicate && dupeCheck.suggestedAction === 'update') {
+          if (isPreview) {
+            // Preview mode: just count what would be updated
+            updated++
+            updatedResources.push(resource.name)
+            continue
+          }
           // Similar resource exists - update it
           try {
             await db
@@ -192,6 +200,12 @@ export async function POST(request: NextRequest) {
             errors++
             errorDetails.push(`${resource.name} (update): ${updErrMsg}`)
           }
+          continue
+        }
+
+        if (isPreview) {
+          // Preview mode: count what would be created (skip actual DB operations)
+          created++
           continue
         }
 
@@ -293,41 +307,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Auto-geocode resources that were created without coordinates
-    const ungeocodedResources = createdResources.filter(
-      (r) => r.latitude === null || r.longitude === null
-    )
+    // Auto-geocode resources that were created without coordinates (skip in preview mode)
     let geocoded = 0
     const geocodeErrors: string[] = []
 
-    if (ungeocodedResources.length > 0) {
-      for (const resource of ungeocodedResources) {
-        if (!resource.address) continue
-        try {
-          const result = await geocodeResource(
-            resource.address,
-            resource.city,
-            resource.state,
-            resource.zip
-          )
-          if (result) {
-            await db
-              .update(resources)
-              .set({
-                latitude: result.latitude,
-                longitude: result.longitude,
-                formattedAddress: result.formattedAddress,
-              })
-              .where(eq(resources.id, resource.id))
-            geocoded++
-          } else {
+    if (!isPreview) {
+      const ungeocodedResources = createdResources.filter(
+        (r) => r.latitude === null || r.longitude === null
+      )
+
+      if (ungeocodedResources.length > 0) {
+        for (const resource of ungeocodedResources) {
+          if (!resource.address) continue
+          try {
+            const result = await geocodeResource(
+              resource.address,
+              resource.city,
+              resource.state,
+              resource.zip
+            )
+            if (result) {
+              await db
+                .update(resources)
+                .set({
+                  latitude: result.latitude,
+                  longitude: result.longitude,
+                  formattedAddress: result.formattedAddress,
+                })
+                .where(eq(resources.id, resource.id))
+              geocoded++
+            } else {
+              geocodeErrors.push(resource.name)
+            }
+            // Rate limit: 10 requests/second
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          } catch (err) {
             geocodeErrors.push(resource.name)
+            console.error(`Geocode error for ${resource.name}:`, err)
           }
-          // Rate limit: 10 requests/second
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        } catch (err) {
-          geocodeErrors.push(resource.name)
-          console.error(`Geocode error for ${resource.name}:`, err)
         }
       }
     }
@@ -342,6 +359,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      ...(isPreview && { preview: true }),
       stats: {
         total: validResources.length,
         created,
@@ -351,7 +369,7 @@ export async function POST(request: NextRequest) {
         geocoded,
       },
       details: {
-        created: createdResources.length,
+        created: isPreview ? created : createdResources.length,
         skipped: skippedResources,
         updated: updatedResources,
       },

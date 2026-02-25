@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { resources } from '@/lib/db/schema'
-import { eq, count } from 'drizzle-orm'
+import { eq, and, count } from 'drizzle-orm'
 
 /**
  * GET /api/admin/prompt-generator?city=Oakland&state=CA
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         primaryCategory: resources.primaryCategory,
       })
       .from(resources)
-      .where(eq(resources.city, city) && eq(resources.state, state))
+      .where(and(eq(resources.city, city), eq(resources.state, state)))
       .orderBy(resources.name)
 
     return NextResponse.json({
@@ -88,13 +88,13 @@ export async function POST(request: NextRequest) {
         primaryCategory: resources.primaryCategory,
       })
       .from(resources)
-      .where(eq(resources.city, city) && eq(resources.state, state))
+      .where(and(eq(resources.city, city), eq(resources.state, state)))
       .orderBy(resources.name)
 
     const [countResult] = await db
       .select({ value: count() })
       .from(resources)
-      .where(eq(resources.city, city) && eq(resources.state, state))
+      .where(and(eq(resources.city, city), eq(resources.state, state)))
 
     const currentCount = countResult?.value || 0
 
@@ -133,7 +133,7 @@ Focus on these categories: **${categoriesList}**
 **IMPORTANT**: Before spending time researching a resource, check if it already exists using our fast lookup API:
 
 \`\`\`
-GET https://reentry-map.vercel.app/api/resources/check-duplicate?name=Resource+Name&address=123+Main+St&city=${city}&state=${state}
+GET https://reentrymap.org/api/resources/check-duplicate?name=Resource+Name&address=123+Main+St&city=${city}&state=${state}
 \`\`\`
 
 **Parameters**:
