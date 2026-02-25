@@ -32,6 +32,7 @@
     "verify:periodic:dry-run": "node scripts/periodic-verification.mjs --dry-run",
     "verify:check-ip-blocks": "node scripts/check-ip-blocks.mjs",
     "import:resources": "node scripts/import-resource-files.mjs",
+    "admin": "node scripts/admin-cli.mjs",
     "geoip:update": "node node_modules/geoip-lite/scripts/updatedb.js",
     "prepare": "husky"
   },
