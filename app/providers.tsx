@@ -5,6 +5,7 @@ import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
 import { SessionProvider } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import { LocationProvider } from '@/lib/context/LocationContext'
+import { FavoritesProvider } from '@/lib/context/FavoritesContext'
 import { PWAWrapper } from '@/components/pwa/PWAWrapper'
 
 // Create MUI theme with dark mode support
@@ -51,8 +52,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <MuiThemeWrapper>
           <CssBaseline />
           <LocationProvider>
-            {children}
-            <PWAWrapper />
+            <FavoritesProvider>
+              {children}
+              <PWAWrapper />
+            </FavoritesProvider>
           </LocationProvider>
         </MuiThemeWrapper>
       </NextThemesProvider>

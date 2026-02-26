@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { IconButton, CircularProgress, Tooltip } from '@mui/material'
 import { Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { useFavorites } from '@/lib/context/FavoritesContext'
 import { useRouter } from 'next/navigation'
 
 interface FavoriteButtonProps {
@@ -15,43 +16,21 @@ interface FavoriteButtonProps {
 /**
  * FavoriteButton component
  *
- * Heart icon button to favorite/unfavorite a resource
- * - Requires authentication
- * - Shows auth modal if not logged in
- * - Optimistic updates for better UX
- * - Accessible with ARIA labels
+ * Heart icon button to favorite/unfavorite a resource.
+ * Uses FavoritesContext for batch-loaded favorite state (single API call)
+ * instead of per-card API calls.
  */
 export function FavoriteButton({
   resourceId,
   size = 'medium',
   showAuthModal,
 }: FavoriteButtonProps) {
-  const { user, isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth()
+  const { isFavorited, toggleFavorite, isLoading: checking } = useFavorites()
   const router = useRouter()
-  const [isFav, setIsFav] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [checking, setChecking] = useState(true)
 
-  // Check if resource is favorited on mount
-  useEffect(() => {
-    async function checkFavorite() {
-      if (user && resourceId) {
-        setChecking(true)
-        try {
-          const response = await fetch(`/api/favorites/check?resourceId=${resourceId}`)
-          const data = (await response.json()) as { isFavorited?: boolean }
-          setIsFav(data.isFavorited || false)
-        } catch (error) {
-          console.error('Error checking favorite status:', error)
-          setIsFav(false)
-        }
-        setChecking(false)
-      } else {
-        setChecking(false)
-      }
-    }
-    checkFavorite()
-  }, [user, resourceId])
+  const isFav = isFavorited(resourceId)
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -62,45 +41,23 @@ export function FavoriteButton({
       if (showAuthModal) {
         showAuthModal()
       } else {
-        // Store the current URL to redirect back after login
         sessionStorage.setItem('redirectAfterLogin', window.location.pathname)
         router.push('/auth/login')
       }
       return
     }
 
-    if (!user || loading) return
+    if (loading) return
 
     setLoading(true)
-
-    // Optimistic update
-    const previousState = isFav
-    setIsFav(!isFav)
-
     try {
-      const method = previousState ? 'DELETE' : 'POST'
-      const response = await fetch('/api/favorites', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resourceId }),
-      })
-
-      if (!response.ok) {
-        // Revert on error
-        setIsFav(previousState)
-        const data = (await response.json()) as { error?: string }
-        console.error('Failed to toggle favorite:', data.error)
-      }
-    } catch (error) {
-      // Revert on error
-      setIsFav(previousState)
-      console.error('Failed to toggle favorite:', error)
+      await toggleFavorite(resourceId)
     } finally {
       setLoading(false)
     }
   }
 
-  // Show loading spinner while checking initial state
+  // Show loading spinner while initial favorites are loading
   if (checking) {
     return (
       <IconButton size={size} disabled>

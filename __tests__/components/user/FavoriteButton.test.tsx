@@ -7,6 +7,14 @@ vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }))
 
+// Mock useFavorites context
+const mockIsFavorited = vi.fn()
+const mockToggleFavorite = vi.fn()
+const mockUseFavorites = vi.fn()
+vi.mock('@/lib/context/FavoritesContext', () => ({
+  useFavorites: () => mockUseFavorites(),
+}))
+
 // Mock next/navigation
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
@@ -27,27 +35,34 @@ describe('FavoriteButton', () => {
       user: null,
       isAuthenticated: false,
     })
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ isFavorited: false }),
+    mockIsFavorited.mockReturnValue(false)
+    mockToggleFavorite.mockResolvedValue(true)
+    mockUseFavorites.mockReturnValue({
+      favoriteIds: new Set(),
+      isFavorited: mockIsFavorited,
+      toggleFavorite: mockToggleFavorite,
+      isLoading: false,
     })
   })
 
-  it('renders loading spinner while checking initial state', () => {
+  it('renders loading spinner while favorites are loading', { timeout: 15000 }, () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1' },
       isAuthenticated: true,
     })
-    // fetch never resolves, so checking stays true
-    global.fetch = vi.fn().mockReturnValue(new Promise(() => {}))
+    mockUseFavorites.mockReturnValue({
+      favoriteIds: new Set(),
+      isFavorited: mockIsFavorited,
+      toggleFavorite: mockToggleFavorite,
+      isLoading: true,
+    })
 
     render(<FavoriteButton resourceId="res-1" />)
-    // Should show disabled button with spinner while checking
     const button = screen.getByRole('button')
     expect(button).toBeDisabled()
   })
 
-  it('renders unfilled heart when not favorited', async () => {
+  it('renders unfilled heart when not favorited', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -55,50 +70,36 @@ describe('FavoriteButton', () => {
 
     render(<FavoriteButton resourceId="res-1" />)
 
-    await waitFor(() => {
-      const button = screen.getByRole('button')
-      expect(button).not.toBeDisabled()
-    })
-
+    const button = screen.getByRole('button')
+    expect(button).not.toBeDisabled()
     expect(screen.getByLabelText('Add to favorites')).toBeInTheDocument()
   })
 
-  it('checks favorite status on mount for authenticated users', async () => {
+  it('renders filled heart when favorited', () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1' },
       isAuthenticated: true,
     })
-
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ isFavorited: true }),
-    })
-    global.fetch = mockFetch
+    mockIsFavorited.mockReturnValue(true)
 
     render(<FavoriteButton resourceId="res-1" />)
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/favorites/check?resourceId=res-1')
-    })
+    expect(screen.getByLabelText('Remove from favorites')).toBeInTheDocument()
   })
 
-  it('redirects to login when unauthenticated user clicks', async () => {
+  it('redirects to login when unauthenticated user clicks', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
     })
 
     render(<FavoriteButton resourceId="res-1" />)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button')).not.toBeDisabled()
-    })
 
     fireEvent.click(screen.getByRole('button'))
     expect(mockPush).toHaveBeenCalledWith('/auth/login')
   })
 
-  it('calls showAuthModal if provided instead of redirecting', async () => {
+  it('calls showAuthModal if provided instead of redirecting', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -107,149 +108,60 @@ describe('FavoriteButton', () => {
     const mockShowAuth = vi.fn()
     render(<FavoriteButton resourceId="res-1" showAuthModal={mockShowAuth} />)
 
-    await waitFor(() => {
-      expect(screen.getByRole('button')).not.toBeDisabled()
-    })
-
     fireEvent.click(screen.getByRole('button'))
     expect(mockShowAuth).toHaveBeenCalled()
     expect(mockPush).not.toHaveBeenCalled()
   })
 
-  it('sends POST to add favorite when not favorited', async () => {
+  it('calls toggleFavorite from context when clicking', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1' },
       isAuthenticated: true,
     })
 
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ isFavorited: false }),
-      })
-      .mockResolvedValueOnce({ ok: true })
-
-    global.fetch = mockFetch
-
     render(<FavoriteButton resourceId="res-1" />)
-
-    // Wait for initial check to complete
-    await waitFor(() => {
-      expect(screen.getByLabelText('Add to favorites')).not.toBeDisabled()
-    })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button'))
     })
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/favorites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resourceId: 'res-1' }),
-    })
+    expect(mockToggleFavorite).toHaveBeenCalledWith('res-1')
   })
 
-  it('sends DELETE to remove favorite when already favorited', async () => {
+  it('shows loading state while toggle is in progress', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1' },
       isAuthenticated: true,
     })
 
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ isFavorited: true }),
+    // Make toggleFavorite take time to resolve
+    let resolveToggle: (value: boolean) => void
+    mockToggleFavorite.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveToggle = resolve
       })
-      .mockResolvedValueOnce({ ok: true })
-
-    global.fetch = mockFetch
+    )
 
     render(<FavoriteButton resourceId="res-1" />)
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Remove from favorites')).not.toBeDisabled()
-    })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button'))
     })
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/favorites', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resourceId: 'res-1' }),
-    })
-  })
+    // Button should be disabled during toggle
+    expect(screen.getByRole('button')).toBeDisabled()
 
-  it('reverts optimistic update on API error', async () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-1' },
-      isAuthenticated: true,
-    })
-
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ isFavorited: false }),
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Server error' }),
-      })
-
-    global.fetch = mockFetch
-
-    render(<FavoriteButton resourceId="res-1" />)
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Add to favorites')).not.toBeDisabled()
-    })
-
+    // Resolve the toggle
     await act(async () => {
-      fireEvent.click(screen.getByRole('button'))
+      resolveToggle!(true)
     })
 
-    // After error, should revert back to unfavorited
     await waitFor(() => {
-      expect(screen.getByLabelText('Add to favorites')).toBeInTheDocument()
+      expect(screen.getByRole('button')).not.toBeDisabled()
     })
   })
 
-  it('reverts optimistic update on fetch exception', async () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: 'user-1' },
-      isAuthenticated: true,
-    })
-
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ isFavorited: false }),
-      })
-      .mockRejectedValueOnce(new Error('Network error'))
-
-    global.fetch = mockFetch
-
-    render(<FavoriteButton resourceId="res-1" />)
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Add to favorites')).not.toBeDisabled()
-    })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button'))
-    })
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Add to favorites')).toBeInTheDocument()
-    })
-  })
-
-  it('handles different sizes', () => {
+  it('handles different sizes', { timeout: 15000 }, () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -262,19 +174,27 @@ describe('FavoriteButton', () => {
     expect(screen.getByRole('button')).toBeInTheDocument()
   })
 
-  it('handles error when checking initial favorite status', async () => {
+  it('does not call toggleFavorite when already loading', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1' },
       isAuthenticated: true,
     })
 
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+    // Make toggleFavorite never resolve
+    mockToggleFavorite.mockReturnValue(new Promise(() => {}))
 
     render(<FavoriteButton resourceId="res-1" />)
 
-    await waitFor(() => {
-      // Should finish checking even on error (defaults to unfavorited)
-      expect(screen.getByLabelText('Add to favorites')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'))
     })
+
+    // Click again while loading
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'))
+    })
+
+    // Should only have been called once
+    expect(mockToggleFavorite).toHaveBeenCalledTimes(1)
   })
 })

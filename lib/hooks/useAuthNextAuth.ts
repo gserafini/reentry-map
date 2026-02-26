@@ -2,7 +2,7 @@
 
 import { useSession, signOut as nextAuthSignOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { identifyUser, clearUser } from '@/lib/analytics/queue'
 
 /**
@@ -63,18 +63,34 @@ export function useAuthNextAuth(): UseAuthResult {
   const isLoading = status === 'loading'
   const isAuthenticated = status === 'authenticated' && !!session?.user
 
-  // Convert NextAuth session user to our AuthUser type
-  const user: AuthUser | null = session?.user
-    ? {
-        id: session.user.id,
-        email: session.user.email,
-        phone: session.user.phone,
-        name: session.user.name,
-        image: session.user.image,
-        isAdmin: session.user.isAdmin,
-        created_at: session.user.created_at,
-      }
-    : null
+  // Memoize the user object to prevent infinite re-renders in components
+  // that use `user` as a useEffect dependency (FavoriteButton, favorites page, etc.)
+  const user: AuthUser | null = useMemo(
+    () =>
+      session?.user
+        ? {
+            id: session.user.id,
+            email: session.user.email,
+            phone: session.user.phone,
+            name: session.user.name,
+            image: session.user.image,
+            isAdmin: session.user.isAdmin,
+            created_at: session.user.created_at,
+          }
+        : null,
+    // Intentionally listing individual fields instead of session.user to prevent
+    // object reference changes from triggering re-memos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      session?.user?.id,
+      session?.user?.email,
+      session?.user?.phone,
+      session?.user?.name,
+      session?.user?.image,
+      session?.user?.isAdmin,
+      session?.user?.created_at,
+    ]
+  )
 
   const isAdmin = user?.isAdmin ?? false
 
