@@ -51,83 +51,71 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    const body = (await request.json()) as {
-      name: string
-      description?: string
-      primary_category: string
-      categories?: string[]
-      tags?: string[]
-      address: string
-      city?: string
-      state?: string
-      zip?: string
-      latitude?: number
-      longitude?: number
-      county?: string
-      phone?: string
-      email?: string
-      website?: string
-      hours?: Record<string, string>
-      services_offered?: string[]
-      eligibility_requirements?: string
-      required_documents?: string[]
-      fees?: string
-      languages?: string[]
-      accessibility_features?: string[]
-      status?: string
-      verified?: boolean
-      placeId?: string
-      locationType?: string
-      neighborhood?: string
-      formattedAddress?: string
+    const body = (await request.json()) as Record<string, unknown>
+
+    // Build partial update — only include fields that were sent in the request
+    const fieldMap: Record<string, string> = {
+      name: 'name',
+      description: 'description',
+      primary_category: 'primaryCategory',
+      categories: 'categories',
+      tags: 'tags',
+      address: 'address',
+      city: 'city',
+      state: 'state',
+      zip: 'zip',
+      latitude: 'latitude',
+      longitude: 'longitude',
+      phone: 'phone',
+      email: 'email',
+      website: 'website',
+      hours: 'hours',
+      services_offered: 'servicesOffered',
+      eligibility_requirements: 'eligibilityRequirements',
+      required_documents: 'requiredDocuments',
+      fees: 'fees',
+      languages: 'languages',
+      accessibility_features: 'accessibilityFeatures',
+      status: 'status',
+      verified: 'verified',
+      placeId: 'googlePlaceId',
+      locationType: 'locationType',
+      neighborhood: 'neighborhood',
+      formattedAddress: 'formattedAddress',
     }
 
-    // Automatically determine county (use provided county from geocoding or lookup from coordinates)
-    let countyData = null
-    if (body.county || body.latitude) {
-      countyData = await determineCounty(
-        body.county || null, // County name from geocoding
-        body.state || 'CA',
-        body.latitude || null,
-        body.longitude || null
+    const updateData: Record<string, unknown> = {}
+    for (const [bodyKey, dbKey] of Object.entries(fieldMap)) {
+      if (bodyKey in body) {
+        updateData[dbKey] = body[bodyKey] ?? null
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
+
+    // Automatically determine county when location fields change
+    if ('county' in body || 'latitude' in body) {
+      // Fetch existing resource for fallback state
+      const [existing] = await db.select().from(resources).where(eq(resources.id, id)).limit(1)
+      const state = (body.state as string) || existing?.state || 'CO'
+      const countyData = await determineCounty(
+        (body.county as string) || null,
+        state,
+        (body.latitude as number) || null,
+        (body.longitude as number) || null
       )
+      if (countyData) {
+        updateData.county = countyData.county
+        updateData.countyFips = countyData.county_fips
+      }
     }
 
-    // Update resource
+    // Update resource (partial merge — only provided fields are changed)
     const [data] = await db
       .update(resources)
-      .set({
-        name: body.name,
-        description: body.description || null,
-        primaryCategory: body.primary_category,
-        categories: body.categories || null,
-        tags: body.tags || null,
-        address: body.address,
-        city: body.city || null,
-        state: body.state || 'CA',
-        zip: body.zip || null,
-        latitude: body.latitude || null,
-        longitude: body.longitude || null,
-        county: countyData?.county || null,
-        countyFips: countyData?.county_fips || null,
-        phone: body.phone || null,
-        email: body.email || null,
-        website: body.website || null,
-        hours: body.hours || null,
-        servicesOffered: body.services_offered || null,
-        eligibilityRequirements: body.eligibility_requirements || null,
-        requiredDocuments: body.required_documents || null,
-        fees: body.fees || null,
-        languages: body.languages || null,
-        accessibilityFeatures: body.accessibility_features || null,
-        status: body.status,
-        verified: body.verified,
-        // Geocoding metadata (from Google Maps Geocoding API)
-        googlePlaceId: body.placeId || null,
-        locationType: body.locationType || null,
-        neighborhood: body.neighborhood || null,
-        formattedAddress: body.formattedAddress || null,
-      })
+      .set(updateData)
       .where(eq(resources.id, id))
       .returning()
 
