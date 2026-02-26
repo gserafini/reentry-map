@@ -27,6 +27,7 @@ const COMMANDS = {
   agents: () => import('./cli/commands/agents.mjs'),
   deploy: () => import('./cli/commands/deploy.mjs'),
   quality: () => import('./cli/commands/quality.mjs'),
+  migrate: () => import('./cli/commands/migrate.mjs'),
 }
 
 const COMMAND_DESCRIPTIONS = {
@@ -39,6 +40,7 @@ const COMMAND_DESCRIPTIONS = {
   agents: 'AI agent control (discovery, enrichment)',
   deploy: 'Production deployment, logs, status',
   quality: 'Quality checks and testing',
+  migrate: 'Apply SQL migrations to production database',
 }
 
 function showHelp() {
