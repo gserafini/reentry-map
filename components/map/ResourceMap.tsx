@@ -212,8 +212,19 @@ export function ResourceMap({
     const markers: google.maps.marker.AdvancedMarkerElement[] = []
     const bounds = new google.maps.LatLngBounds()
 
-    // Create markers for each resource
+    // Create markers for each resource (skip those without valid coordinates)
     resources.forEach((resource) => {
+      if (
+        resource.latitude == null ||
+        resource.longitude == null ||
+        typeof resource.latitude !== 'number' ||
+        typeof resource.longitude !== 'number' ||
+        isNaN(resource.latitude) ||
+        isNaN(resource.longitude)
+      ) {
+        return // Skip resources without valid coordinates
+      }
+
       const position = {
         lat: resource.latitude,
         lng: resource.longitude,
