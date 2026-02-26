@@ -34,7 +34,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { checkCurrentUserIsAdmin } from '@/lib/utils/admin'
 import { CATEGORIES } from '@/lib/utils/categories'
 import { geocodeAddress } from '@/lib/utils/geocoding'
-import type { Resource } from '@/lib/types/database'
+import type { Resource } from '@/lib/db/schema'
 
 export default function EditResourcePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
@@ -108,7 +108,7 @@ export default function EditResourcePage() {
 
         // Populate form fields
         setName(data.name || '')
-        setPrimaryCategory(data.primary_category || 'general_support')
+        setPrimaryCategory(data.primaryCategory || 'general_support')
         setAddress(data.address || '')
         setCity(data.city || '')
         setState(data.state || '')
@@ -120,7 +120,7 @@ export default function EditResourcePage() {
           typeof data.hours === 'string' ? data.hours : data.hours ? JSON.stringify(data.hours) : ''
         )
         setEmail(data.email || '')
-        setServices(Array.isArray(data.services_offered) ? data.services_offered.join(', ') : '')
+        setServices(Array.isArray(data.servicesOffered) ? data.servicesOffered.join(', ') : '')
         setVerified(data.verified || false)
         setStatus(data.status || 'active')
         setLatitude(data.latitude)
