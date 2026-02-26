@@ -45,14 +45,14 @@ import { getResourceUrl } from '@/lib/utils/resource-url'
 interface Resource {
   id: string
   name: string
-  primary_category: string
+  primaryCategory: string
   address: string
   city: string | null
   state: string | null
   zip: string | null
   status: string
   verified: boolean
-  created_at: string
+  createdAt: string
 }
 
 export default function AdminResourcesPage() {
@@ -262,7 +262,7 @@ export default function AdminResourcesPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Chip label={resource.primary_category} size="small" />
+                      <Chip label={resource.primaryCategory || 'Uncategorized'} size="small" />
                     </TableCell>
                     <TableCell>{resource.address}</TableCell>
                     <TableCell>{resource.city || '-'}</TableCell>
@@ -288,7 +288,9 @@ export default function AdminResourcesPage() {
                         <Chip label="No" size="small" />
                       )}
                     </TableCell>
-                    <TableCell>{new Date(resource.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {resource.createdAt ? new Date(resource.createdAt).toLocaleDateString() : '-'}
+                    </TableCell>
                     <TableCell align="right">
                       <IconButton
                         size="small"

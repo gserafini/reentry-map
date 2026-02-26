@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
     const createdResources: Resource[] = []
     const skippedResources: string[] = []
     const updatedResources: string[] = []
+    const updatedResourceObjects: Resource[] = []
     const errorDetails: string[] = []
 
     // Auto-detect parent-child relationships
@@ -183,16 +184,20 @@ export async function POST(request: NextRequest) {
           }
           // Similar resource exists - update it
           try {
-            await db
+            const [updatedRow] = await db
               .update(resources)
               .set({
                 ...resource,
                 updatedAt: new Date(),
               })
               .where(eq(resources.id, dupeCheck.existingResource!.id))
+              .returning()
 
             updated++
             updatedResources.push(resource.name)
+            if (updatedRow) {
+              updatedResourceObjects.push(updatedRow)
+            }
           } catch (updateError) {
             const updErrMsg =
               updateError instanceof Error ? updateError.message : String(updateError)
@@ -307,12 +312,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Auto-geocode resources that were created without coordinates (skip in preview mode)
+    // Auto-geocode resources that were created or updated without coordinates (skip in preview mode)
     let geocoded = 0
     const geocodeErrors: string[] = []
 
     if (!isPreview) {
-      const ungeocodedResources = createdResources.filter(
+      const ungeocodedResources = [...createdResources, ...updatedResourceObjects].filter(
         (r) => r.latitude === null || r.longitude === null
       )
 

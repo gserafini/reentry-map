@@ -46,6 +46,8 @@ export function DistanceFilter({ hasLocation, defaultDistance = 25 }: DistanceFi
   const searchParams = useSearchParams()
 
   // Get initial distance from URL params, localStorage, or default
+  // Note: This component only renders client-side (hasLocation is always false on SSR
+  // since coordinates come from client-only geolocation), so localStorage is safe here.
   const getInitialDistance = (): number => {
     const urlDistance = searchParams.get('distance')
     if (urlDistance) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Avatar,
   Box,
@@ -51,45 +51,60 @@ export default function ProfilePage() {
     }
   }, [authLoading, isAuthenticated, router])
 
-  // Fetch user profile via API route
-  const fetchProfile = useCallback(async () => {
-    if (!authUser) {
-      setIsLoadingProfile(false)
+  // Fetch user profile via API route — only when fully authenticated
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !authUser) {
+      if (!authLoading && !isAuthenticated) {
+        setIsLoadingProfile(false)
+      }
       return
     }
 
-    try {
-      const res = await fetch('/api/profile')
+    let cancelled = false
 
-      if (!res.ok) {
-        const errorData = (await res.json()) as { error?: string }
-        throw new Error(errorData.error || `Failed to fetch profile (${res.status})`)
+    async function fetchProfile() {
+      try {
+        const res = await fetch('/api/profile')
+
+        if (cancelled) return
+
+        if (!res.ok) {
+          const errorData = (await res.json()) as { error?: string }
+          throw new Error(errorData.error || `Failed to fetch profile (${res.status})`)
+        }
+
+        const { data } = (await res.json()) as { data: User | null }
+
+        if (cancelled) return
+
+        if (data) {
+          setProfile(data)
+          setFirstName(data.first_name || '')
+          setLastName(data.last_name || '')
+        }
+      } catch (err) {
+        if (cancelled) return
+        console.error('Error fetching profile:', err)
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'object' && err !== null
+              ? JSON.stringify(err)
+              : 'Unknown error'
+        setError(`Failed to load profile: ${errorMessage}`)
+      } finally {
+        if (!cancelled) {
+          setIsLoadingProfile(false)
+        }
       }
-
-      const { data } = (await res.json()) as { data: User | null }
-
-      if (data) {
-        setProfile(data)
-        setFirstName(data.first_name || '')
-        setLastName(data.last_name || '')
-      }
-    } catch (err) {
-      console.error('Error fetching profile:', err)
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'object' && err !== null
-            ? JSON.stringify(err)
-            : 'Unknown error'
-      setError(`Failed to load profile: ${errorMessage}`)
-    } finally {
-      setIsLoadingProfile(false)
     }
-  }, [authUser])
 
-  useEffect(() => {
     fetchProfile()
-  }, [fetchProfile])
+
+    return () => {
+      cancelled = true
+    }
+  }, [authUser, authLoading, isAuthenticated])
 
   const handleSave = async () => {
     if (!authUser || !profile) return
