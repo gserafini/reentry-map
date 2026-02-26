@@ -75,14 +75,22 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  const getDirectionsUrl = () => {
+    // Prefer lat/lng for precision, fall back to full address string
+    if (resource.latitude && resource.longitude) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${resource.latitude},${resource.longitude}`
+    }
+    // Build full address to avoid ambiguity (e.g. "3460 Broadway" alone → NYC instead of Boulder)
+    const parts = [resource.address, resource.city, resource.state, resource.zip].filter(Boolean)
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(parts.join(', '))}`
+  }
+
   const handleGetDirections = () => {
-    // Track analytics
     analytics.track('resource_click_directions', {
       resource_id: resource.id,
     })
 
-    const address = encodeURIComponent(resource.address)
-    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+    window.open(getDirectionsUrl(), '_blank')
   }
 
   const handleCallClick = () => {
@@ -248,7 +256,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             <LocationOnIcon color="action" sx={{ mt: 0.5 }} aria-label="Address" />
             <Tooltip title="Click to open directions in Google Maps" arrow placement="top">
               <MuiLink
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resource.address)}`}
+                href={getDirectionsUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 underline="hover"
