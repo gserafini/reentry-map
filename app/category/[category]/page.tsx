@@ -10,6 +10,7 @@ import { CategoryFilter } from '@/components/search/CategoryFilter'
 import { LocationFilterSidebar } from '@/components/search/LocationFilterSidebar'
 import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
+import { LocationUrlSync } from '@/components/search/LocationUrlSync'
 import { parseSortParam } from '@/lib/utils/sort'
 import { getCategoryLabel, getAllCategories } from '@/lib/utils/categories'
 import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
@@ -24,6 +25,9 @@ interface CategoryPageProps {
     search?: string
     page?: string
     sort?: string
+    lat?: string
+    lng?: string
+    distance?: string
   }>
 }
 
@@ -36,10 +40,24 @@ const PAGE_SIZE = 20
  */
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { category } = await params
-  const { search, page, sort: sortParam } = await searchParams
+  const {
+    search,
+    page,
+    sort: sortParam,
+    lat: latParam,
+    lng: lngParam,
+    distance: distParam,
+  } = await searchParams
   const currentPage = Number(page) || 1
   const offset = (currentPage - 1) * PAGE_SIZE
   const sort = parseSortParam(sortParam)
+
+  // Parse location parameters
+  const lat = latParam ? parseFloat(latParam) : undefined
+  const lng = lngParam ? parseFloat(lngParam) : undefined
+  const distance = distParam ? parseInt(distParam, 10) : undefined
+  const hasLocation =
+    lat !== undefined && !isNaN(lat) && lng !== undefined && !isNaN(lng) && distance
 
   // Validate category
   const validCategories = getAllCategories()
@@ -49,19 +67,21 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const typedCategory = category as ResourceCategory
 
-  // Fetch resources for this category (nationwide)
+  // Fetch resources for this category
   const { data: resources, error } = await getResources({
     search,
     categories: [typedCategory],
     limit: PAGE_SIZE,
     offset,
     sort,
+    ...(hasLocation ? { latitude: lat, longitude: lng, radius_miles: distance } : {}),
   })
 
   // Get total count for pagination
   const { data: totalCount } = await getResourcesCount({
     search,
     categories: [typedCategory],
+    ...(hasLocation ? { latitude: lat, longitude: lng, radius_miles: distance } : {}),
   })
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE)
 
@@ -91,6 +111,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   return (
     <>
+      {/* Sync user location to URL for distance-based sorting */}
+      <LocationUrlSync />
+
       {/* Structured Data for SEO */}
       <BreadcrumbList
         items={[
@@ -146,7 +169,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
             {/* Sort dropdown */}
             {hasResults && (
               <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <SortDropdown />
+                <SortDropdown showDistanceSort={!!hasLocation} />
               </Box>
             )}
 
