@@ -144,9 +144,10 @@ async function coverageTargets(args) {
   try {
     const rows = await sql`
       SELECT
-        city_name, state_code, county_name,
-        metro_population, priority_score, tier,
-        resource_count, status, research_status, notes
+        city, state, county,
+        population, priority_score, priority_tier,
+        current_resource_count, target_resource_count,
+        status, research_status, strategic_rationale
       FROM expansion_priorities
       WHERE 1=1
         ${values.status ? sql`AND status = ${values.status}` : sql``}
@@ -171,11 +172,11 @@ async function coverageTargets(args) {
 
     table(
       rows.map((r) => ({
-        city: `${r.city_name}, ${r.state_code}`,
-        population: r.metro_population?.toLocaleString() || '?',
-        score: r.priority_score?.toFixed(1) || '?',
-        tier: r.tier || '?',
-        resources: r.resource_count || 0,
+        city: `${r.city}, ${r.state}`,
+        population: r.population?.toLocaleString() || '?',
+        score: r.priority_score || '?',
+        tier: r.priority_tier || '?',
+        resources: `${r.current_resource_count || 0}/${r.target_resource_count || '?'}`,
         status: r.status || 'pending',
       })),
       ['city', 'population', 'score', 'tier', 'resources', 'status'],
