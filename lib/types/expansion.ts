@@ -132,6 +132,8 @@ export interface CreateExpansionPriorityRequest {
   metro_area?: string
   region?: ExpansionRegion
   phase?: ExpansionPhase
+  priority_score?: number
+  priority_tier?: string
   population?: number
   state_release_volume?: number
   incarceration_rate?: number

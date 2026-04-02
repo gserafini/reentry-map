@@ -175,6 +175,8 @@ export async function POST(request: NextRequest) {
           metroArea: body.metro_area,
           region: body.region,
           phase: body.phase,
+          priorityScore: body.priority_score ?? 0,
+          priorityTier: body.priority_tier ?? 'tier_3',
           population: body.population,
           stateReleaseVolume: body.state_release_volume,
           incarcerationRate: body.incarceration_rate,
