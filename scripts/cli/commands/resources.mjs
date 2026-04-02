@@ -41,6 +41,7 @@ Subcommands:
   delete <id>          Delete a resource
 
   search --name X      Check for duplicate resources
+    --address X        Optional address filter
     --city X           Optional city filter
     --state X          Optional state filter
 
