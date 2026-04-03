@@ -633,7 +633,7 @@ Be lenient but accurate. Minor differences in wording are okay. Focus on substan
         status, verified, source, verification_status
       ) VALUES (
         ${suggestion.name}, ${suggestion.description || null},
-        ${suggestion.primary_category || null},
+        ${(suggestion.primary_category || 'general-support').replace(/_/g, '-')},
         ${suggestion.categories ? sql`${suggestion.categories}::text[]` : sql`NULL`},
         ${suggestion.tags ? sql`${suggestion.tags}::text[]` : sql`NULL`},
         ${suggestion.address || null}, ${suggestion.city || null},

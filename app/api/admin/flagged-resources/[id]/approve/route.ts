@@ -97,7 +97,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .values({
         name: suggestion.name,
         description: suggestion.description,
-        primaryCategory: suggestion.primaryCategory || suggestion.category || 'general_support',
+        primaryCategory: (
+          suggestion.primaryCategory ||
+          suggestion.category ||
+          'general-support'
+        ).replace(/_/g, '-'),
         categories: suggestion.categories,
         tags: suggestion.tags,
         address: suggestion.address || '',
