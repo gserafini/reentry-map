@@ -95,7 +95,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       ...updates,
       verificationSource: verification_source,
       lastVerifiedAt: new Date(),
-      verifiedBy: auth.userId || 'api_key',
+      verifiedBy: auth.userId || null,
     }
 
     // Update resource
