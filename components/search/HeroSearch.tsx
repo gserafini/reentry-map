@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import { TextField, Button, Box } from '@mui/material'
 import { Search as SearchIcon } from '@mui/icons-material'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { LocationInput } from './LocationInput'
+import { useUserLocation } from '@/lib/context/LocationContext'
 
 interface HeroSearchProps {
   /**
@@ -20,6 +21,8 @@ interface HeroSearchProps {
 export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
   const [searchQuery, setSearchQuery] = useState(initialValue)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { coordinates, displayName } = useUserLocation()
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Update when initialValue changes (e.g., URL navigation)
@@ -65,16 +68,35 @@ export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    // Trim the search query
     const query = searchQuery.trim()
+    const params = new URLSearchParams()
 
-    // Navigate to search page with query
     if (query) {
-      router.push(`/search?search=${encodeURIComponent(query)}`)
-    } else {
-      // If empty, just go to the search page
-      router.push('/search')
+      params.set('search', query)
     }
+
+    // Carry location params through from LocationInput/context
+    // Priority: existing URL params > LocationContext coordinates
+    const lat = searchParams.get('lat')
+    const lng = searchParams.get('lng')
+    const locationName = searchParams.get('locationName')
+    const distance = searchParams.get('distance')
+
+    if (lat && lng) {
+      params.set('lat', lat)
+      params.set('lng', lng)
+      if (locationName) params.set('locationName', locationName)
+      params.set('distance', distance || '25')
+    } else if (coordinates) {
+      // Fall back to LocationContext (set by LocationInput or GeoIP)
+      params.set('lat', coordinates.latitude.toString())
+      params.set('lng', coordinates.longitude.toString())
+      if (displayName) params.set('locationName', displayName)
+      params.set('distance', '25')
+    }
+
+    const qs = params.toString()
+    router.push(qs ? `/search?${qs}` : '/search')
   }
 
   return (
