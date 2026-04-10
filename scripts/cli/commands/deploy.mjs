@@ -1,33 +1,33 @@
 /**
- * deploy - Production deployment, logs, and status.
+ * deploy - Deployment, logs, and status.
  *
  * Subcommands:
  *   production             Deploy to production (git pull, build, restart)
- *   check-logs [--lines N] View production error logs
- *   status                 Check production status (HTTP + PM2)
+ *   staging                Deploy to staging (git pull, build, restart)
+ *   check-logs [--lines N] View target error logs
+ *   status                 Check target status (HTTP + PM2)
  */
 import { parseArgs } from 'node:util'
 import { spawn, execSync } from 'node:child_process'
 import { error, summary, success } from '../output.mjs'
-
-const SSH_HOST = 'root@dc3-1.serafinihosting.com'
-const SSH_PORT = '22022'
-const DEPLOY_CMD =
-  'su - reentrymap -c "cd ~/reentry-map-prod && git pull origin main && npm install && npm run build && pm2 restart reentry-map-prod"'
-const PROD_URL = 'https://reentrymap.org'
+import { getTargetConfig } from '../targets.mjs'
 
 function showHelp() {
   console.log(`
-deploy - Production deployment, logs, and status
+deploy - Deployment, logs, and status
 
 Subcommands:
   production               Deploy to production
                            Runs: git pull, npm install, npm run build, pm2 restart
+  staging                  Deploy to staging
+                           Runs: git pull, npm install, npm run build, pm2 restart
 
-  check-logs [--lines N]   View production error logs
+  check-logs [--lines N]   View target error logs
     --lines N              Number of lines (default: 50)
+    --target TARGET        production (default) or staging
 
-  status                   Check production status (HTTP response + PM2)
+  status                   Check target status (HTTP response + PM2)
+    --target TARGET        production (default) or staging
 `)
 }
 
@@ -41,7 +41,9 @@ export async function run(args) {
 
   switch (subcommand) {
     case 'production':
-      return await deployProduction(args)
+      return await deployTarget('production')
+    case 'staging':
+      return await deployTarget('staging')
     case 'check-logs':
       return await checkLogs(args)
     case 'status':
@@ -53,18 +55,25 @@ export async function run(args) {
   }
 }
 
-async function deployProduction() {
-  console.log('Deploying to production...')
-  console.log(`SSH: ${SSH_HOST}:${SSH_PORT}`)
-  console.log(`Command: ${DEPLOY_CMD}\n`)
+function buildDeployCommand(target) {
+  return `su - ${target.user} -c "cd ${target.cwd} && git pull origin ${target.branch} && npm install && npm run build && pm2 restart ${target.appName} --update-env"`
+}
+
+async function deployTarget(targetName) {
+  const target = getTargetConfig(targetName)
+  const deployCmd = buildDeployCommand(target)
+
+  console.log(`Deploying to ${target.name}...`)
+  console.log(`SSH: ${target.sshHost}:${target.sshPort}`)
+  console.log(`Command: ${deployCmd}\n`)
 
   return new Promise((resolve, reject) => {
-    const child = spawn('ssh', ['-p', SSH_PORT, SSH_HOST, DEPLOY_CMD], {
+    const child = spawn('ssh', ['-p', target.sshPort, target.sshHost, deployCmd], {
       stdio: 'inherit',
     })
     child.on('close', (code) => {
       if (code === 0) {
-        success('\nDeployment complete!')
+        success(`\n${target.name} deployment complete!`)
         resolve()
       } else {
         reject(new Error(`Deployment failed with exit code ${code}`))
@@ -76,14 +85,18 @@ async function deployProduction() {
 async function checkLogs(args) {
   const { values } = parseArgs({
     args,
-    options: { lines: { type: 'string', default: '50' } },
+    options: {
+      lines: { type: 'string', default: '50' },
+      target: { type: 'string', default: 'production' },
+    },
     allowPositionals: true,
     strict: false,
   })
 
-  const cmd = `tail -${values.lines} /home/reentrymap/logs/reentry-map-prod-error.log`
+  const target = getTargetConfig(values.target)
+  const cmd = `tail -${values.lines} /home/${target.user}/logs/${target.logPrefix}-error.log`
   return new Promise((resolve, reject) => {
-    const child = spawn('ssh', ['-p', SSH_PORT, SSH_HOST, cmd], {
+    const child = spawn('ssh', ['-p', target.sshPort, target.sshHost, cmd], {
       stdio: 'inherit',
     })
     child.on('close', (code) => {
@@ -93,11 +106,22 @@ async function checkLogs(args) {
   })
 }
 
-async function checkStatus() {
+async function checkStatus(args) {
+  const { values } = parseArgs({
+    args,
+    options: {
+      target: { type: 'string', default: 'production' },
+    },
+    allowPositionals: true,
+    strict: false,
+  })
+
+  const target = getTargetConfig(values.target)
+
   // Check HTTP
   let httpStatus = 'unknown'
   try {
-    const response = await fetch(PROD_URL, { method: 'HEAD' })
+    const response = await fetch(target.publicUrl, { method: 'HEAD' })
     httpStatus = `${response.status} ${response.statusText}`
   } catch (err) {
     httpStatus = `ERROR: ${err.message}`
@@ -107,7 +131,7 @@ async function checkStatus() {
   let pm2Status = 'unknown'
   try {
     pm2Status = execSync(
-      `ssh -p ${SSH_PORT} ${SSH_HOST} 'su - reentrymap -c "pm2 show reentry-map-prod --no-color"' 2>/dev/null`,
+      `ssh -p ${target.sshPort} ${target.sshHost} 'su - ${target.user} -c "pm2 show ${target.appName} --no-color"' 2>/dev/null`,
       { encoding: 'utf-8', timeout: 15000 }
     )
       .split('\n')
@@ -118,8 +142,8 @@ async function checkStatus() {
     pm2Status = 'Could not reach server'
   }
 
-  summary('Production Status', {
-    URL: PROD_URL,
+  summary(`${target.name[0].toUpperCase()}${target.name.slice(1)} Status`, {
+    URL: target.publicUrl,
     HTTP: httpStatus,
   })
 

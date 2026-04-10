@@ -1,8 +1,8 @@
 /**
- * migrate - Apply SQL migrations to production database.
+ * migrate - Apply SQL migrations to production or staging database.
  *
  * Subcommands:
- *   apply <file>        Apply a migration file to production DB via SSH
+ *   apply <file>        Apply a migration file to target DB via SSH
  *   list                List all migration files (with applied status if available)
  *   check <file>        Preview migration SQL without applying
  */
@@ -11,19 +11,15 @@ import { spawn, execSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, basename } from 'node:path'
 import { error, success, table } from '../output.mjs'
-
-const SSH_HOST = 'root@dc3-1.serafinihosting.com'
-const SSH_PORT = '22022'
-const DB_NAME = 'reentry_map'
-const DB_USER = 'reentrymap'
+import { getTargetConfig } from '../targets.mjs'
 const MIGRATIONS_DIR = resolve(import.meta.dirname, '../../../lib/db/migrations')
 
 function showHelp() {
   console.log(`
-migrate - Apply SQL migrations to production database
+migrate - Apply SQL migrations to production or staging database
 
 Subcommands:
-  apply <file>     Apply a migration to production DB
+  apply <file>     Apply a migration to target DB
                    <file> can be a full path or just the filename (e.g. 030_create_agent_sessions.sql)
                    Runs via SSH as reentrymap user on dc3-1
 
@@ -34,6 +30,7 @@ Subcommands:
 Options:
   --dry-run        Show the SSH command without executing (for apply)
   --force          Skip confirmation prompt
+  --target TARGET  production (default) or staging
 `)
 }
 
@@ -104,6 +101,7 @@ async function applyMigration(args) {
     options: {
       'dry-run': { type: 'boolean', default: false },
       force: { type: 'boolean', default: false },
+      target: { type: 'string', default: 'production' },
     },
     allowPositionals: true,
     strict: false,
@@ -113,10 +111,11 @@ async function applyMigration(args) {
   const fileArg = positionals[1] // first positional is "apply"
   const migrationPath = resolveMigrationPath(fileArg)
   const fileName = basename(migrationPath)
+  const target = getTargetConfig(values.target)
 
   console.log(`Migration: ${fileName}`)
   console.log(`Source:    ${migrationPath}`)
-  console.log(`Target:    ${DB_USER}@dc3-1/${DB_NAME}`)
+  console.log(`Target:    ${target.user}@dc3-1/${target.dbName} (${target.name})`)
   console.log()
 
   // Read and show a preview
@@ -131,7 +130,7 @@ async function applyMigration(args) {
   console.log()
 
   // The SSH command pipes the local file to psql on the remote
-  const sshCmd = `ssh -p ${SSH_PORT} ${SSH_HOST} 'su - ${DB_USER} -c "psql -U ${DB_USER} ${DB_NAME}"'`
+  const sshCmd = `ssh -p ${target.sshPort} ${target.sshHost} 'su - ${target.user} -c "psql -U ${target.user} ${target.dbName}"'`
 
   if (values['dry-run']) {
     console.log('Dry run - would execute:')
@@ -146,7 +145,7 @@ async function applyMigration(args) {
       'sh',
       [
         '-c',
-        `cat "${migrationPath}" | ssh -p ${SSH_PORT} ${SSH_HOST} 'su - ${DB_USER} -c "psql -U ${DB_USER} ${DB_NAME}"'`,
+        `cat "${migrationPath}" | ssh -p ${target.sshPort} ${target.sshHost} 'su - ${target.user} -c "psql -U ${target.user} ${target.dbName}"'`,
       ],
       { stdio: ['pipe', 'inherit', 'inherit'] }
     )

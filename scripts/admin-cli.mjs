@@ -38,7 +38,7 @@ const COMMAND_DESCRIPTIONS = {
   verify: 'Resource verification operations',
   suggestions: 'Suggestions queue management',
   agents: 'AI agent control (discovery, enrichment)',
-  deploy: 'Production deployment, logs, status',
+  deploy: 'Deployment, logs, and status for production/staging',
   quality: 'Quality checks and testing',
   migrate: 'Apply SQL migrations to production database',
 }

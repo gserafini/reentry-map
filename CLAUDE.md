@@ -67,6 +67,7 @@ npm run quality:full # Full: Above + E2E tests
   - E2E tests (`npm run test:e2e`) via `dev:test`
   - Playwright automated tests
   - Screenshot generation
+- **Port 3009**: Permanent staging server (`reentry-map-staging`) - do not reuse for ad-hoc local tests
 
 **Important**: All automated testing uses port 3004 to preserve the user's dev server on port 3003. Never run commands that kill port 3003 during quality checks.
 
