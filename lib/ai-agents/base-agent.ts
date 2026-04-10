@@ -29,6 +29,7 @@ export abstract class BaseAgent {
   protected openai: OpenAI
   protected agentType: AgentType
   protected logId: string | null = null
+  protected startedAtMs: number | null = null
 
   constructor(agentType: AgentType) {
     this.agentType = agentType
@@ -47,9 +48,16 @@ export abstract class BaseAgent {
    * Start agent execution and create log entry
    */
   protected async startLog(): Promise<string> {
+    this.startedAtMs = Date.now()
+
     const rows = await sql<{ id: string }[]>`
-      INSERT INTO ai_agent_logs (agent_type, status, resources_processed, resources_added, resources_updated)
-      VALUES (${this.agentType}, ${'success'}, ${0}, ${0}, ${0})
+      INSERT INTO ai_agent_logs (agent_type, action, input, success)
+      VALUES (
+        ${this.agentType},
+        ${'run'},
+        ${JSON.stringify({ status: 'started' })}::jsonb,
+        ${null}
+      )
       RETURNING id
     `
 
@@ -68,16 +76,40 @@ export abstract class BaseAgent {
     if (!this.logId) return
 
     try {
+      const successValue =
+        logData.status === 'success' ? true : logData.status === 'failure' ? false : null
+
+      const outputPayload = {
+        ...(logData.status ? { status: logData.status } : {}),
+        ...(typeof logData.resources_processed === 'number'
+          ? { resources_processed: logData.resources_processed }
+          : {}),
+        ...(typeof logData.resources_added === 'number'
+          ? { resources_added: logData.resources_added }
+          : {}),
+        ...(typeof logData.resources_updated === 'number'
+          ? { resources_updated: logData.resources_updated }
+          : {}),
+        ...(logData.metadata ? { metadata: logData.metadata } : {}),
+      }
+
+      const durationMs =
+        typeof this.startedAtMs === 'number' ? Math.max(Date.now() - this.startedAtMs, 0) : null
+      const costUsd =
+        typeof logData.cost_cents === 'number'
+          ? Number((logData.cost_cents / 100).toFixed(4))
+          : null
+
       await sql`
         UPDATE ai_agent_logs SET
-          status = COALESCE(${logData.status ?? null}, status),
-          resources_processed = COALESCE(${logData.resources_processed ?? null}, resources_processed),
-          resources_added = COALESCE(${logData.resources_added ?? null}, resources_added),
-          resources_updated = COALESCE(${logData.resources_updated ?? null}, resources_updated),
+          success = COALESCE(${successValue}, success),
           error_message = COALESCE(${logData.error_message ?? null}, error_message),
-          metadata = COALESCE(${logData.metadata ? JSON.stringify(logData.metadata) : null}::jsonb, metadata),
-          cost_cents = COALESCE(${logData.cost_cents ?? null}, cost_cents),
-          completed_at = NOW()
+          output = COALESCE(
+            ${Object.keys(outputPayload).length > 0 ? JSON.stringify(outputPayload) : null}::jsonb,
+            output
+          ),
+          cost = COALESCE(${costUsd}, cost),
+          duration_ms = COALESCE(${durationMs}, duration_ms)
         WHERE id = ${this.logId}
       `
     } catch (error) {
