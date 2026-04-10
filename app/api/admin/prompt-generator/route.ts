@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const categoriesList =
       categories && categories.length > 0
         ? categories.join(', ')
-        : 'employment, housing, food, healthcare, legal aid, mental health, substance abuse treatment'
+        : 'employment, housing, food, healthcare, legal-aid, mental-health, substance-abuse, education, transportation, clothing, id-documents, faith-based, general-support'
 
     // Build "already found" list
     const alreadyFoundList =
@@ -165,23 +165,23 @@ For each resource, collect:
 
 ### Basic Info (Required)
 - **name**: Full organization name
-- **description**: 2-3 sentence description of services
-- **primary_category**: Most relevant category (one of: employment, housing, food, healthcare, legal_aid, mental_health, substance_abuse, education, transportation, clothing, id_documents, faith_based, general_support)
+- **description**: 2-3 thorough sentences explaining what the organization actually does, who it serves, and why it is relevant for reentry
+- **primary_category**: Most relevant category (one of: employment, housing, food, healthcare, legal-aid, mental-health, substance-abuse, education, transportation, clothing, id-documents, faith-based, general-support)
 - **categories**: Array of all applicable categories
 - **tags**: Relevant tags (e.g., ["reentry-specific", "no-cost", "walk-in-welcome"])
 
 ### Contact (Required)
-- **address**: Full street address
+- **address**: Full street address with a street number. Do NOT use a PO Box, city-only address, "call for location", "serving the area", or other vague location
 - **city**: "${city}"
 - **state**: "${state}"
 - **zip**: ZIP code
 - **phone**: Phone number (format: "555-123-4567")
-- **website**: Website URL (if available)
-- **email**: Email address (if available)
+- **website**: Website URL. Required effort: if they have a website, include it
+- **email**: Email address. Required effort: check contact page, footer, About page, staff directory, and referral/intake pages before leaving blank
 
 ### Additional Details (If Available)
 - **hours**: Hours of operation (object format: {"Monday": "9:00 AM - 5:00 PM", ...})
-- **services_offered**: Array of specific services
+- **services_offered**: Array of specific services. Do NOT just repeat the category name
 - **eligibility_requirements**: Array of eligibility criteria
 - **fees**: Fee structure (or "free")
 - **languages**: Array of languages spoken
@@ -208,11 +208,19 @@ For **EVERY resource**, include a \`source\` object documenting where/how you fo
 - \`nonprofit_directory\` - Found in nonprofit directory
 - \`verification_call\` - Verified by phone call
 
+## Non-Negotiable Data Quality Rules
+- **Email is required effort**: actively look for email on the website before leaving it blank
+- **No vague addresses**: every resource must have a real street address with a street number
+- **No PO Box-only entries**: if only a PO Box is available and no service location can be found, skip it
+- **Descriptions must be specific**: write 2-3 thorough sentences, not fragments or category labels
+- **services_offered must be concrete**: list actual services like "GED prep", "resume workshops", "transitional housing", "record expungement help"
+
 ## Quality Standards
 - ✅ **Verify resource is still active** (check website/call if possible)
 - ✅ **Confirm address is current**
 - ✅ **Prioritize reentry-specific services**
 - ✅ **Include diverse service types** (don't just focus on housing)
+- ✅ **Get phone, website, and email whenever they can be found**
 - ✅ **Document your source for EVERY resource**
 
 ## Output Format
@@ -267,7 +275,7 @@ Save as: **${city.toLowerCase().replace(/\s+/g, '-')}-resources-batch-${batchNum
 
 ## Success Criteria
 - [ ] Found ${targetCount} resources
-- [ ] All resources have complete contact info (name, address, phone)
+- [ ] All resources have complete contact info (name, address, phone, website, email)
 - [ ] All resources have \`source\` provenance tracking
 - [ ] Mix of service categories (not just one type)
 - [ ] Verified resources are currently active

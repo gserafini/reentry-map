@@ -165,7 +165,8 @@ async function importResources(args) {
   }
 
   const params = isPreview ? { preview: 'true' } : {}
-  const data = await apiPost('/api/admin/resources/import', fileContent, params)
+  const requestBody = Array.isArray(fileContent) ? { resources: fileContent } : fileContent
+  const data = await apiPost('/api/admin/resources/import', requestBody, params)
 
   if (args.includes('--json')) {
     output(data)
