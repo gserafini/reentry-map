@@ -216,17 +216,21 @@ export async function getResources(
     }
 
     // No location provided - use standard query
-    const conditions = buildResourceConditions({
-      search,
-      categories,
-      tags,
-      city,
-      state,
-      min_rating,
-      verified_only,
-      accepts_records,
-      appointment_required,
-    })
+    const conditions = buildResourceConditions(
+      {
+        search,
+        categories,
+        tags,
+        city,
+        state,
+        min_rating,
+        verified_only,
+        accepts_records,
+        appointment_required,
+      },
+      undefined,
+      'with_primary_category'
+    )
     const whereClause = combineConditions(conditions)
 
     // Validate sort field and direction against allowlists
