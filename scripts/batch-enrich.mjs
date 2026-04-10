@@ -94,7 +94,7 @@ function parseJson(text) {
 }
 
 // ── Website fetching ────────────────────────────────────────────────────────
-async function fetchWebsiteText(url) {
+async function fetchSinglePage(url) {
   try {
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'ReentryMap-Enrichment/1.0' },
@@ -115,6 +115,46 @@ async function fetchWebsiteText(url) {
   } catch {
     return null
   }
+}
+
+/**
+ * Multi-page fetch: crawl the stored URL plus common pages where
+ * contact info and hours typically live (/contact, /about, homepage).
+ * Combines text from all pages into a single document for the model.
+ */
+async function fetchWebsiteText(url) {
+  // Extract base domain from stored URL
+  const baseMatch = url.match(/^(https?:\/\/[^/]+)/)
+  if (!baseMatch) return fetchSinglePage(url)
+  const base = baseMatch[1]
+
+  // Pages to check, in priority order
+  const pagesToCheck = [
+    url, // stored URL (always check first)
+    base, // homepage (may have footer with contact)
+    base + '/contact',
+    base + '/contact-us',
+    base + '/about',
+    base + '/hours',
+  ]
+
+  // Deduplicate (stored URL might be the homepage)
+  const uniquePages = [...new Set(pagesToCheck.map((p) => p.replace(/\/$/, '')))]
+
+  const sections = []
+  for (const pageUrl of uniquePages) {
+    const text = await fetchSinglePage(pageUrl)
+    if (text && text.length > 50) {
+      // Label each section so the model knows which page it came from
+      const pagePath = pageUrl.replace(base, '') || '/'
+      sections.push(`[Page: ${pagePath}]\n${text}`)
+    }
+    // Don't fetch more if we already have plenty of content
+    if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
+  }
+
+  if (sections.length === 0) return null
+  return sections.join('\n\n').slice(0, 10000)
 }
 
 // ── Build the enrichment query based on field filter ────────────────────────
@@ -156,10 +196,17 @@ Current phone on file: ${resource.phone || 'none'}
 Current email on file: ${resource.email || 'none'}
 Current description on file: ${resource.description || 'none'}
 
-Website content (text extracted from HTML):
+Below is text extracted from multiple pages of this organization's website. Each section is labeled with the page path.
+
 ${websiteText}
 
-Extract ONLY information that is clearly stated on the website. Do not guess or make up data.
+Extract information from ANY of the pages above. Look carefully for:
+- Email addresses (often on /contact pages or in page footers)
+- Operating hours (often on /contact, /about, or homepage)
+- Services offered (often on homepage or /about)
+- A clear description if the current one is missing or too short
+
+Extract ONLY information that is clearly stated. Do not guess or make up data.
 
 Respond with ONLY valid JSON:
 {
