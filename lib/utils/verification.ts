@@ -16,14 +16,14 @@
  */
 
 import { geocodeAddress } from './geocoding'
-import Anthropic from '@anthropic-ai/sdk'
-import { env } from '@/lib/env'
-import { trackAICost, calculateAnthropicCost } from '@/lib/ai-agents/verification-events'
-
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: env.ANTHROPIC_API_KEY,
-})
+import { trackAICost } from '@/lib/ai-agents/verification-events'
+import {
+  ollamaChatWithTools,
+  ollamaHealthCheck,
+  toolFetchUrl,
+  FETCH_URL_TOOL,
+  parseJsonFromOutput,
+} from '@/lib/ai-agents/ollama-client'
 
 // ============================================================================
 // LEVEL 1: AUTOMATED CHECKS
@@ -340,71 +340,57 @@ export async function autoFixUrl(
   output_tokens?: number
 }> {
   try {
+    const health = await ollamaHealthCheck()
+    if (!health.available) {
+      console.warn('Ollama not available for URL auto-fix, skipping')
+      return { fixed: false, method: 'ollama_unavailable' }
+    }
+
     const locationContext = city && state ? ` in ${city}, ${state}` : ''
+    const citySlug = city?.toLowerCase().replace(/\s+/g, '-') || 'city'
 
     const prompt = `Find the CORRECT, WORKING website URL for "${organizationName}"${locationContext}.
 
-Current broken URL: ${currentUrl} (returns 404)
+Current broken URL: ${currentUrl} (returns error)
 
-IMPORTANT INSTRUCTIONS:
-1. Search for the organization's OFFICIAL website (ceoworks.org, not directory listings like findhelp.org, LinkedIn, Indeed)
-2. For multi-location organizations, systematically test URL patterns:
-   - /locations/${city?.toLowerCase() || 'city'}
-   - /locations/${city?.toLowerCase().replace(/\s+/g, '-') || 'city'}
-   - /${city?.toLowerCase() || 'city'}
-   - /${city?.toLowerCase().replace(/\s+/g, '-') || 'city'}
-3. The URL you return MUST be the organization's official website and MUST return HTTP 200 (not 404)
-4. If you find search results, extract the organization's domain and test actual URL patterns
+INSTRUCTIONS:
+1. Use the fetch_url tool to check the base domain (e.g., if URL is example.org/page, check example.org first)
+2. Read the fetched content to find navigation links or location pages
+3. Try URL patterns for the city "${city || 'unknown'}":
+   - /locations/${citySlug}
+   - /${citySlug}
+   - /contact
+4. Each URL you try MUST be verified with fetch_url before reporting it
+5. Only report URLs that returned HTTP 200
 
-CRITICAL: Your response must be EXACTLY ONE LINE containing ONLY the URL.
-- Start with http:// or https://
-- No explanations, no markdown, no additional text
-- Just the URL, nothing else
-- Example correct response: https://www.ceoworks.org/locations/oakland
-- Example incorrect response: "Based on search results, the URL is https://..."
+When done, respond with JSON:
+{"fixed": true/false, "new_url": "the working URL or null", "confidence": 0.0-1.0}
 
-If you cannot find a verified working URL, return exactly: NOT_FOUND`
+If no working URL found: {"fixed": false, "new_url": null, "confidence": 0}`
 
-    const response = await anthropic.messages.create({
-      model: env.ANTHROPIC_VERIFICATION_MODEL, // Sonnet 4.5 with web search
-      max_tokens: 1024, // More tokens for reasoning through URL patterns
-      temperature: 0.1, // Low temperature for factual responses
-      tools: [
+    const result = await ollamaChatWithTools(
+      [
         {
-          type: 'web_search_20250305' as const, // Enable real-time web search
-          name: 'web_search',
+          role: 'system',
+          content:
+            'You find correct website URLs for organizations. Use the fetch_url tool to verify each URL you try. Respond with JSON when done.',
         },
+        { role: 'user', content: prompt },
       ],
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    })
-
-    // Extract URL from response (find the text block, not tool_use blocks)
-    const textBlock = response.content.find((block) => block.type === 'text')
-    const textContent = textBlock && textBlock.type === 'text' ? textBlock.text : ''
-    const foundUrl = textContent.trim()
-
-    // Calculate cost using centralized pricing function
-    const { input_cost_usd, output_cost_usd } = calculateAnthropicCost(
-      env.ANTHROPIC_VERIFICATION_MODEL,
-      response.usage.input_tokens,
-      response.usage.output_tokens
+      [FETCH_URL_TOOL],
+      { fetch_url: toolFetchUrl },
+      { temperature: 0.1, maxRounds: 6, timeoutMs: 120_000 }
     )
-    const totalCost = input_cost_usd + output_cost_usd
 
-    // Track cost to database (async, don't await to avoid slowing down verification)
+    // Track cost (free for local model)
     trackAICost({
       operation_type: 'url_autofix',
-      provider: 'anthropic',
-      model: env.ANTHROPIC_VERIFICATION_MODEL,
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
-      input_cost_usd,
-      output_cost_usd,
+      provider: 'ollama' as 'openai', // Type expects 'anthropic' | 'openai', ollama is free
+      model: health.model,
+      input_tokens: 0,
+      output_tokens: result.evalTokens,
+      input_cost_usd: 0,
+      output_cost_usd: 0,
       operation_context: {
         organization_name: organizationName,
         current_url: currentUrl,
@@ -413,41 +399,56 @@ If you cannot find a verified working URL, return exactly: NOT_FOUND`
       },
     }).catch((err) => console.error('Failed to track AI cost:', err))
 
-    // Check if URL was found
-    if (foundUrl === 'NOT_FOUND' || !foundUrl.startsWith('http')) {
+    // Parse the response
+    try {
+      const parsed = parseJsonFromOutput<{
+        fixed: boolean
+        new_url?: string | null
+        confidence?: number
+      }>(result.content)
+
+      if (parsed.fixed && parsed.new_url) {
+        // Double-check the URL is actually reachable
+        const checkResult = await checkUrlReachable(parsed.new_url)
+        if (checkResult.pass) {
+          return {
+            fixed: true,
+            new_url: parsed.new_url,
+            confidence: parsed.confidence || 0.9,
+            method: 'ollama_tool_use',
+            cost_usd: 0,
+            input_tokens: 0,
+            output_tokens: result.evalTokens,
+          }
+        }
+      }
+
       return {
         fixed: false,
-        method: 'ai_web_search',
-        cost_usd: totalCost,
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
+        method: 'ollama_tool_use',
+        cost_usd: 0,
+        input_tokens: 0,
+        output_tokens: result.evalTokens,
       }
-    }
-
-    // Verify the URL Claude found is actually reachable
-    const checkResult = await checkUrlReachable(foundUrl)
-
-    if (checkResult.pass) {
-      return {
-        fixed: true,
-        new_url: foundUrl,
-        confidence: 0.95, // High confidence when Claude finds it and it's reachable
-        method: 'ai_web_search',
-        cost_usd: totalCost,
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
+    } catch {
+      // Model didn't return valid JSON — check if it returned a raw URL
+      const urlMatch = result.content.match(/https?:\/\/[^\s"]+/)
+      if (urlMatch) {
+        const checkResult = await checkUrlReachable(urlMatch[0])
+        if (checkResult.pass) {
+          return {
+            fixed: true,
+            new_url: urlMatch[0],
+            confidence: 0.7,
+            method: 'ollama_tool_use',
+            cost_usd: 0,
+          }
+        }
       }
-    } else {
-      return {
-        fixed: false,
-        method: 'ai_web_search',
-        cost_usd: totalCost,
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
-      }
+      return { fixed: false, method: 'ollama_tool_use', cost_usd: 0 }
     }
   } catch (error) {
-    console.error(`    ❌ Error in AI URL auto-fix:`, error)
+    console.error(`    Error in AI URL auto-fix:`, error)
     return { fixed: false }
   }
 }

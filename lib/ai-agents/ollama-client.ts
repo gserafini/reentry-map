@@ -145,6 +145,203 @@ export async function ollamaGenerate(
   }
 }
 
+// ── Tool-calling support ───────────────────────────────────────────────────
+
+/** Tool definition compatible with Ollama's native /api/chat tool format */
+export interface OllamaTool {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: {
+      type: 'object'
+      properties: Record<string, { type: string; description: string }>
+      required?: string[]
+    }
+  }
+}
+
+/** A tool call returned by the model */
+export interface OllamaToolCall {
+  function: {
+    name: string
+    arguments: Record<string, unknown>
+  }
+}
+
+/** Handler that executes a tool and returns the result as a string */
+export type ToolHandler = (args: Record<string, unknown>) => Promise<string>
+
+/** Native /api/chat response shape (supports tool_calls) */
+interface OllamaNativeChatResponse {
+  message?: {
+    role: string
+    content: string
+    tool_calls?: Array<{
+      function: { name: string; arguments: Record<string, unknown> }
+    }>
+  }
+  total_duration?: number
+  eval_count?: number
+  eval_duration?: number
+}
+
+/**
+ * Run an agentic tool-use loop: send messages to the model, execute any tool
+ * calls it makes, feed results back, and repeat until the model produces a
+ * final text response (up to maxRounds to prevent infinite loops).
+ *
+ * Uses Ollama's native /api/chat endpoint which supports tool definitions.
+ */
+export async function ollamaChatWithTools(
+  messages: Array<{ role: string; content: string }>,
+  tools: OllamaTool[],
+  toolHandlers: Record<string, ToolHandler>,
+  options?: {
+    model?: string
+    temperature?: number
+    maxRounds?: number
+    timeoutMs?: number
+  }
+): Promise<OllamaCompletionResult> {
+  const model = options?.model || OLLAMA_ENRICHMENT_MODEL
+  const maxRounds = options?.maxRounds || 5
+  const timeoutMs = options?.timeoutMs || 180_000 // 3 min for multi-turn
+  const conversationMessages = [...messages]
+  let totalEvalTokens = 0
+
+  for (let round = 0; round < maxRounds; round++) {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: conversationMessages,
+        tools,
+        stream: false,
+        options: { temperature: options?.temperature ?? 0.1 },
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'unknown error')
+      throw new Error(`Ollama tool-chat error ${response.status}: ${errorText}`)
+    }
+
+    const data = (await response.json()) as OllamaNativeChatResponse
+    const msg = data.message
+    totalEvalTokens += data.eval_count || 0
+
+    if (!msg) throw new Error('Ollama returned no message')
+
+    // If model produced tool calls, execute them and continue the loop
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      conversationMessages.push({ role: 'assistant', content: msg.content || '' })
+
+      for (const tc of msg.tool_calls) {
+        const handler = toolHandlers[tc.function.name]
+        if (!handler) {
+          conversationMessages.push({
+            role: 'tool',
+            content: JSON.stringify({ error: `Unknown tool: ${tc.function.name}` }),
+          })
+          continue
+        }
+
+        try {
+          const result = await handler(tc.function.arguments)
+          conversationMessages.push({ role: 'tool', content: result })
+        } catch (err) {
+          conversationMessages.push({
+            role: 'tool',
+            content: JSON.stringify({
+              error: err instanceof Error ? err.message : 'Tool execution failed',
+            }),
+          })
+        }
+      }
+      continue // Next round
+    }
+
+    // No tool calls — model produced a final text response
+    return {
+      content: msg.content || '',
+      model: data.message?.role === 'assistant' ? model : model,
+      totalDurationMs: Math.round((data.total_duration || 0) / 1e6),
+      evalTokens: totalEvalTokens,
+      tokensPerSec: 0,
+    }
+  }
+
+  // Hit maxRounds — return whatever we have
+  return {
+    content: 'Tool loop exceeded maximum rounds',
+    model,
+    totalDurationMs: 0,
+    evalTokens: totalEvalTokens,
+    tokensPerSec: 0,
+  }
+}
+
+/**
+ * Built-in tool: fetch a URL and return its text content.
+ * Used by the URL auto-fix agent to verify websites.
+ */
+export async function toolFetchUrl(args: Record<string, unknown>): Promise<string> {
+  const url = args.url as string
+  if (!url || typeof url !== 'string') {
+    return JSON.stringify({ error: 'url parameter is required' })
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'ReentryMap-Verification/1.0' },
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'follow',
+    })
+
+    if (!response.ok) {
+      return JSON.stringify({ status: response.status, error: `HTTP ${response.status}` })
+    }
+
+    const html = await response.text()
+    const text = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    return JSON.stringify({ status: 200, url: response.url, content: text.slice(0, 3000) })
+  } catch (err) {
+    return JSON.stringify({
+      status: 'error',
+      error: err instanceof Error ? err.message : 'Fetch failed',
+    })
+  }
+}
+
+/** Standard fetch_url tool definition for Ollama tool-calling models */
+export const FETCH_URL_TOOL: OllamaTool = {
+  type: 'function',
+  function: {
+    name: 'fetch_url',
+    description:
+      'Fetch a URL to check if it exists and is reachable. Returns HTTP status and text content.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The URL to fetch (must start with http:// or https://)',
+        },
+      },
+      required: ['url'],
+    },
+  },
+}
+
 /**
  * Parse JSON from model output, handling markdown code blocks.
  */
