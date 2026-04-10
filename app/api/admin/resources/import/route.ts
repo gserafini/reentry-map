@@ -6,6 +6,12 @@ import { eq, and } from 'drizzle-orm'
 import { checkForDuplicate, detectParentChildRelationships } from '@/lib/utils/deduplication'
 import type { NewResource, Resource } from '@/lib/db/schema'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
+import {
+  normalizeAddressType,
+  normalizeServiceArea,
+  requiresServiceArea,
+  requiresStreetAddress,
+} from '@/lib/utils/resource-location'
 
 /**
  * Server-side geocoding using Google Maps REST API
@@ -62,7 +68,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const isPreview = request.nextUrl.searchParams.get('preview') === 'true'
+    const searchParams = request.nextUrl?.searchParams || new URL(request.url).searchParams
+    const isPreview = searchParams.get('preview') === 'true'
 
     const body = (await request.json()) as { resources: unknown[] }
     const resourceList = body.resources
@@ -78,6 +85,8 @@ export async function POST(request: NextRequest) {
       const sourceData = resource.source || {}
       const sourceName =
         sourceData.discovered_by || sourceData.name || sourceData.research_method || 'admin_import'
+      const addressType = normalizeAddressType(resource.address_type)
+      const serviceArea = normalizeServiceArea(resource.service_area)
 
       // Build initial change_log entry with full provenance
       const initialChangeLog = [
@@ -114,7 +123,9 @@ export async function POST(request: NextRequest) {
         primaryCategory: resource.primary_category,
         categories: resource.categories || null,
         tags: resource.tags || null,
-        address: resource.address,
+        address: resource.address || '',
+        addressType,
+        serviceArea,
         city: resource.city || null,
         state: resource.state || 'CA',
         zip: resource.zip || resource.zip_code || null,
@@ -166,6 +177,20 @@ export async function POST(request: NextRequest) {
     // Process each resource with deduplication
     for (const resource of validResources) {
       try {
+        if (requiresStreetAddress(resource.addressType || 'physical') && !resource.address) {
+          errors++
+          errorDetails.push(`${resource.name}: physical resources require a street address`)
+          continue
+        }
+
+        if (requiresServiceArea(resource.addressType || 'physical') && !resource.serviceArea) {
+          errors++
+          errorDetails.push(
+            `${resource.name}: ${resource.addressType} resources require a valid service_area`
+          )
+          continue
+        }
+
         const dupeCheck = await checkForDuplicate(resource)
 
         if (dupeCheck.isDuplicate && dupeCheck.suggestedAction === 'skip') {
@@ -317,16 +342,29 @@ export async function POST(request: NextRequest) {
     const geocodeErrors: string[] = []
 
     if (!isPreview) {
-      const ungeocodedResources = [...createdResources, ...updatedResourceObjects].filter(
-        (r) => r.latitude === null || r.longitude === null
-      )
+      const ungeocodedResources = [...createdResources, ...updatedResourceObjects].filter((r) => {
+        if (r.latitude !== null && r.longitude !== null) {
+          return false
+        }
+
+        return (r.addressType || 'physical') === 'physical' || r.addressType === 'confidential'
+      })
 
       if (ungeocodedResources.length > 0) {
         for (const resource of ungeocodedResources) {
-          if (!resource.address) continue
           try {
+            if ((resource.addressType || 'physical') === 'physical' && !resource.address) {
+              geocodeErrors.push(resource.name)
+              continue
+            }
+
+            if (resource.addressType === 'confidential' && (!resource.city || !resource.state)) {
+              geocodeErrors.push(resource.name)
+              continue
+            }
+
             const result = await geocodeResource(
-              resource.address,
+              resource.addressType === 'confidential' ? '' : resource.address,
               resource.city,
               resource.state,
               resource.zip
@@ -358,7 +396,7 @@ export async function POST(request: NextRequest) {
     const warnings: string[] = []
     if (geocodeErrors.length > 0) {
       warnings.push(
-        `${geocodeErrors.length} resource(s) could not be geocoded and will not appear in location-based search: ${geocodeErrors.join(', ')}`
+        `${geocodeErrors.length} physical/confidential resource(s) could not be geocoded and may not appear in location-based search: ${geocodeErrors.join(', ')}`
       )
     }
 

@@ -373,6 +373,8 @@ export const resourceSuggestions = pgTable(
     // Suggested resource details
     name: text('name').notNull(),
     address: text('address'),
+    addressType: text('address_type').default('physical'),
+    serviceArea: jsonb('service_area'),
     city: text('city'),
     state: text('state'),
     zip: text('zip'),

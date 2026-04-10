@@ -171,13 +171,16 @@ For each resource, collect:
 - **tags**: Relevant tags (e.g., ["reentry-specific", "no-cost", "walk-in-welcome"])
 
 ### Contact (Required)
-- **address**: Full street address with a street number. Do NOT use a PO Box, city-only address, "call for location", "serving the area", or other vague location
+- **address**: When a real street address exists, include it with a street number
 - **city**: "${city}"
 - **state**: "${state}"
 - **zip**: ZIP code
 - **phone**: Phone number (format: "555-123-4567")
-- **website**: Website URL. Required effort: if they have a website, include it
+- **website**: Website URL. Required effort: if they have a website, include it. In web research, website is usually the easiest field to capture
 - **email**: Email address. Required effort: check contact page, footer, About page, staff directory, and referral/intake pages before leaving blank
+- **address_type**: "physical" | "confidential" | "regional" | "online" | "mobile"
+- **Confidential example**: use \`"address_type": "confidential"\` when the organization is real but intentionally withholds its street address for safety/privacy
+- **service_area**: Required for "regional", "online", and "mobile" resources. Format: {"type": "city|county|statewide|region|nationwide", "values": ["Lubbock", "Lubbock County"]}
 
 ### Additional Details (If Available)
 - **hours**: Hours of operation (object format: {"Monday": "9:00 AM - 5:00 PM", ...})
@@ -210,8 +213,11 @@ For **EVERY resource**, include a \`source\` object documenting where/how you fo
 
 ## Non-Negotiable Data Quality Rules
 - **Email is required effort**: actively look for email on the website before leaving it blank
-- **No vague addresses**: every resource must have a real street address with a street number
-- **No PO Box-only entries**: if only a PO Box is available and no service location can be found, skip it
+- **Some legitimate resources do not publish a street address**: shelters, confidential programs, statewide hotlines, online services, and mobile programs are still valid if you capture them honestly
+- **Use address_type correctly**: "physical" for normal street-address resources, "confidential" when exact location is intentionally withheld, "regional"/"online"/"mobile" for area-serving resources
+- **Use service_area for non-physical coverage**: if a resource serves an area instead of a single public address, define that area explicitly
+- **Do not invent street addresses**: if no public street address exists, leave address blank instead of guessing
+- **PO Boxes are acceptable as mailing-only info** only when the resource is otherwise clearly real and you still classify it correctly
 - **Descriptions must be specific**: write 2-3 thorough sentences, not fragments or category labels
 - **services_offered must be concrete**: list actual services like "GED prep", "resume workshops", "transitional housing", "record expungement help"
 
@@ -221,6 +227,7 @@ For **EVERY resource**, include a \`source\` object documenting where/how you fo
 - ✅ **Prioritize reentry-specific services**
 - ✅ **Include diverse service types** (don't just focus on housing)
 - ✅ **Get phone, website, and email whenever they can be found**
+- ✅ **Include area-serving and confidential-location resources when they are clearly real**
 - ✅ **Document your source for EVERY resource**
 
 ## Output Format
@@ -238,6 +245,7 @@ Save as: **${city.toLowerCase().replace(/\s+/g, '-')}-resources-batch-${batchNum
     "city": "${city}",
     "state": "${state}",
     "zip": "12345",
+    "address_type": "physical",
     "phone": "555-123-4567",
     "website": "https://example.org",
     "email": "info@example.org",
@@ -269,13 +277,44 @@ Save as: **${city.toLowerCase().replace(/\s+/g, '-')}-resources-batch-${batchNum
       "discovered_by": "claude_web",
       "notes": "Listed on county probation department website"
     }
+  },
+  {
+    "name": "Example Statewide Hotline",
+    "description": "Provides statewide referrals and navigation support for people returning from incarceration, including resource matching and crisis referrals.",
+    "primary_category": "general-support",
+    "categories": ["general-support"],
+    "tags": ["statewide", "referrals"],
+    "address": "",
+    "city": "${city}",
+    "state": "${state}",
+    "zip": "",
+    "address_type": "regional",
+    "service_area": {
+      "type": "statewide",
+      "values": ["${state}"]
+    },
+    "phone": "555-222-3333",
+    "website": "https://examplehotline.org",
+    "email": "",
+    "services_offered": [
+      "Resource referrals",
+      "Navigation support"
+    ],
+    "source": {
+      "name": "State corrections reentry page",
+      "url": "https://state.gov/reentry",
+      "accessed_date": "${new Date().toISOString().split('T')[0]}",
+      "research_method": "government_website",
+      "discovered_by": "claude_web",
+      "notes": "Statewide referral resource serving ${state}"
+    }
   }
 ]
 \`\`\`
 
 ## Success Criteria
 - [ ] Found ${targetCount} resources
-- [ ] All resources have complete contact info (name, address, phone, website, email)
+- [ ] All resources have the strongest contact profile available for their type (website, phone, email, and either address or explicit address_type/service_area)
 - [ ] All resources have \`source\` provenance tracking
 - [ ] Mix of service categories (not just one type)
 - [ ] Verified resources are currently active

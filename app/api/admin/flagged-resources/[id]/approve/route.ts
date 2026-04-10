@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
+import { requiresServiceArea } from '@/lib/utils/resource-location'
 
 /**
  * POST /api/admin/flagged-resources/[id]/approve
@@ -42,53 +43,98 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Geocode address if coordinates are missing
     let latitude = suggestion.latitude
     let longitude = suggestion.longitude
+    const addressType = suggestion.addressType || 'physical'
+    const serviceArea = suggestion.serviceArea || null
 
-    if (!latitude || !longitude) {
+    if (addressType === 'physical' && (!latitude || !longitude)) {
       if (!suggestion.address) {
         return NextResponse.json(
-          { error: 'Cannot approve resource: missing address and coordinates' },
+          { error: 'Cannot approve physical resource: missing address and coordinates' },
           { status: 400 }
         )
       }
 
-      // Build full address for geocoding
       const fullAddress = [suggestion.address, suggestion.city, suggestion.state, suggestion.zip]
         .filter(Boolean)
         .join(', ')
 
-      // Geocode using Google Maps API
-      if (env.GOOGLE_MAPS_KEY) {
-        try {
-          const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${env.GOOGLE_MAPS_KEY}`
-          const geocodeResponse = await fetch(geocodeUrl)
-          const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
-
-          if (geocodeData.status === 'OK' && geocodeData.results[0]) {
-            latitude = geocodeData.results[0].geometry.location.lat
-            longitude = geocodeData.results[0].geometry.location.lng
-          } else {
-            console.error('Geocoding failed:', geocodeData.status, geocodeData.error_message)
-            return NextResponse.json(
-              {
-                error: `Cannot approve resource: failed to geocode address "${fullAddress}"`,
-                geocode_status: geocodeData.status,
-              },
-              { status: 400 }
-            )
-          }
-        } catch (error) {
-          console.error('Geocoding error:', error)
-          return NextResponse.json(
-            { error: 'Cannot approve resource: geocoding service unavailable' },
-            { status: 500 }
-          )
-        }
-      } else {
+      if (!env.GOOGLE_MAPS_KEY) {
         return NextResponse.json(
           { error: 'Cannot approve resource: geocoding not configured (GOOGLE_MAPS_KEY missing)' },
           { status: 500 }
         )
       }
+
+      try {
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+        const geocodeResponse = await fetch(geocodeUrl)
+        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+          latitude = geocodeData.results[0].geometry.location.lat
+          longitude = geocodeData.results[0].geometry.location.lng
+        } else {
+          console.error('Geocoding failed:', geocodeData.status, geocodeData.error_message)
+          return NextResponse.json(
+            {
+              error: `Cannot approve resource: failed to geocode address "${fullAddress}"`,
+              geocode_status: geocodeData.status,
+            },
+            { status: 400 }
+          )
+        }
+      } catch (error) {
+        console.error('Geocoding error:', error)
+        return NextResponse.json(
+          { error: 'Cannot approve resource: geocoding service unavailable' },
+          { status: 500 }
+        )
+      }
+    } else if (addressType === 'confidential' && (!latitude || !longitude)) {
+      if (!suggestion.city || !suggestion.state) {
+        return NextResponse.json(
+          { error: 'Cannot approve confidential resource: missing city/state' },
+          { status: 400 }
+        )
+      }
+
+      if (!env.GOOGLE_MAPS_KEY) {
+        return NextResponse.json(
+          { error: 'Cannot approve resource: geocoding not configured (GOOGLE_MAPS_KEY missing)' },
+          { status: 500 }
+        )
+      }
+
+      try {
+        const cityAddress = `${suggestion.city}, ${suggestion.state}`
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cityAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+        const geocodeResponse = await fetch(geocodeUrl)
+        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+          latitude = geocodeData.results[0].geometry.location.lat
+          longitude = geocodeData.results[0].geometry.location.lng
+        } else {
+          return NextResponse.json(
+            {
+              error: `Cannot approve resource: failed to geocode city "${cityAddress}"`,
+              geocode_status: geocodeData.status,
+            },
+            { status: 400 }
+          )
+        }
+      } catch (error) {
+        console.error('City geocoding error:', error)
+        return NextResponse.json(
+          { error: 'Cannot approve resource: geocoding service unavailable' },
+          { status: 500 }
+        )
+      }
+    } else if (requiresServiceArea(addressType) && !serviceArea) {
+      return NextResponse.json(
+        { error: `${addressType} resources require service_area to be defined` },
+        { status: 400 }
+      )
     }
 
     // Create resource from suggestion (only using columns that exist in resources table)
@@ -118,7 +164,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         eligibilityRequirements: suggestion.eligibilityRequirements,
         languages: suggestion.languages,
         accessibilityFeatures: suggestion.accessibilityFeatures,
-        addressType: 'physical', // Standard approval assumes physical address
+        addressType,
+        serviceArea,
         status: 'active',
         verified: true,
         source: 'admin_approved',

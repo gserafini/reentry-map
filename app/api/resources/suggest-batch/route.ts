@@ -3,10 +3,18 @@ import { sql } from '@/lib/db/client'
 import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import { getAISystemStatus } from '@/lib/api/settings'
 import type { ResourceSuggestion } from '@/lib/types/database'
+import {
+  normalizeAddressType,
+  normalizeServiceArea,
+  requiresServiceArea,
+  requiresStreetAddress,
+} from '@/lib/utils/resource-location'
 
 interface BatchResourceInput {
   name?: string
   address?: string
+  address_type?: string
+  service_area?: unknown
   city?: string
   state?: string
   zip?: string
@@ -103,42 +111,93 @@ export async function POST(request: NextRequest) {
       try {
         // Extract resource data
         const r = resource as BatchResourceInput
+        const name = r.name?.trim()
+        const address = r.address?.trim() || null
+        const city = r.city?.trim()
+        const state = r.state?.trim()
+        const addressType = normalizeAddressType(r.address_type)
+        const serviceArea = normalizeServiceArea(r.service_area)
 
         // Validate required fields
-        if (!r.name || !r.address || !r.city || !r.state) {
-          console.error('Missing required fields:', { name: r.name, address: r.address })
+        if (!name || !city || !state) {
+          console.error('Missing required fields:', { name, city, state })
           results.errors++
+          results.error_details.push(
+            `${name || 'Unknown resource'}: missing required fields (name, city, state)`
+          )
+          continue
+        }
+
+        if (requiresStreetAddress(addressType) && !address) {
+          console.error('Missing required street address:', { name, addressType })
+          results.errors++
+          results.error_details.push(`${name}: physical resources require a street address`)
+          continue
+        }
+
+        if (requiresServiceArea(addressType) && !serviceArea) {
+          console.error('Missing required service_area:', { name, addressType })
+          results.errors++
+          results.error_details.push(
+            `${name}: ${addressType} resources require a valid service_area`
+          )
           continue
         }
 
         // Check for existing resource (avoid suggesting duplicates)
-        const existingResource = await sql`
-          SELECT id, name, address FROM resources
-          WHERE LOWER(name) = LOWER(${r.name})
-            AND LOWER(address) = LOWER(${r.address})
-            AND city = ${r.city}
-            AND state = ${r.state}
-          LIMIT 1
-        `
+        const existingResource =
+          addressType === 'physical' && address
+            ? await sql`
+                SELECT id, name, address FROM resources
+                WHERE LOWER(name) = LOWER(${name})
+                  AND LOWER(address) = LOWER(${address})
+                  AND city = ${city}
+                  AND state = ${state}
+                LIMIT 1
+              `
+            : await sql`
+                SELECT id, name, address FROM resources
+                WHERE LOWER(name) = LOWER(${name})
+                  AND city = ${city}
+                  AND state = ${state}
+                  AND COALESCE(address_type, 'physical') = ${addressType}
+                LIMIT 1
+              `
 
         if (existingResource.length > 0) {
           results.skipped_duplicates++
+          results.verification_results.push({
+            name,
+            status: 'duplicate',
+            decision_reason: 'Already exists in resources',
+          })
           continue
         }
 
         // Check for existing pending suggestion
-        const existingSuggestion = await sql`
-          SELECT id, name, address FROM resource_suggestions
-          WHERE LOWER(name) = LOWER(${r.name})
-            AND LOWER(address) = LOWER(${r.address})
-            AND status = 'pending'
-          LIMIT 1
-        `
+        const existingSuggestion =
+          addressType === 'physical' && address
+            ? await sql`
+                SELECT id, name, address FROM resource_suggestions
+                WHERE LOWER(name) = LOWER(${name})
+                  AND LOWER(address) = LOWER(${address})
+                  AND status = 'pending'
+                LIMIT 1
+              `
+            : await sql`
+                SELECT id, name, address FROM resource_suggestions
+                WHERE LOWER(name) = LOWER(${name})
+                  AND city = ${city}
+                  AND state = ${state}
+                  AND status = 'pending'
+                  AND COALESCE(address_type, 'physical') = ${addressType}
+                LIMIT 1
+              `
 
         if (existingSuggestion.length > 0) {
           results.skipped_duplicates++
           results.verification_results.push({
-            name: r.name,
+            name,
             status: 'duplicate',
             decision_reason: 'Already exists in pending suggestions',
           })
@@ -152,17 +211,19 @@ export async function POST(request: NextRequest) {
           const reasonText = `Submitted by ${submitter}${notes ? `: ${notes}` : ''}`
           const insertResult = await sql`
             INSERT INTO resource_suggestions (
-              suggested_by, name, address, city, state, zip, phone, website, email,
+              suggested_by, name, address, address_type, service_area, city, state, zip, phone, website, email,
               description, latitude, longitude, primary_category, category,
               categories, tags, hours, services_offered, eligibility_requirements,
               languages, accessibility_features,
               discovered_via, discovery_notes, reason, status
             ) VALUES (
               ${null},
-              ${r.name},
-              ${r.address},
-              ${r.city},
-              ${r.state},
+              ${name},
+              ${address},
+              ${addressType},
+              ${serviceArea ? JSON.stringify(serviceArea) : null}::jsonb,
+              ${city},
+              ${state},
               ${r.zip || r.zip_code || null},
               ${r.phone || null},
               ${r.website || null},
@@ -198,7 +259,7 @@ export async function POST(request: NextRequest) {
           results.errors++
           results.error_details.push(`${r.name}: ${errorMessage}`)
           results.verification_results.push({
-            name: r.name,
+            name,
             status: 'error',
             error: errorMessage,
           })
@@ -250,7 +311,7 @@ export async function POST(request: NextRequest) {
             results.auto_approved++
 
             results.verification_results.push({
-              name: r.name,
+              name,
               status: 'auto_approved',
               resource_id: resourceId,
               suggestion_id: suggestionId,
@@ -266,7 +327,7 @@ export async function POST(request: NextRequest) {
             results.flagged_for_human++
 
             results.verification_results.push({
-              name: r.name,
+              name,
               status: 'flagged',
               suggestion_id: suggestionId,
               verification_score: verificationResult.overall_score,
@@ -281,7 +342,7 @@ export async function POST(request: NextRequest) {
             results.auto_rejected++
 
             results.verification_results.push({
-              name: r.name,
+              name,
               status: 'rejected',
               suggestion_id: suggestionId,
               verification_score: verificationResult.overall_score,
@@ -294,7 +355,7 @@ export async function POST(request: NextRequest) {
           results.flagged_for_human++
 
           results.verification_results.push({
-            name: r.name,
+            name,
             status: 'flagged',
             suggestion_id: suggestionId,
             decision_reason: `Verification error: ${verificationError instanceof Error ? verificationError.message : 'Unknown error'}`,

@@ -15,7 +15,7 @@ function makeSelectChain(result, includeOrderBy = true) {
 }
 
 describe('admin prompt generator', () => {
-  it('includes strong data-quality requirements for contact info and addresses', async () => {
+  it('allows valid non-physical resources while still demanding strong contact detail effort', async () => {
     vi.resetModules()
 
     const db = {
@@ -57,9 +57,11 @@ describe('admin prompt generator', () => {
     const body = await response.json()
 
     expect(body.prompt).toContain('Email is required effort')
-    expect(body.prompt).toContain('No vague addresses')
-    expect(body.prompt).toContain('No PO Box-only entries')
-    expect(body.prompt).toContain('complete contact info (name, address, phone, website, email)')
-    expect(body.prompt).toContain('2-3 thorough sentences')
+    expect(body.prompt).toContain('When a real street address exists, include it')
+    expect(body.prompt).toContain('Some legitimate resources do not publish a street address')
+    expect(body.prompt).toContain('"address_type": "confidential"')
+    expect(body.prompt).toContain('"address_type": "regional"')
+    expect(body.prompt).toContain('"service_area"')
+    expect(body.prompt).toContain('website is usually the easiest field to capture')
   })
 })

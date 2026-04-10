@@ -5,6 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
+import { requiresServiceArea } from '@/lib/utils/resource-location'
 
 interface BatchResult {
   id: string
@@ -121,8 +122,10 @@ async function approveSuggestion(
   // Geocode if coordinates missing
   let latitude = suggestion.latitude
   let longitude = suggestion.longitude
+  const addressType = suggestion.addressType || 'physical'
+  const serviceArea = suggestion.serviceArea || null
 
-  if (!latitude || !longitude) {
+  if (addressType === 'physical' && (!latitude || !longitude)) {
     if (!suggestion.address) {
       return { id, status: 'failed', error: 'Missing address and coordinates' }
     }
@@ -149,6 +152,32 @@ async function approveSuggestion(
     } else {
       return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
     }
+  } else if (addressType === 'confidential' && (!latitude || !longitude)) {
+    if (!suggestion.city || !suggestion.state) {
+      return { id, status: 'failed', error: 'Missing city/state for confidential resource' }
+    }
+
+    if (env.GOOGLE_MAPS_KEY) {
+      try {
+        const cityAddress = `${suggestion.city}, ${suggestion.state}`
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cityAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+        const geocodeResponse = await fetch(geocodeUrl)
+        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+          latitude = geocodeData.results[0].geometry.location.lat
+          longitude = geocodeData.results[0].geometry.location.lng
+        } else {
+          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
+        }
+      } catch {
+        return { id, status: 'failed', error: 'Geocoding service unavailable' }
+      }
+    } else {
+      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
+    }
+  } else if (requiresServiceArea(addressType) && !serviceArea) {
+    return { id, status: 'failed', error: `${addressType} resources require service_area` }
   }
 
   // Create resource
@@ -178,7 +207,8 @@ async function approveSuggestion(
       eligibilityRequirements: suggestion.eligibilityRequirements,
       languages: suggestion.languages,
       accessibilityFeatures: suggestion.accessibilityFeatures,
-      addressType: 'physical',
+      addressType,
+      serviceArea,
       status: 'active',
       verified: true,
       source: 'admin_approved',
