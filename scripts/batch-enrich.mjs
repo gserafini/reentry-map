@@ -166,6 +166,51 @@ Respond with ONLY valid JSON:
 }`
 }
 
+// ── Agent logging (writes to ai_agent_logs so admin dashboard sees runs) ────
+async function createAgentLog() {
+  const { rows } = await pool.query(
+    `INSERT INTO ai_agent_logs (agent_type, action, input, success)
+     VALUES ('enrichment', 'batch_run', $1::jsonb, NULL)
+     RETURNING id`,
+    [
+      JSON.stringify({
+        model: MODEL,
+        limit: LIMIT,
+        field_filter: FIELD_FILTER || 'all',
+        dry_run: DRY_RUN,
+      }),
+    ]
+  )
+  return rows[0]?.id
+}
+
+async function updateAgentLog(logId, { success, enriched, skipped, failed, durationMs, error }) {
+  if (!logId) return
+  await pool.query(
+    `UPDATE ai_agent_logs SET
+       success = $1,
+       output = $2::jsonb,
+       error_message = $3,
+       duration_ms = $4
+     WHERE id = $5`,
+    [
+      success,
+      JSON.stringify({
+        status: success ? 'success' : 'failure',
+        resources_processed: enriched + skipped + failed,
+        resources_updated: enriched,
+        skipped,
+        failed,
+        model: MODEL,
+        dry_run: DRY_RUN,
+      }),
+      error || null,
+      durationMs,
+      logId,
+    ]
+  )
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   // Health check
@@ -184,6 +229,9 @@ async function main() {
     process.exit(1)
   }
 
+  // Create agent log entry (visible on admin dashboard)
+  const logId = DRY_RUN ? null : await createAgentLog().catch(() => null)
+
   // Fetch resources needing enrichment
   const query = buildQuery(LIMIT)
   const { rows: resources } = await pool.query(query, [LIMIT])
@@ -193,6 +241,14 @@ async function main() {
   )
   if (resources.length === 0) {
     console.log('Nothing to do.')
+    if (logId)
+      await updateAgentLog(logId, {
+        success: true,
+        enriched: 0,
+        skipped: 0,
+        failed: 0,
+        durationMs: 0,
+      })
     await pool.end()
     return
   }
@@ -289,10 +345,23 @@ async function main() {
     }
   }
 
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+  const durationMs = Date.now() - startTime
+  const elapsed = (durationMs / 1000).toFixed(1)
   console.log(
     `\nDone in ${elapsed}s — Enriched: ${enriched}, Skipped: ${skipped}, Failed: ${failed}`
   )
+
+  // Update agent log for admin dashboard visibility
+  if (logId) {
+    await updateAgentLog(logId, {
+      success: failed === 0,
+      enriched,
+      skipped,
+      failed,
+      durationMs,
+      error: failed > 0 ? `${failed} resource(s) failed enrichment` : null,
+    }).catch((err) => console.error('Failed to update agent log:', err.message))
+  }
 
   await pool.end()
 }
