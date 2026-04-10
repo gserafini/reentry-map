@@ -269,7 +269,7 @@ async function main() {
     // Fetch website
     const websiteText = await fetchWebsiteText(resource.website)
     if (!websiteText || websiteText.length < 50) {
-      console.log(`${progress} SKIP ${resource.name} — website unreachable or too little content`)
+      console.log(`${progress} UNREACHABLE ${resource.name} — website down or too little content`)
       skipped++
       continue
     }
@@ -317,7 +317,16 @@ async function main() {
       }
 
       if (updates.length === 0) {
-        console.log(`${progress} SKIP ${resource.name} — no new data extracted`)
+        // Distinguish: did the model find data we already have, or find nothing at all?
+        const modelFoundSomething =
+          extracted.hours || extracted.description || extracted.email || extracted.services?.length
+        if (modelFoundSomething) {
+          console.log(`${progress} CURRENT ${resource.name} — analyzed, already has this data`)
+        } else {
+          console.log(
+            `${progress} NO_DATA ${resource.name} — analyzed website, no structured data found`
+          )
+        }
         skipped++
         continue
       }
