@@ -93,30 +93,112 @@ function parseJson(text) {
   return JSON.parse(raw)
 }
 
-// ── Website fetching ────────────────────────────────────────────────────────
+// ── Website fetching (3-tier: fetch → Patchright local → Patchright via Mac) ─
 
-/** Fetch a URL and return { html, text } or null on failure */
-async function fetchPage(url) {
+/** Strip HTML to plain text */
+function htmlToText(html) {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Tier 1: Simple HTTP fetch — fast (~0.5s), works for most static sites */
+async function fetchPageSimple(url) {
   try {
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'ReentryMap-Enrichment/1.0' },
       signal: AbortSignal.timeout(10_000),
       redirect: 'follow',
     })
-    if (!resp.ok) return null
+    if (!resp.ok) return { html: '', text: '', status: resp.status }
 
     const html = await resp.text()
-    const text = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-
-    return { html, text: text.slice(0, 5000) }
+    const text = htmlToText(html)
+    return { html, text: text.slice(0, 5000), status: 200 }
   } catch {
     return null
   }
+}
+
+/** Tier 2: Patchright headless browser on dc3-1 — handles JS rendering + basic bot evasion (~3-5s) */
+let _patchright = null
+async function fetchPageWithBrowser(url) {
+  try {
+    if (!_patchright) {
+      _patchright = await import('patchright').catch(() => null)
+    }
+    if (!_patchright) return null
+
+    const browser = await _patchright.chromium.launch({ headless: true, args: ['--no-sandbox'] })
+    try {
+      const page = await browser.newPage()
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 15_000 })
+      const html = await page.content()
+      const text = await page.evaluate(() => document.body.innerText)
+      return { html, text: text.slice(0, 5000), status: 200 }
+    } finally {
+      await browser.close()
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Tier 3: Patchright on Mac via Tailscale — residential IP for datacenter-blocked sites */
+async function fetchPageViaMac(url) {
+  try {
+    const { execSync } = await import('child_process')
+    const cmd = `ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no gserafini@100.72.66.60 "node -e \\"
+      const { chromium } = require('patchright');
+      (async () => {
+        const b = await chromium.launch({ headless: true });
+        const p = await b.newPage();
+        await p.goto('${url.replace(/'/g, "\\'")}', { waitUntil: 'networkidle', timeout: 15000 });
+        const t = await p.evaluate(() => document.body.innerText);
+        await b.close();
+        process.stdout.write(t.slice(0, 5000));
+      })();
+    \\""`
+    const text = execSync(cmd, { timeout: 25_000, encoding: 'utf-8' })
+    return { html: '', text, status: 200 }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch a page with 3-tier escalation:
+ * 1. Simple fetch (fast, works for 80%+ of sites)
+ * 2. Patchright on dc3-1 (JS rendering, basic bot evasion)
+ * 3. Patchright via Mac (residential IP for datacenter blocks)
+ *
+ * Escalates when content is suspiciously thin (<100 chars) or fetch fails.
+ */
+async function fetchPage(url) {
+  // Tier 1: Simple fetch
+  const simple = await fetchPageSimple(url)
+  if (simple?.text && simple.text.length >= 100) {
+    return { html: simple.html, text: simple.text }
+  }
+
+  // Tier 2: Patchright on server (JS-rendered pages, 403s)
+  const browserResult = await fetchPageWithBrowser(url)
+  if (browserResult?.text && browserResult.text.length >= 100) {
+    return { html: browserResult.html, text: browserResult.text }
+  }
+
+  // Tier 3: Mac residential IP (datacenter IP blocks)
+  const macResult = await fetchPageViaMac(url)
+  if (macResult?.text && macResult.text.length >= 100) {
+    return { html: macResult.html || '', text: macResult.text }
+  }
+
+  // All tiers failed — return whatever we got (even if thin)
+  if (simple?.text) return { html: simple.html, text: simple.text }
+  return null
 }
 
 /**
