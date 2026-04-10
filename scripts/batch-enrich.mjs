@@ -163,11 +163,18 @@ function extractContactLinks(html, baseUrl) {
       (isShortText && contactKeywords.test(linkText)) ||
       serviceKeywords.test(linkText.trim())
     ) {
-      found.set(absoluteUrl.replace(/\/$/, ''), linkText || path)
+      // Assign priority: contact/hours pages first (most likely to have email/hours)
+      const isContactPage = /contact|hours|reach|find-?us|get-?help/i.test(path + ' ' + linkText)
+      const priority = isContactPage ? 0 : 1
+      found.set(absoluteUrl.replace(/\/$/, ''), { text: linkText || path, priority })
     }
   }
 
-  return [...found.keys()].slice(0, 4) // Max 4 discovered pages
+  // Sort by priority (contact pages first) then return URLs only
+  return [...found.entries()]
+    .sort((a, b) => a[1].priority - b[1].priority)
+    .map(([url]) => url)
+    .slice(0, 4)
 }
 
 /**
@@ -194,60 +201,58 @@ async function fetchWebsiteText(url) {
     visited.add(url.replace(/\/$/, ''))
   }
 
-  // 2. Fetch homepage if different from stored URL
+  // 2. Fetch homepage to discover nav links (but DON'T add homepage content yet —
+  //    contact/about pages are more valuable and should get priority in the char budget)
   const homeUrl = base.replace(/\/$/, '')
+  let homePageData = null
   if (!visited.has(homeUrl)) {
-    const homePage = await fetchPage(base)
-    if (homePage?.text && homePage.text.length > 50) {
-      sections.push(`[Page: /]\n${homePage.text}`)
-      visited.add(homeUrl)
+    homePageData = await fetchPage(base)
+    visited.add(homeUrl) // Mark visited to avoid re-fetching
+  }
 
-      // 3. Discover real contact/about/hours pages from homepage navigation
-      const discoveredLinks = extractContactLinks(homePage.html, base)
-      for (const linkUrl of discoveredLinks) {
-        const normalized = linkUrl.replace(/\/$/, '')
-        if (visited.has(normalized)) continue
-        if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
+  // Use stored page or homepage for link discovery
+  const discoveryHtml = homePageData?.html || storedPage?.html
+  const discoveredLinks = discoveryHtml ? extractContactLinks(discoveryHtml, base) : []
 
-        const linkPage = await fetchPage(linkUrl)
-        if (linkPage?.text && linkPage.text.length > 50) {
-          const linkPath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
-          sections.push(`[Page: ${linkPath}]\n${linkPage.text}`)
-          visited.add(normalized)
-        }
-      }
+  // 3. Fetch discovered pages (contact pages sorted first by extractContactLinks)
+  for (const linkUrl of discoveredLinks) {
+    const normalized = linkUrl.replace(/\/$/, '')
+    if (visited.has(normalized)) continue
+    if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
+
+    const linkPage = await fetchPage(linkUrl)
+    if (linkPage?.text && linkPage.text.length > 50) {
+      const linkPath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
+      sections.push(`[Page: ${linkPath}]\n${linkPage.text}`)
+      visited.add(normalized)
     }
-  } else if (storedPage?.html) {
-    // Stored URL IS the homepage — discover links from it
-    const discoveredLinks = extractContactLinks(storedPage.html, base)
-    for (const linkUrl of discoveredLinks) {
-      const normalized = linkUrl.replace(/\/$/, '')
+  }
+
+  // 4. Probe /contact and /contact-us if nav discovery didn't find a contact page
+  const hasContactPage = [...visited].some((u) => /\/contact/.test(u))
+  if (!hasContactPage) {
+    for (const probeUrl of [base + '/contact', base + '/contact-us']) {
+      const normalized = probeUrl.replace(/\/$/, '')
       if (visited.has(normalized)) continue
       if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
 
-      const linkPage = await fetchPage(linkUrl)
-      if (linkPage?.text && linkPage.text.length > 50) {
-        const linkPath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
-        sections.push(`[Page: ${linkPath}]\n${linkPage.text}`)
+      const probePage = await fetchPage(probeUrl)
+      if (probePage?.text && probePage.text.length > 50) {
+        const probePath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
+        sections.push(`[Page: ${probePath} (probed)]\n${probePage.text}`)
         visited.add(normalized)
+        break // Only need one contact page
       }
     }
   }
 
-  // 4. If we didn't discover a contact page from nav, probe the two most common paths
-  // Many sites have /contact pages that aren't in the main nav
-  const contactProbes = [base + '/contact', base + '/contact-us']
-  for (const probeUrl of contactProbes) {
-    const normalized = probeUrl.replace(/\/$/, '')
-    if (visited.has(normalized)) continue
-    if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
-
-    const probePage = await fetchPage(probeUrl)
-    if (probePage?.text && probePage.text.length > 50) {
-      const probePath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
-      sections.push(`[Page: ${probePath} (probed)]\n${probePage.text}`)
-      visited.add(normalized)
-      break // Only need one contact page
+  // 5. Add homepage content last (only if we still have budget — it's mostly marketing copy)
+  if (homePageData?.text && homePageData.text.length > 50) {
+    const currentSize = sections.reduce((sum, s) => sum + s.length, 0)
+    if (currentSize < 7000) {
+      // Trim homepage to fit remaining budget
+      const remainingBudget = Math.max(9000 - currentSize, 1000)
+      sections.push(`[Page: /]\n${homePageData.text.slice(0, remainingBudget)}`)
     }
   }
 
