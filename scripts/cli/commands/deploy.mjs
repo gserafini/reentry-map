@@ -8,7 +8,8 @@
  *   status                 Check target status (HTTP + PM2)
  */
 import { parseArgs } from 'node:util'
-import { spawn, execSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { hostname } from 'node:os'
 import { error, summary, success } from '../output.mjs'
 import { getTargetConfig } from '../targets.mjs'
 
@@ -29,6 +30,39 @@ Subcommands:
   status                   Check target status (HTTP response + PM2)
     --target TARGET        production (default) or staging
 `)
+}
+
+export function buildUserCommandTransport(target, userCommand, currentHostname = hostname()) {
+  const targetHost = String(target.sshHost).split('@').pop()
+  const isLocalHost =
+    targetHost === currentHostname || targetHost === 'localhost' || targetHost === '127.0.0.1'
+
+  if (isLocalHost) {
+    return {
+      cmd: 'su',
+      args: ['-', target.user, '-c', userCommand],
+    }
+  }
+
+  return {
+    cmd: 'ssh',
+    args: [
+      '-p',
+      target.sshPort,
+      target.sshHost,
+      `su - ${target.user} -c ${JSON.stringify(userCommand)}`,
+    ],
+  }
+}
+
+function spawnTargetUserCommand(target, userCommand, options = {}) {
+  const transport = buildUserCommandTransport(target, userCommand)
+  return spawn(transport.cmd, transport.args, options)
+}
+
+function execTargetUserCommand(target, userCommand, options = {}) {
+  const transport = buildUserCommandTransport(target, userCommand)
+  return spawnSync(transport.cmd, transport.args, options)
 }
 
 export async function run(args) {
@@ -56,19 +90,20 @@ export async function run(args) {
 }
 
 function buildDeployCommand(target) {
-  return `su - ${target.user} -c "cd ${target.cwd} && git pull origin ${target.branch} && npm install && npm run build && pm2 restart ${target.appName} --update-env"`
+  return `cd ${target.cwd} && git pull origin ${target.branch} && npm install && npm run build && pm2 restart ${target.appName} --update-env`
 }
 
 async function deployTarget(targetName) {
   const target = getTargetConfig(targetName)
   const deployCmd = buildDeployCommand(target)
+  const transport = buildUserCommandTransport(target, deployCmd)
 
   console.log(`Deploying to ${target.name}...`)
   console.log(`SSH: ${target.sshHost}:${target.sshPort}`)
-  console.log(`Command: ${deployCmd}\n`)
+  console.log(`Command: ${transport.cmd} ${transport.args.join(' ')}\n`)
 
   return new Promise((resolve, reject) => {
-    const child = spawn('ssh', ['-p', target.sshPort, target.sshHost, deployCmd], {
+    const child = spawnTargetUserCommand(target, deployCmd, {
       stdio: 'inherit',
     })
     child.on('close', (code) => {
@@ -96,7 +131,7 @@ async function checkLogs(args) {
   const target = getTargetConfig(values.target)
   const cmd = `tail -${values.lines} /home/${target.user}/logs/${target.logPrefix}-error.log`
   return new Promise((resolve, reject) => {
-    const child = spawn('ssh', ['-p', target.sshPort, target.sshHost, cmd], {
+    const child = spawnTargetUserCommand(target, cmd, {
       stdio: 'inherit',
     })
     child.on('close', (code) => {
@@ -130,10 +165,16 @@ async function checkStatus(args) {
   // Check PM2 via SSH
   let pm2Status = 'unknown'
   try {
-    pm2Status = execSync(
-      `ssh -p ${target.sshPort} ${target.sshHost} 'su - ${target.user} -c "pm2 show ${target.appName} --no-color"' 2>/dev/null`,
-      { encoding: 'utf-8', timeout: 15000 }
-    )
+    const result = execTargetUserCommand(target, `pm2 show ${target.appName} --no-color`, {
+      encoding: 'utf-8',
+      timeout: 15000,
+    })
+
+    if (result.status !== 0) {
+      throw new Error(result.stderr || `Process exited with ${result.status}`)
+    }
+
+    pm2Status = String(result.stdout)
       .split('\n')
       .filter((l) => l.includes('status') || l.includes('uptime') || l.includes('memory'))
       .map((l) => l.trim())
