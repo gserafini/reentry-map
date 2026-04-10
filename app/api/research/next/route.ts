@@ -12,38 +12,25 @@ interface ExpansionPriorityWithProgress {
   priority_categories: string[] | null
 }
 
+interface ExistingResourceSummary {
+  id: string
+  name: string
+  primary_category: string | null
+  address_type: string | null
+  verification_status: string | null
+}
+
+interface SubmittedResourceSummary {
+  id: string
+  name: string
+  primary_category: string | null
+  verification_status: string | null
+  created_at: string
+}
+
 /**
  * GET /api/research/next
- * Get next research task for discovery agents
- *
- * Returns the highest-priority incomplete expansion target with clear instructions.
- * Uses expansion_priorities framework for consistency with Command Center.
- *
- * Authentication: x-admin-api-key header
- *
- * Response:
- * {
- *   task_id: string,          // expansion_priority.id
- *   city: string,
- *   state: string,
- *   categories: string[],      // Priority categories for this city
- *   target_count: number,
- *   current_found: number,
- *   remaining: number,
- *   instructions: string,      // What to search for
- *   suggested_queries: string[], // Example searches
- *   submit_url: string,        // Where to submit candidates
- *   priority_score: number     // 0-1000 composite score
- * }
- *
- * Agent Workflow:
- * 1. Call this endpoint
- * 2. Use WebSearch with suggested_queries
- * 3. For each candidate found:
- *    - WebFetch website to extract details
- *    - POST to submit_url with resource data
- * 4. Repeat until remaining = 0
- * 5. Call this endpoint again for next task
+ * Returns the next expansion priority plus enough context to avoid duplicate work.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -56,7 +43,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get highest-priority incomplete expansion target using raw SQL for the view
     const priorities = await sql<ExpansionPriorityWithProgress[]>`
       SELECT * FROM expansion_priorities_with_progress
       ORDER BY priority_score DESC
@@ -70,9 +56,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Find first priority that hasn't reached target
     const target = priorities.find(
-      (p) => (p.current_resource_count || 0) < (p.target_resource_count || 50)
+      (priority) => (priority.current_resource_count || 0) < (priority.target_resource_count || 50)
     )
 
     if (!target) {
@@ -82,7 +67,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get categories (use priority_categories or defaults)
     const categories =
       target.priority_categories && target.priority_categories.length > 0
         ? target.priority_categories
@@ -90,26 +74,41 @@ export async function GET(request: NextRequest) {
             'employment',
             'housing',
             'healthcare',
-            'legal_aid',
-            'substance_abuse_treatment',
-            'mental_health',
-            'food_assistance',
+            'legal-aid',
+            'substance-abuse',
+            'mental-health',
+            'food',
             'education',
           ]
 
-    // Generate suggested search queries
     const suggestedQueries = [
       `"${target.city}, ${target.state}" reentry services`,
       `"${target.city}, ${target.state}" formerly incarcerated support`,
       ...categories
         .slice(0, 4)
-        .map((cat: string) => `"${target.city}, ${target.state}" ${cat.replace(/_/g, ' ')}`),
+        .map((category) => `"${target.city}, ${target.state}" ${category.replace(/[-_]/g, ' ')}`),
     ]
 
-    // Calculate remaining
     const remaining = (target.target_resource_count || 50) - (target.current_resource_count || 0)
 
-    // Return standardized response
+    const existingResources = await sql<ExistingResourceSummary[]>`
+      SELECT id, name, primary_category, address_type, verification_status
+      FROM resources
+      WHERE LOWER(COALESCE(city, '')) = LOWER(${target.city})
+        AND LOWER(COALESCE(state, '')) = LOWER(${target.state})
+        AND status = 'active'
+      ORDER BY created_at DESC
+      LIMIT 25
+    `
+
+    const submittedThisTask = await sql<SubmittedResourceSummary[]>`
+      SELECT id, name, primary_category, verification_status, created_at
+      FROM resources
+      WHERE provenance->>'expansion_priority_id' = ${target.id}
+      ORDER BY created_at DESC
+      LIMIT 25
+    `
+
     return NextResponse.json({
       task_id: target.id,
       city: target.city,
@@ -118,11 +117,15 @@ export async function GET(request: NextRequest) {
       target_count: target.target_resource_count || 50,
       current_found: target.current_resource_count || 0,
       remaining,
-      instructions: `Find reentry resources in ${target.city}, ${target.state}. Focus on: ${categories.join(', ').replace(/_/g, ' ')}. Target: ${remaining} more resources needed.`,
+      instructions: `Find reentry resources in ${target.city}, ${target.state}. Publish trusted finds directly, then let verification sweeps catch issues later.`,
       suggested_queries: suggestedQueries,
-      submit_url: '/api/resources/suggest-batch',
+      submit_url: '/api/research/submit-candidate',
+      intake_url: '/admin/research-intake',
+      submission_mode: 'publish_live_pending_verification',
       priority_score: target.priority_score,
       message: `Research ${remaining} resources in ${target.city}, ${target.state}`,
+      existing_resources: existingResources,
+      submitted_this_task: submittedThisTask,
     })
   } catch (error) {
     console.error('Error in research/next:', error)

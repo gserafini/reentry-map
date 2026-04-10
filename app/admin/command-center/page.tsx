@@ -402,7 +402,7 @@ ${
     ? `🔌 SUBMISSION (CLAUDE CODE):
 
 API ENDPOINT:
-POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3003'}/api/resources/suggest-batch
+POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3003'}/api/research/submit-candidate
 
 AUTHENTICATION:
 Use the admin API key from your /systems command:
@@ -413,55 +413,46 @@ Headers:
   "x-admin-api-key": "YOUR_ADMIN_API_KEY"
 }
 
-BATCH SIZE: 5-20 resources per submission (don't overwhelm the queue)
+SUBMIT ONE RESOURCE AT A TIME.
+Trusted intake publishes live immediately with verification_status = pending.
 
 EXAMPLE API CALL:
 \`\`\`bash
-curl -X POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3003'}/api/resources/suggest-batch \\
+curl -X POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3003'}/api/research/submit-candidate \\
   -H "Content-Type: application/json" \\
   -H "x-admin-api-key: YOUR_API_KEY" \\
-  -d @resources.json
+  -d '{
+    "task_id": "${target.id}",
+    "name": "Organization Name",
+    "city": "${target.city}",
+    "state": "${target.state}",
+    "category": "housing",
+    "address_type": "physical",
+    "address": "123 Main St",
+    "website": "https://example.org",
+    "discovered_via": "websearch",
+    "discovery_notes": "Found via targeted search and confirmed on the official website."
+  }'
 \`\`\``
-    : `💾 SUBMISSION (CLAUDE WEB):
+    : `🌐 SUBMISSION (CLAUDE WEB):
 
-⚠️ Claude Web cannot POST to the API directly. Instead, save to the import directory:
+Use the trusted intake form:
+
+${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3003'}/admin/research-intake
 
 WORKFLOW:
 1. Research resources following the guide above
-2. Save to JSON file: data-imports/${target.city.toLowerCase().replace(/\s+/g, '-')}-${target.state.toLowerCase()}-resources.json
-3. File is saved locally - Command Center can see it immediately
-4. Refresh Command Center page - you'll see an "Import Now" button
-5. Click to import - your file gets auto-processed and archived
+2. Open the form above in the browser
+3. Fill in one trusted resource at a time
+4. Submit it live
+5. Watch the "Submitted This Task" list update
 
-NOTE: Claude Web commits to a branch automatically. You'll need to review and merge that branch
-manually later. But the import works immediately with the local file - no git push/pull needed.
-
-FILE FORMAT:
-{
-  "resources": [
-    {
-      "name": "Organization Name",
-      "address": "123 Main St",
-      "city": "${target.city}",
-      "state": "${target.state}",
-      "phone": "(555) 555-1234",
-      "website": "https://example.org",
-      "description": "What they do...",
-      "primary_category": "employment",
-      "services_offered": ["Service 1", "Service 2"],
-      "source": "google_search",
-      "source_url": "https://example.org"
-    }
-  ],
-  "submitter": "claude_web",
-  "notes": "Research for ${target.city}, ${target.state} expansion"
-}
+The form handles validation, keeps task context attached, and publishes resources with pending verification.
 
 IMPORTANT:
-- Save to data-imports/ directory (not root!)
-- Valid JSON format (use the schema shown in the example above)
-- 5-20 resources per file (don't create huge files)
-- Files are automatically archived after import`
+- Do not submit vague leads. Only submit confirmed resources.
+- Use one entry per resource.
+- If the form warns about a duplicate, skip it and move on.`
 }
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -716,6 +707,9 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
                   Claude Web
                 </Button>
               </Box>
+              <Button component={Link} href="/admin/research-intake" variant="outlined">
+                Trusted Intake Form
+              </Button>
               <Button
                 variant="contained"
                 startIcon={<ContentCopy />}
@@ -744,8 +738,8 @@ START RESEARCHING! Remember: ACCURACY > COMPLETENESS. One perfect resource > ten
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
             {agentType === 'code'
-              ? '💡 Copy this prompt and paste it into Claude Code (claude.ai/code) with your admin API key to start researching resources.'
-              : '💡 Copy this prompt and paste it into Claude Web (claude.ai) - it will save resources to a JSON file for you to review and import.'}
+              ? '💡 Claude Code agents can POST directly to the trusted intake endpoint one resource at a time.'
+              : '💡 Claude Web agents should use the Trusted Intake Form for structured live publishing.'}
           </Typography>
         </Paper>
       )}
