@@ -8,13 +8,14 @@
  * and uses the local LLM to extract structured data.
  *
  * Usage:
- *   node scripts/batch-enrich.mjs [--limit N] [--model MODEL] [--dry-run] [--field hours|description|email]
+ *   node scripts/batch-enrich.mjs [--limit N] [--model MODEL] [--dry-run] [--field hours|description|email] [--delay MS]
  *
  * Examples:
  *   node scripts/batch-enrich.mjs --limit 50                    # Enrich 50 resources
  *   node scripts/batch-enrich.mjs --model gemma4:26b-chat       # Use Gemma instead of Qwen
  *   node scripts/batch-enrich.mjs --dry-run --limit 5           # Preview without writing to DB
  *   node scripts/batch-enrich.mjs --field email --limit 100     # Only enrich email field
+ *   node scripts/batch-enrich.mjs --delay 5000 --limit 500      # 5s delay between requests (gentle on CPU)
  */
 
 import { readFileSync } from 'fs'
@@ -37,7 +38,10 @@ const LIMIT = parseInt(getArg('--limit') || '20', 10)
 const MODEL = getArg('--model') || 'qwen3-coder:30b'
 const DRY_RUN = hasFlag('--dry-run')
 const FIELD_FILTER = getArg('--field') // hours, description, email, or null for all
+const DELAY_MS = parseInt(getArg('--delay') || '2000', 10) // ms between requests (default 2s, gentle on CPU)
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // ── Load DATABASE_URL from .env.local ───────────────────────────────────────
 function loadDatabaseUrl() {
@@ -342,6 +346,11 @@ async function main() {
     } catch (err) {
       console.log(`${progress} FAIL ${resource.name} — ${err.message?.substring(0, 100)}`)
       failed++
+    }
+
+    // Rate limit: pause between requests to keep server load reasonable
+    if (DELAY_MS > 0 && i < resources.length - 1) {
+      await sleep(DELAY_MS)
     }
   }
 
