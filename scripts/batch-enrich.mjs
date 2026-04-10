@@ -94,7 +94,9 @@ function parseJson(text) {
 }
 
 // ── Website fetching ────────────────────────────────────────────────────────
-async function fetchSinglePage(url) {
+
+/** Fetch a URL and return { html, text } or null on failure */
+async function fetchPage(url) {
   try {
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'ReentryMap-Enrichment/1.0' },
@@ -111,46 +113,142 @@ async function fetchSinglePage(url) {
       .replace(/\s+/g, ' ')
       .trim()
 
-    return text.slice(0, 5000)
+    return { html, text: text.slice(0, 5000) }
   } catch {
     return null
   }
 }
 
 /**
- * Multi-page fetch: crawl the stored URL plus common pages where
- * contact info and hours typically live (/contact, /about, homepage).
- * Combines text from all pages into a single document for the model.
+ * Extract internal navigation links from HTML that are likely to contain
+ * contact info, hours, or about content. Only returns same-domain links.
+ */
+function extractContactLinks(html, baseUrl) {
+  // Match href values from <a> tags
+  const hrefPattern = /<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  // Match URL paths and short link text (< 40 chars) to avoid matching blog posts
+  const contactKeywords = /contact|about|hours|location|get-?help|connect|reach|find-?us|visit/i
+  const serviceKeywords = /^(services|programs|get-?involved|info|resources)$/i
+  const found = new Map() // url -> link text
+
+  let match
+  while ((match = hrefPattern.exec(html)) !== null) {
+    const href = match[1].trim()
+    const linkText = match[2]
+      .replace(/<[^>]+>/g, '')
+      .trim()
+      .toLowerCase()
+
+    // Skip external links, mailto, tel, anchors, files
+    if (href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) continue
+    if (/\.(pdf|jpg|png|gif|zip|doc)$/i.test(href)) continue
+
+    // Build absolute URL
+    let absoluteUrl
+    try {
+      absoluteUrl = new URL(href, baseUrl).href
+    } catch {
+      continue
+    }
+
+    // Must be same domain
+    if (!absoluteUrl.startsWith(baseUrl.replace(/\/$/, ''))) continue
+
+    // Check if the URL path or link text suggests contact/about/hours content
+    // Only match short link text to avoid blog post titles that contain keywords
+    const path = absoluteUrl.replace(baseUrl, '').toLowerCase()
+    const isShortText = linkText.length < 40
+    if (
+      contactKeywords.test(path) ||
+      (isShortText && contactKeywords.test(linkText)) ||
+      serviceKeywords.test(linkText.trim())
+    ) {
+      found.set(absoluteUrl.replace(/\/$/, ''), linkText || path)
+    }
+  }
+
+  return [...found.keys()].slice(0, 4) // Max 4 discovered pages
+}
+
+/**
+ * Multi-page fetch: crawl the stored URL, then discover real navigation
+ * links from the homepage that are likely to contain contact/about/hours.
+ * Only fetches pages that actually exist on the site.
  */
 async function fetchWebsiteText(url) {
-  // Extract base domain from stored URL
   const baseMatch = url.match(/^(https?:\/\/[^/]+)/)
-  if (!baseMatch) return fetchSinglePage(url)
+  if (!baseMatch) {
+    const page = await fetchPage(url)
+    return page?.text || null
+  }
   const base = baseMatch[1]
 
-  // Pages to check, in priority order
-  const pagesToCheck = [
-    url, // stored URL (always check first)
-    base, // homepage (may have footer with contact)
-    base + '/contact',
-    base + '/contact-us',
-    base + '/about',
-    base + '/hours',
-  ]
-
-  // Deduplicate (stored URL might be the homepage)
-  const uniquePages = [...new Set(pagesToCheck.map((p) => p.replace(/\/$/, '')))]
-
   const sections = []
-  for (const pageUrl of uniquePages) {
-    const text = await fetchSinglePage(pageUrl)
-    if (text && text.length > 50) {
-      // Label each section so the model knows which page it came from
-      const pagePath = pageUrl.replace(base, '') || '/'
-      sections.push(`[Page: ${pagePath}]\n${text}`)
+  const visited = new Set()
+
+  // 1. Always fetch the stored URL first
+  const storedPage = await fetchPage(url)
+  if (storedPage?.text && storedPage.text.length > 50) {
+    const path = url.replace(base, '').replace(/\/$/, '') || '/'
+    sections.push(`[Page: ${path}]\n${storedPage.text}`)
+    visited.add(url.replace(/\/$/, ''))
+  }
+
+  // 2. Fetch homepage if different from stored URL
+  const homeUrl = base.replace(/\/$/, '')
+  if (!visited.has(homeUrl)) {
+    const homePage = await fetchPage(base)
+    if (homePage?.text && homePage.text.length > 50) {
+      sections.push(`[Page: /]\n${homePage.text}`)
+      visited.add(homeUrl)
+
+      // 3. Discover real contact/about/hours pages from homepage navigation
+      const discoveredLinks = extractContactLinks(homePage.html, base)
+      for (const linkUrl of discoveredLinks) {
+        const normalized = linkUrl.replace(/\/$/, '')
+        if (visited.has(normalized)) continue
+        if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
+
+        const linkPage = await fetchPage(linkUrl)
+        if (linkPage?.text && linkPage.text.length > 50) {
+          const linkPath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
+          sections.push(`[Page: ${linkPath}]\n${linkPage.text}`)
+          visited.add(normalized)
+        }
+      }
     }
-    // Don't fetch more if we already have plenty of content
+  } else if (storedPage?.html) {
+    // Stored URL IS the homepage — discover links from it
+    const discoveredLinks = extractContactLinks(storedPage.html, base)
+    for (const linkUrl of discoveredLinks) {
+      const normalized = linkUrl.replace(/\/$/, '')
+      if (visited.has(normalized)) continue
+      if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
+
+      const linkPage = await fetchPage(linkUrl)
+      if (linkPage?.text && linkPage.text.length > 50) {
+        const linkPath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
+        sections.push(`[Page: ${linkPath}]\n${linkPage.text}`)
+        visited.add(normalized)
+      }
+    }
+  }
+
+  // 4. If we didn't discover a contact page from nav, probe the two most common paths
+  // Many sites have /contact pages that aren't in the main nav
+  const contactProbes = [base + '/contact', base + '/contact-us']
+  for (const probeUrl of contactProbes) {
+    const normalized = probeUrl.replace(/\/$/, '')
+    if (visited.has(normalized)) continue
     if (sections.reduce((sum, s) => sum + s.length, 0) > 8000) break
+
+    const probePage = await fetchPage(probeUrl)
+    if (probePage?.text && probePage.text.length > 50) {
+      const probePath = normalized.replace(base.replace(/\/$/, ''), '') || '/'
+      sections.push(`[Page: ${probePath} (probed)]\n${probePage.text}`)
+      visited.add(normalized)
+      break // Only need one contact page
+    }
   }
 
   if (sections.length === 0) return null
