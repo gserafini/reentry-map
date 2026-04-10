@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       try {
         // Extract resource data
         const r = resource as BatchResourceInput
-        const name = r.name?.trim()
+        const name = r.name?.trim() || ''
         const address = r.address?.trim() || null
         const city = r.city?.trim()
         const state = r.state?.trim()
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
         if (!verificationEnabled || !verificationAgent) {
           results.flagged_for_human++
           results.verification_results.push({
-            name: r.name,
+            name,
             status: 'flagged',
             suggestion_id: suggestionId,
             decision_reason:

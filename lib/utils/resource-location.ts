@@ -40,10 +40,14 @@ export function normalizeServiceArea(value: unknown): ServiceArea | null {
   return { type, values }
 }
 
-export function requiresStreetAddress(addressType: ResourceAddressType): boolean {
-  return addressType === 'physical'
+export function requiresStreetAddress(
+  addressType: ResourceAddressType | string | null | undefined
+): boolean {
+  return normalizeAddressType(addressType) === 'physical'
 }
 
-export function requiresServiceArea(addressType: ResourceAddressType): boolean {
-  return SERVICE_AREA_TYPES.has(addressType)
+export function requiresServiceArea(
+  addressType: ResourceAddressType | string | null | undefined
+): boolean {
+  return SERVICE_AREA_TYPES.has(normalizeAddressType(addressType))
 }
