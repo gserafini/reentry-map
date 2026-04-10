@@ -12,6 +12,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { sql } from '@/lib/db/client'
 import { env } from '@/lib/env'
+import { ollamaChat, parseJsonFromOutput, ollamaHealthCheck } from './ollama-client'
 import {
   checkUrlReachable,
   validatePhoneNumber,
@@ -408,6 +409,45 @@ Respond in JSON format:
 
 Be lenient but accurate. Minor differences in wording are okay. Focus on substantial mismatches.`
 
+    // Try local Ollama first (free), fall back to Anthropic
+    try {
+      const health = await ollamaHealthCheck()
+      if (health.available) {
+        const ollamaResult = await ollamaChat(
+          [
+            {
+              role: 'system',
+              content:
+                'You verify resource data against website content. Respond with ONLY valid JSON.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          { temperature: 0.1, maxTokens: 1024, timeoutMs: 90_000 }
+        )
+
+        const parsed = parseJsonFromOutput<{
+          pass: boolean
+          confidence?: number
+          evidence?: string
+        }>(ollamaResult.content)
+
+        this.apiCallCount++
+        // Local model = $0 cost
+
+        return {
+          pass: parsed.pass === true,
+          confidence: Math.min(Math.max(parsed.confidence || 0, 0), 1),
+          evidence: parsed.evidence || 'No evidence provided',
+          input_tokens: 0,
+          output_tokens: ollamaResult.evalTokens,
+          cost_usd: 0,
+        }
+      }
+    } catch (ollamaError) {
+      console.warn('Ollama verification failed, falling back to Anthropic:', ollamaError)
+    }
+
+    // Fallback: Anthropic Claude Haiku
     const response = await anthropic.messages.create({
       model: env.ANTHROPIC_ENRICHMENT_MODEL,
       max_tokens: 1024,
