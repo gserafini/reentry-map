@@ -1,52 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkAdminAuth } from '@/lib/utils/admin-auth'
-import { db } from '@/lib/db/client'
-import { resourceSuggestions, researchTasks } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { db, sql } from '@/lib/db/client'
+import { expansionPriorities, resources } from '@/lib/db/schema'
+import { checkForDuplicate } from '@/lib/utils/deduplication'
+import {
+  normalizeAddressType,
+  normalizeServiceArea,
+  requiresServiceArea,
+  requiresStreetAddress,
+} from '@/lib/utils/resource-location'
+
+type SubmitCandidateBody = {
+  task_id: string
+  name: string
+  address?: string
+  address_type?: string
+  service_area?: unknown
+  city?: string
+  state?: string
+  zip?: string
+  phone?: string
+  email?: string
+  website?: string
+  description?: string
+  category?: string
+  primary_category?: string
+  services_offered?: string[]
+  hours?: Record<string, unknown>
+  eligibility_requirements?: string
+  discovered_via?: string
+  discovery_notes?: string
+  source_url?: string
+}
+
+type CountRow = {
+  count: number | string
+}
+
+type ExistingDuplicateRow = {
+  id: string
+  name: string
+  primary_category: string | null
+}
+
+function trimToNull(value: string | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeCategory(value: string | undefined): string | null {
+  const trimmed = trimToNull(value)
+  return trimmed ? trimmed.replace(/_/g, '-') : null
+}
+
+function parseCount(value: number | string | undefined, fallback: number): number {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10)
+    if (!Number.isNaN(parsed)) return parsed
+  }
+  return fallback
+}
 
 /**
  * POST /api/research/submit-candidate
- * Submit a resource candidate found during research
+ * Trusted intake for internal research agents.
  *
- * Agents call this ONE at a time (no batching!) to submit discovered resources.
- *
- * Authentication: x-admin-api-key header
- *
- * Body:
- * {
- *   task_id: string,          // From GET /api/research/next
- *   name: string,             // Organization name
- *   address?: string,
- *   city?: string,
- *   state?: string,
- *   zip?: string,
- *   phone?: string,
- *   email?: string,
- *   website?: string,
- *   description?: string,
- *   category?: string,
- *   services_offered?: string[],
- *   discovered_via: 'websearch' | 'webfetch' | 'manual',
- *   discovery_notes: string   // REQUIRED: What search found this, source URL, etc.
- * }
- *
- * Validation:
- * - discovery_notes is required (documents how resource was found)
- * - Must include source (search query OR website URL)
- * - At minimum: name and (address OR website OR phone)
- *
- * Response:
- * {
- *   success: true,
- *   suggestion_id: string,
- *   task_progress: {
- *     found: number,
- *     target: number,
- *     remaining: number,
- *     task_complete: boolean
- *   },
- *   next_action: string  // Instructions for what to do next
- * }
+ * This route publishes resources live immediately, then leaves them in
+ * pending verification for later sweeps.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -59,46 +82,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = (await request.json()) as {
-      task_id: string
-      name: string
-      address?: string
-      city?: string
-      state?: string
-      zip?: string
-      phone?: string
-      email?: string
-      website?: string
-      description?: string
-      category?: string
-      services_offered?: string[]
-      hours?: Record<string, unknown>
-      eligibility_requirements?: string
-      discovered_via?: string
-      discovery_notes?: string
-    }
+    const body = (await request.json()) as SubmitCandidateBody
+    const taskId = trimToNull(body.task_id)
+    const name = trimToNull(body.name)
+    const category = normalizeCategory(body.category || body.primary_category)
+    const discoveryNotes = trimToNull(body.discovery_notes)
+    const discoveredVia = trimToNull(body.discovered_via) || 'websearch'
+    const addressType = normalizeAddressType(body.address_type)
+    const serviceArea = normalizeServiceArea(body.service_area)
+    const website = trimToNull(body.website)
+    const phone = trimToNull(body.phone)
+    const email = trimToNull(body.email)
+    const description = trimToNull(body.description)
+    const zip = trimToNull(body.zip)
 
-    const {
-      task_id,
-      name,
-      address,
-      city,
-      state,
-      zip,
-      phone,
-      email,
-      website,
-      description,
-      category,
-      services_offered,
-      hours,
-      eligibility_requirements,
-      discovered_via,
-      discovery_notes,
-    } = body
-
-    // Validation: Required fields
-    if (!task_id) {
+    if (!taskId) {
       return NextResponse.json(
         {
           error: 'task_id is required',
@@ -115,18 +113,61 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!discovery_notes) {
+    if (!category) {
+      return NextResponse.json(
+        { error: 'category is required', details: 'Resource must have a primary category' },
+        { status: 400 }
+      )
+    }
+
+    if (!discoveryNotes) {
       return NextResponse.json(
         {
           error: 'discovery_notes is required',
-          details:
-            'Must document how this was found: search query used, website URL, etc. Example: "Found via WebSearch: Contra Costa food pantries. Website: https://example.org"',
+          details: 'Document how this resource was found and which source confirmed it.',
         },
         { status: 400 }
       )
     }
 
-    // Validation: Must have some contact/location info
+    const [task] = await db
+      .select()
+      .from(expansionPriorities)
+      .where(eq(expansionPriorities.id, taskId))
+      .limit(1)
+
+    if (!task) {
+      return NextResponse.json(
+        { error: 'Expansion priority not found', details: 'Invalid task_id or task was deleted' },
+        { status: 404 }
+      )
+    }
+
+    const city = trimToNull(body.city) || task.city
+    const state = trimToNull(body.state) || task.state
+    const candidateAddress = trimToNull(body.address)
+    const address = requiresStreetAddress(addressType) ? candidateAddress || '' : ''
+
+    if (requiresStreetAddress(addressType) && !address) {
+      return NextResponse.json(
+        {
+          error: 'Address is required',
+          details: 'Physical resources must include a street address.',
+        },
+        { status: 400 }
+      )
+    }
+
+    if (requiresServiceArea(addressType) && !serviceArea) {
+      return NextResponse.json(
+        {
+          error: 'service_area is required',
+          details: `${addressType} resources must include a valid service_area payload.`,
+        },
+        { status: 400 }
+      )
+    }
+
     if (!address && !website && !phone) {
       return NextResponse.json(
         {
@@ -137,101 +178,135 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify task exists and is in_progress
-    const [task] = await db
-      .select()
-      .from(researchTasks)
-      .where(eq(researchTasks.id, task_id))
-      .limit(1)
-
-    if (!task) {
-      return NextResponse.json(
-        { error: 'Research task not found', details: 'Invalid task_id or task was deleted' },
-        { status: 404 }
-      )
-    }
-
-    if (task.status !== 'in_progress') {
-      return NextResponse.json(
-        {
-          error: 'Task not active',
-          details: `Task status is "${task.status}". Only in_progress tasks can receive submissions.`,
-        },
-        { status: 400 }
-      )
-    }
-
-    // Create resource suggestion
-    let suggestion: { id: string } | undefined
-    try {
-      const [created] = await db
-        .insert(resourceSuggestions)
-        .values({
-          name,
-          address,
-          city: city || task.county, // Default to task county if not specified
-          state: state || task.state, // Default to task state
-          zip,
-          phone,
-          email,
-          website,
-          description,
-          category: category || task.category,
-          primaryCategory: category || task.category,
-          servicesOffered: services_offered,
-          hours,
-          eligibilityRequirements: eligibility_requirements,
-          status: 'pending', // Awaits verification
-          researchTaskId: task_id,
-          discoveredVia: discovered_via || 'websearch',
-          discoveryNotes: discovery_notes,
-        })
-        .returning({ id: resourceSuggestions.id })
-      suggestion = created
-    } catch (createError) {
-      console.error('Error creating suggestion:', createError)
-      return NextResponse.json(
-        { error: 'Failed to create suggestion', details: String(createError) },
-        { status: 500 }
-      )
-    }
-
-    if (!suggestion) {
-      return NextResponse.json(
-        { error: 'Failed to create suggestion', details: 'No suggestion returned' },
-        { status: 500 }
-      )
-    }
-
-    // Fetch updated task progress (trigger will have updated it)
-    const [updatedTask] = await db
-      .select({
-        resourcesFound: researchTasks.resourcesFound,
-        targetCount: researchTasks.targetCount,
-        status: researchTasks.status,
+    if (addressType === 'physical' && address) {
+      const dupeCheck = await checkForDuplicate({
+        name,
+        address,
+        city,
+        state,
+        zip,
       })
-      .from(researchTasks)
-      .where(eq(researchTasks.id, task_id))
-      .limit(1)
 
-    const remaining = updatedTask
-      ? (updatedTask.targetCount || 20) - (updatedTask.resourcesFound || 0)
-      : (task.targetCount || 20) - (task.resourcesFound || 0) - 1
+      if (dupeCheck.isDuplicate && dupeCheck.existingResource) {
+        return NextResponse.json(
+          {
+            error: 'Possible duplicate resource',
+            details: 'A matching physical resource already exists.',
+            duplicate: {
+              id: dupeCheck.existingResource.id,
+              name: dupeCheck.existingResource.name,
+              match_type: dupeCheck.matchType,
+              suggested_action: dupeCheck.suggestedAction,
+            },
+          },
+          { status: 409 }
+        )
+      }
+    } else {
+      const existingRows = await sql<ExistingDuplicateRow[]>`
+        SELECT id, name, primary_category
+        FROM resources
+        WHERE LOWER(name) = LOWER(${name})
+          AND LOWER(COALESCE(city, '')) = LOWER(${city})
+          AND LOWER(COALESCE(state, '')) = LOWER(${state})
+          AND LOWER(COALESCE(address_type, 'physical')) = LOWER(${addressType})
+          AND status = 'active'
+        LIMIT 1
+      `
 
-    const taskComplete = updatedTask?.status === 'completed' || remaining <= 0
+      if (existingRows[0]) {
+        return NextResponse.json(
+          {
+            error: 'Possible duplicate resource',
+            details: 'A matching non-physical resource already exists.',
+            duplicate: existingRows[0],
+          },
+          { status: 409 }
+        )
+      }
+    }
+
+    const resourceName = name
+    const primaryCategory = category
+    const requiredDiscoveryNotes = discoveryNotes
+
+    const provenance = {
+      intake_method: 'trusted_agent_intake',
+      submitted_via: auth.authMethod === 'session' ? 'browser_form' : 'api',
+      expansion_priority_id: task.id,
+      expansion_city: task.city,
+      expansion_state: task.state,
+      discovered_via: discoveredVia,
+      discovery_notes: requiredDiscoveryNotes,
+      source_url: trimToNull(body.source_url) || website,
+      submitted_at: new Date().toISOString(),
+      submitted_by: auth.userId || auth.authMethod,
+    }
+
+    const [created] = await db
+      .insert(resources)
+      .values({
+        name: resourceName,
+        description,
+        primaryCategory,
+        categories: [primaryCategory],
+        address,
+        addressType,
+        serviceArea,
+        city,
+        state,
+        zip,
+        county: task.county || null,
+        phone,
+        email,
+        website,
+        hours: body.hours || null,
+        servicesOffered: body.services_offered || null,
+        eligibilityRequirements: trimToNull(body.eligibility_requirements),
+        status: 'active',
+        source: 'trusted_research_intake',
+        aiDiscovered: true,
+        verified: false,
+        verificationStatus: 'pending',
+        humanReviewRequired: false,
+        provenance,
+      })
+      .returning({ id: resources.id })
+
+    const countRows = await sql<CountRow[]>`
+      SELECT COUNT(*)::int AS count
+      FROM resources
+      WHERE LOWER(COALESCE(city, '')) = LOWER(${city})
+        AND LOWER(COALESCE(state, '')) = LOWER(${state})
+        AND status = 'active'
+    `
+
+    const found = parseCount(countRows[0]?.count, (task.currentResourceCount || 0) + 1)
+    const target = task.targetResourceCount || 50
+    const remaining = Math.max(0, target - found)
+    const taskComplete = remaining <= 0
+
+    await db
+      .update(expansionPriorities)
+      .set({
+        currentResourceCount: found,
+        researchStatus: taskComplete ? 'completed' : task.researchStatus || 'researching',
+        researchAgentCompletedAt: taskComplete ? new Date() : task.researchAgentCompletedAt || null,
+      })
+      .where(eq(expansionPriorities.id, taskId))
 
     return NextResponse.json({
       success: true,
-      suggestion_id: suggestion.id,
+      resource_id: created.id,
       task_progress: {
-        found: updatedTask?.resourcesFound || (task.resourcesFound || 0) + 1,
-        target: task.targetCount || 20,
-        remaining: Math.max(0, remaining),
+        found,
+        target,
+        remaining,
         task_complete: taskComplete,
       },
       next_action: taskComplete
-        ? 'Task complete! Call GET /api/research/next for your next research task.'
-        : `Continue researching. Find ${remaining} more resources in ${task.county} County, ${task.state}. Submit each candidate individually.`,
+        ? 'Task complete. Call GET /api/research/next for the next city.'
+        : `Continue researching ${city}, ${state}. ${remaining} more resource(s) needed for this target.`,
     })
   } catch (error) {
     console.error('Error in research/submit-candidate:', error)
