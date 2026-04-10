@@ -51,4 +51,21 @@ describe('reentry map deploy targets', () => {
       ],
     })
   })
+
+  it('runs directly when already on the target host as the target user', async () => {
+    const { getTargetConfig } = await import('../../scripts/cli/targets.mjs')
+    const { buildUserCommandTransport } = await import('../../scripts/cli/commands/deploy.mjs')
+
+    expect(
+      buildUserCommandTransport(
+        getTargetConfig('staging'),
+        'pm2 show reentry-map-staging --no-color',
+        'dc3-1.serafinihosting.com',
+        'reentrymap'
+      )
+    ).toEqual({
+      cmd: 'bash',
+      args: ['-lc', 'pm2 show reentry-map-staging --no-color'],
+    })
+  })
 })

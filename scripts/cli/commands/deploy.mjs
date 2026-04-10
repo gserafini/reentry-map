@@ -9,7 +9,7 @@
  */
 import { parseArgs } from 'node:util'
 import { spawn, spawnSync } from 'node:child_process'
-import { hostname } from 'node:os'
+import { hostname, userInfo } from 'node:os'
 import { error, summary, success } from '../output.mjs'
 import { getTargetConfig } from '../targets.mjs'
 
@@ -32,12 +32,24 @@ Subcommands:
 `)
 }
 
-export function buildUserCommandTransport(target, userCommand, currentHostname = hostname()) {
+export function buildUserCommandTransport(
+  target,
+  userCommand,
+  currentHostname = hostname(),
+  currentUser = userInfo().username
+) {
   const targetHost = String(target.sshHost).split('@').pop()
   const isLocalHost =
     targetHost === currentHostname || targetHost === 'localhost' || targetHost === '127.0.0.1'
 
   if (isLocalHost) {
+    if (currentUser === target.user) {
+      return {
+        cmd: 'bash',
+        args: ['-lc', userCommand],
+      }
+    }
+
     return {
       cmd: 'su',
       args: ['-', target.user, '-c', userCommand],
