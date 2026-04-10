@@ -25,6 +25,10 @@ export const env = createEnv({
     ANTHROPIC_VERIFICATION_MODEL: z.string().default('claude-sonnet-4-20250514'), // For URL auto-fix with web search
     ANTHROPIC_ENRICHMENT_MODEL: z.string().default('claude-haiku-4-5-20250514'), // For content verification
 
+    // Local Ollama model configuration (for free background enrichment on dc3-1)
+    OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
+    OLLAMA_ENRICHMENT_MODEL: z.string().default('qwen3-coder:30b'),
+
     // Google Maps server-side key (for geocoding, etc.)
     GOOGLE_MAPS_KEY: z.string().min(1).optional(),
 
@@ -82,6 +86,8 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_VERIFICATION_MODEL: process.env.ANTHROPIC_VERIFICATION_MODEL,
     ANTHROPIC_ENRICHMENT_MODEL: process.env.ANTHROPIC_ENRICHMENT_MODEL,
+    OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
+    OLLAMA_ENRICHMENT_MODEL: process.env.OLLAMA_ENRICHMENT_MODEL,
     GOOGLE_MAPS_KEY: process.env.GOOGLE_MAPS_KEY,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     ADMIN_API_KEY: process.env.ADMIN_API_KEY,

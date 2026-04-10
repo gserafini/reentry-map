@@ -1,6 +1,8 @@
 import { BaseAgent } from './base-agent'
 import { sql } from '@/lib/db/client'
 import { geocodeAddress } from '@/lib/utils/geocoding'
+import { extractWebsiteContent } from '@/lib/utils/verification'
+import { ollamaChat, parseJsonFromOutput, ollamaHealthCheck } from './ollama-client'
 
 /** Resource row shape returned by enrichment queries */
 interface EnrichmentResourceRow {
@@ -15,14 +17,6 @@ interface EnrichmentResourceRow {
   services_offered: string[] | null
   status: string
   ai_enriched: boolean
-}
-
-/** Result of extracting data from a website via AI */
-interface WebsiteExtractionResult {
-  hours?: string
-  description?: string
-  services?: string[]
-  costCents: number
 }
 
 /**
@@ -188,30 +182,93 @@ export class EnrichmentAgent extends BaseAgent {
   }
 
   /**
-   * Enrich resource data from its website
+   * Enrich resource data from its website using local Ollama model.
+   * Fetches the website, strips HTML, and uses Qwen3 Coder (local) to extract
+   * structured data. Falls back to OpenAI if Ollama is unavailable.
    */
-  private async enrichFromWebsite(_websiteUrl: string): Promise<{
+  private async enrichFromWebsite(websiteUrl: string): Promise<{
     hours?: string
     description?: string
     services?: string[]
     costCents?: number
   }> {
-    // In a production environment, we would:
-    // 1. Fetch the website HTML
-    // 2. Extract relevant text
-    // 3. Use GPT-4o-mini to parse and structure the data
+    // 1. Fetch and extract website text
+    const websiteText = await extractWebsiteContent(websiteUrl)
+    if (!websiteText || websiteText.length < 50) {
+      return {} // Too little content to analyze
+    }
 
-    // For now, return empty object as we don't have web scraping set up
-    return {}
+    // 2. Call local Ollama model for extraction
+    const prompt = `You are analyzing a reentry services organization's website to extract structured data for a resource directory.
+
+Website URL: ${websiteUrl}
+Website content (text extracted from HTML):
+${websiteText.substring(0, 4000)}
+
+Extract the following information ONLY if clearly stated on the website. Do not guess or infer.
+
+Respond with ONLY valid JSON, no other text:
+{
+  "hours": "Operating hours as a string, e.g. 'Monday-Friday 9am-5pm' or null if not found",
+  "description": "2-3 sentence description of what this organization does for people reentering society after incarceration, or null if unclear",
+  "services": ["list", "of", "specific", "services", "offered"]
+}`
+
+    try {
+      // Try local Ollama first (free, runs on dc3-1)
+      const health = await ollamaHealthCheck()
+      if (health.available) {
+        const result = await ollamaChat(
+          [
+            {
+              role: 'system',
+              content:
+                'You extract structured data from website content. Respond with ONLY valid JSON.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          { temperature: 0.1, maxTokens: 512, timeoutMs: 60_000 }
+        )
+
+        const parsed = parseJsonFromOutput<{
+          hours?: string | null
+          description?: string | null
+          services?: string[] | null
+        }>(result.content)
+
+        return {
+          hours: parsed.hours || undefined,
+          description: parsed.description || undefined,
+          services: parsed.services?.length ? parsed.services : undefined,
+          costCents: 0, // Local model = free
+        }
+      }
+
+      // Fallback to OpenAI if Ollama unavailable
+      return await this.extractWebsiteDataViaOpenAI(websiteText, websiteUrl)
+    } catch (error) {
+      console.error(`enrichFromWebsite error for ${websiteUrl}:`, error)
+      // Try OpenAI fallback on Ollama failure
+      try {
+        return await this.extractWebsiteDataViaOpenAI(websiteText, websiteUrl)
+      } catch {
+        return {}
+      }
+    }
   }
 
   /**
-   * Extract structured data from website content using AI
+   * Fallback: extract structured data from website content using OpenAI
    */
-  private async extractWebsiteData(
+  private async extractWebsiteDataViaOpenAI(
     content: string,
     websiteUrl: string
-  ): Promise<WebsiteExtractionResult> {
+  ): Promise<{
+    hours?: string
+    description?: string
+    services?: string[]
+    costCents?: number
+  }> {
     const prompt = `You are analyzing the website content from ${websiteUrl} for a reentry resource directory.
 
 Extract the following information if available:
@@ -220,7 +277,7 @@ Extract the following information if available:
 - services: Array of specific services offered
 
 Website content:
-${content.substring(0, 4000)} // Limit content length
+${content.substring(0, 4000)}
 
 Respond ONLY with valid JSON in this format:
 {
@@ -238,10 +295,19 @@ Respond ONLY with valid JSON in this format:
         { role: 'user', content: prompt },
       ])
 
-      const parsed = JSON.parse(responseContent) as WebsiteExtractionResult
-      return { ...parsed, costCents }
+      const parsed = JSON.parse(responseContent) as {
+        hours?: string | null
+        description?: string | null
+        services?: string[] | null
+      }
+      return {
+        hours: parsed.hours || undefined,
+        description: parsed.description || undefined,
+        services: parsed.services?.length ? parsed.services : undefined,
+        costCents,
+      }
     } catch (error) {
-      console.error('Error extracting website data:', error)
+      console.error('Error extracting website data via OpenAI:', error)
       return { costCents: 0 }
     }
   }
