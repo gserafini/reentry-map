@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-13
+
+- Made batch enrichment outcome reporting explicit. Batch summaries and `ai_agent_logs.output` now break no-write results into `already_current`, `unreachable`, and `no_data` instead of folding them under the misleading `skipped` label.
+
 ## 2026-04-10
 
 - Fixed the admin AI discovery and enrichment routes to log against the actual `ai_agent_logs` schema. The agents no longer reference nonexistent `status` and `resources_*` columns, restoring live route execution and making agent retesting possible again.

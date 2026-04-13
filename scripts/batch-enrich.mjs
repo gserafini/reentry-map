@@ -22,6 +22,11 @@ import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import pg from 'pg'
+import {
+  buildAgentLogOutput,
+  createOutcomeCounts,
+  formatOutcomeSummary,
+} from './lib/batch-enrich-outcomes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(__dirname, '..')
@@ -420,7 +425,7 @@ async function createAgentLog() {
   return rows[0]?.id
 }
 
-async function updateAgentLog(logId, { success, enriched, skipped, failed, durationMs, error }) {
+async function updateAgentLog(logId, { success, counts, durationMs, error }) {
   if (!logId) return
   await pool.query(
     `UPDATE ai_agent_logs SET
@@ -431,15 +436,7 @@ async function updateAgentLog(logId, { success, enriched, skipped, failed, durat
      WHERE id = $5`,
     [
       success,
-      JSON.stringify({
-        status: success ? 'success' : 'failure',
-        resources_processed: enriched + skipped + failed,
-        resources_updated: enriched,
-        skipped,
-        failed,
-        model: MODEL,
-        dry_run: DRY_RUN,
-      }),
+      JSON.stringify(buildAgentLogOutput({ success, model: MODEL, dryRun: DRY_RUN, counts })),
       error || null,
       durationMs,
       logId,
@@ -480,18 +477,14 @@ async function main() {
     if (logId)
       await updateAgentLog(logId, {
         success: true,
-        enriched: 0,
-        skipped: 0,
-        failed: 0,
+        counts: createOutcomeCounts(),
         durationMs: 0,
       })
     await pool.end()
     return
   }
 
-  let enriched = 0
-  let failed = 0
-  let skipped = 0
+  const counts = createOutcomeCounts()
   const startTime = Date.now()
 
   for (let i = 0; i < resources.length; i++) {
@@ -502,7 +495,7 @@ async function main() {
     const websiteText = await fetchWebsiteText(resource.website)
     if (!websiteText || websiteText.length < 50) {
       console.log(`${progress} UNREACHABLE ${resource.name} — website down or too little content`)
-      skipped++
+      counts.unreachable++
       continue
     }
 
@@ -554,12 +547,13 @@ async function main() {
           extracted.hours || extracted.description || extracted.email || extracted.services?.length
         if (modelFoundSomething) {
           console.log(`${progress} CURRENT ${resource.name} — analyzed, already has this data`)
+          counts.current++
         } else {
           console.log(
             `${progress} NO_DATA ${resource.name} — analyzed website, no structured data found`
           )
+          counts.noData++
         }
-        skipped++
         continue
       }
 
@@ -570,7 +564,7 @@ async function main() {
       if (DRY_RUN) {
         console.log(`${progress} DRY-RUN ${resource.name} — would update: ${updates.join(', ')}`)
         console.log(`  Data: ${JSON.stringify(extracted, null, 2).substring(0, 200)}`)
-        enriched++
+        counts.enriched++
         continue
       }
 
@@ -578,7 +572,7 @@ async function main() {
       values.push(resource.id)
       const updateQuery = `UPDATE resources SET ${updates.join(', ')} WHERE id = $${paramIdx}`
       await pool.query(updateQuery, values)
-      enriched++
+      counts.enriched++
 
       const fields = updates
         .filter((u) => !u.startsWith('ai_enriched') && !u.startsWith('updated_at'))
@@ -586,7 +580,7 @@ async function main() {
       console.log(`${progress} OK ${resource.name} — enriched: ${fields.join(', ')}`)
     } catch (err) {
       console.log(`${progress} FAIL ${resource.name} — ${err.message?.substring(0, 100)}`)
-      failed++
+      counts.failed++
     }
 
     // Rate limit: pause between requests to keep server load reasonable
@@ -597,19 +591,15 @@ async function main() {
 
   const durationMs = Date.now() - startTime
   const elapsed = (durationMs / 1000).toFixed(1)
-  console.log(
-    `\nDone in ${elapsed}s — Enriched: ${enriched}, Skipped: ${skipped}, Failed: ${failed}`
-  )
+  console.log(formatOutcomeSummary({ elapsedSeconds: elapsed, counts }))
 
   // Update agent log for admin dashboard visibility
   if (logId) {
     await updateAgentLog(logId, {
-      success: failed === 0,
-      enriched,
-      skipped,
-      failed,
+      success: counts.failed === 0,
+      counts,
       durationMs,
-      error: failed > 0 ? `${failed} resource(s) failed enrichment` : null,
+      error: counts.failed > 0 ? `${counts.failed} resource(s) failed enrichment` : null,
     }).catch((err) => console.error('Failed to update agent log:', err.message))
   }
 
