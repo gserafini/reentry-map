@@ -4,6 +4,7 @@
 
 - Made batch enrichment outcome reporting explicit. Batch summaries and `ai_agent_logs.output` now break no-write results into `already_current`, `unreachable`, and `no_data` instead of folding them under the misleading `skipped` label.
 - Fixed the batch enrichment Mac fallback to use the known Patchright install under `~/.claude/scripts/social/node_modules/patchright` instead of a bare `require('patchright')`, restoring the residential-IP reachability tier for future batches.
+- Added a durable unreachable-site recheck workflow. The admin CLI can now rerun `UNREACHABLE` batch-log entries through the Mac residential-IP path and write internal CSV/TXT reports without dumping raw artifacts into chat by default.
 
 ## 2026-04-10
 
