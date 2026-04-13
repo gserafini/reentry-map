@@ -27,6 +27,7 @@ import {
   createOutcomeCounts,
   formatOutcomeSummary,
 } from './lib/batch-enrich-outcomes.mjs'
+import { buildMacPatchrightFetchCommand } from './lib/batch-enrich-fetch.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(__dirname, '..')
@@ -156,17 +157,7 @@ async function fetchPageWithBrowser(url) {
 async function fetchPageViaMac(url) {
   try {
     const { execSync } = await import('child_process')
-    const cmd = `ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no gserafini@100.72.66.60 "node -e \\"
-      const { chromium } = require('patchright');
-      (async () => {
-        const b = await chromium.launch({ headless: true });
-        const p = await b.newPage();
-        await p.goto('${url.replace(/'/g, "\\'")}', { waitUntil: 'networkidle', timeout: 15000 });
-        const t = await p.evaluate(() => document.body.innerText);
-        await b.close();
-        process.stdout.write(t.slice(0, 5000));
-      })();
-    \\""`
+    const cmd = buildMacPatchrightFetchCommand(url)
     const text = execSync(cmd, { timeout: 25_000, encoding: 'utf-8' })
     return { html: '', text, status: 200 }
   } catch {
