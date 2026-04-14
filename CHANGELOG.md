@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-14
+
+- Fixed batch enrichment queue burn-down. The worker now records per-resource enrichment attempts in `provenance.enrichment`, prioritizes never-attempted resources first, and applies a 30-day retry cooldown so repeated runs stop hammering the same no-write resources.
+
 ## 2026-04-13
 
 - Made batch enrichment outcome reporting explicit. Batch summaries and `ai_agent_logs.output` now break no-write results into `already_current`, `unreachable`, and `no_data` instead of folding them under the misleading `skipped` label.

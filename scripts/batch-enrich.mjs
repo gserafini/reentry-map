@@ -8,7 +8,7 @@
  * and uses the local LLM to extract structured data.
  *
  * Usage:
- *   node scripts/batch-enrich.mjs [--limit N] [--model MODEL] [--dry-run] [--field hours|description|email] [--delay MS]
+ *   node scripts/batch-enrich.mjs [--limit N] [--model MODEL] [--dry-run] [--field hours|description|email] [--delay MS] [--retry-days N]
  *
  * Examples:
  *   node scripts/batch-enrich.mjs --limit 50                    # Enrich 50 resources
@@ -16,6 +16,7 @@
  *   node scripts/batch-enrich.mjs --dry-run --limit 5           # Preview without writing to DB
  *   node scripts/batch-enrich.mjs --field email --limit 100     # Only enrich email field
  *   node scripts/batch-enrich.mjs --delay 5000 --limit 500      # 5s delay between requests (gentle on CPU)
+ *   node scripts/batch-enrich.mjs --retry-days 30 --limit 500   # Revisit no-write resources after 30 days
  */
 
 import { readFileSync } from 'fs'
@@ -28,6 +29,10 @@ import {
   formatOutcomeSummary,
 } from './lib/batch-enrich-outcomes.mjs'
 import { buildMacPatchrightFetchCommand } from './lib/batch-enrich-fetch.mjs'
+import {
+  buildEnrichmentProvenance,
+  selectResourcesForEnrichment,
+} from './lib/batch-enrich-selection.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(__dirname, '..')
@@ -45,6 +50,7 @@ const MODEL = getArg('--model') || 'qwen3-coder:30b'
 const DRY_RUN = hasFlag('--dry-run')
 const FIELD_FILTER = getArg('--field') // hours, description, email, or null for all
 const DELAY_MS = parseInt(getArg('--delay') || '2000', 10) // ms between requests (default 2s, gentle on CPU)
+const RETRY_DAYS = parseInt(getArg('--retry-days') || '30', 10)
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -339,7 +345,7 @@ async function fetchWebsiteText(url) {
 }
 
 // ── Build the enrichment query based on field filter ────────────────────────
-function buildQuery(_limit) {
+function buildQuery() {
   const conditions = []
 
   if (FIELD_FILTER === 'hours') {
@@ -357,13 +363,11 @@ function buildQuery(_limit) {
 
   return `
     SELECT id, name, address, city, state, website, phone, email,
-           description, hours, services_offered
+           description, hours, services_offered, created_at, provenance
     FROM resources
     WHERE status = 'active'
       AND website IS NOT NULL AND website != ''
       AND ${conditions.join(' AND ')}
-    ORDER BY created_at DESC
-    LIMIT $1
   `
 }
 
@@ -435,6 +439,29 @@ async function updateAgentLog(logId, { success, counts, durationMs, error }) {
   )
 }
 
+async function recordEnrichmentAttempt(resource, outcome, updatedFields = []) {
+  if (DRY_RUN) return
+
+  const attemptedAt = new Date().toISOString()
+  const provenance = buildEnrichmentProvenance(resource.provenance, {
+    attemptedAt,
+    outcome,
+    model: MODEL,
+    fieldFilter: FIELD_FILTER || 'all',
+    updatedFields,
+  })
+
+  await pool.query(
+    `UPDATE resources
+     SET provenance = $1::jsonb,
+         updated_at = NOW()
+     WHERE id = $2`,
+    [JSON.stringify(provenance), resource.id]
+  )
+
+  resource.provenance = provenance
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   // Health check
@@ -457,11 +484,16 @@ async function main() {
   const logId = DRY_RUN ? null : await createAgentLog().catch(() => null)
 
   // Fetch resources needing enrichment
-  const query = buildQuery(LIMIT)
-  const { rows: resources } = await pool.query(query, [LIMIT])
+  const query = buildQuery()
+  const { rows: candidateResources } = await pool.query(query)
+  const resources = selectResourcesForEnrichment(candidateResources, {
+    limit: LIMIT,
+    retryDays: RETRY_DAYS,
+    now: new Date(),
+  })
 
   console.log(
-    `Found ${resources.length} resources needing enrichment${FIELD_FILTER ? ` (field: ${FIELD_FILTER})` : ''}`
+    `Found ${candidateResources.length} resources needing enrichment${FIELD_FILTER ? ` (field: ${FIELD_FILTER})` : ''}; selected ${resources.length} after ${RETRY_DAYS}-day retry cooldown`
   )
   if (resources.length === 0) {
     console.log('Nothing to do.')
@@ -487,6 +519,7 @@ async function main() {
     if (!websiteText || websiteText.length < 50) {
       console.log(`${progress} UNREACHABLE ${resource.name} — website down or too little content`)
       counts.unreachable++
+      await recordEnrichmentAttempt(resource, 'unreachable')
       continue
     }
 
@@ -539,14 +572,27 @@ async function main() {
         if (modelFoundSomething) {
           console.log(`${progress} CURRENT ${resource.name} — analyzed, already has this data`)
           counts.current++
+          await recordEnrichmentAttempt(resource, 'already_current')
         } else {
           console.log(
             `${progress} NO_DATA ${resource.name} — analyzed website, no structured data found`
           )
           counts.noData++
+          await recordEnrichmentAttempt(resource, 'no_data')
         }
         continue
       }
+
+      const fields = updates.map((u) => u.split(' = ')[0])
+      const provenance = buildEnrichmentProvenance(resource.provenance, {
+        attemptedAt: new Date().toISOString(),
+        outcome: 'enriched',
+        model: MODEL,
+        fieldFilter: FIELD_FILTER || 'all',
+        updatedFields: fields,
+      })
+      updates.push(`provenance = $${paramIdx++}::jsonb`)
+      values.push(JSON.stringify(provenance))
 
       // Mark as enriched
       updates.push(`ai_enriched = true`)
@@ -563,15 +609,18 @@ async function main() {
       values.push(resource.id)
       const updateQuery = `UPDATE resources SET ${updates.join(', ')} WHERE id = $${paramIdx}`
       await pool.query(updateQuery, values)
+      resource.provenance = provenance
       counts.enriched++
 
-      const fields = updates
+      const updatedFieldNames = updates
         .filter((u) => !u.startsWith('ai_enriched') && !u.startsWith('updated_at'))
+        .filter((u) => !u.startsWith('provenance'))
         .map((u) => u.split(' = ')[0])
-      console.log(`${progress} OK ${resource.name} — enriched: ${fields.join(', ')}`)
+      console.log(`${progress} OK ${resource.name} — enriched: ${updatedFieldNames.join(', ')}`)
     } catch (err) {
       console.log(`${progress} FAIL ${resource.name} — ${err.message?.substring(0, 100)}`)
       counts.failed++
+      await recordEnrichmentAttempt(resource, 'failed')
     }
 
     // Rate limit: pause between requests to keep server load reasonable
