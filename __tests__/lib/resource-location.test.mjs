@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   hasPlausibleStreetAddress,
+  needsPhysicalAddressReview,
   requiresServiceArea,
   requiresStreetAddress,
 } from '../../lib/utils/resource-location.ts'
@@ -20,5 +21,25 @@ describe('resource location helpers', () => {
     expect(hasPlausibleStreetAddress('San Diego', 'San Diego', 'CA')).toBe(false)
     expect(hasPlausibleStreetAddress('4047 Normal St', 'San Diego', 'CA')).toBe(true)
     expect(hasPlausibleStreetAddress('One Market St', 'San Francisco', 'CA')).toBe(true)
+  })
+
+  it('only flags weak addresses for physical resources', () => {
+    expect(
+      needsPhysicalAddressReview({
+        addressType: 'physical',
+        address: 'San Diego, CA',
+        city: 'San Diego',
+        state: 'CA',
+      })
+    ).toBe(true)
+
+    expect(
+      needsPhysicalAddressReview({
+        addressType: 'regional',
+        address: 'San Diego, CA',
+        city: 'San Diego',
+        state: 'CA',
+      })
+    ).toBe(false)
   })
 })

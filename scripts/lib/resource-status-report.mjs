@@ -40,6 +40,7 @@ export function buildResourceStatusReport(raw, { batchSize = 500 } = {}) {
     data_quality: {
       missing_website: toCount(raw.missing_website),
       ungeocoded: toCount(raw.ungeocoded),
+      weak_physical_address: toCount(raw.weak_physical_address),
     },
   }
 }

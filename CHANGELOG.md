@@ -3,6 +3,7 @@
 ## 2026-04-20
 
 - Tightened physical-address validation across suggestion intake, trusted research intake, admin imports, and approval flows. City-only values like `San Diego, CA` no longer pass as physical street addresses, preventing vague location data from being auto-approved and geocoded to city centroids.
+- Surfaced weak physical addresses in operational content work. Verification queue prioritization and status reporting now flag physical resources whose stored address is only city/state-level, so they get caught during verification runs without penalizing legitimate non-physical resources.
 
 ## 2026-04-14
 

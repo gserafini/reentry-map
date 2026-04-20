@@ -21,6 +21,7 @@ describe('resource status report', () => {
         missing_email: 1684,
         missing_hours: 2447,
         ungeocoded: 6,
+        weak_physical_address: 4,
       },
       { batchSize: 500 }
     )
@@ -54,6 +55,7 @@ describe('resource status report', () => {
     expect(report.data_quality).toEqual({
       missing_website: 243,
       ungeocoded: 6,
+      weak_physical_address: 4,
     })
   })
 })

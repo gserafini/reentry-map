@@ -157,7 +157,18 @@ async function resourceStatus(args) {
         COUNT(*) FILTER (WHERE status = 'active' AND (website IS NULL OR website = ''))::int AS missing_website,
         COUNT(*) FILTER (WHERE status = 'active' AND (email IS NULL OR email = ''))::int AS missing_email,
         COUNT(*) FILTER (WHERE status = 'active' AND (hours IS NULL OR hours::text = 'null' OR hours::text = '{}'))::int AS missing_hours,
-        COUNT(*) FILTER (WHERE status = 'active' AND (latitude IS NULL OR longitude IS NULL))::int AS ungeocoded
+        COUNT(*) FILTER (WHERE status = 'active' AND (latitude IS NULL OR longitude IS NULL))::int AS ungeocoded,
+        COUNT(*) FILTER (
+          WHERE status = 'active'
+            AND LOWER(COALESCE(address_type, 'physical')) = 'physical'
+            AND (
+              address IS NULL
+              OR BTRIM(address) = ''
+              OR LOWER(BTRIM(address)) = LOWER(BTRIM(COALESCE(city, '')))
+              OR LOWER(BTRIM(REGEXP_REPLACE(address, '[\\.,]+', ' ', 'g'))) = LOWER(BTRIM(COALESCE(city, '')))
+              OR LOWER(BTRIM(REGEXP_REPLACE(address, '[\\.,]+', ' ', 'g'))) = CONCAT_WS(' ', LOWER(BTRIM(COALESCE(city, ''))), LOWER(BTRIM(COALESCE(state, ''))))
+            )
+        )::int AS weak_physical_address
       FROM resources
     `
 
@@ -195,6 +206,7 @@ async function resourceStatus(args) {
     summary('Data Quality', {
       'Missing Website': report.data_quality.missing_website,
       Ungeocoded: report.data_quality.ungeocoded,
+      'Weak Physical Address': report.data_quality.weak_physical_address,
     })
   } finally {
     await closeDb()

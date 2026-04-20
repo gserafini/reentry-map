@@ -89,3 +89,16 @@ export function hasPlausibleStreetAddress(
 
   return /\d/.test(normalizedAddress) || SPELLED_NUMBER_PREFIX.test(normalizedAddress)
 }
+
+export function needsPhysicalAddressReview(resource: {
+  addressType?: string | null
+  address_type?: string | null
+  address?: string | null
+  city?: string | null
+  state?: string | null
+}): boolean {
+  return (
+    requiresStreetAddress(resource.addressType ?? resource.address_type) &&
+    !hasPlausibleStreetAddress(resource.address, resource.city, resource.state)
+  )
+}
