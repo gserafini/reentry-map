@@ -64,12 +64,11 @@ function buildResourceConditions(
   }
 
   if (opts.categories && opts.categories.length > 0) {
-    // Use overlap operator (&&) when combined with location (matches any), containment (@>) otherwise
-    if (resourceIds) {
-      conditions.push(sqlClient`categories && ${opts.categories}::text[]`)
-    } else {
-      conditions.push(sqlClient`categories @> ${opts.categories}::text[]`)
-    }
+    // Category filters are additive: match resources whose primary_category OR categories[]
+    // overlaps with any selected category.
+    conditions.push(
+      sqlClient`(primary_category = ANY(${opts.categories}::text[]) OR categories && ${opts.categories}::text[])`
+    )
   }
 
   if (opts.tags && opts.tags.length > 0) {

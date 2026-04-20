@@ -6,6 +6,7 @@
 - Added a `stats status` admin CLI view for quick operational checks. It reports verified, pending, stale, due-for-verification, AI-enriched, needs-enrichment, remaining 500-resource enrichment batches, missing email/hours, missing website, and ungeocoded counts in one command.
 - Fixed the `/resources` category filter route. Selecting a single category from the sidebar on `/resources` now stays on `/resources?categories=...` instead of navigating to the nonexistent `/resources/category/...` path that produced a 404.
 - Fixed `/resources` distance-aware filtering. The server query now honors `lat`, `lng`, and `distance` URL params and defaults to nearest-first sorting when a location filter is present, so the list view matches the distance-filtered map instead of falling back to alphabetical results.
+- Fixed additive category filtering on `/resources`. Multi-select category filters now match any selected category against both `primary_category` and `categories[]`, so combined filters like San Diego + multiple categories no longer collapse to zero results just because many resources only had `primary_category` populated.
 
 ## 2026-04-13
 
