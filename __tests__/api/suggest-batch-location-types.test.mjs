@@ -97,4 +97,47 @@ describe('suggest-batch location types', () => {
     expect(body.stats.errors).toBe(1)
     expect(sql).not.toHaveBeenCalled()
   })
+
+  it('rejects city-only physical addresses before inserting suggestions', async () => {
+    const sql = vi.fn()
+
+    vi.doMock('@/lib/db/client', () => ({ sql }))
+    vi.doMock('@/lib/api/settings', () => ({
+      getAISystemStatus: vi.fn().mockResolvedValue({ isVerificationActive: false }),
+    }))
+    vi.doMock('@/lib/ai-agents/verification-agent', () => ({
+      VerificationAgent: vi.fn(),
+    }))
+
+    const { POST } = await import('../../app/api/resources/suggest-batch/route.ts')
+
+    const response = await POST(
+      new Request('https://reentrymap.org/api/resources/suggest-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resources: [
+            {
+              name: 'Restoring Citizens',
+              address: 'San Diego, CA',
+              city: 'San Diego',
+              state: 'CA',
+              primary_category: 'housing',
+              address_type: 'physical',
+            },
+          ],
+        }),
+      })
+    )
+
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.stats.submitted).toBe(0)
+    expect(body.stats.errors).toBe(1)
+    expect(body.error_details).toContain(
+      'Restoring Citizens: physical resources require a street-level address'
+    )
+    expect(sql).not.toHaveBeenCalled()
+  })
 })

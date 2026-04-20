@@ -7,6 +7,7 @@ import { checkForDuplicate, detectParentChildRelationships } from '@/lib/utils/d
 import type { NewResource, Resource } from '@/lib/db/schema'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
 import {
+  hasPlausibleStreetAddress,
   normalizeAddressType,
   normalizeServiceArea,
   requiresServiceArea,
@@ -177,9 +178,12 @@ export async function POST(request: NextRequest) {
     // Process each resource with deduplication
     for (const resource of validResources) {
       try {
-        if (requiresStreetAddress(resource.addressType || 'physical') && !resource.address) {
+        if (
+          requiresStreetAddress(resource.addressType || 'physical') &&
+          !hasPlausibleStreetAddress(resource.address, resource.city, resource.state)
+        ) {
           errors++
-          errorDetails.push(`${resource.name}: physical resources require a street address`)
+          errorDetails.push(`${resource.name}: physical resources require a street-level address`)
           continue
         }
 

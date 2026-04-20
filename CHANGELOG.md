@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-20
+
+- Tightened physical-address validation across suggestion intake, trusted research intake, admin imports, and approval flows. City-only values like `San Diego, CA` no longer pass as physical street addresses, preventing vague location data from being auto-approved and geocoded to city centroids.
+
 ## 2026-04-14
 
 - Fixed batch enrichment queue burn-down. The worker now records per-resource enrichment attempts in `provenance.enrichment`, prioritizes never-attempted resources first, and applies a 30-day retry cooldown so repeated runs stop hammering the same no-write resources.

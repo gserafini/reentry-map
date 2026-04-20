@@ -5,6 +5,7 @@ import { db, sql } from '@/lib/db/client'
 import { expansionPriorities, resources } from '@/lib/db/schema'
 import { checkForDuplicate } from '@/lib/utils/deduplication'
 import {
+  hasPlausibleStreetAddress,
   normalizeAddressType,
   normalizeServiceArea,
   requiresServiceArea,
@@ -148,11 +149,11 @@ export async function POST(request: NextRequest) {
     const candidateAddress = trimToNull(body.address)
     const address = requiresStreetAddress(addressType) ? candidateAddress || '' : ''
 
-    if (requiresStreetAddress(addressType) && !address) {
+    if (requiresStreetAddress(addressType) && !hasPlausibleStreetAddress(address, city, state)) {
       return NextResponse.json(
         {
           error: 'Address is required',
-          details: 'Physical resources must include a street address.',
+          details: 'Physical resources must include a street-level address, not just city/state.',
         },
         { status: 400 }
       )

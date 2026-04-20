@@ -4,6 +4,7 @@ import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import { getAISystemStatus } from '@/lib/api/settings'
 import type { ResourceSuggestion } from '@/lib/types/database'
 import {
+  hasPlausibleStreetAddress,
   normalizeAddressType,
   normalizeServiceArea,
   requiresServiceArea,
@@ -128,10 +129,13 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        if (requiresStreetAddress(addressType) && !address) {
-          console.error('Missing required street address:', { name, addressType })
+        if (
+          requiresStreetAddress(addressType) &&
+          !hasPlausibleStreetAddress(address, city, state)
+        ) {
+          console.error('Missing required street-level address:', { name, addressType, address })
           results.errors++
-          results.error_details.push(`${name}: physical resources require a street address`)
+          results.error_details.push(`${name}: physical resources require a street-level address`)
           continue
         }
 

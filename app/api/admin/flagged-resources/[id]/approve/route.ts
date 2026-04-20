@@ -5,7 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
-import { requiresServiceArea } from '@/lib/utils/resource-location'
+import { hasPlausibleStreetAddress, requiresServiceArea } from '@/lib/utils/resource-location'
 
 /**
  * POST /api/admin/flagged-resources/[id]/approve
@@ -47,9 +47,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const serviceArea = suggestion.serviceArea || null
 
     if (addressType === 'physical' && (!latitude || !longitude)) {
-      if (!suggestion.address) {
+      if (!hasPlausibleStreetAddress(suggestion.address, suggestion.city, suggestion.state)) {
         return NextResponse.json(
-          { error: 'Cannot approve physical resource: missing address and coordinates' },
+          { error: 'Cannot approve physical resource: missing street-level address' },
           { status: 400 }
         )
       }

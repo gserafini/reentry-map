@@ -9,6 +9,15 @@ export interface ServiceArea {
 
 const ADDRESS_TYPE_SET = new Set<string>(ADDRESS_TYPES)
 const SERVICE_AREA_TYPES = new Set<ResourceAddressType>(['regional', 'online', 'mobile'])
+const SPELLED_NUMBER_PREFIX = /^(one|two|three|four|five|six|seven|eight|nine|ten)\b/i
+
+function normalizeAddressText(value: string | null | undefined): string {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  return value.trim().toLowerCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ')
+}
 
 export function normalizeAddressType(value: unknown): ResourceAddressType {
   if (typeof value !== 'string') {
@@ -50,4 +59,33 @@ export function requiresServiceArea(
   addressType: ResourceAddressType | string | null | undefined
 ): boolean {
   return SERVICE_AREA_TYPES.has(normalizeAddressType(addressType))
+}
+
+export function hasPlausibleStreetAddress(
+  address: string | null | undefined,
+  city?: string | null,
+  state?: string | null
+): boolean {
+  const normalizedAddress = normalizeAddressText(address)
+  if (!normalizedAddress) {
+    return false
+  }
+
+  const normalizedCity = normalizeAddressText(city)
+  const normalizedState = normalizeAddressText(state)
+
+  const localityOnlyValues = new Set(
+    [
+      normalizedCity,
+      normalizedState,
+      [normalizedCity, normalizedState].filter(Boolean).join(' '),
+      [normalizedCity, normalizedState].filter(Boolean).join(', '),
+    ].filter(Boolean)
+  )
+
+  if (localityOnlyValues.has(normalizedAddress)) {
+    return false
+  }
+
+  return /\d/.test(normalizedAddress) || SPELLED_NUMBER_PREFIX.test(normalizedAddress)
 }

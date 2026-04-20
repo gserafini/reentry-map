@@ -5,7 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
-import { requiresServiceArea } from '@/lib/utils/resource-location'
+import { hasPlausibleStreetAddress, requiresServiceArea } from '@/lib/utils/resource-location'
 
 interface BatchResult {
   id: string
@@ -126,8 +126,8 @@ async function approveSuggestion(
   const serviceArea = suggestion.serviceArea || null
 
   if (addressType === 'physical' && (!latitude || !longitude)) {
-    if (!suggestion.address) {
-      return { id, status: 'failed', error: 'Missing address and coordinates' }
+    if (!hasPlausibleStreetAddress(suggestion.address, suggestion.city, suggestion.state)) {
+      return { id, status: 'failed', error: 'Physical resources require a street-level address' }
     }
 
     const fullAddress = [suggestion.address, suggestion.city, suggestion.state, suggestion.zip]
