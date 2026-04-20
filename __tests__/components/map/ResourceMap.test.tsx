@@ -13,6 +13,13 @@ vi.mock('@/lib/google-maps', () => ({
   }),
 }))
 
+vi.mock('@/lib/env', () => ({
+  env: {
+    NEXT_PUBLIC_DEFAULT_LATITUDE: 37.8044,
+    NEXT_PUBLIC_DEFAULT_LONGITUDE: -122.2712,
+  },
+}))
+
 // Mock Google Maps global objects
 global.google = {
   maps: {
@@ -146,6 +153,29 @@ describe('ResourceMap', () => {
 
     // Component should render with user location
     expect(container).toBeTruthy()
+  })
+
+  it('falls back to the default center when userLocation is invalid', async () => {
+    render(
+      <ResourceMap
+        resources={mockResources}
+        userLocation={{ latitude: Number.NaN, longitude: Number.NaN }}
+      />
+    )
+
+    // Wait for async map init to run
+    await screen.findByText(/Loading map/i)
+
+    expect(global.google.maps.Map).toHaveBeenCalled()
+    const [, options] = vi.mocked(global.google.maps.Map).mock.calls.at(-1) as [
+      HTMLElement,
+      { center: { lat: number; lng: number } },
+    ]
+
+    expect(options.center).toEqual({
+      lat: 37.8044,
+      lng: -122.2712,
+    })
   })
 
   it('accepts onResourceClick callback', () => {

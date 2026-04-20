@@ -44,10 +44,36 @@ export function CategoryFilter({ categoryCounts, defaultExpanded = true }: Categ
   const pathname = usePathname()
   const [expanded, setExpanded] = React.useState(defaultExpanded)
 
+  const getSingleCategoryRoute = React.useCallback(
+    (category: ResourceCategory) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('categories', category)
+
+      if (
+        pathname === '/resources' ||
+        pathname.startsWith('/search') ||
+        pathname.startsWith('/tag/')
+      ) {
+        return `${pathname}?${params.toString()}`
+      }
+
+      const cityCategoryMatch = pathname.match(/^\/([^\/]+)\/([^\/]+)(?:\/category\/[^\/]+)?$/)
+      const reservedRoots = new Set(['resources', 'search', 'category', 'tag', 'admin', 'api'])
+
+      if (cityCategoryMatch && !reservedRoots.has(cityCategoryMatch[1])) {
+        const [, state, city] = cityCategoryMatch
+        return `/${state}/${city}/category/${category}`
+      }
+
+      return `/category/${category}`
+    },
+    [pathname, searchParams]
+  )
+
   // Get selected categories from URL (both query params and pathname)
   const selectedCategories = React.useMemo(() => {
-    // Check if we're on a category page (/resources/category/{category})
-    const categoryMatch = pathname.match(/\/resources\/category\/([^\/]+)/)
+    // Check if we're on a category page (/category/{category} or /{state}/{city}/category/{category})
+    const categoryMatch = pathname.match(/\/category\/([^\/]+)/)
     if (categoryMatch) {
       return [categoryMatch[1]]
     }
@@ -72,9 +98,7 @@ export function CategoryFilter({ categoryCounts, defaultExpanded = true }: Categ
     // Use SEO-friendly URLs for single category, query params for multiple or none
     if (newCategories.length === 1) {
       // Single category: use SEO-friendly URL and populate search bar with category name
-      router.push(
-        `/resources/category/${newCategories[0]}?search=${encodeURIComponent(newCategories[0])}`
-      )
+      router.push(getSingleCategoryRoute(newCategories[0] as ResourceCategory))
     } else if (newCategories.length > 1) {
       // Multiple categories: use query params
       params.set('categories', newCategories.join(','))

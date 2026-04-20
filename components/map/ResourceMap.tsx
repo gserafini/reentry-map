@@ -45,6 +45,16 @@ interface ResourceMapProps {
   height?: string
 }
 
+function hasValidUserLocation(
+  userLocation: ResourceMapProps['userLocation']
+): userLocation is { latitude: number; longitude: number } {
+  return Boolean(
+    userLocation &&
+    Number.isFinite(userLocation.latitude) &&
+    Number.isFinite(userLocation.longitude)
+  )
+}
+
 // Default map center (from environment config)
 const DEFAULT_CENTER = {
   lat: env.NEXT_PUBLIC_DEFAULT_LATITUDE,
@@ -109,7 +119,7 @@ export function ResourceMap({
         }
 
         // Determine map center
-        const center = userLocation
+        const center = hasValidUserLocation(userLocation)
           ? { lat: userLocation.latitude, lng: userLocation.longitude }
           : DEFAULT_CENTER
 
@@ -184,7 +194,7 @@ export function ResourceMap({
 
   // Re-center map when userLocation changes (separate effect for efficiency)
   useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation) return
+    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation)) return
 
     const newCenter = { lat: userLocation.latitude, lng: userLocation.longitude }
 
@@ -232,7 +242,7 @@ export function ResourceMap({
 
       // Calculate distance if user location is available
       let distance: number | null = null
-      if (userLocation) {
+      if (hasValidUserLocation(userLocation)) {
         distance = calculateDistance(
           { latitude: resource.latitude, longitude: resource.longitude },
           userLocation
@@ -329,7 +339,7 @@ export function ResourceMap({
 
     // Only auto-fit bounds when there's NO user location
     // If user explicitly selected a location, respect that choice
-    if (markers.length > 0 && !userLocation) {
+    if (markers.length > 0 && !hasValidUserLocation(userLocation)) {
       map.fitBounds(bounds, {
         top: 50,
         right: 50,
@@ -348,13 +358,13 @@ export function ResourceMap({
       return () => {
         google.maps.event.removeListener(listener)
       }
-    } else if (userLocation) {
+    } else if (hasValidUserLocation(userLocation)) {
     }
   }, [resources, userLocation, selectedResourceId, isLoading, onResourceClick])
 
   // Create user location marker (blue dot)
   useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation) {
+    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation)) {
       // Remove marker if no location
       if (userLocationMarkerRef.current) {
         userLocationMarkerRef.current.map = null
@@ -395,7 +405,7 @@ export function ResourceMap({
 
   // Draw radius circle around user location
   useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation || !radiusMiles) {
+    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation) || !radiusMiles) {
       // Remove circle if no location or radius
       if (radiusCircleRef.current) {
         radiusCircleRef.current.setMap(null)
@@ -459,7 +469,7 @@ export function ResourceMap({
 
   // Adjust zoom based on radius changes (smooth zoom)
   useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation || !radiusMiles) return
+    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation) || !radiusMiles) return
 
     const map = mapInstanceRef.current
 

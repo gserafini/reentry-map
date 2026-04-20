@@ -4,6 +4,7 @@
 
 - Fixed batch enrichment queue burn-down. The worker now records per-resource enrichment attempts in `provenance.enrichment`, prioritizes never-attempted resources first, and applies a 30-day retry cooldown so repeated runs stop hammering the same no-write resources.
 - Added a `stats status` admin CLI view for quick operational checks. It reports verified, pending, stale, due-for-verification, AI-enriched, needs-enrichment, remaining 500-resource enrichment batches, missing email/hours, missing website, and ungeocoded counts in one command.
+- Fixed the `/resources` category filter route. Selecting a single category from the sidebar on `/resources` now stays on `/resources?categories=...` instead of navigating to the nonexistent `/resources/category/...` path that produced a 404.
 
 ## 2026-04-13
 
