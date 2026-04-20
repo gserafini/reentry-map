@@ -1,12 +1,16 @@
 import { Container, Typography, Box, Alert } from '@mui/material'
 import { getResources, getCategoryCounts } from '@/lib/api/resources'
 import { ResourcesView } from './ResourcesView'
-import type { ResourceCategory } from '@/lib/types/database'
+import { buildResourcesQueryOptions } from './params'
 
 interface ResourcesPageProps {
   searchParams: Promise<{
     search?: string
     categories?: string
+    lat?: string
+    lng?: string
+    distance?: string
+    sort?: string
   }>
 }
 
@@ -15,15 +19,10 @@ interface ResourcesPageProps {
  * Server Component that fetches and displays all active resources
  */
 export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {
-  const { search, categories: categoriesParam } = await searchParams
-
-  // Parse categories from URL param
-  const categories = categoriesParam
-    ? (categoriesParam.split(',').filter(Boolean) as ResourceCategory[])
-    : undefined
+  const query = buildResourcesQueryOptions(await searchParams)
 
   // Fetch resources with filters
-  const { data: resources, error } = await getResources({ search, categories, limit: 100 })
+  const { data: resources, error } = await getResources({ ...query, limit: 100 })
 
   // Fetch category counts for filter display
   const { data: categoryCounts } = await getCategoryCounts()
@@ -43,8 +42,7 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
     )
   }
 
-  const isSearching = Boolean(search && search.trim())
-  const isFiltering = Boolean(categories && categories.length > 0)
+  const { search, isSearching, isFiltering } = query
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>

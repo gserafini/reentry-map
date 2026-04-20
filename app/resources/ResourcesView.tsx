@@ -125,7 +125,17 @@ export function ResourcesView({
           )}
 
           {/* Resource List */}
-          <ResourceList resources={resources} />
+          <ResourceList
+            resources={resources}
+            userLocation={
+              coordinates
+                ? {
+                    lat: coordinates.latitude,
+                    lng: coordinates.longitude,
+                  }
+                : undefined
+            }
+          />
         </Box>
       </Box>
     </Box>
