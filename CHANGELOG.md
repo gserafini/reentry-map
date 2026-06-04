@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-04
+
+- Fixed flagged-resource approval tooling so successful human approvals no longer report failure just because verification log audit updates break. Added the missing `verification_logs` human-review columns in the database and made approve/reject flows resilient if that secondary audit write ever fails again.
+
 ## 2026-04-20
 
 - Tightened physical-address validation across suggestion intake, trusted research intake, admin imports, and approval flows. City-only values like `San Diego, CA` no longer pass as physical street addresses, preventing vague location data from being auto-approved and geocoded to city centroids.

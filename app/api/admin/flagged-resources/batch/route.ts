@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { env } from '@/lib/env'
 import { db } from '@/lib/db/client'
-import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { resources, resourceSuggestions } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
 import { hasPlausibleStreetAddress, requiresServiceArea } from '@/lib/utils/resource-location'
+import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 interface BatchResult {
   id: string
@@ -232,24 +233,11 @@ async function approveSuggestion(
     })
     .where(eq(resourceSuggestions.id, id))
 
-  // Update verification log
-  const [latestLog] = await db
-    .select({ id: verificationLogs.id })
-    .from(verificationLogs)
-    .where(eq(verificationLogs.suggestionId, id))
-    .orderBy(desc(verificationLogs.createdAt))
-    .limit(1)
-
-  if (latestLog) {
-    await db
-      .update(verificationLogs)
-      .set({
-        humanReviewed: true,
-        humanReviewerId: auth.userId || null,
-        humanDecision: 'approved',
-      })
-      .where(eq(verificationLogs.id, latestLog.id))
-  }
+  await markVerificationLogHumanReview({
+    suggestionId: id,
+    reviewerId: auth.userId || null,
+    decision: 'approved',
+  })
 
   return { id, status: 'approved', resource_id: resource.id }
 }
@@ -303,24 +291,12 @@ async function rejectSuggestion(
     })
     .where(eq(resourceSuggestions.id, id))
 
-  // Update verification log
-  const [latestLog] = await db
-    .select({ id: verificationLogs.id })
-    .from(verificationLogs)
-    .where(eq(verificationLogs.suggestionId, id))
-    .orderBy(desc(verificationLogs.createdAt))
-    .limit(1)
-
-  if (latestLog) {
-    await db
-      .update(verificationLogs)
-      .set({
-        humanReviewed: true,
-        humanReviewerId: auth.userId || null,
-        humanDecision: status,
-      })
-      .where(eq(verificationLogs.id, latestLog.id))
-  }
+  await markVerificationLogHumanReview({
+    suggestionId: id,
+    reviewerId: auth.userId || null,
+    decision: status,
+    notes: reviewNotes,
+  })
 
   return { id, status }
 }

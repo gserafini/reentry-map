@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { db } from '@/lib/db/client'
-import { resourceSuggestions, verificationLogs } from '@/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { resourceSuggestions } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
+import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 /**
  * POST /api/admin/flagged-resources/[id]/reject
@@ -101,25 +102,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       })
       .where(eq(resourceSuggestions.id, id))
 
-    // Update verification log to mark as human reviewed
-    // First find the most recent log for this suggestion
-    const [latestLog] = await db
-      .select({ id: verificationLogs.id })
-      .from(verificationLogs)
-      .where(eq(verificationLogs.suggestionId, id))
-      .orderBy(desc(verificationLogs.createdAt))
-      .limit(1)
-
-    if (latestLog) {
-      await db
-        .update(verificationLogs)
-        .set({
-          humanReviewed: true,
-          humanReviewerId: auth.userId || null,
-          humanDecision: status,
-        })
-        .where(eq(verificationLogs.id, latestLog.id))
-    }
+    await markVerificationLogHumanReview({
+      suggestionId: id,
+      reviewerId: auth.userId || null,
+      decision: status,
+      notes: reviewNotes,
+    })
 
     return NextResponse.json({
       success: true,
