@@ -21,6 +21,19 @@ export interface GetResourcesOptions extends Partial<ResourceFilters>, Paginatio
   state?: string
 }
 
+export type ResourceMapItem = Pick<
+  Resource,
+  | 'id'
+  | 'name'
+  | 'primary_category'
+  | 'address'
+  | 'latitude'
+  | 'longitude'
+  | 'slug'
+  | 'city'
+  | 'state'
+>
+
 // Allowlist for ORDER BY field validation (safe to use with sql.unsafe since values are validated)
 const ALLOWED_SORT_FIELDS = [
   'name',
@@ -252,6 +265,105 @@ export async function getResources(
     return { data, error: null }
   } catch (error) {
     console.error('Unexpected error in getResources:', error)
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error('Unknown error'),
+    }
+  }
+}
+
+/**
+ * Get a larger, map-focused resource dataset using the same filtering rules as getResources,
+ * but returning only the fields the map needs. This keeps the /resources map comprehensive
+ * without forcing the list view to render thousands of cards.
+ */
+export async function getResourcesForMap(
+  options: Omit<GetResourcesOptions, 'offset' | 'sort'> = {},
+  limit = 5000
+): Promise<{ data: ResourceMapItem[] | null; error: Error | null }> {
+  try {
+    const {
+      search,
+      categories,
+      tags,
+      city,
+      state,
+      latitude,
+      longitude,
+      radius_miles,
+      min_rating,
+      verified_only,
+      accepts_records,
+      appointment_required,
+    } = options
+
+    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
+      const nearbyResult = await sqlClient<{ id: string }[]>`
+        SELECT id
+        FROM get_resources_near(${latitude}, ${longitude}, ${radius_miles})
+      `
+
+      if (!nearbyResult || nearbyResult.length === 0) {
+        return { data: [], error: null }
+      }
+
+      const resourceIds = nearbyResult.map((item) => item.id)
+      const conditions = buildResourceConditions(
+        {
+          search,
+          categories,
+          tags,
+          city,
+          state,
+          min_rating,
+          verified_only,
+          accepts_records,
+          appointment_required,
+        },
+        resourceIds,
+        'with_primary_category'
+      )
+      const whereClause = combineConditions(conditions)
+
+      const data = await sqlClient<ResourceMapItem[]>`
+        SELECT id, name, primary_category, address, latitude, longitude, slug, city, state
+        FROM resources
+        WHERE ${whereClause}
+        ORDER BY name ASC
+        LIMIT ${limit}
+      `
+
+      return { data, error: null }
+    }
+
+    const conditions = buildResourceConditions(
+      {
+        search,
+        categories,
+        tags,
+        city,
+        state,
+        min_rating,
+        verified_only,
+        accepts_records,
+        appointment_required,
+      },
+      undefined,
+      'with_primary_category'
+    )
+    const whereClause = combineConditions(conditions)
+
+    const data = await sqlClient<ResourceMapItem[]>`
+      SELECT id, name, primary_category, address, latitude, longitude, slug, city, state
+      FROM resources
+      WHERE ${whereClause}
+      ORDER BY name ASC
+      LIMIT ${limit}
+    `
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error in getResourcesForMap:', error)
     return {
       data: null,
       error: error instanceof Error ? error : new Error('Unknown error'),

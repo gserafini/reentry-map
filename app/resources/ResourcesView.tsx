@@ -11,9 +11,11 @@ import { DistanceFilter } from '@/components/search/DistanceFilter'
 import { ResourceMap } from '@/components/map'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
+import type { ResourceMapItem } from '@/lib/api/resources'
 
 interface ResourcesViewProps {
   resources: Resource[]
+  mapResources?: ResourceMapItem[]
   categoryCounts?: Partial<Record<ResourceCategory, number>>
   search?: string
   isSearching: boolean
@@ -25,6 +27,7 @@ interface ResourcesViewProps {
  */
 export function ResourcesView({
   resources,
+  mapResources,
   categoryCounts,
   search,
   isSearching,
@@ -46,6 +49,8 @@ export function ResourcesView({
   // Get radius from URL params
   const distanceParam = searchParams.get('distance')
   const radiusMiles = distanceParam ? parseInt(distanceParam, 10) : undefined
+  const mapDataset = mapResources && mapResources.length > 0 ? mapResources : resources
+  const mapHasMoreThanList = mapDataset.length > resources.length
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -59,7 +64,7 @@ export function ResourcesView({
         }}
       >
         <ResourceMap
-          resources={resources}
+          resources={mapDataset}
           userLocation={
             coordinates
               ? {
@@ -93,10 +98,17 @@ export function ResourcesView({
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* Results count */}
           {hasResults && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {resources.length} resource{resources.length !== 1 ? 's' : ''}
-              {isFiltering && ` in selected categories`}
-            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Showing {resources.length} resource{resources.length !== 1 ? 's' : ''} in the list
+                {isFiltering && ` for the selected categories`}
+              </Typography>
+              {mapHasMoreThanList && (
+                <Typography variant="body2" color="text.secondary">
+                  The map is showing all {mapDataset.length} matching resources.
+                </Typography>
+              )}
+            </Box>
           )}
 
           {/* No results state */}

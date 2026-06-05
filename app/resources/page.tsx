@@ -1,5 +1,5 @@
 import { Container, Typography, Box, Alert } from '@mui/material'
-import { getResources, getCategoryCounts } from '@/lib/api/resources'
+import { getResources, getCategoryCounts, getResourcesForMap } from '@/lib/api/resources'
 import { ResourcesView } from './ResourcesView'
 import { buildResourcesQueryOptions } from './params'
 
@@ -21,11 +21,18 @@ interface ResourcesPageProps {
 export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {
   const query = buildResourcesQueryOptions(await searchParams)
 
-  // Fetch resources with filters
-  const { data: resources, error } = await getResources({ ...query, limit: 100 })
+  // Fetch a capped list dataset for cards and a fuller dataset for the map.
+  const [
+    { data: resources, error: listError },
+    { data: mapResources, error: mapError },
+    { data: categoryCounts },
+  ] = await Promise.all([
+    getResources({ ...query, limit: 100 }),
+    getResourcesForMap(query),
+    getCategoryCounts(),
+  ])
 
-  // Fetch category counts for filter display
-  const { data: categoryCounts } = await getCategoryCounts()
+  const error = listError || mapError
 
   if (error) {
     return (
@@ -59,6 +66,7 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
 
       <ResourcesView
         resources={resources || []}
+        mapResources={mapResources || resources || []}
         categoryCounts={categoryCounts || undefined}
         search={search}
         isSearching={isSearching}

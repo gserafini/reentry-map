@@ -2,6 +2,7 @@
 
 ## 2026-06-04
 
+- Fixed `/resources` so the map no longer silently drops newer resources once the global result set exceeds 100. The list remains capped for performance, but the map now receives the full filtered dataset and the page explicitly tells users when the map is showing more matches than the list.
 - Fixed flagged-resource approval tooling so successful human approvals no longer report failure just because verification log audit updates break. Added the missing `verification_logs` human-review columns in the database and made approve/reject flows resilient if that secondary audit write ever fails again.
 
 ## 2026-04-20

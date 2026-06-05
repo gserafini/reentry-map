@@ -13,11 +13,24 @@ import { getResourceUrl } from '@/lib/utils/resource-url'
 import type { ResourceCategory } from '@/lib/types/database'
 import { env } from '@/lib/env'
 
+export type ResourceMapResource = Pick<
+  Resource,
+  | 'id'
+  | 'name'
+  | 'primary_category'
+  | 'address'
+  | 'latitude'
+  | 'longitude'
+  | 'slug'
+  | 'city'
+  | 'state'
+>
+
 interface ResourceMapProps {
   /**
    * Resources to display on map
    */
-  resources: Resource[]
+  resources: ResourceMapResource[]
 
   /**
    * User's current location (center map here)
