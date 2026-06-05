@@ -12,6 +12,7 @@ import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
 import { getResourceUrl } from '@/lib/utils/resource-url'
 import type { ResourceCategory } from '@/lib/types/database'
 import { env } from '@/lib/env'
+import { normalizeViewportBounds, type MapViewportBounds } from '@/lib/utils/map-viewport'
 
 export type ResourceMapResource = Pick<
   Resource,
@@ -43,6 +44,11 @@ interface ResourceMapProps {
   radiusMiles?: number
 
   /**
+   * Explicit viewport bounds to restore from a sharable URL
+   */
+  viewportBounds?: MapViewportBounds | null
+
+  /**
    * Selected resource ID (to highlight/open)
    */
   selectedResourceId?: string | null
@@ -51,6 +57,11 @@ interface ResourceMapProps {
    * Callback when resource marker is clicked
    */
   onResourceClick?: (resourceId: string) => void
+
+  /**
+   * Callback when the user changes the visible map bounds via pan/zoom
+   */
+  onViewportBoundsChange?: (bounds: MapViewportBounds) => void
 
   /**
    * Map height (default: '500px')
@@ -83,8 +94,10 @@ export function ResourceMap({
   resources,
   userLocation,
   radiusMiles,
+  viewportBounds,
   selectedResourceId,
   onResourceClick,
+  onViewportBoundsChange,
   height = '500px',
 }: ResourceMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -94,6 +107,8 @@ export function ResourceMap({
   const clustererRef = useRef<MarkerClusterer | null>(null)
   const userLocationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
   const radiusCircleRef = useRef<google.maps.Circle | null>(null)
+  const pendingViewportSyncRef = useRef(false)
+  const suppressViewportSyncRef = useRef(false)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -167,11 +182,55 @@ export function ResourceMap({
           }
         })
 
+        const dragStartListener = map.addListener('dragstart', () => {
+          pendingViewportSyncRef.current = true
+        })
+
+        const zoomChangedListener = map.addListener('zoom_changed', () => {
+          if (suppressViewportSyncRef.current) return
+          pendingViewportSyncRef.current = true
+        })
+
+        const idleListener = map.addListener('idle', () => {
+          if (suppressViewportSyncRef.current) {
+            suppressViewportSyncRef.current = false
+            pendingViewportSyncRef.current = false
+            return
+          }
+
+          if (!pendingViewportSyncRef.current || !onViewportBoundsChange) return
+
+          const bounds = map.getBounds()
+          if (!bounds) return
+
+          const northEast = bounds.getNorthEast()
+          const southWest = bounds.getSouthWest()
+
+          pendingViewportSyncRef.current = false
+          onViewportBoundsChange(
+            normalizeViewportBounds({
+              north: northEast.lat(),
+              south: southWest.lat(),
+              east: northEast.lng(),
+              west: southWest.lng(),
+            })
+          )
+        })
+
         // Store cleanup functions
         const cleanup = () => {
           document.removeEventListener('keydown', handleEscKey)
           if (mapClickListener) {
             google.maps.event.removeListener(mapClickListener)
+          }
+          if (dragStartListener) {
+            google.maps.event.removeListener(dragStartListener)
+          }
+          if (zoomChangedListener) {
+            google.maps.event.removeListener(zoomChangedListener)
+          }
+          if (idleListener) {
+            google.maps.event.removeListener(idleListener)
           }
         }
 
@@ -203,7 +262,7 @@ export function ResourceMap({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted]) // Only initialize once on mount - userLocation handled separately below
+  }, [isMounted, onViewportBoundsChange]) // Only initialize once on mount - userLocation handled separately below
 
   // Re-center map when userLocation changes (separate effect for efficiency)
   useEffect(() => {
@@ -214,6 +273,19 @@ export function ResourceMap({
     // Smooth pan to new location with animation
     mapInstanceRef.current.panTo(newCenter)
   }, [userLocation])
+
+  // Restore an explicit sharable viewport when present
+  useEffect(() => {
+    if (!mapInstanceRef.current || !viewportBounds) return
+
+    suppressViewportSyncRef.current = true
+    mapInstanceRef.current.fitBounds(viewportBounds, {
+      top: 50,
+      right: 50,
+      bottom: 50,
+      left: 50,
+    })
+  }, [viewportBounds])
 
   // Create markers when resources or map changes
   useEffect(() => {
@@ -352,7 +424,8 @@ export function ResourceMap({
 
     // Only auto-fit bounds when there's NO user location
     // If user explicitly selected a location, respect that choice
-    if (markers.length > 0 && !hasValidUserLocation(userLocation)) {
+    if (markers.length > 0 && !hasValidUserLocation(userLocation) && !viewportBounds) {
+      suppressViewportSyncRef.current = true
       map.fitBounds(bounds, {
         top: 50,
         right: 50,
@@ -364,6 +437,7 @@ export function ResourceMap({
       const listener = google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
         const zoom = map.getZoom()
         if (zoom && zoom > 15) {
+          suppressViewportSyncRef.current = true
           map.setZoom(15)
         }
       })
@@ -373,7 +447,7 @@ export function ResourceMap({
       }
     } else if (hasValidUserLocation(userLocation)) {
     }
-  }, [resources, userLocation, selectedResourceId, isLoading, onResourceClick])
+  }, [resources, userLocation, viewportBounds, selectedResourceId, isLoading, onResourceClick])
 
   // Create user location marker (blue dot)
   useEffect(() => {
@@ -504,6 +578,7 @@ export function ResourceMap({
     // Smoothly animate to the new zoom level
     const currentZoom = map.getZoom() || DEFAULT_ZOOM
     if (currentZoom !== targetZoom) {
+      suppressViewportSyncRef.current = true
       map.setZoom(targetZoom)
     }
   }, [radiusMiles, userLocation])

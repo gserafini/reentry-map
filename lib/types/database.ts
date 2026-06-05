@@ -855,6 +855,10 @@ export type ResourceFilters = {
   latitude?: number
   longitude?: number
   radius_miles?: number
+  north?: number
+  south?: number
+  east?: number
+  west?: number
   min_rating?: number
   verified_only?: boolean
   accepts_records?: boolean

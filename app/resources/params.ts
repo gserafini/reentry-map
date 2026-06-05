@@ -1,6 +1,7 @@
 import type { ResourceCategory, ResourceSort } from '@/lib/types/database'
 import { parseSortParam } from '@/lib/utils/sort'
 import { parseStateLocationName } from '@/lib/utils/location-scope'
+import { parseViewportBounds } from '@/lib/utils/map-viewport'
 
 export interface ResourcesPageSearchParams {
   search?: string
@@ -10,6 +11,10 @@ export interface ResourcesPageSearchParams {
   distance?: string
   sort?: string
   locationName?: string
+  north?: string
+  south?: string
+  east?: string
+  west?: string
 }
 
 export function buildResourcesQueryOptions(searchParams: ResourcesPageSearchParams): {
@@ -19,6 +24,10 @@ export function buildResourcesQueryOptions(searchParams: ResourcesPageSearchPara
   longitude?: number
   radius_miles?: number
   state?: string
+  north?: number
+  south?: number
+  east?: number
+  west?: number
   sort: ResourceSort
   isSearching: boolean
   isFiltering: boolean
@@ -31,6 +40,10 @@ export function buildResourcesQueryOptions(searchParams: ResourcesPageSearchPara
     distance,
     sort: sortParam,
     locationName,
+    north,
+    south,
+    east,
+    west,
   } = searchParams
 
   const categories = categoriesParam
@@ -38,12 +51,21 @@ export function buildResourcesQueryOptions(searchParams: ResourcesPageSearchPara
     : undefined
 
   const state = parseStateLocationName(locationName)
+  const viewportBounds = parseViewportBounds(
+    new URLSearchParams(
+      Object.entries({ north, south, east, west }).filter(([, value]) => value != null) as [
+        string,
+        string,
+      ][]
+    )
+  )
   const latitude = lat ? parseFloat(lat) : undefined
   const longitude = lng ? parseFloat(lng) : undefined
   const radius_miles = distance ? parseInt(distance, 10) : undefined
 
   const hasLocation =
     !state &&
+    !viewportBounds &&
     latitude !== undefined &&
     Number.isFinite(latitude) &&
     longitude !== undefined &&
@@ -61,6 +83,7 @@ export function buildResourcesQueryOptions(searchParams: ResourcesPageSearchPara
     search,
     categories,
     ...(state ? { state } : {}),
+    ...(viewportBounds || {}),
     ...(hasLocation ? { latitude, longitude, radius_miles } : {}),
     sort,
     isSearching: Boolean(search && search.trim()),

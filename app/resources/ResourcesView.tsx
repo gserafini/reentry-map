@@ -2,7 +2,7 @@
 
 import { Box, Typography, Alert, Button, Stack } from '@mui/material'
 import { SearchOff as SearchOffIcon } from '@mui/icons-material'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ResourceList } from '@/components/resources/ResourceList'
 import { CategoryFilter } from '@/components/search/CategoryFilter'
@@ -13,6 +13,12 @@ import { useUserLocation } from '@/lib/context/LocationContext'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
 import type { ResourceMapItem } from '@/lib/api/resources'
 import { parseStateLocationName } from '@/lib/utils/location-scope'
+import {
+  buildViewportUrl,
+  parseViewportBounds,
+  type MapViewportBounds,
+} from '@/lib/utils/map-viewport'
+import { useDebouncedCallback } from 'use-debounce'
 
 interface ResourcesViewProps {
   resources: Resource[]
@@ -35,6 +41,8 @@ export function ResourcesView({
   isFiltering,
 }: ResourcesViewProps) {
   const { coordinates: gpsCoordinates } = useUserLocation()
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const hasResults = resources && resources.length > 0
 
@@ -44,8 +52,9 @@ export function ResourcesView({
   const lngParam = searchParams.get('lng')
   const locationName = searchParams.get('locationName')
   const stateLocation = parseStateLocationName(locationName)
+  const viewportBounds = parseViewportBounds(searchParams)
   const coordinates =
-    !stateLocation && latParam && lngParam
+    !viewportBounds && !stateLocation && latParam && lngParam
       ? { latitude: parseFloat(latParam), longitude: parseFloat(lngParam) }
       : stateLocation
         ? null
@@ -53,9 +62,19 @@ export function ResourcesView({
 
   // Get radius from URL params
   const distanceParam = searchParams.get('distance')
-  const radiusMiles = !stateLocation && distanceParam ? parseInt(distanceParam, 10) : undefined
+  const radiusMiles =
+    !viewportBounds && !stateLocation && distanceParam ? parseInt(distanceParam, 10) : undefined
   const mapDataset = mapResources && mapResources.length > 0 ? mapResources : resources
   const mapHasMoreThanList = mapDataset.length > resources.length
+
+  const syncViewportToUrl = useDebouncedCallback((bounds: MapViewportBounds) => {
+    const nextUrl = buildViewportUrl(pathname, searchParams, bounds)
+    const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname
+
+    if (nextUrl !== currentUrl) {
+      router.replace(nextUrl, { scroll: false })
+    }
+  }, 300)
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -79,6 +98,8 @@ export function ResourcesView({
               : null
           }
           radiusMiles={radiusMiles}
+          viewportBounds={viewportBounds}
+          onViewportBoundsChange={syncViewportToUrl}
           height="100%"
         />
       </Box>

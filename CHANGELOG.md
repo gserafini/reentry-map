@@ -4,6 +4,7 @@
 
 - Fixed `/resources` so the map no longer silently drops newer resources once the global result set exceeds 100. The list remains capped for performance, but the map now receives the full filtered dataset and the page explicitly tells users when the map is showing more matches than the list.
 - Fixed state-level location searches like `Washington, USA`. The app no longer treats a whole-state search as a 25-mile radius around the state's geographic center, so `/resources` and `/search` now behave like statewide searches instead of showing empty maps from centroid filtering.
+- Fixed `/resources` map viewport sharing. Panning or zooming the map now updates the URL with the visible bounds and refreshes the resource results to match, so shared links reopen the same map area instead of losing the user's map context.
 - Fixed flagged-resource approval tooling so successful human approvals no longer report failure just because verification log audit updates break. Added the missing `verification_logs` human-review columns in the database and made approve/reject flows resilient if that secondary audit write ever fails again.
 
 ## 2026-04-20

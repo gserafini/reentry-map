@@ -62,6 +62,10 @@ function buildResourceConditions(
     tags?: string[]
     city?: string
     state?: string
+    north?: number
+    south?: number
+    east?: number
+    west?: number
     min_rating?: number
     verified_only?: boolean
     accepts_records?: boolean | null
@@ -123,6 +127,17 @@ function buildResourceConditions(
     conditions.push(sqlClient`state = ${opts.state}`)
   }
 
+  if (
+    opts.north !== undefined &&
+    opts.south !== undefined &&
+    opts.east !== undefined &&
+    opts.west !== undefined
+  ) {
+    conditions.push(
+      sqlClient`latitude IS NOT NULL AND longitude IS NOT NULL AND latitude BETWEEN ${opts.south} AND ${opts.north} AND longitude BETWEEN ${opts.west} AND ${opts.east}`
+    )
+  }
+
   return conditions
 }
 
@@ -149,6 +164,10 @@ export async function getResources(
       latitude,
       longitude,
       radius_miles,
+      north,
+      south,
+      east,
+      west,
       min_rating,
       verified_only,
       accepts_records,
@@ -184,6 +203,10 @@ export async function getResources(
           categories,
           city,
           state,
+          north,
+          south,
+          east,
+          west,
           min_rating,
           verified_only,
           accepts_records,
@@ -235,6 +258,10 @@ export async function getResources(
         tags,
         city,
         state,
+        north,
+        south,
+        east,
+        west,
         min_rating,
         verified_only,
         accepts_records,
@@ -291,6 +318,10 @@ export async function getResourcesForMap(
       latitude,
       longitude,
       radius_miles,
+      north,
+      south,
+      east,
+      west,
       min_rating,
       verified_only,
       accepts_records,
@@ -315,6 +346,10 @@ export async function getResourcesForMap(
           tags,
           city,
           state,
+          north,
+          south,
+          east,
+          west,
           min_rating,
           verified_only,
           accepts_records,
@@ -343,6 +378,10 @@ export async function getResourcesForMap(
         tags,
         city,
         state,
+        north,
+        south,
+        east,
+        west,
         min_rating,
         verified_only,
         accepts_records,
@@ -563,13 +602,18 @@ export async function getCategoryCounts(
     latitude?: number
     longitude?: number
     radius_miles?: number
+    north?: number
+    south?: number
+    east?: number
+    west?: number
   } = {}
 ): Promise<{
   data: Partial<Record<ResourceCategory, number>> | null
   error: Error | null
 }> {
   try {
-    const { search, city, state, latitude, longitude, radius_miles } = options
+    const { search, city, state, latitude, longitude, radius_miles, north, south, east, west } =
+      options
 
     let resourceList: { categories: string[] | null }[] = []
 
@@ -586,7 +630,7 @@ export async function getCategoryCounts(
       const resourceIds = nearbyResult.map((item) => item.id)
 
       const conditions = buildResourceConditions(
-        { search, city, state },
+        { search, city, state, north, south, east, west },
         resourceIds,
         'with_primary_category'
       )
@@ -599,7 +643,7 @@ export async function getCategoryCounts(
     } else {
       // No location filtering - get all active resources
       const conditions = buildResourceConditions(
-        { search, city, state },
+        { search, city, state, north, south, east, west },
         undefined,
         'with_primary_category'
       )

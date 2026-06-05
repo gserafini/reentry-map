@@ -43,4 +43,28 @@ describe('resources page query options', () => {
     expect(result).not.toHaveProperty('longitude')
     expect(result).not.toHaveProperty('radius_miles')
   })
+
+  it('prefers explicit viewport bounds over center-radius params', () => {
+    const result = buildResourcesQueryOptions({
+      lat: '47.7510741',
+      lng: '-120.7401386',
+      distance: '25',
+      north: '48.2',
+      south: '47.4',
+      east: '-121.5',
+      west: '-122.7',
+    })
+
+    expect(result).toMatchObject({
+      north: 48.2,
+      south: 47.4,
+      east: -121.5,
+      west: -122.7,
+      sort: { field: 'name', direction: 'asc' },
+    })
+
+    expect(result).not.toHaveProperty('latitude')
+    expect(result).not.toHaveProperty('longitude')
+    expect(result).not.toHaveProperty('radius_miles')
+  })
 })
