@@ -6,6 +6,7 @@ import { MyLocation as MyLocationIcon, Place as PlaceIcon } from '@mui/icons-mat
 import { useRouter, useSearchParams } from 'next/navigation'
 import { initializeGoogleMaps } from '@/lib/google-maps'
 import { useUserLocation } from '@/lib/context/LocationContext'
+import { parseStateLocationName } from '@/lib/utils/location-scope'
 
 interface LocationInputProps {
   fullWidth?: boolean
@@ -84,14 +85,23 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   const updateURLWithLocation = useCallback(
     (lat: number, lng: number, locationName: string, distance?: number) => {
       const params = new URLSearchParams(searchParams.toString())
-      params.set('lat', lat.toString())
-      params.set('lng', lng.toString())
       params.set('locationName', locationName)
-      if (distance) {
-        params.set('distance', distance.toString())
-      } else if (!params.has('distance')) {
-        // Set default distance if not present
-        params.set('distance', '25')
+
+      const stateLocation = parseStateLocationName(locationName)
+
+      if (stateLocation) {
+        params.delete('lat')
+        params.delete('lng')
+        params.delete('distance')
+      } else {
+        params.set('lat', lat.toString())
+        params.set('lng', lng.toString())
+        if (distance) {
+          params.set('distance', distance.toString())
+        } else if (!params.has('distance')) {
+          // Set default distance if not present
+          params.set('distance', '25')
+        }
       }
       router.push(`?${params.toString()}`, { scroll: false })
     },

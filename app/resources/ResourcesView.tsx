@@ -12,6 +12,7 @@ import { ResourceMap } from '@/components/map'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
 import type { ResourceMapItem } from '@/lib/api/resources'
+import { parseStateLocationName } from '@/lib/utils/location-scope'
 
 interface ResourcesViewProps {
   resources: Resource[]
@@ -41,14 +42,18 @@ export function ResourcesView({
   // URL params take priority so map re-centers when user searches for a location
   const latParam = searchParams.get('lat')
   const lngParam = searchParams.get('lng')
+  const locationName = searchParams.get('locationName')
+  const stateLocation = parseStateLocationName(locationName)
   const coordinates =
-    latParam && lngParam
+    !stateLocation && latParam && lngParam
       ? { latitude: parseFloat(latParam), longitude: parseFloat(lngParam) }
-      : gpsCoordinates
+      : stateLocation
+        ? null
+        : gpsCoordinates
 
   // Get radius from URL params
   const distanceParam = searchParams.get('distance')
-  const radiusMiles = distanceParam ? parseInt(distanceParam, 10) : undefined
+  const radiusMiles = !stateLocation && distanceParam ? parseInt(distanceParam, 10) : undefined
   const mapDataset = mapResources && mapResources.length > 0 ? mapResources : resources
   const mapHasMoreThanList = mapDataset.length > resources.length
 

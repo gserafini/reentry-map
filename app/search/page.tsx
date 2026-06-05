@@ -9,6 +9,7 @@ import { Pagination } from '@/components/search/Pagination'
 import { SortDropdown } from '@/components/search/SortDropdown'
 import { SearchPageHeader } from '@/components/search/SearchPageHeader'
 import { parseSortParam } from '@/lib/utils/sort'
+import { parseStateLocationName } from '@/lib/utils/location-scope'
 import type { Metadata } from 'next'
 
 interface SearchPageProps {
@@ -43,10 +44,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const lng = params.lng ? parseFloat(params.lng) : undefined
   const distance = params.distance ? parseInt(params.distance, 10) : undefined
   const locationName = params.locationName
+  const state = parseStateLocationName(locationName)
 
   // Determine if we have valid location for filtering
   const hasLocation =
-    lat !== undefined && !isNaN(lat) && lng !== undefined && !isNaN(lng) && distance
+    !state && lat !== undefined && !isNaN(lat) && lng !== undefined && !isNaN(lng) && distance
 
   // First, try to get resources within radius if location is provided
   let resources = null
@@ -95,6 +97,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     // No location filtering - standard search
     const result = await getResources({
       search,
+      ...(state ? { state } : {}),
       limit: PAGE_SIZE,
       offset,
       sort,
@@ -107,6 +110,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // Get total count for pagination
   const { data: totalCount } = await getResourcesCount({
     search,
+    ...(state ? { state } : {}),
     ...(hasLocation && withinRadiusCount > 0
       ? { latitude: lat, longitude: lng, radius_miles: distance }
       : {}),
@@ -117,6 +121,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // Get category counts with current filters applied
   const { data: categoryCounts } = await getCategoryCounts({
     search,
+    ...(state ? { state } : {}),
     ...(hasLocation ? { latitude: lat, longitude: lng, radius_miles: distance } : {}),
   })
 

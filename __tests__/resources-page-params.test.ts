@@ -23,4 +23,24 @@ describe('resources page query options', () => {
       isFiltering: true,
     })
   })
+
+  it('treats a US state location name as a state filter instead of a 25-mile centroid search', () => {
+    const result = buildResourcesQueryOptions({
+      locationName: 'Washington, USA',
+      lat: '47.7510741',
+      lng: '-120.7401386',
+      distance: '25',
+    })
+
+    expect(result).toMatchObject({
+      state: 'WA',
+      sort: { field: 'name', direction: 'asc' },
+      isSearching: false,
+      isFiltering: false,
+    })
+
+    expect(result).not.toHaveProperty('latitude')
+    expect(result).not.toHaveProperty('longitude')
+    expect(result).not.toHaveProperty('radius_miles')
+  })
 })

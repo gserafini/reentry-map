@@ -6,6 +6,7 @@ import { Search as SearchIcon } from '@mui/icons-material'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LocationInput } from './LocationInput'
 import { useUserLocation } from '@/lib/context/LocationContext'
+import { parseStateLocationName } from '@/lib/utils/location-scope'
 
 interface HeroSearchProps {
   /**
@@ -81,18 +82,30 @@ export function HeroSearch({ initialValue = '' }: HeroSearchProps) {
     const lng = searchParams.get('lng')
     const locationName = searchParams.get('locationName')
     const distance = searchParams.get('distance')
+    const stateLocation = parseStateLocationName(locationName)
 
-    if (lat && lng) {
+    if (locationName) {
+      params.set('locationName', locationName)
+    }
+
+    if (stateLocation) {
+      params.delete('lat')
+      params.delete('lng')
+      params.delete('distance')
+    } else if (lat && lng) {
       params.set('lat', lat)
       params.set('lng', lng)
-      if (locationName) params.set('locationName', locationName)
       params.set('distance', distance || '25')
     } else if (coordinates) {
       // Fall back to LocationContext (set by LocationInput or GeoIP)
       params.set('lat', coordinates.latitude.toString())
       params.set('lng', coordinates.longitude.toString())
-      if (displayName) params.set('locationName', displayName)
-      params.set('distance', '25')
+      if (displayName) {
+        params.set('locationName', displayName)
+      }
+      if (!parseStateLocationName(displayName)) {
+        params.set('distance', '25')
+      }
     }
 
     const qs = params.toString()

@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { ResourceMap } from './ResourceMap'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import type { Resource } from '@/lib/types/database'
+import { parseStateLocationName } from '@/lib/utils/location-scope'
 
 interface ResourceMapWithLocationProps {
   /**
@@ -39,15 +40,18 @@ export function ResourceMapWithLocation({
 }: ResourceMapWithLocationProps) {
   const { coordinates } = useUserLocation()
   const searchParams = useSearchParams()
+  const locationName = searchParams.get('locationName')
+  const stateLocation = parseStateLocationName(locationName)
 
   // Get radius from URL params
   const distanceParam = searchParams.get('distance')
-  const radiusMiles = distanceParam ? parseInt(distanceParam, 10) : undefined
+  const radiusMiles = !stateLocation && distanceParam ? parseInt(distanceParam, 10) : undefined
 
   // Convert coordinates to userLocation format
-  const userLocation = coordinates
-    ? { latitude: coordinates.latitude, longitude: coordinates.longitude }
-    : null
+  const userLocation =
+    !stateLocation && coordinates
+      ? { latitude: coordinates.latitude, longitude: coordinates.longitude }
+      : null
 
   return (
     <ResourceMap
