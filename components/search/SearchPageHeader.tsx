@@ -1,7 +1,9 @@
 'use client'
 
 import { Box, Typography } from '@mui/material'
+import { useSearchParams } from 'next/navigation'
 import { useUserLocation } from '@/lib/context/LocationContext'
+import { resolveVisibleLocationName } from '@/lib/utils/location-scope'
 
 interface SearchPageHeaderProps {
   /**
@@ -15,7 +17,10 @@ interface SearchPageHeaderProps {
  * Client component to access LocationContext
  */
 export function SearchPageHeader({ search }: SearchPageHeaderProps) {
+  const searchParams = useSearchParams()
   const { displayName } = useUserLocation()
+  const locationName = searchParams.get('locationName')
+  const visibleLocationName = resolveVisibleLocationName(locationName, displayName)
   const isSearching = Boolean(search && search.trim())
 
   return (
@@ -27,7 +32,7 @@ export function SearchPageHeader({ search }: SearchPageHeaderProps) {
         {isSearching ? (
           <>
             Showing results for &ldquo;{search}&rdquo;
-            {displayName && ` near ${displayName}`}
+            {visibleLocationName && ` near ${visibleLocationName}`}
           </>
         ) : (
           'Find employment, housing, food, healthcare, and support services in your community. Browse our directory of verified resources.'

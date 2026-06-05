@@ -67,3 +67,18 @@ export function parseStateLocationName(locationName?: string | null): string | u
 
   return US_STATE_NAME_TO_CODE[baseName]
 }
+
+/**
+ * Choose the location label that should be visible to the user.
+ * Explicit URL-driven location searches take precedence over cached context display names.
+ */
+export function resolveVisibleLocationName(
+  urlLocationName?: string | null,
+  contextDisplayName?: string | null
+): string | null {
+  if (urlLocationName && urlLocationName.trim()) {
+    return urlLocationName
+  }
+
+  return contextDisplayName || null
+}

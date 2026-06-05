@@ -6,8 +6,7 @@ import { MyLocation as MyLocationIcon, Place as PlaceIcon } from '@mui/icons-mat
 import { useRouter, useSearchParams } from 'next/navigation'
 import { initializeGoogleMaps } from '@/lib/google-maps'
 import { useUserLocation } from '@/lib/context/LocationContext'
-import { parseStateLocationName } from '@/lib/utils/location-scope'
-
+import { parseStateLocationName, resolveVisibleLocationName } from '@/lib/utils/location-scope'
 interface LocationInputProps {
   fullWidth?: boolean
   size?: 'small' | 'medium'
@@ -47,6 +46,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   } = useUserLocation()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const urlLocationName = searchParams.get('locationName')
 
   // localStorage keys for location persistence
   const USER_SELECTED_LOCATION_KEY = 'reentry-map-user-selected-location'
@@ -123,6 +123,9 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   // Smart location pre-fill with localStorage persistence
   // Priority: 1. User's last selection, 2. GeoIP auto-detect, 3. Default
   useEffect(() => {
+    // Only pre-fill if we don't have an explicit location search or a location already set
+    if (urlLocationName) return
+
     // Only pre-fill if we don't have a location yet
     if (coordinates || displayName) return
 
@@ -198,14 +201,15 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
     fetchGeoIPLocation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only run on mount - intentionally excluding dependencies to fetch GeoIP only once
+  }, [coordinates, displayName, urlLocationName]) // Skip cache/geoip when URL drives the location
 
   // Update input value when displayName changes
   useEffect(() => {
-    if (displayName) {
-      setInputValue(displayName)
+    const nextVisibleLocation = resolveVisibleLocationName(urlLocationName, displayName)
+    if (nextVisibleLocation) {
+      setInputValue(nextVisibleLocation)
     }
-  }, [displayName])
+  }, [displayName, urlLocationName])
 
   // Reverse geocode when we get geolocation coordinates
   useEffect(() => {
