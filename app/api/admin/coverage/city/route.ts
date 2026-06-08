@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
-import { db } from '@/lib/db/client'
-import { resources } from '@/lib/db/schema'
-import { eq, and, ilike, count, sql } from 'drizzle-orm'
+import { sql } from '@/lib/db/client'
 import { getAllCategories } from '@/lib/utils/categories'
 
 /**
@@ -35,46 +33,47 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Query resource counts grouped by primary_category for this city
-    const categoryCounts = await db
-      .select({
-        category: resources.primaryCategory,
-        count: count(),
-      })
-      .from(resources)
-      .where(
-        and(
-          ilike(resources.city, city),
-          eq(resources.state, state),
-          eq(resources.status, 'active')
-        )
-      )
-      .groupBy(resources.primaryCategory)
+    const categoryCounts = await sql<{ category: string | null; count: number }[]>`
+      WITH resource_categories AS (
+        SELECT id, primary_category AS category
+        FROM resources
+        WHERE city ILIKE ${city}
+          AND state = ${state}
+          AND status = 'active'
 
-    // Get total active resources for this city
-    const [totalResult] = await db
-      .select({ value: count() })
-      .from(resources)
-      .where(
-        and(
-          ilike(resources.city, city),
-          eq(resources.state, state),
-          eq(resources.status, 'active')
-        )
-      )
+        UNION ALL
 
-    // Count resources missing geocoding
-    const [ungeocodedResult] = await db
-      .select({ value: count() })
-      .from(resources)
-      .where(
-        and(
-          ilike(resources.city, city),
-          eq(resources.state, state),
-          eq(resources.status, 'active'),
-          sql`(${resources.latitude} IS NULL OR ${resources.longitude} IS NULL)`
-        )
+        SELECT id, unnest(categories) AS category
+        FROM resources
+        WHERE city ILIKE ${city}
+          AND state = ${state}
+          AND status = 'active'
+          AND categories IS NOT NULL
       )
+      SELECT
+        category,
+        COUNT(DISTINCT id)::int AS count
+      FROM resource_categories
+      WHERE category IS NOT NULL
+      GROUP BY category
+    `
+
+    const [totalResult] = await sql<{ value: number }[]>`
+      SELECT COUNT(*)::int AS value
+      FROM resources
+      WHERE city ILIKE ${city}
+        AND state = ${state}
+        AND status = 'active'
+    `
+
+    const [ungeocodedResult] = await sql<{ value: number }[]>`
+      SELECT COUNT(*)::int AS value
+      FROM resources
+      WHERE city ILIKE ${city}
+        AND state = ${state}
+        AND status = 'active'
+        AND (latitude IS NULL OR longitude IS NULL)
+    `
 
     // Build category map from query results
     const categoryMap: Record<string, number> = {}

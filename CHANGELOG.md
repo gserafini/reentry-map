@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-08
+
+- Fixed the admin city-coverage helper so category breadth checks now count secondary entries from `resources.categories[]` instead of only `primary_category`. Oregon expansion work was exposing false gaps in places that were already complete, and the helper now reflects the true 13-category coverage picture.
+
 ## 2026-06-04
 
 - Fixed `/resources` so the map no longer silently drops newer resources once the global result set exceeds 100. The list remains capped for performance, but the map now receives the full filtered dataset and the page explicitly tells users when the map is showing more matches than the list.
