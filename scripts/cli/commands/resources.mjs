@@ -16,6 +16,7 @@ import { resolve } from 'node:path'
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.mjs'
 import { table, summary, error, output, success } from '../output.mjs'
 import { PROJECT_ROOT } from '../config.mjs'
+import { coerceUpdateValue } from '../field-coerce.mjs'
 
 function showHelp() {
   console.log(`
@@ -37,6 +38,10 @@ Subcommands:
 
   update <id> <field=value>...
                        Update resource fields (e.g., phone=555-1234 status=active)
+                       Array fields accept comma-separated values or a JSON array:
+                         categories=housing,general-support,food
+                         services_offered='["GED prep","Job training"]'
+                       JSON fields (hours) accept a JSON object; latitude/longitude are numeric.
 
   delete <id>          Delete a resource
 
@@ -221,7 +226,13 @@ async function updateResource(args) {
       error(`Invalid field format: ${arg} (expected field=value)`)
       process.exit(1)
     }
-    updates[arg.substring(0, eqIdx)] = arg.substring(eqIdx + 1)
+    const field = arg.substring(0, eqIdx)
+    try {
+      updates[field] = coerceUpdateValue(field, arg.substring(eqIdx + 1))
+    } catch (err) {
+      error(err.message)
+      process.exit(1)
+    }
   }
 
   const data = await apiPut(`/api/admin/resources/${id}`, updates)
