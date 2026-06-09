@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Fresno scaffold for California, extending metro coverage in the Central Valley and closing another major seeded population gap with a full 13-category baseline.
 - Added a second-wave San Jose scaffold for California, filling one of the biggest remaining seeded metro gaps in an otherwise deep state and establishing a full 13-category baseline in Silicon Valley.
 - Added a second-wave Cleveland scaffold for Ohio, expanding the state beyond the initial Columbus launch and covering another major release-area metro with a full 13-category baseline.
 - Added a second-wave Buffalo scaffold for New York, expanding the state beyond the initial New York City launch and covering another major release-area metro with a full 13-category baseline.
