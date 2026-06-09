@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a second-wave Charleston enrichment batch for West Virginia, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, food, healthcare, recovery, legal, transit, identity-document, education, and faith-based coverage.
 - Added a second-wave Wilmington enrichment batch for Delaware, deepening the state's seeded metro from a thin 9-resource launch city to a broader 25-resource foothold, closing the remaining `id-documents` and `education` gaps, and fixing a stale city-only Salvation Army record so all Wilmington resources geocode cleanly.
 - Added a second-wave Washington enrichment batch for the District of Columbia, deepening the district from a thin 12-resource launch city to a broader 25-resource foothold with stronger food, housing, employment, legal, transit, literacy, and general-support coverage.
 - Added a second-wave Newark enrichment batch for New Jersey, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger food, housing, health, behavioral-health, legal, transit, identity-document, and faith-based coverage.
