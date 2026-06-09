@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Salt Lake City enrichment batch for Utah, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, legal, transit, recovery, and general-support coverage.
 - Added a second-wave Cleveland enrichment batch for Ohio, deepening the state's live coverage from a thin 13-resource scaffold to a broader 25-resource metro foothold with stronger housing, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave San Jose enrichment batch for California, deepening Silicon Valley from a thin 13-resource scaffold to a broader 25-resource metro foothold with stronger housing, health, recovery, legal, transit, and general-support coverage.
 - Added a second-wave Birmingham enrichment batch for Alabama, deepening the state's seeded metro from a thin 13-resource launch city to a broader 24-resource foothold with stronger housing, health, legal, transit, literacy, and general-support coverage.
