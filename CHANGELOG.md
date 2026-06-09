@@ -2,6 +2,9 @@
 
 ## 2026-06-09
 
+- Fixed the admin CLI `resource update` so it correctly writes array fields (categories, services_offered, languages) and JSON/number fields, instead of storing them as raw strings; added unit tests and `--help` examples.
+- Ran a data-quality sweep: inactivated 60 exact-duplicate active records (e.g. a triple-imported Columbus, OH set and duplicate Berkeley/Oakland/Las Vegas entries), and re-categorized 27 records that were mis-filed as `general-support` but are actually food banks, legal aid, transit agencies, community health centers, public libraries, or vital-records offices.
+
 - Added a major Columbia catch-up batch for South Carolina (its overdue second- and third-wave combined), deepening Columbia from 13 to 32 active resources and clearing every remaining thin category.
 - Added a Louisville thin-category enrichment batch for Kentucky, clearing the city's 6 remaining thin lanes (mental-health, legal-aid, transportation, id-documents, education, faith-based) and deepening Louisville from 36 to 43 active resources.
 - Added a third-wave Charleston enrichment batch for South Carolina, deepening Charleston from 25 to 37 active resources and clearing every remaining thin category.
