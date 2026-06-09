@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Orlando enrichment batch for Florida, deepening one of the largest remaining seeded metros from a thin 13-resource launch city to a broader 24-resource foothold with stronger housing, legal, mental health, employment, and general-support coverage.
 - Added a second-wave Little Rock enrichment batch for Arkansas, deepening the state beyond its initial first-pass footprint, closing the remaining `transportation` and `education` gaps in Little Rock, and raising the city to a broader 23-resource metro foothold.
 - Added a second-wave Hartford enrichment batch for Connecticut, raising Hartford from a thin first-pass city to a broader 20-resource metro foothold and closing the remaining `id-documents` gap.
 - Added a second-wave Austin scaffold for Texas, expanding the state beyond Dallas, Houston, San Antonio, Beaumont, Denton, Amarillo, and Lubbock coverage and establishing a full 13-category baseline in one of the largest remaining seeded metros.
