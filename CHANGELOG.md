@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added Alaska to live coverage with an initial Anchorage scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Alaska a usable first-pass statewide foothold for later depth work.
 - Added Wyoming to live coverage with an initial Cheyenne scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Wyoming a usable first-pass statewide foothold for later depth work.
 - Added Vermont to live coverage with an initial Burlington scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Vermont a usable first-pass statewide foothold for later depth work.
 - Added West Virginia to live coverage with an initial Charleston scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives West Virginia a usable first-pass statewide foothold for later depth work.
