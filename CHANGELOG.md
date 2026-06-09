@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added North Dakota to live coverage with an initial Fargo scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives North Dakota a usable first-pass statewide foothold for later depth work.
 - Added New Mexico to live coverage with an initial Albuquerque scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives New Mexico a usable first-pass statewide foothold for later depth work.
 - Added Utah to live coverage with an initial Salt Lake City scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Utah a usable first-pass statewide foothold for later depth work.
 - Added Nebraska to live coverage with an initial Omaha scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Nebraska a usable first-pass statewide foothold for later depth work.
