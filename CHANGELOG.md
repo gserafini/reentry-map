@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a second-wave Portland enrichment batch for Maine, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave Manchester enrichment batch for New Hampshire, deepening the state's seeded metro from a thin 13-resource launch city to a broader 26-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave Jackson enrichment batch for Mississippi, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave Wichita enrichment batch for Kansas, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
