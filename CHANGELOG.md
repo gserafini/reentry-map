@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Manchester enrichment batch for New Hampshire, deepening Manchester from 26 to 37 active resources and clearing every remaining thin category.
 - Added a third-wave Boise enrichment batch for Idaho, deepening Boise from 25 to 35 active resources and clearing every remaining thin category.
 - Added a third-wave Fargo enrichment batch for North Dakota, deepening Fargo from 25 to 36 active resources and clearing every remaining thin category.
 - Added a third-wave Sioux Falls enrichment batch for South Dakota, deepening Sioux Falls from 25 to 35 active resources and clearing every remaining thin category.
