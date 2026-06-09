@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Buffalo scaffold for New York, expanding the state beyond the initial New York City launch and covering another major release-area metro with a full 13-category baseline.
 - Added New York to live coverage with an initial New York City scaffold spanning all 13 major categories. This clears the final blank state and brings Reentry Map to full 50-state coverage plus DC for the first time.
 - Added Alaska to live coverage with an initial Anchorage scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Alaska a usable first-pass statewide foothold for later depth work.
 - Added Wyoming to live coverage with an initial Cheyenne scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Wyoming a usable first-pass statewide foothold for later depth work.
