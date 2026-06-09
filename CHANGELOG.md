@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added Maine to live coverage with an initial Portland scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Maine a usable first-pass statewide foothold for later depth work.
 - Added South Carolina to live coverage with an initial Columbia scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives South Carolina a usable first-pass statewide foothold for later depth work.
 - Added Kansas to live coverage with an initial Wichita scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Kansas a usable first-pass statewide foothold for later depth work.
 - Added Iowa to live coverage with an initial Des Moines scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Iowa a usable first-pass statewide foothold for later depth work.
