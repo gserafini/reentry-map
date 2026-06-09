@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Birmingham enrichment batch for Alabama, deepening the state's seeded metro from a thin 13-resource launch city to a broader 24-resource foothold with stronger housing, health, legal, transit, literacy, and general-support coverage.
 - Added a second-wave Richmond enrichment batch for Virginia, deepening the state's live coverage from a thin initial footprint to a broader 24-resource Richmond metro foothold with stronger housing, treatment, employment, education, and general-support coverage.
 - Added a second-wave Providence enrichment batch for Rhode Island, deepening the state's single seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, healthcare, legal, clothing, mental health, and transit coverage.
 - Added a second-wave Orlando enrichment batch for Florida, deepening one of the largest remaining seeded metros from a thin 13-resource launch city to a broader 24-resource foothold with stronger housing, legal, mental health, employment, and general-support coverage.
