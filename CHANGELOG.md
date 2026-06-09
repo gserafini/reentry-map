@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Austin scaffold for Texas, expanding the state beyond Dallas, Houston, San Antonio, Beaumont, Denton, Amarillo, and Lubbock coverage and establishing a full 13-category baseline in one of the largest remaining seeded metros.
 - Added a second-wave Charleston scaffold for South Carolina, expanding the state beyond the initial Columbia launch and covering another major seeded metro with a full 13-category baseline.
 - Added a second-wave Fresno scaffold for California, extending metro coverage in the Central Valley and closing another major seeded population gap with a full 13-category baseline.
 - Added a second-wave San Jose scaffold for California, filling one of the biggest remaining seeded metro gaps in an otherwise deep state and establishing a full 13-category baseline in Silicon Valley.
