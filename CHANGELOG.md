@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a second-wave Jackson enrichment batch for Mississippi, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave Wichita enrichment batch for Kansas, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave Charleston enrichment batch for South Carolina, deepening the city's live coverage from a thin 13-resource scaffold to a broader 25-resource metro foothold with stronger housing, health, recovery, legal, education, and general-support coverage.
 - Added a second-wave Des Moines enrichment batch for Iowa, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, legal, transit, education, and general-support coverage.
