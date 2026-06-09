@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave San Jose scaffold for California, filling one of the biggest remaining seeded metro gaps in an otherwise deep state and establishing a full 13-category baseline in Silicon Valley.
 - Added a second-wave Cleveland scaffold for Ohio, expanding the state beyond the initial Columbus launch and covering another major release-area metro with a full 13-category baseline.
 - Added a second-wave Buffalo scaffold for New York, expanding the state beyond the initial New York City launch and covering another major release-area metro with a full 13-category baseline.
 - Added New York to live coverage with an initial New York City scaffold spanning all 13 major categories. This clears the final blank state and brings Reentry Map to full 50-state coverage plus DC for the first time.
