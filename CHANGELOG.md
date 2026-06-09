@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a second-wave Burlington enrichment batch for Vermont, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, food, clothing, healthcare, mental-health, recovery, legal, transit, identity-document, education, employment, and faith-based coverage.
 - Added a second-wave Billings enrichment batch for Montana, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, food, clothing, healthcare, mental-health, recovery, legal, transit, identity-document, education, and employment coverage.
 - Added a second-wave Fargo enrichment batch for North Dakota, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, food, clothing, healthcare, mental-health, recovery, legal, transit, identity-document, education, and employment coverage.
 - Added a second-wave Sioux Falls enrichment batch for South Dakota, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, food, clothing, healthcare, mental-health, recovery, legal, transit, identity-document, education, and aftercare coverage.
