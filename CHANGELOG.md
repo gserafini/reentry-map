@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a major Columbia catch-up batch for South Carolina (its overdue second- and third-wave combined), deepening Columbia from 13 to 32 active resources and clearing every remaining thin category.
 - Added a Louisville thin-category enrichment batch for Kentucky, clearing the city's 6 remaining thin lanes (mental-health, legal-aid, transportation, id-documents, education, faith-based) and deepening Louisville from 36 to 43 active resources.
 - Added a third-wave Charleston enrichment batch for South Carolina, deepening Charleston from 25 to 37 active resources and clearing every remaining thin category.
 - Added a third-wave Wilmington enrichment batch for Delaware, deepening Wilmington from 25 to 32 active resources and clearing every remaining thin category.
