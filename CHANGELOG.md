@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-09
+
+- Added a second-wave Boise enrichment batch for Idaho, closing Boise's last missing category gap and deepening the city from a thin 12-resource first-pass foothold to a broader 25-resource metro set with stronger housing, recovery, legal, transportation, and employment coverage.
+
 ## 2026-06-08
 
 - Added a second-wave Albuquerque enrichment batch for New Mexico, deepening the state's seeded metro from a thin 13-resource scaffold to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, and general-support coverage.
