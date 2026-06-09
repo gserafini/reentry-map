@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a second-wave Newark enrichment batch for New Jersey, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger food, housing, health, behavioral-health, legal, transit, identity-document, and faith-based coverage.
 - Added a second-wave Anchorage enrichment batch for Alaska, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger food, housing, employment, health, recovery, legal, transit, and identity-document coverage.
 - Added a second-wave Portland enrichment batch for Maine, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
 - Added a second-wave Manchester enrichment batch for New Hampshire, deepening the state's seeded metro from a thin 13-resource launch city to a broader 26-resource foothold with stronger housing, health, recovery, legal, transit, education, and general-support coverage.
