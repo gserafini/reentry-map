@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Buffalo enrichment batch for New York, deepening Buffalo from 25 to 34 active resources and clearing every remaining thin category.
 - Added a third-wave Newark enrichment batch for New Jersey, deepening the state's seeded metro from 25 to 34 active resources and clearing every remaining thin category.
 - Added a third-wave Cleveland enrichment batch for Ohio, deepening Cleveland from 25 to 33 active resources and clearing every remaining thin category.
 - Added a third-wave Anchorage enrichment batch for Alaska, deepening the state's seeded metro from 25 to 33 active resources and clearing every remaining thin category.
