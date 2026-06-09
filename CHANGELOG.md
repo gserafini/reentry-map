@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Charleston enrichment batch for West Virginia, deepening Charleston from 25 to 33 active resources and clearing every remaining thin category.
 - Added a third-wave Jackson enrichment batch for Mississippi, deepening Jackson from 25 to 36 active resources and clearing every remaining thin category.
 - Added a third-wave Little Rock enrichment batch for Arkansas, deepening Little Rock from 23 to 32 active resources and clearing every remaining thin category.
 - Added a third-wave Des Moines enrichment batch for Iowa, deepening Des Moines from 25 to 35 active resources and clearing every remaining thin category.
