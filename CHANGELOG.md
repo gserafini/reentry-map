@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Providence enrichment batch for Rhode Island, deepening the state's single seeded metro from 25 to 33 active resources and clearing every remaining thin category.
 - Added a third-wave Honolulu enrichment batch for Hawaii, deepening the metro from 25 to 35 active resources and clearing every remaining thin category.
 - Added a third-wave Salt Lake City enrichment batch for Utah, deepening the metro from 25 to 34 active resources and clearing every remaining thin category.
 - Added a third-wave Albuquerque enrichment batch for New Mexico, deepening the metro from 25 to 33 active resources and lifting all thin lanes except the single remaining `legal-aid` and `transportation` entries.
