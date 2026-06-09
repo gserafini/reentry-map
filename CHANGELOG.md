@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Des Moines enrichment batch for Iowa, deepening Des Moines from 25 to 35 active resources and clearing every remaining thin category.
 - Added a third-wave Wichita enrichment batch for Kansas, deepening Wichita from 25 to 35 active resources and clearing every remaining thin category.
 - Added a third-wave Omaha enrichment batch for Nebraska, deepening Omaha from 25 to 35 active resources and clearing every remaining thin category.
 - Added a third-wave Buffalo enrichment batch for New York, deepening Buffalo from 25 to 34 active resources and clearing every remaining thin category.
