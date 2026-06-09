@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added West Virginia to live coverage with an initial Charleston scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives West Virginia a usable first-pass statewide foothold for later depth work.
 - Added New Jersey to live coverage with an initial Newark scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives New Jersey a usable first-pass statewide foothold for later depth work.
 - Added South Dakota to live coverage with an initial Sioux Falls scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives South Dakota a usable first-pass statewide foothold for later depth work.
 - Added Montana to live coverage with an initial Billings scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Montana a usable first-pass statewide foothold for later depth work.
