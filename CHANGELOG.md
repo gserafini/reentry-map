@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Providence enrichment batch for Rhode Island, deepening the state's single seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, healthcare, legal, clothing, mental health, and transit coverage.
 - Added a second-wave Orlando enrichment batch for Florida, deepening one of the largest remaining seeded metros from a thin 13-resource launch city to a broader 24-resource foothold with stronger housing, legal, mental health, employment, and general-support coverage.
 - Added a second-wave Little Rock enrichment batch for Arkansas, deepening the state beyond its initial first-pass footprint, closing the remaining `transportation` and `education` gaps in Little Rock, and raising the city to a broader 23-resource metro foothold.
 - Added a second-wave Hartford enrichment batch for Connecticut, raising Hartford from a thin first-pass city to a broader 20-resource metro foothold and closing the remaining `id-documents` gap.
