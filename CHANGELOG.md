@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Cleveland enrichment batch for Ohio, deepening Cleveland from 25 to 33 active resources and clearing every remaining thin category.
 - Added a third-wave Anchorage enrichment batch for Alaska, deepening the state's seeded metro from 25 to 33 active resources and clearing every remaining thin category.
 - Added a third-wave Washington enrichment batch for the District of Columbia, deepening the district from 25 to 31 active resources and clearing every remaining thin category.
 - Added a third-wave Providence enrichment batch for Rhode Island, deepening the state's single seeded metro from 25 to 33 active resources and clearing every remaining thin category.
