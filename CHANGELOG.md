@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a second-wave Omaha enrichment batch for Nebraska, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, legal, transit, education, and general-support coverage.
 - Added a second-wave Fresno enrichment batch for California, deepening the Central Valley from a thin 13-resource scaffold to a broader 25-resource metro foothold with stronger housing, health, recovery, legal, transit, and general-support coverage.
 - Added a second-wave Buffalo enrichment batch for New York, deepening the state's upstate coverage from a thin 13-resource scaffold to a broader 25-resource metro foothold with stronger housing, health, legal, transit, education, and general-support coverage.
 - Added a second-wave Honolulu enrichment batch for Hawaii, deepening the state's seeded metro from a thin 13-resource launch city to a broader 25-resource foothold with stronger housing, health, legal, transit, education, and general-support coverage.
