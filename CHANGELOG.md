@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added Rhode Island to live coverage with an initial Providence scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Rhode Island a usable first-pass statewide foothold for later depth work.
 - Added New Hampshire to live coverage with an initial Manchester scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives New Hampshire a usable first-pass statewide foothold for later depth work.
 - Added Maine to live coverage with an initial Portland scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives Maine a usable first-pass statewide foothold for later depth work.
 - Added South Carolina to live coverage with an initial Columbia scaffold spanning all 13 major categories. This reduces the fully blank-state list again and gives South Carolina a usable first-pass statewide foothold for later depth work.
