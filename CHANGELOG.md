@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a third-wave Salt Lake City enrichment batch for Utah, deepening the metro from 25 to 34 active resources and clearing every remaining thin category.
 - Added a third-wave Albuquerque enrichment batch for New Mexico, deepening the metro from 25 to 33 active resources and lifting all thin lanes except the single remaining `legal-aid` and `transportation` entries.
 - Added a third-wave Richmond enrichment batch for Virginia, deepening the metro from 24 to 32 active resources and clearing the remaining thin lanes in food, clothing, healthcare, mental-health, legal, transit, identity-document, and faith-based coverage.
 - Added a third-wave Birmingham enrichment batch for Alabama, deepening the metro from 24 to 32 active resources and clearing the remaining thin lanes in food, clothing, recovery, legal, transit, identity-document, education, and faith-based coverage.
