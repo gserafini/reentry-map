@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Hardened AI enrichment against hallucination: added a source-grounding guard so the local LLM can only write an email or hours value that literally appears in the fetched website text. Previously it could fill in plausible-but-wrong `info@<domain>` emails or approximate/invent hours (e.g. wrote a clinic's hours an hour later than reality plus a day that doesn't exist). Added unit tests covering the real failure cases and a re-validation pass to clean values written before the guard.
 - Fixed the admin CLI `resource update` so it correctly writes array fields (categories, services_offered, languages) and JSON/number fields, instead of storing them as raw strings; added unit tests and `--help` examples.
 - Ran a data-quality sweep: inactivated 60 exact-duplicate active records (e.g. a triple-imported Columbus, OH set and duplicate Berkeley/Oakland/Las Vegas entries), and re-categorized 27 records that were mis-filed as `general-support` but are actually food banks, legal aid, transit agencies, community health centers, public libraries, or vital-records offices.
 
