@@ -29,6 +29,7 @@ import {
   formatOutcomeSummary,
 } from './lib/batch-enrich-outcomes.mjs'
 import { buildMacPatchrightFetchCommand } from './lib/batch-enrich-fetch.mjs'
+import { groundExtraction } from './lib/batch-enrich-validate.mjs'
 import {
   buildEnrichmentProvenance,
   selectResourcesForEnrichment,
@@ -538,7 +539,16 @@ async function main() {
         { maxTokens: 512, timeoutMs: 60_000 }
       )
 
-      const extracted = parseJson(rawResponse)
+      const rawExtracted = parseJson(rawResponse)
+
+      // Source-grounding guard: drop any email/hours the model produced that does
+      // not literally appear in the fetched page text (anti-hallucination).
+      const { extracted, rejected } = groundExtraction(rawExtracted, websiteText)
+      if (rejected.length) {
+        console.log(
+          `${progress} GUARD ${resource.name} — dropped ungrounded: ${rejected.join(', ')}`
+        )
+      }
 
       // Build update fields
       const updates = []
@@ -554,7 +564,7 @@ async function main() {
         values.push(extracted.description)
       }
       if (extracted.email && !resource.email) {
-        // Basic email validation
+        // Basic email format validation (grounding already checked source-presence)
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(extracted.email)) {
           updates.push(`email = $${paramIdx++}`)
           values.push(extracted.email)
