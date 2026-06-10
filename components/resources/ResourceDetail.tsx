@@ -24,7 +24,6 @@ import {
   Language as WebsiteIcon,
   Email as EmailIcon,
   Directions as DirectionsIcon,
-  Verified as VerifiedIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
   LocationOn as LocationOnIcon,
@@ -40,6 +39,7 @@ import { ReviewsList } from '@/components/user/ReviewsList'
 import { ReviewForm } from '@/components/user/ReviewForm'
 import { ReportProblemModal } from '@/components/user/ReportProblemModal'
 import { AdminResourceMetadata } from '@/components/admin/AdminResourceMetadata'
+import { AIVerifiedBadge } from '@/components/resources/AIVerifiedBadge'
 import { useState, useEffect } from 'react'
 import { Flag as FlagIcon } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -190,9 +190,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             {resource.name}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {resource.verified && (
-              <Chip icon={<VerifiedIcon />} label="Verified" color="success" variant="outlined" />
-            )}
+            {resource.verified && <AIVerifiedBadge />}
             <FavoriteButton resourceId={resource.id} size="large" />
             {isAdmin && (
               <Tooltip title="Edit this resource (admin only)">

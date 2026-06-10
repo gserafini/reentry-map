@@ -89,9 +89,9 @@ describe('ResourceDetail', () => {
     expect(screen.getByText('Resume help')).toBeInTheDocument()
   })
 
-  it('shows verified badge when verified', () => {
+  it('shows AI Verified badge when verified', () => {
     render(<ResourceDetail resource={mockResource} />)
-    expect(screen.getByText('Verified')).toBeInTheDocument()
+    expect(screen.getByText('AI Verified')).toBeInTheDocument()
   })
 
   it('displays rating information', () => {
