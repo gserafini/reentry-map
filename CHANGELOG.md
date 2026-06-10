@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Completed the per-state breadth pass with the final three states: New York City for New York (47 to 73 — NYC had only 13 resources vs Buffalo's 34), Madison for Wisconsin (48 to 81), and Raleigh for North Carolina (49 to 83). With this, every U.S. state and DC now has 50+ active resources and all 13 service categories covered — no state remains on the thin-coverage list. Net effect of tonight's campaign: ~30 states expanded, directory grew from ~4,290 to ~5,300 active resources, all sourced from verified Google Places listings.
 - Added a sixth round of second-city breadth expansions: Gulfport for Mississippi (36 to 67), Nashua for New Hampshire (36 to 59), Bismarck for North Dakota (36 to 67), Lexington for Kentucky (43 to 73), and Reno for Nevada (46 to 73).
 - Added a fifth round of second-city breadth expansions: Idaho Falls for Idaho (35 to 62), Rutland for Vermont (35 to 63), Dover for Delaware (35 to 60), Bangor for Maine (35 to 64), and Casper for Wyoming (35 to 66).
 - Added a fourth round of second-city breadth expansions: Hilo for Hawaii (34 to 65), Lincoln for Nebraska (34 to 67), Cedar Rapids for Iowa (35 to 63), Rapid City for South Dakota (35 to 62), and Missoula for Montana (35 to 65).
