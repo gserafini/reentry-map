@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-10
+
+- Renamed the resource "Verified" badge to "AI Verified" and made it tappable: tapping it opens a plain-language popover explaining that the resource was checked automatically against the organization's website and public listings, and that AI verification complements but does not replace human review. Mobile-first (a tap-to-open popover rather than a hover tooltip).
+- Fixed the component test suite, which was failing on the production server with "React.act is not a function" — the ambient `NODE_ENV=production` was leaking into Vitest and loading React's production build. Vitest now forces `NODE_ENV=test`, unblocking all component tests.
+- Added `scripts/enrich-drain.sh`, which runs AI-enrichment in back-to-back chunks until the never-enriched backlog is cleared (one run at a time; defers to the cron), for faster catch-up after large resource imports.
+
 ## 2026-06-09
 
 - Completed the per-state breadth pass with the final three states: New York City for New York (47 to 73 — NYC had only 13 resources vs Buffalo's 34), Madison for Wisconsin (48 to 81), and Raleigh for North Carolina (49 to 83). With this, every U.S. state and DC now has 50+ active resources and all 13 service categories covered — no state remains on the thin-coverage list. Net effect of tonight's campaign: ~30 states expanded, directory grew from ~4,290 to ~5,300 active resources, all sourced from verified Google Places listings.
