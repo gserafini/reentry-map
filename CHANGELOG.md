@@ -2,6 +2,7 @@
 
 ## 2026-06-10
 
+- Filled coverage for CEO (Center for Employment Opportunities) partner cities that had zero or near-zero resources: Cincinnati OH (0 to 43), Tulsa OK (0 to 38), Rochester NY (0 to 39), Pontiac MI (0 to 30), San Rafael CA (0 to 27), Fairfield CA (0 to 29), Albany NY (1 to 37), and Harrisburg PA (12 to 41) — all real Google Places-sourced across all 13 service categories. With these, every one of CEO's 31 partner-city offices now has resource coverage on the map.
 - Renamed the resource "Verified" badge to "AI Verified" and made it tappable: tapping it opens a plain-language popover explaining that the resource was checked automatically against the organization's website and public listings, and that AI verification complements but does not replace human review. Mobile-first (a tap-to-open popover rather than a hover tooltip).
 - Fixed the component test suite, which was failing on the production server with "React.act is not a function" — the ambient `NODE_ENV=production` was leaking into Vitest and loading React's production build. Vitest now forces `NODE_ENV=test`, unblocking all component tests.
 - Added `scripts/enrich-drain.sh`, which runs AI-enrichment in back-to-back chunks until the never-enriched backlog is cleared (one run at a time; defers to the cron), for faster catch-up after large resource imports.
