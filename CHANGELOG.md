@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Added a fifth round of second-city breadth expansions: Idaho Falls for Idaho (35 to 62), Rutland for Vermont (35 to 63), Dover for Delaware (35 to 60), Bangor for Maine (35 to 64), and Casper for Wyoming (35 to 66).
 - Added a fourth round of second-city breadth expansions: Hilo for Hawaii (34 to 65), Lincoln for Nebraska (34 to 67), Cedar Rapids for Iowa (35 to 63), Rapid City for South Dakota (35 to 62), and Missoula for Montana (35 to 65).
 - Added a third round of second-city breadth expansions for single-metro states: Huntington for West Virginia (33 to 57), Fairbanks for Alaska (33 to 65), Topeka for Kansas (34 to 62), Fayetteville for Arkansas (34 to 64), and Camden for New Jersey (34 to 65). All real Google Places-sourced across all 13 categories.
 - Continued evening out per-state coverage with real Google Places-sourced second-city expansions for states whose resources were concentrated in a single metro: Washington DC (31 to 56), Montgomery added for Alabama (state 32 to 61), Norfolk for Virginia (33 to 60), Santa Fe for New Mexico (33 to 63), Warwick for Rhode Island (33 to 57), and Ogden for Utah (34 to 62). Each new city covers all 13 service categories; every record is a verified Google Places listing.
