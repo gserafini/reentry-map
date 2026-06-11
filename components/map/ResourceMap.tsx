@@ -13,6 +13,7 @@ import { getResourceUrl } from '@/lib/utils/resource-url'
 import type { ResourceCategory } from '@/lib/types/database'
 import { env } from '@/lib/env'
 import { normalizeViewportBounds, type MapViewportBounds } from '@/lib/utils/map-viewport'
+import { shouldAutoFitBounds, shouldPanToUserLocation } from '@/lib/utils/map-framing'
 
 export type ResourceMapResource = Pick<
   Resource,
@@ -67,6 +68,13 @@ interface ResourceMapProps {
    * Map height (default: '500px')
    */
   height?: string
+
+  /**
+   * Always frame the map to the displayed resources, even when a user location
+   * is set. Use on place-scoped browse pages (a city / category-in-city / tag
+   * page) so a user located elsewhere doesn't pull the map off the place.
+   */
+  fitToResources?: boolean
 }
 
 function hasValidUserLocation(
@@ -99,6 +107,7 @@ export function ResourceMap({
   onResourceClick,
   onViewportBoundsChange,
   height = '500px',
+  fitToResources = false,
 }: ResourceMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
@@ -264,15 +273,23 @@ export function ResourceMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted, onViewportBoundsChange]) // Only initialize once on mount - userLocation handled separately below
 
-  // Re-center map when userLocation changes (separate effect for efficiency)
+  // Re-center map when userLocation changes (separate effect for efficiency).
+  // Skipped on place-scoped pages (fitToResources) so the city stays framed.
   useEffect(() => {
-    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation)) return
+    if (
+      !mapInstanceRef.current ||
+      !shouldPanToUserLocation({
+        hasUserLocation: hasValidUserLocation(userLocation),
+        fitToResources,
+      })
+    )
+      return
 
-    const newCenter = { lat: userLocation.latitude, lng: userLocation.longitude }
+    const newCenter = { lat: userLocation!.latitude, lng: userLocation!.longitude }
 
     // Smooth pan to new location with animation
     mapInstanceRef.current.panTo(newCenter)
-  }, [userLocation])
+  }, [userLocation, fitToResources])
 
   // Restore an explicit sharable viewport when present
   useEffect(() => {
@@ -422,9 +439,16 @@ export function ResourceMap({
       })
     }
 
-    // Only auto-fit bounds when there's NO user location
-    // If user explicitly selected a location, respect that choice
-    if (markers.length > 0 && !hasValidUserLocation(userLocation) && !viewportBounds) {
+    // Frame the resources when appropriate: always on place-scoped pages
+    // (fitToResources), otherwise only when there's no user location to center on.
+    if (
+      markers.length > 0 &&
+      shouldAutoFitBounds({
+        hasUserLocation: hasValidUserLocation(userLocation),
+        hasViewportBounds: Boolean(viewportBounds),
+        fitToResources,
+      })
+    ) {
       suppressViewportSyncRef.current = true
       map.fitBounds(bounds, {
         top: 50,
@@ -445,9 +469,16 @@ export function ResourceMap({
       return () => {
         google.maps.event.removeListener(listener)
       }
-    } else if (hasValidUserLocation(userLocation)) {
     }
-  }, [resources, userLocation, viewportBounds, selectedResourceId, isLoading, onResourceClick])
+  }, [
+    resources,
+    userLocation,
+    viewportBounds,
+    selectedResourceId,
+    isLoading,
+    onResourceClick,
+    fitToResources,
+  ])
 
   // Create user location marker (blue dot)
   useEffect(() => {

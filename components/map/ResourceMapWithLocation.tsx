@@ -26,6 +26,12 @@ interface ResourceMapWithLocationProps {
    * Map height (default: '500px')
    */
   height?: string
+
+  /**
+   * Always frame the map to the displayed resources (place-scoped browse pages
+   * like a city or category-in-city), even if the visitor's location is set.
+   */
+  fitToResources?: boolean
 }
 
 /**
@@ -37,6 +43,7 @@ export function ResourceMapWithLocation({
   selectedResourceId,
   onResourceClick,
   height = '500px',
+  fitToResources = false,
 }: ResourceMapWithLocationProps) {
   const { coordinates } = useUserLocation()
   const searchParams = useSearchParams()
@@ -61,6 +68,7 @@ export function ResourceMapWithLocation({
       selectedResourceId={selectedResourceId}
       onResourceClick={onResourceClick}
       height={height}
+      fitToResources={fitToResources}
     />
   )
 }

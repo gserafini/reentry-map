@@ -264,7 +264,11 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
             {/* Map */}
             {hasResults && (
               <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden', borderRadius: 2 }}>
-                <ResourceMapWithLocation resources={resources || []} height="500px" />
+                <ResourceMapWithLocation
+                  resources={resources || []}
+                  height="500px"
+                  fitToResources
+                />
               </Paper>
             )}
 

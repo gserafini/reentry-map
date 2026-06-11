@@ -160,7 +160,11 @@ export default async function TagInCityPage({ params, searchParams }: TagInCityP
             {/* Map */}
             {hasResults && (
               <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden', borderRadius: 2 }}>
-                <ResourceMapWithLocation resources={resources || []} height="500px" />
+                <ResourceMapWithLocation
+                  resources={resources || []}
+                  height="500px"
+                  fitToResources
+                />
               </Paper>
             )}
 
