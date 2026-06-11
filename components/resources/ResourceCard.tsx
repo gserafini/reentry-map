@@ -64,7 +64,7 @@ export function ResourceCard({
       : null)
 
   // Calculate distance if we have both resource and user coordinates
-  const distance =
+  const computedDistance =
     resource.latitude != null && resource.longitude != null && userLocation
       ? calculateDistance(
           { latitude: resource.latitude, longitude: resource.longitude },
@@ -72,6 +72,10 @@ export function ResourceCard({
           'miles'
         )
       : null
+  // Guard against non-finite results (a record with malformed coordinates would
+  // otherwise render "NaN miles away").
+  const distance =
+    computedDistance != null && Number.isFinite(computedDistance) ? computedDistance : null
 
   // Generate SEO-friendly URL
   const resourceUrl = getResourceUrl(resource)

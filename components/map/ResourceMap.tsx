@@ -349,6 +349,8 @@ export function ResourceMap({
           { latitude: resource.latitude, longitude: resource.longitude },
           userLocation
         )
+        // Avoid rendering "NaN away" for records with malformed coordinates
+        if (!Number.isFinite(distance)) distance = null
       }
 
       // Create custom marker element with category icon
