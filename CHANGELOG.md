@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-11
+
+- Added Blessed Abode Homes as a Lubbock-area Texas housing resource for returning community members, using a regional city-level entry because the public site exposes only a city-level office location rather than a safe street address for the homes.
+
 ## 2026-06-10
 
 - Deepened the remaining lighter-coverage CEO partner cities: Sacramento (30 to 71), Buffalo (34 to 63), Cleveland (33 to 62), San Jose (25 to 62), Fresno (24 to 56), and New York City (32 to 44). All real Google Places-sourced.
