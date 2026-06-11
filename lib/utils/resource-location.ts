@@ -102,3 +102,32 @@ export function needsPhysicalAddressReview(resource: {
     !hasPlausibleStreetAddress(resource.address, resource.city, resource.state)
   )
 }
+
+export function buildGeocodingAddress(resource: {
+  addressType?: string | null
+  address_type?: string | null
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+}): string | null {
+  const addressType = normalizeAddressType(resource.addressType ?? resource.address_type)
+  const address = typeof resource.address === 'string' ? resource.address.trim() : ''
+  const city = typeof resource.city === 'string' ? resource.city.trim() : ''
+  const state = typeof resource.state === 'string' ? resource.state.trim() : ''
+  const zip = typeof resource.zip === 'string' ? resource.zip.trim() : ''
+
+  if (addressType === 'physical') {
+    if (!hasPlausibleStreetAddress(address, city, state)) {
+      return null
+    }
+
+    return [address, city, state, zip].filter(Boolean).join(', ')
+  }
+
+  if (!city || !state) {
+    return null
+  }
+
+  return [city, state].join(', ')
+}

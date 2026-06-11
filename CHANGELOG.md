@@ -2,6 +2,7 @@
 
 ## 2026-06-11
 
+- Regional and other non-physical resources with a real city/state anchor now geocode to an approximate city centroid during admin intake/approval instead of keeping `null` coordinates. This lets city-level service-area resources behave like map/search results without pretending to have a street address.
 - Fixed a client-side Google Maps crash on resource detail pages for coordinate-less resources (for example regional/service-area listings like Blessed Abode Homes). Those pages now show an informational fallback instead of trying to place a `null` map pin.
 - Added Blessed Abode Homes as a Lubbock-area Texas housing resource for returning community members, using a regional city-level entry because the public site exposes only a city-level office location rather than a safe street address for the homes.
 

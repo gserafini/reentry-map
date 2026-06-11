@@ -5,7 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
-import { hasPlausibleStreetAddress, requiresServiceArea } from '@/lib/utils/resource-location'
+import { buildGeocodingAddress, requiresServiceArea } from '@/lib/utils/resource-location'
 import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 /**
@@ -47,17 +47,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const addressType = suggestion.addressType || 'physical'
     const serviceArea = suggestion.serviceArea || null
 
-    if (addressType === 'physical' && (!latitude || !longitude)) {
-      if (!hasPlausibleStreetAddress(suggestion.address, suggestion.city, suggestion.state)) {
+    if (requiresServiceArea(addressType) && !serviceArea) {
+      return NextResponse.json(
+        { error: `${addressType} resources require service_area to be defined` },
+        { status: 400 }
+      )
+    }
+
+    if (!latitude || !longitude) {
+      const geocodingAddress = buildGeocodingAddress({
+        addressType,
+        address: suggestion.address,
+        city: suggestion.city,
+        state: suggestion.state,
+        zip: suggestion.zip,
+      })
+
+      if (!geocodingAddress) {
+        const details =
+          addressType === 'physical'
+            ? 'missing street-level address'
+            : 'missing city/state for approximate locality geocoding'
+
         return NextResponse.json(
-          { error: 'Cannot approve physical resource: missing street-level address' },
+          { error: `Cannot approve ${addressType} resource: ${details}` },
           { status: 400 }
         )
       }
-
-      const fullAddress = [suggestion.address, suggestion.city, suggestion.state, suggestion.zip]
-        .filter(Boolean)
-        .join(', ')
 
       if (!env.GOOGLE_MAPS_KEY) {
         return NextResponse.json(
@@ -67,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       try {
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(geocodingAddress)}&key=${env.GOOGLE_MAPS_KEY}`
         const geocodeResponse = await fetch(geocodeUrl)
         const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
 
@@ -78,7 +94,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           console.error('Geocoding failed:', geocodeData.status, geocodeData.error_message)
           return NextResponse.json(
             {
-              error: `Cannot approve resource: failed to geocode address "${fullAddress}"`,
+              error: `Cannot approve resource: failed to geocode locality "${geocodingAddress}"`,
               geocode_status: geocodeData.status,
             },
             { status: 400 }
@@ -91,51 +107,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           { status: 500 }
         )
       }
-    } else if (addressType === 'confidential' && (!latitude || !longitude)) {
-      if (!suggestion.city || !suggestion.state) {
-        return NextResponse.json(
-          { error: 'Cannot approve confidential resource: missing city/state' },
-          { status: 400 }
-        )
-      }
-
-      if (!env.GOOGLE_MAPS_KEY) {
-        return NextResponse.json(
-          { error: 'Cannot approve resource: geocoding not configured (GOOGLE_MAPS_KEY missing)' },
-          { status: 500 }
-        )
-      }
-
-      try {
-        const cityAddress = `${suggestion.city}, ${suggestion.state}`
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cityAddress)}&key=${env.GOOGLE_MAPS_KEY}`
-        const geocodeResponse = await fetch(geocodeUrl)
-        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
-
-        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
-          latitude = geocodeData.results[0].geometry.location.lat
-          longitude = geocodeData.results[0].geometry.location.lng
-        } else {
-          return NextResponse.json(
-            {
-              error: `Cannot approve resource: failed to geocode city "${cityAddress}"`,
-              geocode_status: geocodeData.status,
-            },
-            { status: 400 }
-          )
-        }
-      } catch (error) {
-        console.error('City geocoding error:', error)
-        return NextResponse.json(
-          { error: 'Cannot approve resource: geocoding service unavailable' },
-          { status: 500 }
-        )
-      }
-    } else if (requiresServiceArea(addressType) && !serviceArea) {
-      return NextResponse.json(
-        { error: `${addressType} resources require service_area to be defined` },
-        { status: 400 }
-      )
     }
 
     // Create resource from suggestion (only using columns that exist in resources table)

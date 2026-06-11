@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildGeocodingAddress,
   hasPlausibleStreetAddress,
   needsPhysicalAddressReview,
   requiresServiceArea,
@@ -41,5 +42,44 @@ describe('resource location helpers', () => {
         state: 'CA',
       })
     ).toBe(false)
+  })
+
+  it('uses city/state centroids for non-physical resources that still have a locality', () => {
+    expect(
+      buildGeocodingAddress({
+        addressType: 'physical',
+        address: '4047 Normal St',
+        city: 'San Diego',
+        state: 'CA',
+        zip: '92103',
+      })
+    ).toBe('4047 Normal St, San Diego, CA, 92103')
+
+    expect(
+      buildGeocodingAddress({
+        addressType: 'confidential',
+        address: '',
+        city: 'San Diego',
+        state: 'CA',
+      })
+    ).toBe('San Diego, CA')
+
+    expect(
+      buildGeocodingAddress({
+        addressType: 'regional',
+        address: '',
+        city: 'Lubbock',
+        state: 'TX',
+      })
+    ).toBe('Lubbock, TX')
+
+    expect(
+      buildGeocodingAddress({
+        addressType: 'online',
+        address: '',
+        city: 'Austin',
+        state: 'TX',
+      })
+    ).toBe('Austin, TX')
   })
 })

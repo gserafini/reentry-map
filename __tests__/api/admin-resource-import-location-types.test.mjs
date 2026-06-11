@@ -21,10 +21,28 @@ describe('admin resource import location types', () => {
     ])
     const values = vi.fn().mockReturnValue({ returning })
 
+    const where = vi.fn().mockResolvedValue(undefined)
+    const set = vi.fn().mockReturnValue({ where })
     const db = {
       insert: vi.fn().mockReturnValue({ values }),
-      update: vi.fn(),
+      update: vi.fn().mockReturnValue({ set }),
     }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: vi.fn().mockResolvedValue({
+          status: 'OK',
+          results: [
+            {
+              formatted_address: 'Lubbock, TX, USA',
+              geometry: { location: { lat: 33.5779, lng: -101.8552 } },
+            },
+          ],
+        }),
+      })
+    )
+    process.env.GOOGLE_MAPS_KEY = 'test-key'
 
     vi.doMock('@/lib/utils/admin-auth', () => ({
       checkAdminAuth: vi.fn().mockResolvedValue({ isAuthorized: true, authMethod: 'api_key' }),
@@ -61,11 +79,18 @@ describe('admin resource import location types', () => {
 
     expect(response.status).toBe(200)
     expect(body.stats.created).toBe(1)
+    expect(body.stats.geocoded).toBe(1)
     expect(values).toHaveBeenCalledOnce()
     expect(values.mock.calls[0][0]).toMatchObject({
       addressType: 'regional',
       serviceArea: { type: 'statewide', values: ['Texas'] },
       address: '',
+    })
+    expect(db.update).toHaveBeenCalledOnce()
+    expect(set).toHaveBeenCalledWith({
+      latitude: 33.5779,
+      longitude: -101.8552,
+      formattedAddress: 'Lubbock, TX, USA',
     })
   })
 })

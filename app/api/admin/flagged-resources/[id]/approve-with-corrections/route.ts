@@ -5,7 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
-import { hasPlausibleStreetAddress } from '@/lib/utils/resource-location'
+import { buildGeocodingAddress, hasPlausibleStreetAddress } from '@/lib/utils/resource-location'
 import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 /**
@@ -235,9 +235,52 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           { status: 400 }
         )
       }
-      // Coordinates are optional for these types
-      latitude = null
-      longitude = null
+
+      if (!latitude || !longitude) {
+        const geocodingAddress = buildGeocodingAddress({
+          addressType: address_type,
+          address: mergedData.address,
+          city: mergedData.city,
+          state: mergedData.state,
+          zip: mergedData.zip,
+        })
+
+        if (!geocodingAddress) {
+          return NextResponse.json(
+            { error: `${address_type} resources require city/state for approximate geocoding` },
+            { status: 400 }
+          )
+        }
+
+        if (env.GOOGLE_MAPS_KEY) {
+          try {
+            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(geocodingAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+            const geocodeResponse = await fetch(geocodeUrl)
+            const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+            if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+              latitude = geocodeData.results[0].geometry.location.lat
+              longitude = geocodeData.results[0].geometry.location.lng
+            } else {
+              return NextResponse.json(
+                {
+                  error: `Cannot geocode locality "${geocodingAddress}"`,
+                  geocode_status: geocodeData.status,
+                },
+                { status: 400 }
+              )
+            }
+          } catch (error) {
+            console.error('Locality geocoding error:', error)
+            return NextResponse.json({ error: 'Geocoding service unavailable' }, { status: 500 })
+          }
+        } else {
+          return NextResponse.json(
+            { error: 'Geocoding not configured (GOOGLE_MAPS_KEY missing)' },
+            { status: 500 }
+          )
+        }
+      }
     }
 
     // Extract verification source from correction_notes for tracking

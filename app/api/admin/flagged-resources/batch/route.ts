@@ -5,7 +5,7 @@ import { db } from '@/lib/db/client'
 import { resources, resourceSuggestions } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
-import { hasPlausibleStreetAddress, requiresServiceArea } from '@/lib/utils/resource-location'
+import { buildGeocodingAddress, requiresServiceArea } from '@/lib/utils/resource-location'
 import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 interface BatchResult {
@@ -126,59 +126,48 @@ async function approveSuggestion(
   const addressType = suggestion.addressType || 'physical'
   const serviceArea = suggestion.serviceArea || null
 
-  if (addressType === 'physical' && (!latitude || !longitude)) {
-    if (!hasPlausibleStreetAddress(suggestion.address, suggestion.city, suggestion.state)) {
-      return { id, status: 'failed', error: 'Physical resources require a street-level address' }
-    }
-
-    const fullAddress = [suggestion.address, suggestion.city, suggestion.state, suggestion.zip]
-      .filter(Boolean)
-      .join(', ')
-
-    if (env.GOOGLE_MAPS_KEY) {
-      try {
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${env.GOOGLE_MAPS_KEY}`
-        const geocodeResponse = await fetch(geocodeUrl)
-        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
-
-        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
-          latitude = geocodeData.results[0].geometry.location.lat
-          longitude = geocodeData.results[0].geometry.location.lng
-        } else {
-          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
-        }
-      } catch {
-        return { id, status: 'failed', error: 'Geocoding service unavailable' }
-      }
-    } else {
-      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
-    }
-  } else if (addressType === 'confidential' && (!latitude || !longitude)) {
-    if (!suggestion.city || !suggestion.state) {
-      return { id, status: 'failed', error: 'Missing city/state for confidential resource' }
-    }
-
-    if (env.GOOGLE_MAPS_KEY) {
-      try {
-        const cityAddress = `${suggestion.city}, ${suggestion.state}`
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cityAddress)}&key=${env.GOOGLE_MAPS_KEY}`
-        const geocodeResponse = await fetch(geocodeUrl)
-        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
-
-        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
-          latitude = geocodeData.results[0].geometry.location.lat
-          longitude = geocodeData.results[0].geometry.location.lng
-        } else {
-          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
-        }
-      } catch {
-        return { id, status: 'failed', error: 'Geocoding service unavailable' }
-      }
-    } else {
-      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
-    }
-  } else if (requiresServiceArea(addressType) && !serviceArea) {
+  if (requiresServiceArea(addressType) && !serviceArea) {
     return { id, status: 'failed', error: `${addressType} resources require service_area` }
+  }
+
+  if (!latitude || !longitude) {
+    const geocodingAddress = buildGeocodingAddress({
+      addressType,
+      address: suggestion.address,
+      city: suggestion.city,
+      state: suggestion.state,
+      zip: suggestion.zip,
+    })
+
+    if (!geocodingAddress) {
+      return {
+        id,
+        status: 'failed',
+        error:
+          addressType === 'physical'
+            ? 'Physical resources require a street-level address'
+            : `${addressType} resources require city/state for approximate geocoding`,
+      }
+    }
+
+    if (env.GOOGLE_MAPS_KEY) {
+      try {
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(geocodingAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+        const geocodeResponse = await fetch(geocodeUrl)
+        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+          latitude = geocodeData.results[0].geometry.location.lat
+          longitude = geocodeData.results[0].geometry.location.lng
+        } else {
+          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
+        }
+      } catch {
+        return { id, status: 'failed', error: 'Geocoding service unavailable' }
+      }
+    } else {
+      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
+    }
   }
 
   // Create resource

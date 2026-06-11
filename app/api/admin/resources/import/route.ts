@@ -7,6 +7,7 @@ import { checkForDuplicate, detectParentChildRelationships } from '@/lib/utils/d
 import type { NewResource, Resource } from '@/lib/db/schema'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
 import {
+  buildGeocodingAddress,
   hasPlausibleStreetAddress,
   normalizeAddressType,
   normalizeServiceArea,
@@ -18,16 +19,12 @@ import {
  * Server-side geocoding using Google Maps REST API
  */
 async function geocodeResource(
-  address: string,
-  city: string | null,
-  state: string | null,
-  zip: string | null
+  query: string
 ): Promise<{ latitude: number; longitude: number; formattedAddress: string } | null> {
   const apiKey = process.env.GOOGLE_MAPS_KEY
   if (!apiKey) return null
 
-  const fullAddress = [address, city, state, zip].filter(Boolean).join(', ')
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`
 
   try {
     const response = await fetch(url)
@@ -41,7 +38,7 @@ async function geocodeResource(
       }
     }
   } catch (err) {
-    console.error(`Geocoding failed for "${fullAddress}":`, err)
+    console.error(`Geocoding failed for "${query}":`, err)
   }
   return null
 }
@@ -351,28 +348,24 @@ export async function POST(request: NextRequest) {
           return false
         }
 
-        return (r.addressType || 'physical') === 'physical' || r.addressType === 'confidential'
+        return (
+          (r.addressType || 'physical') === 'physical' ||
+          r.addressType === 'confidential' ||
+          requiresServiceArea(r.addressType || 'physical')
+        )
       })
 
       if (ungeocodedResources.length > 0) {
         for (const resource of ungeocodedResources) {
           try {
-            if ((resource.addressType || 'physical') === 'physical' && !resource.address) {
+            const geocodingAddress = buildGeocodingAddress(resource)
+
+            if (!geocodingAddress) {
               geocodeErrors.push(resource.name)
               continue
             }
 
-            if (resource.addressType === 'confidential' && (!resource.city || !resource.state)) {
-              geocodeErrors.push(resource.name)
-              continue
-            }
-
-            const result = await geocodeResource(
-              resource.addressType === 'confidential' ? '' : resource.address,
-              resource.city,
-              resource.state,
-              resource.zip
-            )
+            const result = await geocodeResource(geocodingAddress)
             if (result) {
               await db
                 .update(resources)
@@ -400,7 +393,7 @@ export async function POST(request: NextRequest) {
     const warnings: string[] = []
     if (geocodeErrors.length > 0) {
       warnings.push(
-        `${geocodeErrors.length} physical/confidential resource(s) could not be geocoded and may not appear in location-based search: ${geocodeErrors.join(', ')}`
+        `${geocodeErrors.length} resource(s) could not be geocoded from their available address or locality and may not appear in location-based search: ${geocodeErrors.join(', ')}`
       )
     }
 
