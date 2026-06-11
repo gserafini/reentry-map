@@ -25,7 +25,19 @@ interface SingleResourceMapProps {
 }
 
 const DEFAULT_ZOOM = 15
-const APPROXIMATE_LOCATION_ZOOM = 11
+const APPROXIMATE_LOCATION_ZOOM = 10
+
+type ApproximateServiceArea = {
+  type?: string | null
+  values?: string[] | null
+}
+
+type ResourceWithApproximateFields = Resource & {
+  addressType?: string | null
+  address_type?: string | null
+  serviceArea?: ApproximateServiceArea | null
+  service_area?: ApproximateServiceArea | null
+}
 
 function hasValidCoordinates(resource: Pick<Resource, 'latitude' | 'longitude'>): resource is Pick<
   Resource,
@@ -38,11 +50,51 @@ function hasValidCoordinates(resource: Pick<Resource, 'latitude' | 'longitude'>)
 }
 
 function getMapZoom(resource: Resource): number {
+  const approximateLocation = getApproximateLocationPresentation(resource)
+  if (approximateLocation) {
+    return approximateLocation.zoom
+  }
+
+  return DEFAULT_ZOOM
+}
+
+function getApproximateLocationPresentation(resource: Resource): {
+  label: string
+  radiusMeters: number
+  zoom: number
+} | null {
+  const resourceWithApproximateFields = resource as ResourceWithApproximateFields
   const addressType = normalizeAddressType(
-    (resource as Resource & { addressType?: string | null }).addressType
+    resourceWithApproximateFields.addressType ?? resourceWithApproximateFields.address_type
   )
 
-  return addressType === 'physical' ? DEFAULT_ZOOM : APPROXIMATE_LOCATION_ZOOM
+  if (addressType === 'physical') {
+    return null
+  }
+
+  const serviceAreaType = (
+    resourceWithApproximateFields.serviceArea?.type ||
+    resourceWithApproximateFields.service_area?.type ||
+    'city'
+  ).toLowerCase()
+
+  switch (serviceAreaType) {
+    case 'county':
+      return { label: 'Approximate county-level location', radiusMeters: 20000, zoom: 9 }
+    case 'region':
+      return { label: 'Approximate regional location', radiusMeters: 45000, zoom: 8 }
+    case 'statewide':
+      return { label: 'Approximate statewide anchor location', radiusMeters: 120000, zoom: 7 }
+    case 'nationwide':
+      return { label: 'Approximate anchor location', radiusMeters: 250000, zoom: 5 }
+    case 'city':
+    default:
+      return {
+        label: 'Approximate city-level location',
+        radiusMeters: 10000,
+        zoom: APPROXIMATE_LOCATION_ZOOM,
+      }
+  }
 }
 
 /**
@@ -56,9 +108,11 @@ export function SingleResourceMap({
   showInfo = false,
 }: SingleResourceMapProps) {
   const hasCoordinates = hasValidCoordinates(resource)
+  const approximateLocation = getApproximateLocationPresentation(resource)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
+  const approximateCircleRef = useRef<google.maps.Circle | null>(null)
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
@@ -146,6 +200,71 @@ export function SingleResourceMap({
     if (markerRef.current) {
       markerRef.current.map = null
     }
+    if (approximateCircleRef.current) {
+      approximateCircleRef.current.setMap(null)
+    }
+
+    const position = {
+      lat: resource.latitude,
+      lng: resource.longitude,
+    }
+
+    // Build info window content
+    const infoContent = `
+      <div style="padding: 12px; min-width: 250px; max-width: 300px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">
+          ${resource.name}
+        </h3>
+        <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">
+          <strong>Category:</strong> ${resource.primary_category}
+        </p>
+        ${
+          approximateLocation
+            ? `<p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">
+          <strong>Map:</strong> ${approximateLocation.label}, not a street address
+        </p>`
+            : ''
+        }
+        <p style="margin: 0; color: #666; font-size: 14px;">
+          ${resource.address}
+        </p>
+      </div>
+    `
+
+    if (approximateLocation) {
+      const circle = new google.maps.Circle({
+        map,
+        center: position,
+        radius: approximateLocation.radiusMeters,
+        strokeColor: '#1976d2',
+        strokeOpacity: 0.85,
+        strokeWeight: 2,
+        fillColor: '#64b5f6',
+        fillOpacity: 0.2,
+        clickable: true,
+      })
+
+      approximateCircleRef.current = circle
+
+      circle.addListener('click', () => {
+        if (!infoWindowRef.current) return
+        infoWindowRef.current.setContent(infoContent)
+        infoWindowRef.current.setPosition(position)
+        infoWindowRef.current.open({
+          map,
+        })
+      })
+
+      if (showInfo && infoWindowRef.current) {
+        infoWindowRef.current.setContent(infoContent)
+        infoWindowRef.current.setPosition(position)
+        infoWindowRef.current.open({
+          map,
+        })
+      }
+
+      return
+    }
 
     // Create custom marker element with category icon
     const markerElement = createCategoryMarkerElement(
@@ -159,30 +278,12 @@ export function SingleResourceMap({
     // Create Advanced Marker
     const marker = new google.maps.marker.AdvancedMarkerElement({
       map,
-      position: {
-        lat: resource.latitude,
-        lng: resource.longitude,
-      },
+      position,
       title: resource.name,
       content: markerElement,
     })
 
     markerRef.current = marker
-
-    // Build info window content
-    const infoContent = `
-      <div style="padding: 12px; min-width: 250px; max-width: 300px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">
-          ${resource.name}
-        </h3>
-        <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">
-          <strong>Category:</strong> ${resource.primary_category}
-        </p>
-        <p style="margin: 0; color: #666; font-size: 14px;">
-          ${resource.address}
-        </p>
-      </div>
-    `
 
     // Add click listener to show info window
     marker.addListener('click', () => {
@@ -202,13 +303,16 @@ export function SingleResourceMap({
         anchor: marker,
       })
     }
-  }, [resource, isLoading, showInfo, hasCoordinates])
+  }, [resource, isLoading, showInfo, hasCoordinates, approximateLocation])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (markerRef.current) {
         markerRef.current.map = null
+      }
+      if (approximateCircleRef.current) {
+        approximateCircleRef.current.setMap(null)
       }
     }
   }, [])
@@ -240,6 +344,22 @@ export function SingleResourceMap({
     <Box sx={{ position: 'relative', height, width: '100%', borderRadius: 2, overflow: 'hidden' }}>
       {/* Map div - ALWAYS rendered so ref is available */}
       <Box ref={mapRef} sx={{ height: '100%', width: '100%' }} />
+
+      {!isLoading && !error && approximateLocation && (
+        <Alert
+          severity="info"
+          sx={{
+            position: 'absolute',
+            top: 12,
+            left: 12,
+            right: 12,
+            zIndex: 1,
+            bgcolor: 'rgba(255,255,255,0.92)',
+          }}
+        >
+          {approximateLocation.label}, not a street address
+        </Alert>
+      )}
 
       {/* Loading overlay - shown on top */}
       {isLoading && !error && (

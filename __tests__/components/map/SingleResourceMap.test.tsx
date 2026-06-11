@@ -77,6 +77,13 @@ describe('SingleResourceMap', () => {
           return {
             setContent: vi.fn(),
             open: vi.fn(),
+            setPosition: vi.fn(),
+          }
+        }),
+        Circle: vi.fn(function CircleMock() {
+          return {
+            setMap: vi.fn(),
+            addListener: vi.fn(),
           }
         }),
         marker: {
@@ -100,7 +107,7 @@ describe('SingleResourceMap', () => {
     expect(vi.mocked(initializeGoogleMaps)).not.toHaveBeenCalled()
   })
 
-  it('uses a broader city-level zoom for non-physical resources with approximate coordinates', async () => {
+  it('uses an approximate city-level map treatment for non-physical resources with approximate coordinates', async () => {
     render(
       <SingleResourceMap
         resource={
@@ -108,8 +115,8 @@ describe('SingleResourceMap', () => {
             ...baseResource,
             latitude: 33.5855677,
             longitude: -101.8470215,
-            addressType: 'regional',
-            serviceArea: { type: 'city', values: ['Lubbock'] },
+            address_type: 'regional',
+            service_area: { type: 'city', values: ['Lubbock'] },
           } as unknown as Resource
         }
       />
@@ -126,6 +133,9 @@ describe('SingleResourceMap', () => {
       lat: 33.5855677,
       lng: -101.8470215,
     })
-    expect(options.zoom).toBe(11)
+    expect(options.zoom).toBe(10)
+    expect(global.google.maps.marker.AdvancedMarkerElement).not.toHaveBeenCalled()
+    expect(global.google.maps.Circle).toHaveBeenCalled()
+    expect(screen.getByText(/approximate city-level location/i)).toBeInTheDocument()
   })
 })

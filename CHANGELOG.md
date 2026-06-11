@@ -2,6 +2,7 @@
 
 ## 2026-06-11
 
+- Approximate resource maps no longer use an exact-address pin treatment. Non-physical city-anchored resources now render with an approximate-area cue and explicit "not a street address" labeling on the detail-page map.
 - City-anchored non-physical resource detail maps now open at a broader city-level zoom instead of an address-level zoom, so approximate centroids do not visually imply an exact street location.
 - Regional and other non-physical resources with a real city/state anchor now geocode to an approximate city centroid during admin intake/approval instead of keeping `null` coordinates. This lets city-level service-area resources behave like map/search results without pretending to have a street address.
 - Fixed a client-side Google Maps crash on resource detail pages for coordinate-less resources (for example regional/service-area listings like Blessed Abode Homes). Those pages now show an informational fallback instead of trying to place a `null` map pin.
