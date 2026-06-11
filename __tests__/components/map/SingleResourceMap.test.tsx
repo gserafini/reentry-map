@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 
 import { SingleResourceMap } from '@/components/map/SingleResourceMap'
 import type { Resource } from '@/lib/types/database'
@@ -12,6 +12,10 @@ vi.mock('@/lib/google-maps', () => ({
     maps: {},
     marker: {},
   }),
+}))
+
+vi.mock('@/lib/utils/map-marker-icon', () => ({
+  createCategoryMarkerElement: vi.fn(() => document.createElement('div')),
 }))
 
 describe('SingleResourceMap', () => {
@@ -63,6 +67,28 @@ describe('SingleResourceMap', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    global.google = {
+      maps: {
+        Map: vi.fn(function MapMock(_el, options) {
+          return { options }
+        }),
+        InfoWindow: vi.fn(function InfoWindowMock() {
+          return {
+            setContent: vi.fn(),
+            open: vi.fn(),
+          }
+        }),
+        marker: {
+          AdvancedMarkerElement: vi.fn(function AdvancedMarkerElementMock() {
+            return {
+              map: null,
+              addListener: vi.fn(),
+            }
+          }),
+        },
+      },
+    } as unknown as typeof google
   })
 
   it('shows an informational fallback instead of loading Google Maps when coordinates are missing', async () => {
@@ -72,5 +98,34 @@ describe('SingleResourceMap', () => {
       await screen.findByText(/precise map pin isn't available for this resource/i)
     ).toBeInTheDocument()
     expect(vi.mocked(initializeGoogleMaps)).not.toHaveBeenCalled()
+  })
+
+  it('uses a broader city-level zoom for non-physical resources with approximate coordinates', async () => {
+    render(
+      <SingleResourceMap
+        resource={
+          {
+            ...baseResource,
+            latitude: 33.5855677,
+            longitude: -101.8470215,
+            addressType: 'regional',
+            serviceArea: { type: 'city', values: ['Lubbock'] },
+          } as unknown as Resource
+        }
+      />
+    )
+
+    await waitFor(() => expect(global.google.maps.Map).toHaveBeenCalled())
+
+    const [, options] = vi.mocked(global.google.maps.Map).mock.calls.at(-1) as [
+      HTMLElement,
+      { center: { lat: number; lng: number }; zoom: number },
+    ]
+
+    expect(options.center).toEqual({
+      lat: 33.5855677,
+      lng: -101.8470215,
+    })
+    expect(options.zoom).toBe(11)
   })
 })

@@ -5,6 +5,7 @@ import { Box, CircularProgress, Alert } from '@mui/material'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { initializeGoogleMaps } from '@/lib/google-maps'
 import { createCategoryMarkerElement } from '@/lib/utils/map-marker-icon'
+import { normalizeAddressType } from '@/lib/utils/resource-location'
 
 interface SingleResourceMapProps {
   /**
@@ -24,6 +25,7 @@ interface SingleResourceMapProps {
 }
 
 const DEFAULT_ZOOM = 15
+const APPROXIMATE_LOCATION_ZOOM = 11
 
 function hasValidCoordinates(resource: Pick<Resource, 'latitude' | 'longitude'>): resource is Pick<
   Resource,
@@ -33,6 +35,14 @@ function hasValidCoordinates(resource: Pick<Resource, 'latitude' | 'longitude'>)
   longitude: number
 } {
   return Number.isFinite(resource.latitude) && Number.isFinite(resource.longitude)
+}
+
+function getMapZoom(resource: Resource): number {
+  const addressType = normalizeAddressType(
+    (resource as Resource & { addressType?: string | null }).addressType
+  )
+
+  return addressType === 'physical' ? DEFAULT_ZOOM : APPROXIMATE_LOCATION_ZOOM
 }
 
 /**
@@ -87,11 +97,12 @@ export function SingleResourceMap({
           lat: resource.latitude,
           lng: resource.longitude,
         }
+        const zoom = getMapZoom(resource)
 
         // Create map instance with Map ID for Advanced Markers
         const map = new google.maps.Map(mapRef.current, {
           center,
-          zoom: DEFAULT_ZOOM,
+          zoom,
           mapId: 'e3b80f3f5c95c2958f1264e8', // Map ID for Advanced Markers
           mapTypeControl: false,
           streetViewControl: true,
