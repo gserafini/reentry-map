@@ -18,14 +18,24 @@ import { calculateDistance, formatDistanceSmart } from '@/lib/utils/distance'
 import { useUserLocation } from '@/lib/context/LocationContext'
 import { getResourceUrl } from '@/lib/utils/resource-url'
 import { FavoriteButton } from '@/components/user/FavoriteButton'
+import {
+  getApproximateLocationPresentation,
+  getServiceAreaHeading,
+  getServiceAreaSummary,
+  shouldShowDirectionsForResource,
+} from '@/lib/utils/resource-location'
 
 export type ResourceCardResource = {
   id?: string
   name: string
   primary_category?: string | null
   address?: string | null
+  addressType?: string | null
+  address_type?: string | null
   city?: string | null
   state?: string | null
+  serviceArea?: unknown
+  service_area?: unknown
   zip?: string | null
   rating_average?: number | null
   rating_count?: number | null
@@ -44,12 +54,20 @@ interface ResourceCardProps {
   userLocation?: { lat: number; lng: number }
 }
 
+type ResourceCardWithLocationMetadata = (ResourceCardResource | Resource) & {
+  addressType?: string | null
+  address_type?: string | null
+  serviceArea?: unknown
+  service_area?: unknown
+}
+
 export function ResourceCard({
   resource,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onFavorite,
   userLocation: providedLocation,
 }: ResourceCardProps) {
+  const resourceWithLocationMetadata = resource as ResourceCardWithLocationMetadata
   // Get user location from context if not provided as prop
   const { coordinates: contextCoordinates } = useUserLocation()
 
@@ -76,6 +94,10 @@ export function ResourceCard({
   // otherwise render "NaN miles away").
   const distance =
     computedDistance != null && Number.isFinite(computedDistance) ? computedDistance : null
+  const serviceAreaHeading = getServiceAreaHeading(resourceWithLocationMetadata)
+  const serviceAreaSummary = getServiceAreaSummary(resourceWithLocationMetadata)
+  const approximateLocation = getApproximateLocationPresentation(resourceWithLocationMetadata)
+  const showDirections = shouldShowDirectionsForResource(resourceWithLocationMetadata)
 
   // Generate SEO-friendly URL
   const resourceUrl = getResourceUrl(resource)
@@ -127,7 +149,7 @@ export function ResourceCard({
           </Box>
         </Box>
 
-        {resource.address ? (
+        {resource.address && showDirections ? (
           <Link
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resource.address)}`}
             target="_blank"
@@ -153,12 +175,26 @@ export function ResourceCard({
               {resource.zip && <> {resource.zip}</>}
             </Typography>
           </Link>
+        ) : serviceAreaHeading || serviceAreaSummary ? (
+          <Box color="text.secondary" data-testid="resource-address">
+            {serviceAreaHeading && (
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {serviceAreaHeading}
+              </Typography>
+            )}
+            {serviceAreaSummary && <Typography variant="body2">{serviceAreaSummary}</Typography>}
+            {approximateLocation && (
+              <Typography variant="body2">
+                {approximateLocation.label}, not a street address
+              </Typography>
+            )}
+          </Box>
         ) : (
           <Typography variant="body2" color="text.secondary" data-testid="resource-address">
             No address
           </Typography>
         )}
-        {distance !== null && resource.address && (
+        {distance !== null && resource.address && showDirections && (
           <Link
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resource.address)}`}
             target="_blank"

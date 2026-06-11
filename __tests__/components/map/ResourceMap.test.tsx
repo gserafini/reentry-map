@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { ResourceMap } from '@/components/map/ResourceMap'
 import type { Resource } from '@/lib/types/database'
 
@@ -23,30 +23,54 @@ vi.mock('@/lib/env', () => ({
 // Mock Google Maps global objects
 global.google = {
   maps: {
-    Map: vi.fn().mockImplementation(() => ({
-      setCenter: vi.fn(),
-      setZoom: vi.fn(),
-      fitBounds: vi.fn(),
-      panTo: vi.fn(),
-      getZoom: vi.fn().mockReturnValue(12),
-    })),
-    InfoWindow: vi.fn().mockImplementation(() => ({
-      setContent: vi.fn(),
-      open: vi.fn(),
-      close: vi.fn(),
-    })),
-    LatLngBounds: vi.fn().mockImplementation(() => ({
-      extend: vi.fn(),
-    })),
-    marker: {
-      AdvancedMarkerElement: vi.fn().mockImplementation(() => ({
-        map: null,
-        position: null,
+    Map: vi.fn(function MapMock() {
+      return {
         addListener: vi.fn(),
-      })),
-      PinElement: vi.fn().mockImplementation(() => ({
-        element: document.createElement('div'),
-      })),
+        setCenter: vi.fn(),
+        setZoom: vi.fn(),
+        fitBounds: vi.fn(),
+        panTo: vi.fn(),
+        getZoom: vi.fn().mockReturnValue(12),
+      }
+    }),
+    InfoWindow: vi.fn(function InfoWindowMock() {
+      return {
+        setContent: vi.fn(),
+        open: vi.fn(),
+        close: vi.fn(),
+        setPosition: vi.fn(),
+      }
+    }),
+    LatLngBounds: vi.fn(function LatLngBoundsMock() {
+      return {
+        extend: vi.fn(),
+      }
+    }),
+    Circle: vi.fn(function CircleMock() {
+      return {
+        setMap: vi.fn(),
+        addListener: vi.fn(),
+      }
+    }),
+    Polygon: vi.fn(function PolygonMock() {
+      return {
+        setMap: vi.fn(),
+        addListener: vi.fn(),
+      }
+    }),
+    marker: {
+      AdvancedMarkerElement: vi.fn(function AdvancedMarkerElementMock() {
+        return {
+          map: null,
+          position: null,
+          addListener: vi.fn(),
+        }
+      }),
+      PinElement: vi.fn(function PinElementMock() {
+        return {
+          element: document.createElement('div'),
+        }
+      }),
     },
     event: {
       trigger: vi.fn(),
@@ -55,6 +79,37 @@ global.google = {
     },
   },
 } as unknown as typeof google
+
+vi.stubGlobal(
+  'fetch',
+  vi.fn().mockResolvedValue({
+    ok: true,
+    json: vi.fn().mockResolvedValue({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            state_code: 'WA',
+            county_name: 'Mason County',
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-123.3, 47.2],
+                [-123.0, 47.2],
+                [-123.0, 47.4],
+                [-123.3, 47.4],
+                [-123.3, 47.2],
+              ],
+            ],
+          },
+        },
+      ],
+    }),
+  })
+)
 
 // Mock MarkerClusterer
 vi.mock('@googlemaps/markerclusterer', () => ({
@@ -193,5 +248,29 @@ describe('ResourceMap', () => {
 
     // Component should render with selected resource
     expect(container).toBeTruthy()
+  })
+
+  it('renders county-scoped non-physical resources as coverage geometry instead of exact pins', async () => {
+    render(
+      <ResourceMap
+        resources={[
+          {
+            ...mockResources[0],
+            latitude: 47.2133919,
+            longitude: -123.1014187,
+            city: 'Shelton',
+            state: 'WA',
+            address: '',
+            address_type: 'regional',
+            service_area: { type: 'county', values: ['Mason County'] },
+          } as Resource,
+        ]}
+      />
+    )
+
+    await waitFor(() => expect(global.google.maps.Map).toHaveBeenCalled())
+
+    expect(global.google.maps.Polygon).toHaveBeenCalled()
+    expect(global.google.maps.marker.AdvancedMarkerElement).not.toHaveBeenCalled()
   })
 })

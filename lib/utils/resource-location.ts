@@ -1,4 +1,11 @@
-export const ADDRESS_TYPES = ['physical', 'confidential', 'regional', 'online', 'mobile'] as const
+export const ADDRESS_TYPES = [
+  'physical',
+  'confidential',
+  'regional',
+  'online',
+  'mobile',
+  'hotline',
+] as const
 
 export type ResourceAddressType = (typeof ADDRESS_TYPES)[number]
 
@@ -68,7 +75,7 @@ const US_STATE_CODE_TO_NAME: Record<string, string> = {
 }
 
 const ADDRESS_TYPE_SET = new Set<string>(ADDRESS_TYPES)
-const SERVICE_AREA_TYPES = new Set<ResourceAddressType>(['regional', 'online', 'mobile'])
+const SERVICE_AREA_TYPES = new Set<ResourceAddressType>(['regional', 'online', 'mobile', 'hotline'])
 const SPELLED_NUMBER_PREFIX = /^(one|two|three|four|five|six|seven|eight|nine|ten)\b/i
 
 function normalizeAddressText(value: string | null | undefined): string {
@@ -93,14 +100,20 @@ export function normalizeServiceArea(value: unknown): ServiceArea | null {
     return null
   }
 
-  const candidate = value as { type?: unknown; values?: unknown }
+  const candidate = value as { type?: unknown; values?: unknown; name?: unknown }
   const type = typeof candidate.type === 'string' ? candidate.type.trim() : ''
-  const values = Array.isArray(candidate.values)
+  const valuesFromArray = Array.isArray(candidate.values)
     ? candidate.values
         .filter((entry): entry is string => typeof entry === 'string')
         .map((entry) => entry.trim())
         .filter(Boolean)
     : []
+  const values =
+    valuesFromArray.length > 0
+      ? valuesFromArray
+      : typeof candidate.name === 'string' && candidate.name.trim()
+        ? [candidate.name.trim()]
+        : []
 
   if (!type || values.length === 0) {
     return null

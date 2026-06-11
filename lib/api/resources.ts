@@ -21,18 +21,21 @@ export interface GetResourcesOptions extends Partial<ResourceFilters>, Paginatio
   state?: string
 }
 
-export type ResourceMapItem = Pick<
-  Resource,
-  | 'id'
-  | 'name'
-  | 'primary_category'
-  | 'address'
-  | 'latitude'
-  | 'longitude'
-  | 'slug'
-  | 'city'
-  | 'state'
->
+export interface ResourceMapItem {
+  id: string
+  name: string
+  primary_category: string
+  address: string
+  latitude: number | null
+  longitude: number | null
+  slug: string | null
+  city: string | null
+  state: string | null
+  county?: string | null
+  county_fips?: string | null
+  address_type?: string | null
+  service_area?: { type?: string | null; values?: string[] | null } | null
+}
 
 // Allowlist for ORDER BY field validation (safe to use with sql.unsafe since values are validated)
 const ALLOWED_SORT_FIELDS = [
@@ -361,7 +364,20 @@ export async function getResourcesForMap(
       const whereClause = combineConditions(conditions)
 
       const data = await sqlClient<ResourceMapItem[]>`
-        SELECT id, name, primary_category, address, latitude, longitude, slug, city, state
+        SELECT
+          id,
+          name,
+          primary_category,
+          address,
+          latitude,
+          longitude,
+          slug,
+          city,
+          state,
+          county,
+          county_fips,
+          address_type,
+          service_area
         FROM resources
         WHERE ${whereClause}
         ORDER BY name ASC
@@ -393,7 +409,20 @@ export async function getResourcesForMap(
     const whereClause = combineConditions(conditions)
 
     const data = await sqlClient<ResourceMapItem[]>`
-      SELECT id, name, primary_category, address, latitude, longitude, slug, city, state
+      SELECT
+        id,
+        name,
+        primary_category,
+        address,
+        latitude,
+        longitude,
+        slug,
+        city,
+        state,
+        county,
+        county_fips,
+        address_type,
+        service_area
       FROM resources
       WHERE ${whereClause}
       ORDER BY name ASC

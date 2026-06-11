@@ -2,6 +2,7 @@
 
 ## 2026-06-11
 
+- Shared browse/search maps now honor non-physical coverage precision too, not just detail pages: county-scoped resources can render with county coverage geometry, city/statewide resources use approximate areas, and list cards now surface coverage labels like `Countywide resource` / `Serves Alameda County` instead of misleading address-style copy.
 - Statewide and other non-physical detail pages now describe service area explicitly in the header (for example `Statewide resource` / `Serves all of Texas`) and no longer show a misleading `Get Directions` button for approximate anchor locations.
 - Approximate resource maps no longer use an exact-address pin treatment. Non-physical city-anchored resources now render with an approximate-area cue and explicit "not a street address" labeling on the detail-page map.
 - City-anchored non-physical resource detail maps now open at a broader city-level zoom instead of an address-level zoom, so approximate centroids do not visually imply an exact street location.

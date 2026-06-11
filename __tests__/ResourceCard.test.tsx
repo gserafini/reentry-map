@@ -152,4 +152,25 @@ describe('ResourceCard', () => {
 
     expect(screen.getByText('Test Resource')).toBeInTheDocument()
   })
+
+  it('shows statewide coverage clearly instead of saying no address', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard
+          resource={{
+            ...mockResource,
+            address: null,
+            city: 'Lubbock',
+            state: 'TX',
+            address_type: 'regional',
+            service_area: { type: 'statewide', values: ['Texas'] },
+          }}
+        />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText('Statewide resource')).toBeInTheDocument()
+    expect(screen.getByText('Serves all of Texas')).toBeInTheDocument()
+    expect(screen.queryByText('No address')).not.toBeInTheDocument()
+  })
 })

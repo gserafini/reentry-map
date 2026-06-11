@@ -102,4 +102,30 @@ describe('resource location helpers', () => {
     )
     expect(shouldShowDirectionsForResource(statewideResource)).toBe(false)
   })
+
+  it('accepts legacy service_area payloads that used a single name field', () => {
+    const legacyCountyResource = {
+      address_type: 'regional',
+      service_area: { type: 'county', name: 'Alameda County' },
+      city: 'Hayward',
+      state: 'CA',
+    }
+
+    expect(getServiceAreaHeading(legacyCountyResource)).toBe('Countywide resource')
+    expect(getServiceAreaSummary(legacyCountyResource)).toBe('Serves Alameda County')
+  })
+
+  it('treats hotline resources as non-physical coverage, not street-level locations', () => {
+    const hotlineResource = {
+      address_type: 'hotline',
+      service_area: { type: 'county', name: 'Alameda County' },
+      city: 'Hayward',
+      state: 'CA',
+    }
+
+    expect(requiresStreetAddress('hotline')).toBe(false)
+    expect(requiresServiceArea('hotline')).toBe(true)
+    expect(getServiceAreaHeading(hotlineResource)).toBe('Countywide resource')
+    expect(shouldShowDirectionsForResource(hotlineResource)).toBe(false)
+  })
 })

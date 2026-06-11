@@ -25,12 +25,20 @@ export function ResourceList({ resources, onFavorite, userLocation }: ResourceLi
       {resources.map((r) => {
         // ensure name exists for key and props
         const key = r.id ?? r.name ?? Math.random().toString(36).slice(2, 9)
+        const locationMeta = r as Partial<ResourceCardResource> & {
+          addressType?: string | null
+          address_type?: string | null
+          serviceArea?: unknown
+          service_area?: unknown
+        }
 
         const resourceObj: ResourceCardResource = {
           name: r.name ?? 'Unknown',
           id: r.id,
           primary_category: r.primary_category ?? null,
           address: r.address ?? null,
+          addressType: locationMeta.addressType ?? null,
+          address_type: locationMeta.address_type ?? null,
           latitude: r.latitude ?? null,
           longitude: r.longitude ?? null,
           rating_average: r.rating_average ?? null,
@@ -39,6 +47,8 @@ export function ResourceList({ resources, onFavorite, userLocation }: ResourceLi
           slug: r.slug ?? null,
           state: r.state ?? null,
           city: r.city ?? null,
+          serviceArea: locationMeta.serviceArea ?? null,
+          service_area: locationMeta.service_area ?? null,
         }
 
         return (
