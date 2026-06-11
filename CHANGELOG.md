@@ -2,6 +2,7 @@
 
 ## 2026-06-11
 
+- Fixed a client-side Google Maps crash on resource detail pages for coordinate-less resources (for example regional/service-area listings like Blessed Abode Homes). Those pages now show an informational fallback instead of trying to place a `null` map pin.
 - Added Blessed Abode Homes as a Lubbock-area Texas housing resource for returning community members, using a regional city-level entry because the public site exposes only a city-level office location rather than a safe street address for the homes.
 
 ## 2026-06-10

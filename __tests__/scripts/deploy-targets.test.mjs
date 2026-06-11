@@ -23,7 +23,8 @@ describe('reentry map deploy targets', () => {
       buildUserCommandTransport(
         getTargetConfig('staging'),
         'pm2 show reentry-map-staging --no-color',
-        'dc3-1.serafinihosting.com'
+        'dc3-1.serafinihosting.com',
+        'root'
       )
     ).toEqual({
       cmd: 'su',

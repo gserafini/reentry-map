@@ -25,6 +25,16 @@ interface SingleResourceMapProps {
 
 const DEFAULT_ZOOM = 15
 
+function hasValidCoordinates(resource: Pick<Resource, 'latitude' | 'longitude'>): resource is Pick<
+  Resource,
+  'latitude' | 'longitude'
+> & {
+  latitude: number
+  longitude: number
+} {
+  return Number.isFinite(resource.latitude) && Number.isFinite(resource.longitude)
+}
+
 /**
  * SingleResourceMap component
  * Displays a single resource location on an interactive Google Map
@@ -35,6 +45,7 @@ export function SingleResourceMap({
   height = '400px',
   showInfo = false,
 }: SingleResourceMapProps) {
+  const hasCoordinates = hasValidCoordinates(resource)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
@@ -51,7 +62,7 @@ export function SingleResourceMap({
 
   // Initialize map
   useEffect(() => {
-    if (!isMounted) return // Wait for client-side hydration
+    if (!isMounted || !hasCoordinates) return // Wait for client-side hydration
 
     let isComponentMounted = true
 
@@ -112,11 +123,11 @@ export function SingleResourceMap({
     return () => {
       isComponentMounted = false
     }
-  }, [resource, isMounted])
+  }, [resource, isMounted, hasCoordinates])
 
   // Create marker when map is ready
   useEffect(() => {
-    if (!mapInstanceRef.current || isLoading) return
+    if (!hasCoordinates || !mapInstanceRef.current || isLoading) return
 
     const map = mapInstanceRef.current
 
@@ -180,7 +191,7 @@ export function SingleResourceMap({
         anchor: marker,
       })
     }
-  }, [resource, isLoading, showInfo])
+  }, [resource, isLoading, showInfo, hasCoordinates])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -190,6 +201,29 @@ export function SingleResourceMap({
       }
     }
   }, [])
+
+  if (!hasCoordinates) {
+    return (
+      <Box
+        sx={{
+          height,
+          width: '100%',
+          borderRadius: 2,
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.paper',
+          p: 2,
+        }}
+      >
+        <Alert severity="info" sx={{ width: '100%' }}>
+          A precise map pin isn&apos;t available for this resource. Use the contact details below to
+          confirm the best location.
+        </Alert>
+      </Box>
+    )
+  }
 
   return (
     <Box sx={{ position: 'relative', height, width: '100%', borderRadius: 2, overflow: 'hidden' }}>
