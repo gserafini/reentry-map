@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildGeocodingAddress,
+  getApproximateLocationPresentation,
+  getServiceAreaHeading,
+  getServiceAreaSummary,
   hasPlausibleStreetAddress,
   needsPhysicalAddressReview,
   requiresServiceArea,
   requiresStreetAddress,
+  shouldShowDirectionsForResource,
 } from '../../lib/utils/resource-location.ts'
 
 describe('resource location helpers', () => {
@@ -81,5 +85,21 @@ describe('resource location helpers', () => {
         state: 'TX',
       })
     ).toBe('Austin, TX')
+  })
+
+  it('describes statewide resources clearly and suppresses street-level directions', () => {
+    const statewideResource = {
+      address_type: 'regional',
+      service_area: { type: 'statewide', values: ['Texas'] },
+      city: 'Lubbock',
+      state: 'TX',
+    }
+
+    expect(getServiceAreaHeading(statewideResource)).toBe('Statewide resource')
+    expect(getServiceAreaSummary(statewideResource)).toBe('Serves all of Texas')
+    expect(getApproximateLocationPresentation(statewideResource)?.label).toBe(
+      'Approximate statewide anchor location'
+    )
+    expect(shouldShowDirectionsForResource(statewideResource)).toBe(false)
   })
 })

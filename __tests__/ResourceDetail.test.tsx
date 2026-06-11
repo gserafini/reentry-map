@@ -102,4 +102,25 @@ describe('ResourceDetail', () => {
       .closest('[itemtype="https://schema.org/LocalBusiness"]')
     expect(container).toHaveTextContent('10')
   })
+
+  it('shows statewide coverage clearly and hides directions for statewide resources', () => {
+    render(
+      <ResourceDetail
+        resource={
+          {
+            ...mockResource,
+            address: '',
+            city: 'Lubbock',
+            state: 'TX',
+            address_type: 'regional',
+            service_area: { type: 'statewide', values: ['Texas'] },
+          } as Resource
+        }
+      />
+    )
+
+    expect(screen.getByText('Statewide resource')).toBeInTheDocument()
+    expect(screen.getByText('Serves all of Texas')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /get directions/i })).not.toBeInTheDocument()
+  })
 })

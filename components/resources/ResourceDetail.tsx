@@ -50,9 +50,22 @@ import {
   generateNationalTagUrl,
 } from '@/lib/utils/urls'
 import { analytics } from '@/lib/analytics/queue'
+import {
+  getApproximateLocationPresentation,
+  getServiceAreaHeading,
+  getServiceAreaSummary,
+  shouldShowDirectionsForResource,
+} from '@/lib/utils/resource-location'
 
 interface ResourceDetailProps {
   resource: Resource
+}
+
+type ResourceWithLocationMetadata = Resource & {
+  addressType?: string | null
+  address_type?: string | null
+  serviceArea?: unknown
+  service_area?: unknown
 }
 
 export function ResourceDetail({ resource }: ResourceDetailProps) {
@@ -60,6 +73,11 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
   const [showReportModal, setShowReportModal] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const { user } = useAuth()
+  const resourceWithLocationMetadata = resource as ResourceWithLocationMetadata
+  const serviceAreaHeading = getServiceAreaHeading(resourceWithLocationMetadata)
+  const serviceAreaSummary = getServiceAreaSummary(resourceWithLocationMetadata)
+  const approximateLocation = getApproximateLocationPresentation(resourceWithLocationMetadata)
+  const showDirections = shouldShowDirectionsForResource(resourceWithLocationMetadata)
 
   // Check admin status
   useEffect(() => {
@@ -227,7 +245,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
           resourceName={resource.name}
         />
 
-        {/* Address with Get Directions button */}
+        {/* Address / coverage with optional directions */}
         <Box
           component="address"
           itemProp="address"
@@ -252,48 +270,77 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             }}
           >
             <LocationOnIcon color="action" sx={{ mt: 0.5 }} aria-label="Address" />
-            <Tooltip title="Click to open directions in Google Maps" arrow placement="top">
-              <MuiLink
-                href={getDirectionsUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                underline="hover"
-                color="text.secondary"
-                sx={{
-                  cursor: 'pointer',
-                  '&:hover': {
-                    color: 'primary.main',
-                  },
-                }}
-              >
-                <Box>
-                  <Typography variant="body1" component="div" itemProp="streetAddress">
-                    {resource.address}
+            {showDirections ? (
+              <Tooltip title="Click to open directions in Google Maps" arrow placement="top">
+                <MuiLink
+                  href={getDirectionsUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  underline="hover"
+                  color="text.secondary"
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': {
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <Box>
+                    <Typography variant="body1" component="div" itemProp="streetAddress">
+                      {resource.address}
+                    </Typography>
+                    <Typography variant="body1" component="div">
+                      {resource.city && <span itemProp="addressLocality">{resource.city}</span>}
+                      {resource.city && resource.state && ', '}
+                      {resource.state && <span itemProp="addressRegion">{resource.state}</span>}
+                      {resource.zip && (
+                        <>
+                          {' '}
+                          <span itemProp="postalCode">{resource.zip}</span>
+                        </>
+                      )}
+                    </Typography>
+                  </Box>
+                </MuiLink>
+              </Tooltip>
+            ) : (
+              <Box>
+                {serviceAreaHeading && (
+                  <Typography variant="subtitle2" component="div" sx={{ fontWeight: 700 }}>
+                    {serviceAreaHeading}
                   </Typography>
+                )}
+                {serviceAreaSummary && (
+                  <Typography variant="body1" component="div">
+                    {serviceAreaSummary}
+                  </Typography>
+                )}
+                {approximateLocation && (
+                  <Typography variant="body2" color="text.secondary" component="div">
+                    {approximateLocation.label}, not a street address
+                  </Typography>
+                )}
+                {!serviceAreaSummary && (
                   <Typography variant="body1" component="div">
                     {resource.city && <span itemProp="addressLocality">{resource.city}</span>}
                     {resource.city && resource.state && ', '}
                     {resource.state && <span itemProp="addressRegion">{resource.state}</span>}
-                    {resource.zip && (
-                      <>
-                        {' '}
-                        <span itemProp="postalCode">{resource.zip}</span>
-                      </>
-                    )}
                   </Typography>
-                </Box>
-              </MuiLink>
-            </Tooltip>
+                )}
+              </Box>
+            )}
           </Box>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<DirectionsIcon />}
-            onClick={handleGetDirections}
-            sx={{ flexShrink: 0 }}
-          >
-            Get Directions
-          </Button>
+          {showDirections && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<DirectionsIcon />}
+              onClick={handleGetDirections}
+              sx={{ flexShrink: 0 }}
+            >
+              Get Directions
+            </Button>
+          )}
         </Box>
 
         {/* Average Rating */}
