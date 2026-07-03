@@ -59,6 +59,71 @@ describe('suggest-batch location types', () => {
     expect(insertCall.values).toContain('{"type":"statewide","values":["Texas"]}')
   })
 
+  it('allows same-name non-physical suggestions when coverage differs', async () => {
+    const sqlCalls = []
+    const sql = vi.fn(async (strings, ...values) => {
+      const text = strings.join('<?>')
+      sqlCalls.push({ text, values })
+
+      if (sqlCalls.length === 1) {
+        return [
+          {
+            id: 'resource-1',
+            name: 'Reconnect 180',
+            address: '',
+            city: 'Reno',
+            state: 'NV',
+            address_type: 'regional',
+            service_area: { type: 'city', values: ['Reno'] },
+            org_name: 'Reconnect 180',
+          },
+        ]
+      }
+
+      if (sqlCalls.length === 2) return []
+      if (sqlCalls.length === 3) return [{ id: 'suggestion-coverage-1' }]
+
+      throw new Error(`Unexpected SQL call ${sqlCalls.length}: ${text}`)
+    })
+
+    vi.doMock('@/lib/db/client', () => ({ sql }))
+    vi.doMock('@/lib/api/settings', () => ({
+      getAISystemStatus: vi.fn().mockResolvedValue({ isVerificationActive: false }),
+    }))
+    vi.doMock('@/lib/ai-agents/verification-agent', () => ({
+      VerificationAgent: vi.fn(),
+    }))
+
+    const { POST } = await import('../../app/api/resources/suggest-batch/route.ts')
+
+    const response = await POST(
+      new Request('https://reentrymap.org/api/resources/suggest-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resources: [
+            {
+              name: 'Reconnect 180',
+              city: 'Reno',
+              state: 'NV',
+              website: 'https://www.reconnect180.org/',
+              primary_category: 'general-support',
+              address_type: 'regional',
+              service_area: { type: 'statewide', values: ['Nevada'] },
+            },
+          ],
+        }),
+      })
+    )
+
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.stats.submitted).toBe(1)
+    expect(body.stats.skipped_duplicates).toBe(0)
+    expect(sqlCalls).toHaveLength(3)
+  })
+
   it('still rejects physical resources that omit a street address', async () => {
     const sql = vi.fn()
 

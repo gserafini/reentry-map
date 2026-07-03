@@ -9,11 +9,16 @@
 
 import { sql } from '@/lib/db/client'
 import type { Resource } from '@/lib/types/database'
+import {
+  normalizeAddressType,
+  normalizeServiceArea,
+  type ServiceArea,
+} from '@/lib/utils/resource-location'
 
 export interface DeduplicationResult {
   isDuplicate: boolean
   existingResource?: Resource
-  matchType?: 'exact_address' | 'fuzzy_name' | 'none'
+  matchType?: 'exact_address' | 'fuzzy_name' | 'coverage' | 'none'
   similarity?: number
   suggestedAction?: 'skip' | 'update' | 'create_child' | 'merge'
 }
@@ -24,7 +29,73 @@ export interface ImportResource {
   city?: string | null
   state?: string | null
   zip?: string | null
+  addressType?: string | null
+  address_type?: string | null
+  serviceArea?: unknown
+  service_area?: unknown
+  orgName?: string | null
+  org_name?: string | null
   [key: string]: unknown
+}
+
+type CoverageComparableResource = Resource & {
+  org_name?: string | null
+  address_type?: string | null
+  service_area?: unknown
+  city?: string | null
+  state?: string | null
+}
+
+function normalizeKeyPart(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function normalizeServiceAreaSignature(serviceArea: ServiceArea | null): string {
+  if (!serviceArea) {
+    return 'none'
+  }
+
+  const type = normalizeKeyPart(serviceArea.type)
+  const values = serviceArea.values
+    .map((value) => normalizeKeyPart(value))
+    .filter(Boolean)
+    .sort()
+
+  return `${type}:${values.join('|')}`
+}
+
+export function getCanonicalOrganizationName(
+  resource: Pick<ImportResource, 'name'> & {
+    orgName?: string | null
+    org_name?: string | null
+  }
+): string {
+  const candidate =
+    (typeof resource.orgName === 'string' && resource.orgName.trim()) ||
+    (typeof resource.org_name === 'string' && resource.org_name.trim()) ||
+    resource.name
+
+  return candidate.trim()
+}
+
+export function buildNonPhysicalCoverageKey(
+  resource: Pick<ImportResource, 'name' | 'city' | 'state'> & {
+    orgName?: string | null
+    org_name?: string | null
+    addressType?: string | null
+    address_type?: string | null
+    serviceArea?: unknown
+    service_area?: unknown
+  }
+): string {
+  const orgName = normalizeKeyPart(getCanonicalOrganizationName(resource))
+  const addressType = normalizeAddressType(resource.addressType ?? resource.address_type)
+  const city = normalizeKeyPart(resource.city)
+  const state = normalizeKeyPart(resource.state)
+  const serviceArea = normalizeServiceArea(resource.serviceArea ?? resource.service_area)
+
+  return [orgName, addressType, city, state, normalizeServiceAreaSignature(serviceArea)].join('::')
 }
 
 /**
@@ -32,8 +103,33 @@ export interface ImportResource {
  * Returns deduplication result with suggested action
  */
 export async function checkForDuplicate(resource: ImportResource): Promise<DeduplicationResult> {
+  const addressType = normalizeAddressType(resource.addressType ?? resource.address_type)
+
+  if (addressType !== 'physical') {
+    const coverageMatch = await findNonPhysicalMatch(resource)
+
+    if (coverageMatch) {
+      return {
+        isDuplicate: true,
+        existingResource: coverageMatch,
+        matchType: 'coverage',
+        similarity: 1.0,
+        suggestedAction: 'update',
+      }
+    }
+
+    return {
+      isDuplicate: false,
+      matchType: 'none',
+      suggestedAction: 'skip',
+    }
+  }
+
   // Strategy 1: Exact address match (most reliable)
-  const exactMatch = await findExactAddressMatch(resource)
+  const exactMatch =
+    typeof resource.address === 'string' && resource.address.trim()
+      ? await findExactAddressMatch(resource)
+      : null
   if (exactMatch) {
     return {
       isDuplicate: true,
@@ -62,6 +158,38 @@ export async function checkForDuplicate(resource: ImportResource): Promise<Dedup
     matchType: 'none',
     suggestedAction: 'skip', // Will be changed to 'create' by caller
   }
+}
+
+async function findNonPhysicalMatch(resource: ImportResource): Promise<Resource | null> {
+  const orgName = getCanonicalOrganizationName(resource)
+  const addressType = normalizeAddressType(resource.addressType ?? resource.address_type)
+  const city = resource.city?.trim() || ''
+  const state = resource.state?.trim() || ''
+  const targetCoverageKey = buildNonPhysicalCoverageKey(resource)
+
+  const rows = await sql<CoverageComparableResource[]>`
+    SELECT *
+    FROM resources
+    WHERE LOWER(COALESCE(org_name, name)) = LOWER(${orgName})
+      AND LOWER(COALESCE(city, '')) = LOWER(${city})
+      AND LOWER(COALESCE(state, '')) = LOWER(${state})
+      AND LOWER(COALESCE(address_type, 'physical')) = LOWER(${addressType})
+      AND status = 'active'
+  `
+
+  const match = rows.find(
+    (row) =>
+      buildNonPhysicalCoverageKey({
+        name: row.name,
+        org_name: row.org_name,
+        address_type: row.address_type,
+        service_area: row.service_area,
+        city: row.city,
+        state: row.state,
+      }) === targetCoverageKey
+  )
+
+  return match || null
 }
 
 /**

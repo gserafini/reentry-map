@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-02
+
+- Fixed non-physical duplicate detection so same-name resources can coexist when their coverage differs. Admin imports, trusted research intake, the public duplicate-check endpoint, and batch suggestion intake now treat organization identity plus `address_type` plus normalized `service_area` plus anchor locality as the duplicate key instead of collapsing all same-name service-area records together.
+- Stopped admin imports from auto-creating synthetic parent rows for same-name multi-coverage organizations. The system now keeps those as standalone live resource records and stores the shared organization identity in `org_name`, which fixes cases like `Reconnect 180` serving Reno and Las Vegas without forcing title suffix hacks.
+- Hardened the repo quality pipeline so `npm run console:check` starts its own temporary dev server on the dedicated test port instead of assuming a human already has port 3003 running. `npm run quality` no longer depends on hidden local setup to reach the browser console phase.
+
 ## 2026-06-11
 
 - Shared browse/search maps now honor non-physical coverage precision too, not just detail pages: county-scoped resources can render with county coverage geometry, city/statewide resources use approximate areas, and list cards now surface coverage labels like `Countywide resource` / `Serves Alameda County` instead of misleading address-style copy.

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { db, sql } from '@/lib/db/client'
 import { expansionPriorities, resources } from '@/lib/db/schema'
-import { checkForDuplicate } from '@/lib/utils/deduplication'
+import { checkForDuplicate, getCanonicalOrganizationName } from '@/lib/utils/deduplication'
 import {
   hasPlausibleStreetAddress,
   normalizeAddressType,
@@ -37,12 +37,6 @@ type SubmitCandidateBody = {
 
 type CountRow = {
   count: number | string
-}
-
-type ExistingDuplicateRow = {
-  id: string
-  name: string
-  primary_category: string | null
 }
 
 function trimToNull(value: string | undefined): string | null {
@@ -179,52 +173,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (addressType === 'physical' && address) {
-      const dupeCheck = await checkForDuplicate({
-        name,
-        address,
-        city,
-        state,
-        zip,
-      })
+    const dupeCheck = await checkForDuplicate({
+      name,
+      address,
+      city,
+      state,
+      zip,
+      addressType,
+      serviceArea,
+    })
 
-      if (dupeCheck.isDuplicate && dupeCheck.existingResource) {
-        return NextResponse.json(
-          {
-            error: 'Possible duplicate resource',
-            details: 'A matching physical resource already exists.',
-            duplicate: {
-              id: dupeCheck.existingResource.id,
-              name: dupeCheck.existingResource.name,
-              match_type: dupeCheck.matchType,
-              suggested_action: dupeCheck.suggestedAction,
-            },
+    if (dupeCheck.isDuplicate && dupeCheck.existingResource) {
+      return NextResponse.json(
+        {
+          error: 'Possible duplicate resource',
+          details:
+            addressType === 'physical'
+              ? 'A matching physical resource already exists.'
+              : 'A matching non-physical resource already exists.',
+          duplicate: {
+            id: dupeCheck.existingResource.id,
+            name: dupeCheck.existingResource.name,
+            match_type: dupeCheck.matchType,
+            suggested_action: dupeCheck.suggestedAction,
           },
-          { status: 409 }
-        )
-      }
-    } else {
-      const existingRows = await sql<ExistingDuplicateRow[]>`
-        SELECT id, name, primary_category
-        FROM resources
-        WHERE LOWER(name) = LOWER(${name})
-          AND LOWER(COALESCE(city, '')) = LOWER(${city})
-          AND LOWER(COALESCE(state, '')) = LOWER(${state})
-          AND LOWER(COALESCE(address_type, 'physical')) = LOWER(${addressType})
-          AND status = 'active'
-        LIMIT 1
-      `
-
-      if (existingRows[0]) {
-        return NextResponse.json(
-          {
-            error: 'Possible duplicate resource',
-            details: 'A matching non-physical resource already exists.',
-            duplicate: existingRows[0],
-          },
-          { status: 409 }
-        )
-      }
+        },
+        { status: 409 }
+      )
     }
 
     const resourceName = name
@@ -248,6 +223,7 @@ export async function POST(request: NextRequest) {
       .insert(resources)
       .values({
         name: resourceName,
+        orgName: getCanonicalOrganizationName({ name: resourceName }),
         description,
         primaryCategory,
         categories: [primaryCategory],

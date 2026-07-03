@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db/client'
-import { resources } from '@/lib/db/schema'
-import { ilike, eq, and } from 'drizzle-orm'
+import { checkForDuplicate } from '@/lib/utils/deduplication'
+import { normalizeAddressType, normalizeServiceArea } from '@/lib/utils/resource-location'
+
+function parseServiceAreaParam(value: string | null): unknown {
+  if (!value) return null
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
 
 /**
  * GET /api/resources/check-duplicate?name=...&address=...&city=...&state=...
@@ -17,6 +26,8 @@ export async function GET(request: NextRequest) {
   const address = searchParams.get('address')
   const city = searchParams.get('city')
   const state = searchParams.get('state')
+  const addressType = normalizeAddressType(searchParams.get('address_type'))
+  const serviceArea = normalizeServiceArea(parseServiceAreaParam(searchParams.get('service_area')))
 
   // At minimum, need name or address
   if (!name && !address) {
@@ -27,41 +38,29 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Build conditions
-    const conditions = []
+    const duplicateResult = await checkForDuplicate({
+      name: name || address || 'Unnamed resource',
+      address: address || '',
+      city,
+      state,
+      addressType,
+      serviceArea,
+    })
 
-    // Exact name match (case-insensitive)
-    if (name) {
-      conditions.push(ilike(resources.name, name))
-    }
-
-    // Exact address match (case-insensitive)
-    if (address) {
-      conditions.push(ilike(resources.address, address))
-    }
-
-    // Filter by city and state if provided
-    if (city) {
-      conditions.push(eq(resources.city, city))
-    }
-    if (state) {
-      conditions.push(eq(resources.state, state))
-    }
-
-    const matches = await db
-      .select({
-        id: resources.id,
-        name: resources.name,
-        address: resources.address,
-        city: resources.city,
-        state: resources.state,
-        primaryCategory: resources.primaryCategory,
-      })
-      .from(resources)
-      .where(conditions.length > 1 ? and(...conditions) : conditions[0])
-      .limit(5)
-
-    const isDuplicate = matches && matches.length > 0
+    const isDuplicate = duplicateResult.isDuplicate
+    const matches =
+      duplicateResult.existingResource && duplicateResult.existingResource.id
+        ? [
+            {
+              id: duplicateResult.existingResource.id,
+              name: duplicateResult.existingResource.name,
+              address: duplicateResult.existingResource.address,
+              city: duplicateResult.existingResource.city,
+              state: duplicateResult.existingResource.state,
+              primaryCategory: duplicateResult.existingResource.primary_category,
+            },
+          ]
+        : []
 
     return NextResponse.json({
       isDuplicate,
@@ -69,7 +68,7 @@ export async function GET(request: NextRequest) {
       matches:
         matches?.map((m) => ({
           ...m,
-          primary_category: m.primaryCategory,
+          primary_category: m.primaryCategory || null,
         })) || [],
       message: isDuplicate
         ? `Found ${matches.length} potential duplicate(s)`

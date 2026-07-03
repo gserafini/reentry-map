@@ -2,7 +2,8 @@ import { chromium } from 'playwright'
 
 // Get path from command line args, default to /
 const path = process.argv[2] || '/'
-const url = `http://localhost:3003${path}`
+const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3003'
+const url = `${baseUrl}${path}`
 
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext()

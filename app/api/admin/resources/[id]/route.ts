@@ -56,11 +56,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Build partial update — only include fields that were sent in the request
     const fieldMap: Record<string, string> = {
       name: 'name',
+      org_name: 'orgName',
+      location_name: 'locationName',
       description: 'description',
       primary_category: 'primaryCategory',
       categories: 'categories',
       tags: 'tags',
       address: 'address',
+      address_type: 'addressType',
+      service_area: 'serviceArea',
       city: 'city',
       state: 'state',
       zip: 'zip',

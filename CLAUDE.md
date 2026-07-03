@@ -63,7 +63,8 @@ npm run quality:full # Full: Above + E2E tests
 
 - **Port 3003**: User's dev server (`npm run dev`) - NEVER kill this!
 - **Port 3004**: ALL testing and quality checks
-  - Dev compilation check (`npm run dev:check`)
+  - Browser console check (`npm run console:check`) now starts its own temporary dev server here
+  - Standalone dev compilation check (`npm run dev:check`) also uses this port when you need that step by itself
   - E2E tests (`npm run test:e2e`) via `dev:test`
   - Playwright automated tests
   - Screenshot generation
