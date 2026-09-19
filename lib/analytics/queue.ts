@@ -11,8 +11,6 @@
  *   analytics.track('button_click', { button_id: 'submit' })
  */
 
-import { env } from '@/lib/env'
-
 // Event property types for type safety
 interface AnalyticsProperties {
   // Page view properties
@@ -83,48 +81,66 @@ class AnalyticsQueue {
   constructor() {
     if (typeof window === 'undefined') return // Server-side guard
 
-    // Check if analytics is enabled via environment variable or localStorage
+    // Check the visitor's explicit consent and browser privacy preferences
     this.enabled = this.isEnabled()
 
     // Automatically flush periodically (only if enabled)
     if (this.enabled) {
       this.flushTimer = setInterval(() => this.flush(), this.flushInterval)
-
-      // Flush on page unload
-      window.addEventListener('beforeunload', () => this.flushSync())
-      window.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          this.flushSync()
-        }
-      })
     }
+
+    // Flush on page unload
+    window.addEventListener('beforeunload', () => this.flushSync())
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.flushSync()
+      }
+    })
   }
 
   /**
    * Check if analytics is enabled
-   * Priority: localStorage > environment variable > default (true)
+   * Requires explicit opt-in; browser privacy signals always take precedence.
    */
   private isEnabled(): boolean {
-    if (typeof window === 'undefined') return true
+    if (typeof window === 'undefined') return false
+    if (
+      navigator.doNotTrack === '1' ||
+      (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl
+    )
+      return false
 
-    // Check localStorage override (for testing)
-    const localStorageOverride = localStorage.getItem('analytics_enabled')
+    // A stored choice is required before collecting usage events.
+    let localStorageOverride: string | null
+    try {
+      localStorageOverride = localStorage.getItem('analytics_enabled')
+    } catch {
+      return false
+    }
     if (localStorageOverride !== null) {
       return localStorageOverride === 'true'
     }
 
-    // Check environment variable (set at build time)
-    // env.NEXT_PUBLIC_ANALYTICS_ENABLED is already transformed to boolean
-    return env.NEXT_PUBLIC_ANALYTICS_ENABLED
+    // No recorded choice means no analytics.
+    return false
   }
 
   /**
-   * Enable analytics at runtime (for testing)
+   * Check or update the visitor's analytics choice.
    */
+  public isTrackingEnabled(): boolean {
+    return this.enabled && this.isEnabled()
+  }
+
   public enable(): void {
     this.enabled = true
     if (typeof window !== 'undefined') {
-      localStorage.setItem('analytics_enabled', 'true')
+      try {
+        localStorage.setItem('analytics_enabled', 'true')
+      } catch {
+        this.enabled = false
+        return
+      }
     }
 
     // Start flush timer if not already running
@@ -134,12 +150,17 @@ class AnalyticsQueue {
   }
 
   /**
-   * Disable analytics at runtime (for testing)
+   * Withdraw consent and discard unsent events.
    */
   public disable(): void {
     this.enabled = false
     if (typeof window !== 'undefined') {
-      localStorage.setItem('analytics_enabled', 'false')
+      try {
+        localStorage.setItem('analytics_enabled', 'false')
+        sessionStorage.removeItem('reentry-search-journey')
+      } catch {
+        /* Storage may be unavailable. */
+      }
     }
 
     // Clear queue
@@ -158,12 +179,16 @@ class AnalyticsQueue {
    */
   track(event: string, properties?: AnalyticsProperties): void {
     if (typeof window === 'undefined') return // Server-side guard
-    if (!this.enabled) return // Analytics disabled
+    if (!this.isTrackingEnabled()) return // Respect consent and browser privacy preferences
 
     // Add to queue synchronously (just array push, <1ms)
     this.queue.push({
       event,
-      properties,
+      properties:
+        event === 'page_view' &&
+        /^\/(search|resources|category)(\/|$)/.test(window.location.pathname)
+          ? { ...properties, page_title: 'Resource search' }
+          : properties,
       client_timestamp: Date.now(),
       timestamp: new Date().toISOString(),
       session_id: this.getSessionId(),
@@ -171,7 +196,7 @@ class AnalyticsQueue {
       user_id: this.getUserId(),
       is_admin: this.isAdminUser(), // Mark admin users
       page_path: window.location.pathname,
-      referrer: document.referrer || undefined,
+      referrer: sanitizedReferrer(document.referrer),
       viewport: {
         width: window.innerWidth,
         height: window.innerHeight,
@@ -364,6 +389,16 @@ class AnalyticsQueue {
     if (this.flushTimer) {
       clearInterval(this.flushTimer)
     }
+  }
+}
+
+function sanitizedReferrer(referrer: string): string | undefined {
+  if (!referrer) return undefined
+  try {
+    const url = new URL(referrer)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : undefined
+  } catch {
+    return undefined
   }
 }
 

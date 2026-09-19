@@ -19,11 +19,16 @@ deploy - Deployment, logs, and status
 
 Subcommands:
   production               Deploy to production
-                           Runs: git pull, npm install, npm run build, pm2 restart
+                           Runs: git pull --ff-only, npm ci, npm run build, pm2 restart --update-env
   staging                  Deploy to staging
-                           Runs: git pull, npm install, npm run build, pm2 restart
+                           Runs: git pull --ff-only, npm ci, npm run build, pm2 restart --update-env
 
-  check-logs [--lines N]   View target error logs
+  --local --revision SHA  Build an exact committed local revision (no GitHub pull)
+  --dry-run               Preview deployment commands only
+  refresh-staging-resources [--apply] [--dry-run]
+                          Preview/copy public listings to staging; no users copied
+                          --dry-run always prevents writes, even with --apply
+  check-logs [--lines N]   View current PM2 runtime logs
     --lines N              Number of lines (default: 50)
     --target TARGET        production (default) or staging
 
@@ -62,7 +67,7 @@ export function buildUserCommandTransport(
       '-p',
       target.sshPort,
       target.sshHost,
-      `su - ${target.user} -c ${JSON.stringify(userCommand)}`,
+      `su - ${target.user} -c ${shellQuote(userCommand)}`,
     ],
   }
 }
@@ -87,9 +92,19 @@ export async function run(args) {
 
   switch (subcommand) {
     case 'production':
-      return await deployTarget('production')
+      return await deployTarget('production', args)
     case 'staging':
-      return await deployTarget('staging')
+      return await deployTarget('staging', args)
+    case 'refresh-staging-resources': {
+      const { refreshStagingResources } = await import('../staging-resources.mjs')
+      const { values } = parseArgs({
+        args,
+        options: { apply: { type: 'boolean' }, 'dry-run': { type: 'boolean' } },
+        allowPositionals: true,
+        strict: true,
+      })
+      return refreshStagingResources({ dryRun: !!values['dry-run'] || !values.apply })
+    }
     case 'check-logs':
       return await checkLogs(args)
     case 'status':
@@ -101,13 +116,43 @@ export async function run(args) {
   }
 }
 
-function buildDeployCommand(target) {
-  return `cd ${target.cwd} && git pull origin ${target.branch} && npm install && npm run build && pm2 restart ${target.appName} --update-env`
+export function shellQuote(value) {
+  return "'" + String(value).replace(/'/g, "'\\''") + "'"
+}
+export function buildLogCommand(target, lines = 50) {
+  if (!/^\d+$/.test(String(lines)) || Number(lines) < 1 || Number(lines) > 5000)
+    throw Error('Use --lines with an integer between 1 and 5000.')
+  return `pm2 logs ${shellQuote(target.appName)} --lines ${Number(lines)} --nostream`
+}
+export function buildDeployCommand(target, { local = false, revision } = {}) {
+  if (local && !/^[a-f0-9]{40}$/.test(revision || ''))
+    throw Error(
+      'Local deployment requires --revision with the full committed SHA from git rev-parse HEAD.'
+    )
+  const clean = `test -z "$(git status --porcelain)" || { echo 'Deployment refused: commit or preserve working-tree changes first.' >&2; exit 1; }`
+  const sync = local
+    ? `test "$(git rev-parse HEAD)" = ${shellQuote(revision)} || { echo 'Deployment refused: local HEAD differs from --revision.' >&2; exit 1; }`
+    : `git pull --ff-only origin ${shellQuote(target.branch)}`
+  return `cd ${shellQuote(target.cwd)} && { ${clean}; } && { ${sync}; } && npm ci && npm run build && pm2 restart ${shellQuote(target.appName)} --update-env`
 }
 
-async function deployTarget(targetName) {
+async function deployTarget(targetName, args = []) {
+  const { values } = parseArgs({
+    args,
+    options: {
+      local: { type: 'boolean' },
+      revision: { type: 'string' },
+      'dry-run': { type: 'boolean' },
+    },
+    allowPositionals: true,
+    strict: true,
+  })
   const target = getTargetConfig(targetName)
-  const deployCmd = buildDeployCommand(target)
+  const deployCmd = buildDeployCommand(target, values)
+  if (values['dry-run']) {
+    console.log(deployCmd)
+    return
+  }
   const transport = buildUserCommandTransport(target, deployCmd)
 
   console.log(`Deploying to ${target.name}...`)
@@ -141,7 +186,7 @@ async function checkLogs(args) {
   })
 
   const target = getTargetConfig(values.target)
-  const cmd = `tail -${values.lines} /home/${target.user}/logs/${target.logPrefix}-error.log`
+  const cmd = buildLogCommand(target, values.lines)
   return new Promise((resolve, reject) => {
     const child = spawnTargetUserCommand(target, cmd, {
       stdio: 'inherit',

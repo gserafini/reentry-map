@@ -1,7 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Coordinates } from '@/lib/utils/distance'
+
+type LocationSource = 'geolocation' | 'manual' | 'geoip'
+export type GeolocationError =
+  | 'permission-denied'
+  | 'position-unavailable'
+  | 'timeout'
+  | 'not-supported'
+  | 'unknown'
 
 export interface UseLocationResult {
   coordinates: Coordinates | null
@@ -11,341 +19,254 @@ export interface UseLocationResult {
   setManualLocation: (coords: Coordinates, displayName: string) => void
   clearLocation: () => void
   isSupported: boolean
-  lastUpdated: number | null // Unix timestamp of last location update
-  displayName: string | null // "Current Location", "Oakland, CA", "94601", etc.
-  source: 'geolocation' | 'manual' | 'geoip' | null // How we got the location
+  lastUpdated: number | null
+  displayName: string | null
+  source: LocationSource | null
 }
-
 interface CachedLocation {
   coordinates: Coordinates
   timestamp: number
   displayName: string
-  source: 'geolocation' | 'manual' | 'geoip'
+  source: LocationSource
 }
-
-interface GeoIPResponse {
-  location: {
-    latitude: number
-    longitude: number
-    city?: string
-    region?: string
-    country?: string
-    timezone?: string
-  } | null
-  message?: string
-  ip?: string
-}
-
 const LOCATION_CACHE_KEY = 'userLocation'
-const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
-const REFRESH_INTERVAL = 2 * 60 * 1000 // Check every 2 minutes
+const LEGACY_CACHE_KEYS = ['reentry-map-user-selected-location', 'reentry-map-geoip-location']
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000
+const REFRESH_INTERVAL = 2 * 60 * 1000
 
-export type GeolocationError =
-  | 'permission-denied'
-  | 'position-unavailable'
-  | 'timeout'
-  | 'not-supported'
-  | 'unknown'
-
-/**
- * Load cached location from localStorage
- */
+export function isValidCoordinates(value: unknown): value is Coordinates {
+  if (!value || typeof value !== 'object') return false
+  const coords = value as Record<string, unknown>
+  return (
+    typeof coords.latitude === 'number' &&
+    Number.isFinite(coords.latitude) &&
+    Math.abs(coords.latitude) <= 90 &&
+    typeof coords.longitude === 'number' &&
+    Number.isFinite(coords.longitude) &&
+    Math.abs(coords.longitude) <= 180
+  )
+}
+function validLabel(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const label = value.trim()
+  if (
+    label
+      .split(',')
+      .some((part) => ['undefined', 'null', 'nan'].includes(part.trim().toLowerCase()))
+  )
+    return null
+  return label
+}
+function removeCache(keys: string[]) {
+  for (const key of keys) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      /* Storage is optional. */
+    }
+  }
+}
 function loadFromCache(): CachedLocation | null {
-  if (typeof window === 'undefined') return null
-
   try {
-    const cached = localStorage.getItem(LOCATION_CACHE_KEY)
-    if (!cached) return null
-
-    const parsed = JSON.parse(cached) as CachedLocation
-    const age = Date.now() - parsed.timestamp
-
-    // Return cached location if it's still fresh
-    if (age < CACHE_DURATION) {
-      return parsed
-    }
-
-    // Cache expired, remove it
-    localStorage.removeItem(LOCATION_CACHE_KEY)
-    return null
-  } catch {
-    return null
-  }
-}
-
-/**
- * Save location to localStorage cache
- */
-function saveToCache(
-  coordinates: Coordinates,
-  displayName: string,
-  source: 'geolocation' | 'manual' | 'geoip'
-): void {
-  if (typeof window === 'undefined') return
-
-  try {
-    const cached: CachedLocation = {
-      coordinates,
-      timestamp: Date.now(),
-      displayName,
-      source,
-    }
-    localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cached))
-  } catch {
-    // Ignore localStorage errors
-  }
-}
-
-/**
- * Custom hook for accessing browser geolocation with caching and periodic refresh
- *
- * @param autoRequest - Whether to automatically request location on mount
- * @returns Location state and control functions
- *
- * Features:
- * - Caches location in localStorage for 7 days
- * - Auto-loads cached location on mount
- * - Periodic refresh every 2 minutes if location was previously granted
- * - Provides lastUpdated timestamp
- *
- * @example
- * ```tsx
- * function MyComponent() {
- *   const { coordinates, error, loading, requestLocation, lastUpdated } = useLocation()
- *
- *   if (loading) return <p>Getting location...</p>
- *   if (error) return <p>Error: {error}</p>
- *   if (!coordinates) return <button onClick={requestLocation}>Get My Location</button>
- *
- *   return <p>Lat: {coordinates.latitude}, Lng: {coordinates.longitude}</p>
- * }
- * ```
- */
-export function useLocation(autoRequest: boolean = false): UseLocationResult {
-  const [coordinates, setCoordinates] = useState<Coordinates | null>(null)
-  const [error, setError] = useState<GeolocationError | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
-  const [displayName, setDisplayName] = useState<string | null>(null)
-  const [source, setSource] = useState<'geolocation' | 'manual' | 'geoip' | null>(null)
-
-  // Check if geolocation is supported by the browser
-  const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator
-
-  /**
-   * Handle successful geolocation
-   */
-  const handleSuccess = useCallback((position: GeolocationPosition) => {
-    const coords = {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-    }
-    setCoordinates(coords)
-    setDisplayName('Current Location')
-    setSource('geolocation')
-    setError(null)
-    setLoading(false)
-    setLastUpdated(Date.now())
-
-    // Cache the location
-    saveToCache(coords, 'Current Location', 'geolocation')
-  }, [])
-
-  /**
-   * Handle geolocation errors
-   */
-  const handleError = useCallback((err: GeolocationPositionError) => {
-    setLoading(false)
-    setCoordinates(null)
-
-    // Map GeolocationPositionError codes to our error types
-    switch (err.code) {
-      case err.PERMISSION_DENIED:
-        setError('permission-denied')
-        break
-      case err.POSITION_UNAVAILABLE:
-        setError('position-unavailable')
-        break
-      case err.TIMEOUT:
-        setError('timeout')
-        break
-      default:
-        setError('unknown')
-    }
-  }, [])
-
-  /**
-   * Request user's current location
-   */
-  const requestLocation = useCallback(() => {
-    if (!isSupported) {
-      setError('not-supported')
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-      // enableHighAccuracy: false uses cell tower + WiFi triangulation instead of GPS
-      // This is intentional for our use case:
-      // - Faster results (1-3 seconds vs 10-30 seconds for GPS)
-      // - Lower battery drain on mobile devices
-      // - Sufficient accuracy (50-200m in urban areas) for "find resources near me"
-      // - Users are looking for services within miles, not precise turn-by-turn navigation
-      // Trade-off: Less accurate than GPS (5-10m) but better UX for resource discovery
-      enableHighAccuracy: false,
-      timeout: 10000, // 10 second timeout
-      maximumAge: 300000, // Cache location for 5 minutes
-    })
-  }, [isSupported, handleSuccess, handleError])
-
-  /**
-   * Set manual location (from address/zip lookup)
-   */
-  const setManualLocation = useCallback((coords: Coordinates, name: string) => {
-    setCoordinates(coords)
-    setDisplayName(name)
-    setSource('manual')
-    setError(null)
-    setLoading(false)
-    setLastUpdated(Date.now())
-
-    // Cache the manual location
-    saveToCache(coords, name, 'manual')
-  }, [])
-
-  /**
-   * Clear current location and error state
-   */
-  const clearLocation = useCallback(() => {
-    setCoordinates(null)
-    setDisplayName(null)
-    setSource(null)
-    setError(null)
-    setLoading(false)
-    setLastUpdated(null)
-
-    // Clear cache
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(LOCATION_CACHE_KEY)
-    }
-  }, [])
-
-  /**
-   * Load cached location on mount
-   */
-  useEffect(() => {
-    const cached = loadFromCache()
-    if (cached) {
-      setCoordinates(cached.coordinates)
-      setDisplayName(cached.displayName)
-      setSource(cached.source)
-      setLastUpdated(cached.timestamp)
-    }
-  }, [])
-
-  /**
-   * Fetch GeoIP-based location on mount if no cached location
-   * This runs after cache check, providing a default location without permission
-   */
-  useEffect(() => {
-    // Skip if we already have a location (from cache or manual input)
-    if (coordinates) return
-
-    // Skip if we're already loading geolocation
-    if (loading) return
-
-    const fetchGeoIPLocation = async () => {
-      try {
-        const response = await fetch('/api/location/ip')
-        const data = (await response.json()) as GeoIPResponse
-
-        if (data.location && data.location.latitude && data.location.longitude) {
-          const { latitude, longitude, city, region } = data.location
-
-          // Format display name from GeoIP data
-          let displayName = ''
-          if (city && region) {
-            displayName = `${city}, ${region}`
-          } else if (city) {
-            displayName = city
-          } else if (region) {
-            displayName = region
-          } else {
-            displayName = 'Approximate Location'
-          }
-
-          const coords = { latitude, longitude }
-
-          // Set GeoIP location (lower priority than geolocation/manual)
-          setCoordinates(coords)
-          setDisplayName(displayName)
-          setSource('geoip')
-          setLastUpdated(Date.now())
-
-          // Cache the GeoIP location
-          saveToCache(coords, displayName, 'geoip')
-        }
-      } catch (error) {
-        // Silently fail - GeoIP is optional, user can still use manual location
-        console.debug('GeoIP location fetch failed:', error)
+    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as Partial<CachedLocation> | null
+    const label = validLabel(data?.displayName)
+    const age = Date.now() - Number(data?.timestamp)
+    if (
+      data &&
+      isValidCoordinates(data.coordinates) &&
+      label &&
+      typeof data.timestamp === 'number' &&
+      Number.isFinite(age) &&
+      age >= 0 &&
+      age < CACHE_DURATION &&
+      (data.source === 'manual' || data.source === 'geolocation' || data.source === 'geoip')
+    ) {
+      return {
+        coordinates: data.coordinates,
+        displayName: label,
+        timestamp: data.timestamp,
+        source: data.source,
       }
     }
+  } catch {
+    /* Invalid or inaccessible cache is not a location. */
+  }
+  removeCache([LOCATION_CACHE_KEY])
+  return null
+}
+function saveToCache(location: CachedLocation) {
+  try {
+    localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(location))
+  } catch {
+    /* Storage is optional. */
+  }
+}
+function parseGeoIP(value: unknown): CachedLocation | null {
+  if (!value || typeof value !== 'object') return null
+  const data = value as Record<string, unknown>
+  if (data.isDefaultLocation || data.error || !isValidCoordinates(data)) return null
+  const label = validLabel(
+    [validLabel(data.city), validLabel(data.region)].filter(Boolean).join(', ')
+  )
+  if (!label) return null
+  return {
+    coordinates: { latitude: data.latitude, longitude: data.longitude },
+    displayName: label,
+    source: 'geoip',
+    timestamp: Date.now(),
+  }
+}
 
-    fetchGeoIPLocation()
-  }, [coordinates, loading])
+/** One owner for validated location state, persistence and lower-priority GeoIP discovery. */
+export function useLocation(autoRequest = false): UseLocationResult {
+  const [location, setLocation] = useState<CachedLocation | null>(null)
+  const [error, setError] = useState<GeolocationError | null>(null)
+  const [loading, setLoading] = useState(false)
+  const generation = useRef(0)
+  const mounted = useRef(true)
+  const isSupported =
+    typeof navigator !== 'undefined' &&
+    typeof navigator.geolocation?.getCurrentPosition === 'function'
 
-  /**
-   * Auto-request location on mount if autoRequest is true
-   */
-  useEffect(() => {
-    if (autoRequest && isSupported) {
-      requestLocation()
+  const commitLocation = useCallback((next: CachedLocation) => {
+    setLocation(next)
+    setError(null)
+    setLoading(false)
+    saveToCache(next)
+  }, [])
+
+  const acceptGPS = useCallback(
+    (position: GeolocationPosition, requestGeneration: number) => {
+      if (!mounted.current || generation.current !== requestGeneration) return
+      const coords = { latitude: position.coords.latitude, longitude: position.coords.longitude }
+      if (!isValidCoordinates(coords)) {
+        setError('position-unavailable')
+        setLoading(false)
+        return
+      }
+      commitLocation({
+        coordinates: coords,
+        displayName: 'Current Location',
+        source: 'geolocation',
+        timestamp: Date.now(),
+      })
+    },
+    [commitLocation]
+  )
+
+  const requestLocation = useCallback(() => {
+    const requestGeneration = ++generation.current
+    if (!isSupported) {
+      setError('not-supported')
+      setLoading(false)
+      return
     }
+    setLoading(true)
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      (position) => acceptGPS(position, requestGeneration),
+      (failure) => {
+        if (!mounted.current || generation.current !== requestGeneration) return
+        setLoading(false)
+        setLocation(null)
+        setError(
+          failure.code === 1
+            ? 'permission-denied'
+            : failure.code === 2
+              ? 'position-unavailable'
+              : failure.code === 3
+                ? 'timeout'
+                : 'unknown'
+        )
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    )
+  }, [isSupported, acceptGPS])
+
+  const setManualLocation = useCallback(
+    (coords: Coordinates, name: string) => {
+      const label = validLabel(name)
+      if (!isValidCoordinates(coords) || !label) return
+      ++generation.current
+      commitLocation({
+        coordinates: coords,
+        displayName: label,
+        source: 'manual',
+        timestamp: Date.now(),
+      })
+    },
+    [commitLocation]
+  )
+
+  const clearLocation = useCallback(() => {
+    ++generation.current
+    setLocation(null)
+    setError(null)
+    setLoading(false)
+    removeCache([LOCATION_CACHE_KEY, ...LEGACY_CACHE_KEYS])
+  }, [])
+
+  useEffect(() => {
+    mounted.current = true
+    let cancelled = false
+    const requestGeneration = generation.current
+    removeCache(LEGACY_CACHE_KEYS)
+    const cached = loadFromCache()
+    if (cached && requestGeneration === 0) setLocation(cached)
+    else if (requestGeneration === 0) {
+      void (async () => {
+        try {
+          const response = await fetch('/api/location/ip')
+          if (!response.ok) return
+          const detected = parseGeoIP(await response.json())
+          if (detected && !cancelled && generation.current === requestGeneration)
+            commitLocation(detected)
+        } catch {
+          /* GeoIP is optional; manual search remains available. */
+        }
+      })()
+    }
+    return () => {
+      cancelled = true
+      mounted.current = false
+    }
+  }, [commitLocation])
+
+  useEffect(() => {
+    if (autoRequest && isSupported) requestLocation()
   }, [autoRequest, isSupported, requestLocation])
 
-  /**
-   * Set up periodic refresh if we have coordinates
-   */
   useEffect(() => {
-    if (!coordinates || !isSupported) return
-
+    if (location?.source !== 'geolocation' || !isSupported) return
     const intervalId = setInterval(() => {
-      // Silently refresh location in background
+      const requestGeneration = generation.current
       navigator.geolocation.getCurrentPosition(
-        handleSuccess,
+        (position) => acceptGPS(position, requestGeneration),
         () => {
-          // Ignore errors on background refresh, keep using cached location
+          /* Keep the last successful GPS location on a background failure. */
         },
-        {
-          enableHighAccuracy: false, // Same settings as initial request - see comment above
-          timeout: 10000,
-          maximumAge: 300000,
-        }
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
       )
     }, REFRESH_INTERVAL)
-
     return () => clearInterval(intervalId)
-  }, [coordinates, isSupported, handleSuccess])
+  }, [location?.source, isSupported, acceptGPS])
 
   return {
-    coordinates,
+    coordinates: location?.coordinates || null,
+    displayName: location?.displayName || null,
+    source: location?.source || null,
+    lastUpdated: location?.timestamp || null,
     error,
     loading,
     requestLocation,
     setManualLocation,
     clearLocation,
     isSupported,
-    lastUpdated,
-    displayName,
-    source,
   }
 }
 
-/**
- * Get user-friendly error message for geolocation errors
- */
 export function getLocationErrorMessage(error: GeolocationError): string {
   switch (error) {
     case 'permission-denied':

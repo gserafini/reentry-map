@@ -2,12 +2,21 @@ import { describe, it, expect } from 'vitest'
 import {
   getCategoryIcon,
   getCategoryColor,
+  getCategoryTextColor,
   CATEGORY_ICONS,
   CATEGORY_COLORS,
 } from '@/lib/utils/category-icons'
+import { getContrastRatio } from '@mui/material/styles'
 import type { ResourceCategory } from '@/lib/types/database'
 
 describe('category-icons', () => {
+  it('keeps category chip text readable on every category color', () => {
+    for (const category of Object.keys(CATEGORY_COLORS) as ResourceCategory[]) {
+      expect(
+        getContrastRatio(getCategoryColor(category), getCategoryTextColor(category))
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
   describe('getCategoryIcon', () => {
     it('returns correct icon for hyphenated category', () => {
       const icon = getCategoryIcon('employment')

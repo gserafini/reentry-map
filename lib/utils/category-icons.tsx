@@ -15,6 +15,7 @@ import {
 } from '@mui/icons-material'
 import type { ResourceCategory } from '@/lib/types/database'
 import type { SvgIconProps } from '@mui/material'
+import { getContrastRatio } from '@mui/material/styles'
 
 /**
  * Map of category slugs to their corresponding Material UI icons
@@ -38,6 +39,11 @@ export const CATEGORY_ICONS: Record<ResourceCategory, React.ComponentType<SvgIco
 /**
  * Map of category slugs to their brand colors
  */
+/** Choose readable small text for every category badge background. */
+export function getCategoryTextColor(category: ResourceCategory): string {
+  return getContrastRatio(getCategoryColor(category), '#ffffff') >= 4.5 ? '#ffffff' : '#000000'
+}
+
 export const CATEGORY_COLORS: Record<ResourceCategory, string> = {
   employment: '#1976d2', // Blue
   housing: '#388e3c', // Green

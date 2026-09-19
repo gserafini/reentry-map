@@ -1,7 +1,17 @@
 'use client'
 
-import { AppBar as MuiAppBar, Toolbar, IconButton, Box, Container, Button } from '@mui/material'
-import { Menu as MenuIcon } from '@mui/icons-material'
+import { useState } from 'react'
+import {
+  AppBar as MuiAppBar,
+  Toolbar,
+  IconButton,
+  Box,
+  Container,
+  Button,
+  Drawer,
+  Stack,
+} from '@mui/material'
+import { Menu as MenuIcon, Close } from '@mui/icons-material'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
@@ -13,132 +23,93 @@ interface AppBarProps {
   showSearch?: boolean
   isAuthenticated?: boolean
 }
+const links = [
+  { href: '/resources', label: 'Resources' },
+  { href: '/favorites', label: 'Saved resources' },
+  { href: '/suggest-resource', label: 'Suggest a resource' },
+]
 
-export function AppBar({ authButton, showSearch = false, isAuthenticated = false }: AppBarProps) {
-  const searchParams = useSearchParams()
-
-  // Read current search query from URL to populate search input
-  const currentSearch = searchParams.get('search') || ''
-
+export function AppBar({ authButton, showSearch = false }: AppBarProps) {
+  const params = useSearchParams()
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <MuiAppBar
-      position="sticky"
-      elevation={1}
-      sx={{ bgcolor: theme.colors.brand, color: theme.colors.brandText }}
-    >
-      {/* First row: Logo, Navigation, Auth */}
-      <Container
-        maxWidth="lg"
-        sx={{
-          borderBottom: '1px solid rgba(0,0,0,0.12)',
-        }}
+    <>
+      <MuiAppBar
+        position="sticky"
+        elevation={1}
+        sx={{ bgcolor: theme.colors.brand, color: theme.colors.brandText }}
       >
-        <Toolbar
-          disableGutters
-          sx={{
-            gap: 2,
-            color: theme.colors.brandText,
-            minHeight: { xs: 64, md: 80 },
-            py: 1.5,
-          }}
-        >
-          {/* Logo / Brand */}
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                position: 'relative',
-                height: 50,
-                flexGrow: { xs: 1, sm: 0 },
-              }}
+        <Container maxWidth="lg">
+          <Toolbar disableGutters sx={{ gap: 1, minHeight: { xs: 60, md: 64 } }}>
+            <Link
+              href="/"
+              aria-label="Reentry Map home"
+              style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
             >
               <Image
                 src="/ReentryMap_logo_400x100.png"
                 alt="Reentry Map"
-                width={200}
-                height={50}
+                width={180}
+                height={45}
                 priority
-                style={{
-                  objectFit: 'contain',
-                  height: 'auto',
-                  maxHeight: '50px',
-                }}
+                style={{ objectFit: 'contain', height: 'auto' }}
               />
+            </Link>
+            <Box sx={{ flex: 1 }} />
+            <Box
+              component="nav"
+              aria-label="Main navigation"
+              sx={{ display: { xs: 'none', md: 'flex' }, gap: 1 }}
+            >
+              {links.map((link) => (
+                <Button key={link.href} component={Link} href={link.href} color="inherit">
+                  {link.label}
+                </Button>
+              ))}
             </Box>
-          </Link>
-
-          {/* HeroSearch - Desktop only (inline with toolbar) */}
-          <Box
-            sx={{
-              display: { xs: 'none', md: 'flex' },
-              flexGrow: 1,
-              mx: 2,
-              opacity: showSearch ? 1 : 0,
-              transform: showSearch ? 'translateY(0)' : 'translateY(-10px)',
-              transition: 'opacity 0.3s ease, transform 0.3s ease',
-              pointerEvents: showSearch ? 'auto' : 'none',
-            }}
-          >
-            <HeroSearch initialValue={currentSearch} />
-          </Box>
-
-          {/* Desktop Navigation */}
-          <Box
-            sx={{
-              display: { xs: 'none', md: 'flex' },
-              gap: 1,
-              flexGrow: showSearch ? 0 : 1,
-              ml: showSearch ? 2 : 0,
-              justifyContent: showSearch ? 'flex-start' : 'flex-end',
-            }}
-          >
-            <Link href="/resources" style={{ textDecoration: 'none' }}>
-              <Button color="inherit">Resources</Button>
-            </Link>
-            {isAuthenticated && (
-              <Link href="/favorites" style={{ textDecoration: 'none' }}>
-                <Button color="inherit">Favorites</Button>
-              </Link>
-            )}
-            <Link href="/suggest-resource" style={{ textDecoration: 'none' }}>
-              <Button color="inherit">Suggest</Button>
-            </Link>
-          </Box>
-
-          {/* Right side actions */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{authButton}</Box>
-
-            {/* Mobile menu button */}
             <IconButton
               color="inherit"
-              aria-label="menu"
-              sx={{ display: { xs: 'flex', md: 'none' } }}
+              aria-label="Open menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+              sx={{ display: { md: 'none' } }}
             >
               <MenuIcon />
             </IconButton>
-          </Box>
-        </Toolbar>
-      </Container>
-
-      {/* Second row: Mobile search (full-width grey bar below yellow header) */}
-      <Box
-        sx={{
-          display: { xs: 'block', md: 'none' },
-          bgcolor: '#f5f5f5', // Light grey background
-          borderBottom: '1px solid rgba(0,0,0,0.06)', // Fainter bottom border
-          maxHeight: showSearch ? '200px' : '0',
-          opacity: showSearch ? 1 : 0,
-          overflow: 'hidden',
-          transition: 'max-height 0.3s ease, opacity 0.3s ease',
-          pointerEvents: showSearch ? 'auto' : 'none',
-        }}
-      >
-        <Container maxWidth="lg" sx={{ py: 2 }}>
-          <HeroSearch initialValue={currentSearch} />
+          </Toolbar>
         </Container>
-      </Box>
-    </MuiAppBar>
+        {showSearch && (
+          <Box sx={{ bgcolor: '#f5f5f5', borderTop: '1px solid rgba(0,0,0,.08)' }}>
+            <Container maxWidth="lg" sx={{ py: 1 }}>
+              <HeroSearch initialValue={params.get('search') || ''} />
+            </Container>
+          </Box>
+        )}
+      </MuiAppBar>
+      <Drawer anchor="right" open={menuOpen} onClose={() => setMenuOpen(false)}>
+        <Box sx={{ width: 280, p: 2 }}>
+          <Box sx={{ textAlign: 'right' }}>
+            <IconButton aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+              <Close />
+            </IconButton>
+          </Box>
+          <Stack component="nav" aria-label="Mobile navigation" spacing={1}>
+            {links.map((link) => (
+              <Button
+                key={link.href}
+                component={Link}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                sx={{ justifyContent: 'flex-start', minHeight: 48 }}
+              >
+                {link.label}
+              </Button>
+            ))}
+            {authButton}
+          </Stack>
+        </Box>
+      </Drawer>
+    </>
   )
 }

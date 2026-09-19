@@ -1,6 +1,9 @@
 'use client'
 
+import { recordSearchRefinement } from '@/lib/analytics/search-journey'
+
 import React from 'react'
+import { getSelectedCategories } from '@/lib/utils/search-filters'
 import {
   Box,
   Typography,
@@ -44,55 +47,29 @@ export function CategoryFilter({ categoryCounts, defaultExpanded = true }: Categ
   const pathname = usePathname()
   const [expanded, setExpanded] = React.useState(defaultExpanded)
 
-  // Get selected categories from URL (both query params and pathname)
-  const selectedCategories = React.useMemo(() => {
-    // Check if we're on a category page (/resources/category/{category})
-    const categoryMatch = pathname.match(/\/resources\/category\/([^\/]+)/)
-    if (categoryMatch) {
-      return [categoryMatch[1]]
-    }
+  const selectedCategories = React.useMemo(
+    () => getSelectedCategories(searchParams, pathname),
+    [searchParams, pathname]
+  )
 
-    // Otherwise check query params
-    const categories = searchParams.get('categories')
-    return categories ? categories.split(',').filter(Boolean) : []
-  }, [searchParams, pathname])
-
+  const browsePath = pathname.replace(/\/category\/[^/]+$/, '') || '/resources'
+  const resolvedBrowsePath = pathname.startsWith('/category/') ? '/resources' : browsePath
   const handleCategoryToggle = (category: ResourceCategory) => {
+    recordSearchRefinement('category')
     const params = new URLSearchParams(searchParams.toString())
-    let newCategories: string[]
-
-    if (selectedCategories.includes(category)) {
-      // Remove category
-      newCategories = selectedCategories.filter((c) => c !== category)
-    } else {
-      // Add category
-      newCategories = [...selectedCategories, category]
-    }
-
-    // Use SEO-friendly URLs for single category, query params for multiple or none
-    if (newCategories.length === 1) {
-      // Single category: use SEO-friendly URL and populate search bar with category name
-      router.push(
-        `/resources/category/${newCategories[0]}?search=${encodeURIComponent(newCategories[0])}`
-      )
-    } else if (newCategories.length > 1) {
-      // Multiple categories: use query params
-      params.set('categories', newCategories.join(','))
-      router.push(`/resources?${params.toString()}`)
-    } else {
-      // No categories: go to main resources page
-      params.delete('categories')
-      router.push(`/resources?${params.toString()}`)
-    }
+    const next = selectedCategories.includes(category)
+      ? selectedCategories.filter((item) => item !== category)
+      : [...selectedCategories, category]
+    params.delete('page')
+    if (next.length) params.set('categories', next.join(','))
+    else params.delete('categories')
+    router.push(params.size ? `${resolvedBrowsePath}?${params}` : resolvedBrowsePath)
   }
-
   const handleClearAll = () => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('categories')
-
-    // Navigate to main resources page (preserving search if present)
-    const queryString = params.toString()
-    router.push(queryString ? `/resources?${queryString}` : '/resources')
+    params.delete('page')
+    router.push(params.size ? `${resolvedBrowsePath}?${params}` : resolvedBrowsePath)
   }
 
   const categories = getAllCategories()

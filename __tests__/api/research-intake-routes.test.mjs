@@ -43,9 +43,13 @@ describe('research intake routes', () => {
       expansionPriorities: { id: 'expansion_priorities.id' },
       resources: {},
     }))
-    vi.doMock('@/lib/utils/deduplication', () => ({
-      checkForDuplicate: vi.fn().mockResolvedValue({ isDuplicate: false }),
-    }))
+    vi.doMock('@/lib/utils/deduplication', async (importOriginal) => {
+      const actual = await importOriginal()
+      return {
+        ...actual,
+        checkForDuplicate: vi.fn().mockResolvedValue({ isDuplicate: false }),
+      }
+    })
     vi.doMock('drizzle-orm', () => ({
       eq: vi.fn((left, right) => ({ left, right })),
     }))

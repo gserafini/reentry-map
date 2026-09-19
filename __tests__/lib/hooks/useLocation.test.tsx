@@ -34,6 +34,11 @@ describe('useLocation', () => {
       writable: true,
     })
 
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ isDefaultLocation: true }),
+    })) as typeof fetch
+
     // Clear all mocks
     vi.clearAllMocks()
   })
@@ -356,14 +361,13 @@ describe('useLocation', () => {
     vi.mocked(localStorage.getItem).mockReturnValue(null)
 
     const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () =>
         Promise.resolve({
-          location: {
-            latitude: 40.7128,
-            longitude: -74.006,
-            city: 'New York',
-            region: 'NY',
-          },
+          latitude: 40.7128,
+          longitude: -74.006,
+          city: 'New York',
+          region: 'NY',
         }),
     })
     global.fetch = mockFetch
@@ -384,14 +388,13 @@ describe('useLocation', () => {
     vi.mocked(localStorage.getItem).mockReturnValue(null)
 
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () =>
         Promise.resolve({
-          location: {
-            latitude: 40.7128,
-            longitude: -74.006,
-            city: 'New York',
-            region: undefined,
-          },
+          latitude: 40.7128,
+          longitude: -74.006,
+          city: 'New York',
+          region: undefined,
         }),
     })
 
@@ -406,14 +409,13 @@ describe('useLocation', () => {
     vi.mocked(localStorage.getItem).mockReturnValue(null)
 
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () =>
         Promise.resolve({
-          location: {
-            latitude: 40.7128,
-            longitude: -74.006,
-            city: undefined,
-            region: 'California',
-          },
+          latitude: 40.7128,
+          longitude: -74.006,
+          city: undefined,
+          region: 'California',
         }),
     })
 
@@ -424,23 +426,22 @@ describe('useLocation', () => {
     })
   })
 
-  it('handles GeoIP with no city or region', async () => {
+  it('ignores GeoIP with no usable city or region', async () => {
     vi.mocked(localStorage.getItem).mockReturnValue(null)
 
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () =>
         Promise.resolve({
-          location: {
-            latitude: 40.7128,
-            longitude: -74.006,
-          },
+          latitude: 40.7128,
+          longitude: -74.006,
         }),
     })
 
     const { result } = renderHook(() => useLocation())
 
     await waitFor(() => {
-      expect(result.current.displayName).toBe('Approximate Location')
+      expect(result.current.displayName).toBeNull()
     })
   })
 
@@ -448,6 +449,7 @@ describe('useLocation', () => {
     vi.mocked(localStorage.getItem).mockReturnValue(null)
 
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ location: null }),
     })
 

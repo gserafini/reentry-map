@@ -3,6 +3,7 @@ import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { db } from '@/lib/db/client'
 import { resourceSuggestions, researchTasks } from '@/lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
+import { needsPhysicalAddressReview } from '@/lib/utils/resource-location'
 
 /**
  * GET /api/verification/next
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
         city: resourceSuggestions.city,
         state: resourceSuggestions.state,
         zip: resourceSuggestions.zip,
+        addressType: resourceSuggestions.addressType,
         phone: resourceSuggestions.phone,
         email: resourceSuggestions.email,
         website: resourceSuggestions.website,
@@ -122,6 +124,9 @@ export async function GET(request: NextRequest) {
       if (!s.email) {
         priority = 100
         reason = 'Missing email address (highest priority)'
+      } else if (needsPhysicalAddressReview(s)) {
+        priority = 95
+        reason = 'Physical resource missing street-level address'
       } else if (!s.phone) {
         priority = 80
         reason = 'Missing phone number'
@@ -162,6 +167,8 @@ export async function GET(request: NextRequest) {
 
     const fieldsToVerify = []
     if (!suggestion.email) fieldsToVerify.push('EMAIL (priority!)')
+    if (needsPhysicalAddressReview(suggestion))
+      fieldsToVerify.push('street address / address_type check')
     if (!suggestion.phone) fieldsToVerify.push('phone')
     if (!suggestion.hours) fieldsToVerify.push('hours')
     if (!suggestion.services_offered || suggestion.services_offered.length === 0)

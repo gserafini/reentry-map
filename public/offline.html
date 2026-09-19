@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#ffe600" />
+    <title>Saved contacts — Reentry Map</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #fafafa;
+        color: #202124;
+        font:
+          17px/1.5 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      header {
+        background: #ffe600;
+        padding: 16px 22px;
+        font-weight: 800;
+      }
+      main {
+        max-width: 780px;
+        margin: auto;
+        padding: 24px 18px 48px;
+      }
+      h1 {
+        font-size: 2rem;
+        line-height: 1.2;
+        margin: 8px 0 16px;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 0 0 10px;
+      }
+      p {
+        margin: 10px 0;
+      }
+      a {
+        color: #184e89;
+        overflow-wrap: anywhere;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 18px 0;
+      }
+      button,
+      .button {
+        font: inherit;
+        border: 1px solid #777;
+        border-radius: 8px;
+        background: white;
+        color: #202124;
+        padding: 10px 14px;
+        cursor: pointer;
+        min-height: 44px;
+        text-decoration: none;
+      }
+      .primary {
+        background: #ffe600;
+        border-color: #c5af00;
+        color: #111;
+      }
+      .danger {
+        color: #9c2525;
+      }
+      article {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 18px 0;
+      }
+      small {
+        display: block;
+        color: #565b61;
+      }
+      .notice {
+        padding: 14px 16px;
+        background: #edf4fc;
+        border-radius: 8px;
+      }
+      .muted {
+        color: #555;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #185abc;
+        outline-offset: 3px;
+      }
+      @media print {
+        header,
+        .actions,
+        .notice,
+        #connection {
+          display: none;
+        }
+        article {
+          break-inside: avoid;
+          border: 1px solid #aaa;
+        }
+        body {
+          background: white;
+        }
+        main {
+          padding: 0;
+        }
+      }
+    </style>
+    <script src="/offline-contacts.js" defer></script>
+  </head>
+  <body>
+    <header>Reentry Map</header>
+    <main>
+      <h1>Saved contacts</h1>
+      <p id="connection" role="status">
+        Your device list is available here, even without internet.
+      </p>
+      <p class="notice">
+        These copies stay in this browser and may be out of date. Call to confirm details before
+        visiting. On a shared device, clear your list when finished. Downloads remain until you
+        delete them.
+      </p>
+      <div class="actions">
+        <a class="button primary" href="/favorites">Try online list</a
+        ><button id="download" type="button">Download list</button
+        ><button id="print" type="button">Print</button
+        ><button id="clear" class="danger" type="button">Clear device list</button>
+      </div>
+      <p id="feedback" role="status"></p>
+      <section id="contacts" aria-label="Saved organizations"></section>
+      <noscript
+        >Enable JavaScript to read the resources saved in this browser. Your downloaded support list
+        can also be opened without internet.</noscript
+      >
+    </main>
+  </body>
+</html>

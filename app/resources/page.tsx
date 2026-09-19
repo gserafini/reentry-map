@@ -1,70 +1,56 @@
-import { Container, Typography, Box, Alert } from '@mui/material'
-import { getResources, getCategoryCounts } from '@/lib/api/resources'
+import { parsePageNumber } from '@/lib/utils/pagination'
+import { Container, Typography, Alert } from '@mui/material'
+import {
+  getResources,
+  getCategoryCounts,
+  getResourcesForMap,
+  getResourcesCount,
+} from '@/lib/api/resources'
 import { ResourcesView } from './ResourcesView'
-import type { ResourceCategory } from '@/lib/types/database'
+import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from './params'
+import { interpretSearch } from '@/lib/utils/search-intent'
 
 interface ResourcesPageProps {
-  searchParams: Promise<{
-    search?: string
-    categories?: string
-  }>
+  searchParams: Promise<ResourcesPageSearchParams>
 }
+const PAGE_SIZE = 20
 
-/**
- * Resources List Page
- * Server Component that fetches and displays all active resources
- */
 export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {
-  const { search, categories: categoriesParam } = await searchParams
-
-  // Parse categories from URL param
-  const categories = categoriesParam
-    ? (categoriesParam.split(',').filter(Boolean) as ResourceCategory[])
-    : undefined
-
-  // Fetch resources with filters
-  const { data: resources, error } = await getResources({ search, categories, limit: 100 })
-
-  // Fetch category counts for filter display
-  const { data: categoryCounts } = await getCategoryCounts()
-
-  if (error) {
+  const params = await searchParams
+  const query = buildResourcesQueryOptions(params)
+  const currentPage = parsePageNumber(params.page)
+  const [result, map, count, facets] = await Promise.all([
+    getResources({ ...query, limit: PAGE_SIZE, offset: (currentPage - 1) * PAGE_SIZE }),
+    getResourcesForMap(query),
+    getResourcesCount(query),
+    getCategoryCounts({ ...query, categories: undefined }),
+  ])
+  if (result.error || count.error)
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error" sx={{ textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom>
-            Error Loading Resources
-          </Typography>
-          <Typography>
-            We encountered an issue loading resources. Please try again later.
-          </Typography>
-        </Alert>
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Alert severity="error">Resources could not be loaded. Please try again.</Alert>
       </Container>
     )
-  }
-
-  const isSearching = Boolean(search && search.trim())
-  const isFiltering = Boolean(categories && categories.length > 0)
-
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          {isSearching ? <>Search Results: &ldquo;{search}&rdquo;</> : 'Community Resources'}
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          {isSearching
-            ? 'Results matching your search query'
-            : 'Browse resources in your area to help with employment, housing, food, and more.'}
-        </Typography>
-      </Box>
-
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
+      <Typography
+        variant="h4"
+        component="h1"
+        sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' }, fontWeight: 700 }}
+      >
+        {query.search ? `Help with “${query.search}”` : 'Community resources'}
+      </Typography>
       <ResourcesView
-        resources={resources || []}
-        categoryCounts={categoryCounts || undefined}
-        search={search}
-        isSearching={isSearching}
-        isFiltering={isFiltering}
+        resources={result.data || []}
+        mapResources={map.data || undefined}
+        categoryCounts={facets.data || undefined}
+        totalCount={count.data || 0}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        intentLabel={interpretSearch(query.search || '').label}
+        search={query.search}
+        isSearching={query.isSearching}
+        isFiltering={query.isFiltering}
       />
     </Container>
   )

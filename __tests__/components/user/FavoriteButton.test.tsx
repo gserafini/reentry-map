@@ -87,19 +87,22 @@ describe('FavoriteButton', () => {
     expect(screen.getByLabelText('Remove from favorites')).toBeInTheDocument()
   })
 
-  it('redirects to login when unauthenticated user clicks', () => {
+  it('saves on the device without redirecting when unauthenticated', async () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
     })
 
-    render(<FavoriteButton resourceId="res-1" />)
+    render(<FavoriteButton resourceId="res-1" resource={{ name: 'Job Help' }} />)
 
     fireEvent.click(screen.getByRole('button'))
-    expect(mockPush).toHaveBeenCalledWith('/auth/login')
+    await waitFor(() =>
+      expect(mockToggleFavorite).toHaveBeenCalledWith('res-1', { name: 'Job Help' })
+    )
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
-  it('calls showAuthModal if provided instead of redirecting', () => {
+  it('does not force account creation even when an auth modal exists', async () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -108,8 +111,10 @@ describe('FavoriteButton', () => {
     const mockShowAuth = vi.fn()
     render(<FavoriteButton resourceId="res-1" showAuthModal={mockShowAuth} />)
 
-    fireEvent.click(screen.getByRole('button'))
-    expect(mockShowAuth).toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'))
+    })
+    expect(mockShowAuth).not.toHaveBeenCalled()
     expect(mockPush).not.toHaveBeenCalled()
   })
 
@@ -125,7 +130,7 @@ describe('FavoriteButton', () => {
       fireEvent.click(screen.getByRole('button'))
     })
 
-    expect(mockToggleFavorite).toHaveBeenCalledWith('res-1')
+    expect(mockToggleFavorite).toHaveBeenCalledWith('res-1', undefined)
   })
 
   it('shows loading state while toggle is in progress', async () => {

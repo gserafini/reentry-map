@@ -661,7 +661,11 @@ export type TablesUpdate<T extends keyof Database['public']['Tables']> =
 // ============================================================================
 
 /** Resource table types */
-export type Resource = Tables<'resources'>
+export type Resource = Tables<'resources'> & {
+  /** Coverage columns added after the original generated row types. */
+  address_type?: string | null
+  service_area?: { type?: string | null; values?: string[] | null } | null
+}
 export type ResourceInsert = TablesInsert<'resources'>
 export type ResourceUpdate = TablesUpdate<'resources'>
 
@@ -855,6 +859,10 @@ export type ResourceFilters = {
   latitude?: number
   longitude?: number
   radius_miles?: number
+  north?: number
+  south?: number
+  east?: number
+  west?: number
   min_rating?: number
   verified_only?: boolean
   accepts_records?: boolean
@@ -874,6 +882,6 @@ export type PaginationParams = {
  * Sort parameters for resource queries
  */
 export type ResourceSort = {
-  field: 'name' | 'rating_average' | 'distance' | 'created_at' | 'updated_at'
+  field: 'name' | 'rating_average' | 'distance' | 'created_at' | 'updated_at' | 'relevance'
   direction: 'asc' | 'desc'
 }

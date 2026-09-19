@@ -58,10 +58,8 @@ describe('CategoryFilter', () => {
     const employmentCheckbox = screen.getByRole('checkbox', { name: /Filter by Employment/i })
     fireEvent.click(employmentCheckbox)
 
-    // Single category selection uses SEO-friendly URL with search param
-    expect(getMockRouter().push).toHaveBeenCalledWith(
-      '/resources/category/employment?search=employment'
-    )
+    // On /resources, single category selection stays on the same route and uses query params
+    expect(getMockRouter().push).toHaveBeenCalledWith('/resources?categories=employment')
   })
 
   it('handles multiple category selections', () => {
@@ -85,8 +83,8 @@ describe('CategoryFilter', () => {
     const employmentCheckbox = screen.getByRole('checkbox', { name: /Filter by Employment/i })
     fireEvent.click(employmentCheckbox)
 
-    // Removing one category from multiple leaves one, so uses SEO-friendly URL with search param
-    expect(getMockRouter().push).toHaveBeenCalledWith('/resources/category/housing?search=housing')
+    // On /resources, removing one category from multiple leaves one selected category in query params
+    expect(getMockRouter().push).toHaveBeenCalledWith('/resources?categories=housing')
   })
 
   it('shows active filters with chips', () => {
@@ -132,10 +130,28 @@ describe('CategoryFilter', () => {
     const employmentCheckbox = screen.getByRole('checkbox', { name: /Filter by Employment/i })
     fireEvent.click(employmentCheckbox)
 
-    // Single category selection overwrites search param with category name
+    // Existing search term is preserved while category filtering is added
     expect(getMockRouter().push).toHaveBeenCalledWith(
-      '/resources/category/employment?search=employment'
+      '/resources?search=housing&categories=employment'
     )
+  })
+
+  it('preserves location and resets pagination on category routes', () => {
+    setMockPathname('/category/housing')
+    setMockSearchParams({ lat: '32.7', lng: '-96.8', distance: '25', page: '4' })
+    render(<CategoryFilter />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Filter by Employment/i }))
+    expect(getMockRouter().push).toHaveBeenCalledWith(
+      '/resources?lat=32.7&lng=-96.8&distance=25&categories=housing%2Cemployment'
+    )
+  })
+
+  it('uses the category route ahead of a conflicting query filter', () => {
+    setMockPathname('/category/housing')
+    setMockSearchParams({ categories: 'employment' })
+    render(<CategoryFilter />)
+    expect(screen.getByRole('checkbox', { name: /Filter by Housing/i })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /Filter by Employment/i })).not.toBeChecked()
   })
 
   it('supports accessibility', () => {

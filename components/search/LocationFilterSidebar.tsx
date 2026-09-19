@@ -1,45 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@mui/material'
+import { useSearchParams, usePathname } from 'next/navigation'
 import { DistanceFilter } from './DistanceFilter'
-import { useUserLocation } from '@/lib/context/LocationContext'
+import { resolveSearchLocation } from '@/lib/utils/search-location'
 
-interface LocationFilterSidebarProps {
-  /**
-   * Optional additional filters to display
-   */
-  children?: React.ReactNode
-}
-
-/**
- * Location filter sidebar component
- *
- * Provides distance radius slider when user location is available
- * Can be combined with other filters (categories, etc.)
- */
-export function LocationFilterSidebar({ children }: LocationFilterSidebarProps) {
-  const { coordinates } = useUserLocation()
-  const [isMounted, setIsMounted] = useState(false)
-  const hasLocation = Boolean(coordinates)
-
-  // Prevent hydration mismatch by only rendering location-dependent UI after mount
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
+export function LocationFilterSidebar({ children }: { children?: React.ReactNode }) {
+  const location = resolveSearchLocation(useSearchParams(), usePathname())
   return (
     <>
-      {/* Location/Distance Filter */}
-      {isMounted && hasLocation && (
+      {location.coordinates && (
         <Card sx={{ mb: 3 }}>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-            <DistanceFilter hasLocation={hasLocation} defaultDistance={25} />
+            <DistanceFilter hasLocation defaultDistance={location.radiusMiles || 25} />
           </CardContent>
         </Card>
       )}
-
-      {/* Other filters */}
       {children}
     </>
   )

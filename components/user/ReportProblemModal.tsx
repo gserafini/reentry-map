@@ -17,12 +17,8 @@ import {
   IconButton,
 } from '@mui/material'
 import { Close as CloseIcon } from '@mui/icons-material'
-import { useAuth } from '@/lib/hooks/useAuth'
 import { submitUpdate } from '@/lib/api/updates-client'
-import { useRouter } from 'next/navigation'
-import type { Database } from '@/lib/types/database'
-
-type ResourceUpdateInsert = Database['public']['Tables']['resource_updates']['Insert']
+import type { ResourceUpdateReportInsert } from '@/lib/types/database'
 
 interface ReportProblemModalProps {
   open: boolean
@@ -45,7 +41,7 @@ const UPDATE_TYPES = [
  * ReportProblemModal component
  *
  * Modal for reporting issues with a resource
- * - Requires authentication
+ * - Guests can submit factual corrections for moderation
  * - Multiple issue types
  * - Optional description and suggested correction
  */
@@ -55,13 +51,11 @@ export function ReportProblemModal({
   resourceId,
   resourceName,
 }: ReportProblemModalProps) {
-  const { user, isAuthenticated } = useAuth()
-  const router = useRouter()
-
   // Form state
   const [updateType, setUpdateType] = useState('')
   const [description, setDescription] = useState('')
   const [suggestedValue, setSuggestedValue] = useState('')
+  const [contactWebsite, setContactWebsite] = useState('')
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -73,6 +67,7 @@ export function ReportProblemModal({
       setUpdateType('')
       setDescription('')
       setSuggestedValue('')
+      setContactWebsite('')
       setError(null)
       setSuccess(false)
       onClose()
@@ -82,21 +77,14 @@ export function ReportProblemModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!isAuthenticated) {
-      router.push('/auth/login')
-      return
-    }
-
-    if (!user) return
-
     // Validation
     if (!updateType) {
       setError('Please select an issue type')
       return
     }
 
-    if (!description.trim()) {
-      setError('Please provide a description')
+    if (description.trim().length < 3) {
+      setError('Please describe the issue in at least 3 characters')
       return
     }
 
@@ -104,8 +92,8 @@ export function ReportProblemModal({
     setError(null)
 
     try {
-      const update: ResourceUpdateInsert = {
-        reported_by: user.id,
+      const update: ResourceUpdateReportInsert & { contact_website: string } = {
+        contact_website: contactWebsite,
         resource_id: resourceId,
         update_type: updateType,
         description: description.trim(),
@@ -115,12 +103,9 @@ export function ReportProblemModal({
       const { error: submitError } = await submitUpdate(update)
 
       if (submitError) {
-        setError('Failed to submit report. Please try again.')
+        setError(submitError)
       } else {
         setSuccess(true)
-        setTimeout(() => {
-          handleClose()
-        }, 1500)
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
@@ -128,23 +113,6 @@ export function ReportProblemModal({
     } finally {
       setLoading(false)
     }
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Report a Problem</DialogTitle>
-        <DialogContent>
-          <Alert severity="info">Please sign in to report issues with this resource.</Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button variant="contained" onClick={() => router.push('/auth/login')}>
-            Sign In
-          </Button>
-        </DialogActions>
-      </Dialog>
-    )
   }
 
   return (
@@ -165,8 +133,19 @@ export function ReportProblemModal({
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent>
+          <input
+            name="contact_website"
+            aria-hidden="true"
+            tabIndex={-1}
+            autoComplete="off"
+            value={contactWebsite}
+            onChange={(e) => setContactWebsite(e.target.value)}
+            style={{ display: 'none' }}
+          />
           <Alert severity="info" sx={{ mb: 3 }}>
-            Reporting issue with: <strong>{resourceName}</strong>
+            Reporting issue with: <strong>{resourceName}</strong>. No account needed. Reports are
+            reviewed privately before any listing changes. Please leave out personal or medical
+            information.
           </Alert>
 
           {error && (
@@ -177,13 +156,14 @@ export function ReportProblemModal({
 
           {success && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              Report submitted successfully! Our team will review it soon.
+              Report submitted for review. The listing has not changed yet.
             </Alert>
           )}
 
           <FormControl fullWidth required sx={{ mb: 3 }}>
-            <InputLabel>Issue Type</InputLabel>
+            <InputLabel id="report-issue-label">Issue Type</InputLabel>
             <Select
+              labelId="report-issue-label"
               value={updateType}
               label="Issue Type"
               onChange={(e) => setUpdateType(e.target.value)}
@@ -205,6 +185,7 @@ export function ReportProblemModal({
             required
             fullWidth
             sx={{ mb: 3 }}
+            slotProps={{ htmlInput: { maxLength: 2000 } }}
             helperText="Please describe the issue in detail"
           />
 
@@ -215,12 +196,13 @@ export function ReportProblemModal({
             value={suggestedValue}
             onChange={(e) => setSuggestedValue(e.target.value)}
             fullWidth
+            slotProps={{ htmlInput: { maxLength: 1000 } }}
             helperText="If you know the correct information, please share it here"
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
           <Button onClick={handleClose} disabled={loading}>
-            Cancel
+            {success ? 'Done' : 'Cancel'}
           </Button>
           <Button type="submit" variant="contained" disabled={loading || success}>
             {loading ? <CircularProgress size={24} /> : 'Submit Report'}

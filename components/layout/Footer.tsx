@@ -2,6 +2,7 @@
 
 import { Box, Container, Typography, Link as MuiLink } from '@mui/material'
 import Link from 'next/link'
+import { AnalyticsPreference } from './AnalyticsPreference'
 
 /**
  * Footer Component
@@ -19,10 +20,14 @@ export function Footer() {
           theme.palette.mode === 'light' ? theme.palette.grey[200] : theme.palette.grey[800],
         borderTop: '1px solid',
         borderColor: 'divider',
-        display: { xs: 'none', md: 'block' }, // Hidden on mobile (bottom nav instead)
+        display: 'block',
+        pb: { xs: 10, md: 3 },
       }}
     >
       <Container maxWidth="lg">
+        <Box sx={{ mb: 2 }}>
+          <AnalyticsPreference />
+        </Box>
         <Box
           sx={{
             display: 'flex',

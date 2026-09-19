@@ -153,13 +153,13 @@ describe('SortDropdown', () => {
     expect(select).toHaveTextContent('Rating (Highest First)')
   })
 
-  it('falls back to localStorage if no URL param', () => {
+  it('shows the server default when no URL sort is present', () => {
     localStorage.setItem('preferredSort', 'name-desc')
 
     render(<SortDropdown />)
 
     const select = screen.getByLabelText('Sort By')
-    expect(select).toHaveTextContent('Name (Z-A)')
+    expect(select).toHaveTextContent('Name (A-Z)')
   })
 
   it('uses default sort if no URL param or localStorage', () => {

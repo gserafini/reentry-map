@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import type { ResourceSuggestion } from '@/lib/ai-agents/verification-agent'
 
 /**
  * POST /api/admin/verify-resource
  *
- * Run verification agent on a specific resource
+ * Run verification agent on a specific resource.
+ * Requires admin authentication.
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await checkAdminAuth(request)
+    if (!auth.isAuthorized) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: auth.error === 'Not authenticated' ? 401 : 403 }
+      )
+    }
+
     const body = await request.json()
     const { resource_id, suggestion } = body as {
       resource_id: string

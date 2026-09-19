@@ -53,26 +53,15 @@ describe('ReportProblemModal', () => {
     expect(screen.queryByText('Report a Problem')).not.toBeInTheDocument()
   })
 
-  it('shows sign-in prompt for unauthenticated users', () => {
+  it('shows the correction form without requiring sign-in', () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isAuthenticated: false,
     })
 
     render(<ReportProblemModal {...defaultProps} />)
-    expect(screen.getByText(/sign in to report/i)).toBeInTheDocument()
-    expect(screen.getByText('Sign In')).toBeInTheDocument()
-  })
-
-  it('redirects to login when sign in clicked (unauthenticated)', () => {
-    mockUseAuth.mockReturnValue({
-      user: null,
-      isAuthenticated: false,
-    })
-
-    render(<ReportProblemModal {...defaultProps} />)
-    fireEvent.click(screen.getByText('Sign In'))
-    expect(mockPush).toHaveBeenCalledWith('/auth/login')
+    expect(screen.getByText('Submit Report')).toBeInTheDocument()
+    expect(screen.queryByText('Sign In')).not.toBeInTheDocument()
   })
 
   it('shows cancel button for unauthenticated users', () => {

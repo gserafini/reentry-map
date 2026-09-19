@@ -1,5 +1,7 @@
 'use client'
 
+import { recordSearchRefinement } from '@/lib/analytics/search-journey'
+
 import { FormControl, InputLabel, MenuItem, Select, type SelectChangeEvent } from '@mui/material'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { SORT_OPTIONS } from '@/lib/utils/sort'
@@ -42,30 +44,40 @@ interface SortDropdownProps {
  */
 export function SortDropdown({
   showDistanceSort = false,
-  defaultSort = 'name-asc',
+  defaultSort,
   variant = 'standard',
 }: SortDropdownProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  // Get current sort from URL params or localStorage
-  const currentSort =
-    searchParams.get('sort') ||
-    (typeof window !== 'undefined' ? localStorage.getItem('preferredSort') : null) ||
-    defaultSort
+  const effectiveDefault =
+    defaultSort || (searchParams.get('search')?.trim() ? 'relevance' : 'name-asc')
+  const showRelevance = Boolean(searchParams.get('search')?.trim())
+  // The visible order must describe the server query, never a device-only preference.
+  const requestedSort = searchParams.get('sort') || effectiveDefault
+  const currentSort = SORT_OPTIONS.some(
+    (option) => option.value === requestedSort && (showDistanceSort || option.field !== 'distance')
+  )
+    ? requestedSort
+    : effectiveDefault
 
   const handleSortChange = (event: SelectChangeEvent<string>) => {
+    recordSearchRefinement('sort')
     const sortValue = event.target.value
 
     // Save preference to localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('preferredSort', sortValue)
+      try {
+        localStorage.setItem('preferredSort', sortValue)
+      } catch {
+        /* Optional preference. */
+      }
     }
 
     // Create new search params with updated sort
     const params = new URLSearchParams(searchParams.toString())
-    if (sortValue === defaultSort) {
+    if (sortValue === effectiveDefault) {
       // Remove sort param if it's the default
       params.delete('sort')
     } else {
@@ -81,9 +93,11 @@ export function SortDropdown({
   }
 
   // Filter sort options based on whether distance is available
-  const availableSortOptions = showDistanceSort
-    ? SORT_OPTIONS
-    : SORT_OPTIONS.filter((option) => option.field !== 'distance')
+  const availableSortOptions = SORT_OPTIONS.filter(
+    (option) =>
+      (showDistanceSort || option.field !== 'distance') &&
+      (showRelevance || option.field !== 'relevance')
+  )
 
   // Inline variant - Yelp style
   if (variant === 'inline') {
@@ -109,6 +123,7 @@ export function SortDropdown({
       >
         <Select
           id="sort-select-inline"
+          inputProps={{ 'aria-label': 'Sort results' }}
           value={currentSort}
           onChange={handleSortChange}
           renderValue={(value) => {

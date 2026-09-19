@@ -1,10 +1,9 @@
 /**
- * Resource API - Drizzle ORM Implementation
- *
- * Server-side data fetching using postgres.js with self-hosted PostgreSQL.
- * Uses raw SQL queries to maintain compatibility with existing snake_case types.
+ * One matching pipeline for lists, maps, totals and facets.
+ * User values are always bound parameters; service eligibility is separate from map anchors.
  */
-
+import { cache } from 'react'
+import type { PendingQuery, Row } from 'postgres'
 import { sql as sqlClient } from '@/lib/db/client'
 import type {
   Resource,
@@ -14,14 +13,37 @@ import type {
   ResourceSort,
   ResourceCategory,
 } from '@/lib/types/database'
+import { interpretSearch, escapeSearchPattern } from '@/lib/utils/search-intent'
+import { matchesServiceCoverage } from '@/lib/utils/service-coverage'
+import { normalizeServiceArea } from '@/lib/utils/resource-location'
+import {
+  resolveSearchGeography,
+  resolveCityCounties,
+  resolveViewportGeographies,
+} from '@/lib/server/search-geography'
 
 export interface GetResourcesOptions extends Partial<ResourceFilters>, PaginationParams {
   sort?: ResourceSort
   city?: string
   state?: string
+  locationName?: string
 }
-
-// Allowlist for ORDER BY field validation (safe to use with sql.unsafe since values are validated)
+export interface ResourceMapItem {
+  id: string
+  name: string
+  primary_category: string
+  address: string
+  latitude: number | null
+  longitude: number | null
+  slug: string | null
+  city: string | null
+  state: string | null
+  county?: string | null
+  county_fips?: string | null
+  address_type?: string | null
+  service_area?: { type?: string | null; values?: string[] | null } | null
+}
+type SqlFragment = PendingQuery<Row[]>
 const ALLOWED_SORT_FIELDS = [
   'name',
   'created_at',
@@ -29,491 +51,329 @@ const ALLOWED_SORT_FIELDS = [
   'rating_average',
   'distance',
 ] as const
+const combineConditions = (conditions: SqlFragment[]) =>
+  conditions.reduce((a, b) => sqlClient`${a} AND ${b}`)
+const finite = (value: number | undefined) => typeof value === 'number' && Number.isFinite(value)
+function hasPoint(options: GetResourcesOptions): boolean {
+  return (
+    finite(options.latitude) &&
+    finite(options.longitude) &&
+    Math.abs(options.latitude!) <= 90 &&
+    Math.abs(options.longitude!) <= 180
+  )
+}
+function hasBounds(options: GetResourcesOptions): boolean {
+  return [options.north, options.south, options.east, options.west].every(finite)
+}
 
-type SqlFragment = ReturnType<typeof sqlClient>
+/** PostGIS handles coincident points without the acos rounding failure in the legacy RPC. */
+function distanceMiles(options: GetResourcesOptions): SqlFragment {
+  return sqlClient`ST_DistanceSphere(ST_MakePoint(${options.longitude!}, ${options.latitude!}), ST_MakePoint(longitude, latitude)) / 1609.344`
+}
 
-/**
- * Build parameterized WHERE conditions shared by getResources, getResourcesCount, and getCategoryCounts.
- *
- * Returns an array of postgres.js tagged template fragments. All user-supplied values are
- * passed through parameterized queries -- never concatenated into SQL strings.
- *
- * @param opts           - The filter options
- * @param resourceIds    - Optional array of resource IDs (from location-based pre-filter)
- * @param includeSearch  - Whether to include primary_category in the search ILIKE (location path does)
- */
-function buildResourceConditions(
-  opts: {
-    search?: string
-    categories?: ResourceCategory[]
-    tags?: string[]
-    city?: string
-    state?: string
-    min_rating?: number
-    verified_only?: boolean
-    accepts_records?: boolean | null
-    appointment_required?: boolean | null
-  },
-  resourceIds?: string[],
-  includeSearch: 'with_primary_category' | 'without_primary_category' = 'without_primary_category'
-): SqlFragment[] {
-  const conditions: SqlFragment[] = [sqlClient`status = 'active'`]
-
-  if (resourceIds && resourceIds.length > 0) {
-    conditions.push(sqlClient`id = ANY(${resourceIds}::uuid[])`)
+/** Within-request cache shares the geographic candidate set across list, count, map and facets. */
+const geographicIds = cache(async (key: string): Promise<string[] | undefined> => {
+  const options = JSON.parse(key) as GetResourcesOptions
+  const point = hasPoint(options)
+  const radius = point && finite(options.radius_miles) && options.radius_miles! > 0
+  const bounds = hasBounds(options)
+  if (!radius && !bounds && !options.city && !options.state) return undefined
+  const physicalConditions = [
+    sqlClient`status = 'active'`,
+    sqlClient`COALESCE(address_type,'physical') = 'physical'`,
+  ]
+  if (options.city) physicalConditions.push(sqlClient`LOWER(city) = LOWER(${options.city})`)
+  if (options.state)
+    physicalConditions.push(sqlClient`UPPER(state) = ${options.state.toUpperCase()}`)
+  if (bounds) {
+    const longitudeCondition =
+      options.west! <= options.east!
+        ? sqlClient`longitude BETWEEN ${options.west!} AND ${options.east!}`
+        : sqlClient`(longitude >= ${options.west!} OR longitude <= ${options.east!})`
+    physicalConditions.push(
+      sqlClient`latitude BETWEEN ${options.south!} AND ${options.north!} AND ${longitudeCondition}`
+    )
   }
-
-  if (opts.categories && opts.categories.length > 0) {
-    // Use overlap operator (&&) when combined with location (matches any), containment (@>) otherwise
-    if (resourceIds) {
-      conditions.push(sqlClient`categories && ${opts.categories}::text[]`)
-    } else {
-      conditions.push(sqlClient`categories @> ${opts.categories}::text[]`)
-    }
-  }
-
-  if (opts.tags && opts.tags.length > 0) {
-    conditions.push(sqlClient`tags @> ${opts.tags}::text[]`)
-  }
-
-  if (opts.search && opts.search.trim()) {
-    const pattern = '%' + opts.search + '%'
-    if (includeSearch === 'with_primary_category') {
-      conditions.push(
-        sqlClient`(name ILIKE ${pattern} OR description ILIKE ${pattern} OR primary_category ILIKE ${pattern})`
+  if (radius)
+    physicalConditions.push(sqlClient`${distanceMiles(options)} <= ${options.radius_miles!}`)
+  let area = resolveSearchGeography(
+    options.locationName || '',
+    point ? options.latitude : undefined,
+    point ? options.longitude : undefined,
+    options.state,
+    options.city
+  )
+  const [physical, services] = await Promise.all([
+    sqlClient<
+      {
+        id: string
+        city: string | null
+        state: string | null
+        latitude: number | null
+        longitude: number | null
+      }[]
+    >`SELECT id, city, state, latitude, longitude FROM resources WHERE ${combineConditions(physicalConditions)}`,
+    sqlClient<
+      { id: string; city: string | null; state: string | null; service_area: unknown }[]
+    >`SELECT id,city,state,service_area FROM resources WHERE status='active' AND COALESCE(address_type,'physical') <> 'physical'`,
+  ])
+  if (options.city && !point && !bounds) area = resolveCityCounties(area, physical)
+  const viewportAreas = bounds
+    ? resolveViewportGeographies({
+        north: options.north!,
+        south: options.south!,
+        west: options.west!,
+        east: options.east!,
+      }).filter((candidate) => !options.state || candidate.state === options.state.toUpperCase())
+    : []
+  if (bounds) {
+    // City boundaries are not bundled. A real physical address in the viewport
+    // can establish city overlap; nonphysical display anchors cannot.
+    const observedCities = new Set<string>()
+    for (const resource of physical) {
+      if (
+        !resource.city ||
+        !resource.state ||
+        resource.latitude === null ||
+        resource.longitude === null
       )
-    } else {
-      conditions.push(sqlClient`(name ILIKE ${pattern} OR description ILIKE ${pattern})`)
+        continue
+      const cityKey = resource.state.toUpperCase() + ':' + resource.city.trim().toLowerCase()
+      if (observedCities.has(cityKey)) continue
+      const cityArea = resolveSearchGeography(
+        '',
+        resource.latitude,
+        resource.longitude,
+        resource.state.toUpperCase(),
+        resource.city
+      )
+      if (
+        cityArea.countyFips &&
+        viewportAreas.some((candidate) => candidate.countyFips === cityArea.countyFips)
+      ) {
+        observedCities.add(cityKey)
+        viewportAreas.push(cityArea)
+      }
     }
   }
+  const matchingServices = services.filter((resource) => {
+    if (bounds)
+      return viewportAreas.some((candidate) => matchesServiceCoverage(resource, candidate))
+    // A state browse includes local services within that state as well as statewide/national coverage.
+    const coverage = normalizeServiceArea(resource.service_area)
+    if (!coverage) {
+      // An address-free local listing remains discoverable by its declared city/state.
+      // This is not evidence that its service area covers a radius or a map anchor.
+      const sameState = Boolean(
+        area.state && resource.state?.trim().toUpperCase() === area.state.trim().toUpperCase()
+      )
+      const stateBrowse = options.state && !options.city && !radius && !bounds
+      const sameCity = Boolean(
+        area.city && resource.city?.trim().toLowerCase() === area.city.trim().toLowerCase()
+      )
+      return sameState && (Boolean(stateBrowse) || sameCity)
+    }
+    const localCoverage =
+      coverage && ['city', 'county', 'region'].includes(coverage.type.toLowerCase())
+    if (
+      options.state &&
+      !options.city &&
+      !radius &&
+      !bounds &&
+      localCoverage &&
+      resource.state?.toUpperCase() === options.state.toUpperCase()
+    )
+      return true
+    return matchesServiceCoverage(resource, area)
+  })
+  return [...new Set([...physical.map((r) => r.id), ...matchingServices.map((r) => r.id)])]
+})
 
-  if (opts.min_rating !== undefined) {
+async function buildResourceConditions(opts: GetResourcesOptions): Promise<SqlFragment[]> {
+  const conditions: SqlFragment[] = [sqlClient`status = 'active'`]
+  const ids = await geographicIds(
+    JSON.stringify({
+      latitude: opts.latitude,
+      longitude: opts.longitude,
+      radius_miles: opts.radius_miles,
+      north: opts.north,
+      south: opts.south,
+      east: opts.east,
+      west: opts.west,
+      city: opts.city,
+      state: opts.state,
+      locationName: opts.locationName,
+    })
+  )
+  // An empty eligible set must remain empty, never become an unbounded search.
+  if (ids !== undefined) conditions.push(sqlClient`id = ANY(${ids}::uuid[])`)
+  if (opts.categories?.length)
+    conditions.push(
+      sqlClient`(primary_category = ANY(${opts.categories}::text[]) OR categories && ${opts.categories}::text[])`
+    )
+  if (opts.tags?.length) conditions.push(sqlClient`tags @> ${opts.tags}::text[]`)
+  const intent = interpretSearch(opts.search)
+  if (intent.query) {
+    const literal = '%' + escapeSearchPattern(intent.query) + '%'
+    const exactName = sqlClient`name ILIKE ${literal}`
+    const terms = intent.terms.map((term) => {
+      const pattern = '%' + escapeSearchPattern(term) + '%'
+      return sqlClient`(name ILIKE ${pattern} OR description ILIKE ${pattern} OR array_to_string(services_offered,' ') ILIKE ${pattern} OR primary_category ILIKE ${pattern} OR array_to_string(categories,' ') ILIKE ${pattern})`
+    })
+    if (intent.categories.length) {
+      const category = sqlClient`(primary_category = ANY(${intent.categories}::text[]) OR categories && ${intent.categories}::text[])`
+      conditions.push(
+        intent.specific && terms.length
+          ? sqlClient`(${exactName} OR (${category} AND ${combineConditions(terms)}))`
+          : sqlClient`(${exactName} OR ${category})`
+      )
+    } else if (terms.length)
+      conditions.push(sqlClient`(${exactName} OR (${combineConditions(terms)}))`)
+  }
+  if (opts.min_rating !== undefined)
     conditions.push(sqlClient`rating_average >= ${opts.min_rating}`)
-  }
-
-  if (opts.verified_only) {
-    conditions.push(sqlClient`verified = true`)
-  }
-
-  if (opts.accepts_records != null) {
+  if (opts.verified_only) conditions.push(sqlClient`verified = true`)
+  if (opts.accepts_records != null)
     conditions.push(sqlClient`accepts_records = ${opts.accepts_records}`)
-  }
-
-  if (opts.appointment_required != null) {
+  if (opts.appointment_required != null)
     conditions.push(sqlClient`appointment_required = ${opts.appointment_required}`)
-  }
-
-  if (opts.city) {
-    conditions.push(sqlClient`city = ${opts.city}`)
-  }
-
-  if (opts.state) {
-    conditions.push(sqlClient`state = ${opts.state}`)
-  }
-
   return conditions
 }
-
-/**
- * Combine an array of postgres.js fragment conditions with AND.
- */
-function combineConditions(conditions: SqlFragment[]): SqlFragment {
-  return conditions.reduce((acc, cond, i) => (i === 0 ? cond : sqlClient`${acc} AND ${cond}`))
+function errorResult(error: unknown) {
+  return { data: null, error: error instanceof Error ? error : new Error('Unknown error') }
 }
-
-/**
- * Get all resources with filtering, pagination, and sorting
- */
-export async function getResources(
-  options: GetResourcesOptions = {}
-): Promise<{ data: (Resource & { distance?: number })[] | null; error: Error | null }> {
+export async function getResources(options: GetResourcesOptions = {}): Promise<{
+  data: (Resource & { distance?: number; coverage_match?: boolean })[] | null
+  error: Error | null
+}> {
   try {
-    const {
-      search,
-      categories,
-      tags,
-      city,
-      state,
-      latitude,
-      longitude,
-      radius_miles,
-      min_rating,
-      verified_only,
-      accepts_records,
-      appointment_required,
-      limit = 50,
-      offset = 0,
-      sort = { field: 'name', direction: 'asc' },
-    } = options
-
-    // If location is provided, use RPC function for distance calculation
-    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
-      // Call the PostgreSQL function get_resources_near
-      const nearbyResult = await sqlClient<{ id: string; distance: number }[]>`
-        SELECT id, distance
-        FROM get_resources_near(${latitude}, ${longitude}, ${radius_miles})
-      `
-
-      if (!nearbyResult || nearbyResult.length === 0) {
-        return { data: [], error: null }
-      }
-
-      // Extract resource IDs and create a distance map
-      const distanceMap = new Map<string, number>()
-      const resourceIds = nearbyResult.map((item) => {
-        distanceMap.set(item.id, item.distance)
-        return item.id
-      })
-
-      // Build parameterized WHERE conditions
-      const conditions = buildResourceConditions(
-        {
-          search,
-          categories,
-          city,
-          state,
-          min_rating,
-          verified_only,
-          accepts_records,
-          appointment_required,
-        },
-        resourceIds,
-        'with_primary_category'
-      )
-      const whereClause = combineConditions(conditions)
-
-      const filteredResources = await sqlClient<Resource[]>`
-        SELECT * FROM resources
-        WHERE ${whereClause}
-      `
-
-      // Attach distance to each resource
-      const resourcesWithDistance = filteredResources.map((resource) => ({
-        ...resource,
-        distance: distanceMap.get(resource.id) || 0,
-      }))
-
-      // Apply sorting
-      if (sort.field === 'distance') {
-        resourcesWithDistance.sort((a, b) => {
-          const comparison = (a.distance || 0) - (b.distance || 0)
-          return sort.direction === 'asc' ? comparison : -comparison
-        })
-      } else {
-        resourcesWithDistance.sort((a, b) => {
-          const aVal = a[sort.field as keyof Resource]
-          const bVal = b[sort.field as keyof Resource]
-          if (aVal === undefined || aVal === null || bVal === undefined || bVal === null) return 0
-          const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-          return sort.direction === 'asc' ? comparison : -comparison
-        })
-      }
-
-      // Apply pagination
-      const paginatedResults = resourcesWithDistance.slice(offset || 0, (offset || 0) + limit)
-
-      return { data: paginatedResults, error: null }
+    const where = combineConditions(await buildResourceConditions(options))
+    const point = hasPoint(options)
+    const query = interpretSearch(options.search).query
+    const sort = options.sort || {
+      field: query ? 'relevance' : point ? 'distance' : 'name',
+      direction: 'asc',
     }
-
-    // No location provided - use standard query
-    const conditions = buildResourceConditions({
-      search,
-      categories,
-      tags,
-      city,
-      state,
-      min_rating,
-      verified_only,
-      accepts_records,
-      appointment_required,
-    })
-    const whereClause = combineConditions(conditions)
-
-    // Validate sort field and direction against allowlists
-    const sortField = (ALLOWED_SORT_FIELDS as readonly string[]).includes(sort.field)
-      ? sort.field === 'distance'
-        ? 'name'
-        : sort.field
-      : 'name'
-    const sortDir = sort.direction === 'desc' ? 'DESC' : 'ASC'
-
-    // sort field and direction are validated against allowlists above, safe for sql.unsafe
-    const data = await sqlClient<Resource[]>`
-      SELECT * FROM resources
-      WHERE ${whereClause}
-      ORDER BY ${sqlClient.unsafe(sortField)} ${sqlClient.unsafe(sortDir)}
-      LIMIT ${limit}
-      OFFSET ${offset || 0}
+    const recommended = sort.field === 'relevance'
+    const sortField = recommended
+      ? point
+        ? 'distance'
+        : 'name'
+      : (ALLOWED_SORT_FIELDS as readonly string[]).includes(sort.field) &&
+          (sort.field !== 'distance' || point)
+        ? sort.field
+        : 'name'
+    const direction = sort.direction === 'desc' ? 'DESC' : 'ASC'
+    const distance = point
+      ? sqlClient`CASE WHEN COALESCE(address_type,'physical')='physical' AND latitude IS NOT NULL AND longitude IS NOT NULL THEN ${distanceMiles(options)} ELSE NULL END`
+      : sqlClient`NULL::double precision`
+    const rank =
+      query && recommended
+        ? sqlClient`CASE WHEN LOWER(name)=LOWER(${query}) THEN 0 WHEN name ILIKE ${escapeSearchPattern(query) + '%'} THEN 1 ELSE 2 END`
+        : sqlClient`0::integer`
+    const data = await sqlClient<(Resource & { distance: number | null })[]>`
+      SELECT *, ${distance} AS distance FROM resources WHERE ${where}
+      ORDER BY ${rank}, ${sqlClient.unsafe(sortField)} ${sqlClient.unsafe(direction)} NULLS LAST, name ASC, id ASC
+      LIMIT ${Math.max(1, Math.min(options.limit || 50, 5000))} OFFSET ${Math.max(0, options.offset || 0)}
     `
-
-    return { data, error: null }
-  } catch (error) {
-    console.error('Unexpected error in getResources:', error)
     return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error'),
+      data: data.map(({ distance, ...r }) => ({
+        ...r,
+        ...(distance !== null ? { distance: Number(distance) } : {}),
+        coverage_match:
+          (r.address_type || 'physical') !== 'physical' &&
+          Boolean(normalizeServiceArea(r.service_area)),
+      })),
+      error: null,
     }
+  } catch (error) {
+    console.error('getResources failed:', error)
+    return errorResult(error)
   }
 }
-
-/**
- * Get a single resource by ID
- */
+export async function getResourcesForMap(
+  options: Omit<GetResourcesOptions, 'offset' | 'sort'> = {},
+  limit = 5000
+): Promise<{ data: ResourceMapItem[] | null; error: Error | null }> {
+  try {
+    const where = combineConditions(await buildResourceConditions(options))
+    const data = await sqlClient<ResourceMapItem[]>`
+      SELECT id,name,primary_category,address,latitude,longitude,slug,city,state,county,county_fips,address_type,service_area
+      FROM resources WHERE ${where} ORDER BY name,id LIMIT ${Math.max(1, Math.min(limit, 5000))}
+    `
+    return { data, error: null }
+  } catch (error) {
+    console.error('getResourcesForMap failed:', error)
+    return errorResult(error)
+  }
+}
 export async function getResourceById(
   id: string
 ): Promise<{ data: Resource | null; error: Error | null }> {
   try {
-    const result = await sqlClient<Resource[]>`
-      SELECT * FROM resources WHERE id = ${id} LIMIT 1
-    `
-
-    if (result.length === 0) {
-      return { data: null, error: new Error('Resource not found') }
-    }
-
-    return { data: result[0], error: null }
+    const result = await sqlClient<Resource[]>`SELECT * FROM resources WHERE id=${id} LIMIT 1`
+    return result[0]
+      ? { data: result[0], error: null }
+      : { data: null, error: new Error('Resource not found') }
   } catch (error) {
-    console.error('Unexpected error in getResourceById:', error)
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error'),
-    }
+    return errorResult(error)
   }
 }
-
-/**
- * Get resources near a location using PostGIS
- */
 export async function getResourcesNear(
   latitude: number,
   longitude: number,
   radiusMiles = 10
 ): Promise<{ data: ResourceWithDistance[] | null; error: Error | null }> {
-  try {
-    const result = await sqlClient<ResourceWithDistance[]>`
-      SELECT id, name, address, distance
-      FROM get_resources_near(${latitude}, ${longitude}, ${radiusMiles})
-    `
-
-    return { data: result, error: null }
-  } catch (error) {
-    console.error('Unexpected error in getResourcesNear:', error)
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error'),
-    }
+  const result = await getResources({ latitude, longitude, radius_miles: radiusMiles })
+  return {
+    data:
+      result.data
+        ?.filter((r): r is Resource & { distance: number } => r.distance !== undefined)
+        .map((r) => ({ id: r.id, name: r.name, address: r.address, distance: r.distance })) || null,
+    error: result.error,
   }
 }
-
-/**
- * Get resources by category
- */
-export async function getResourcesByCategory(
-  category: ResourceCategory,
-  limit = 50
-): Promise<{ data: Resource[] | null; error: Error | null }> {
+export async function getResourcesByCategory(category: ResourceCategory, limit = 50) {
   return getResources({ categories: [category], limit })
 }
-
-/**
- * Search resources by query string
- */
-export async function searchResources(
-  query: string,
-  limit = 50
-): Promise<{ data: Resource[] | null; error: Error | null }> {
+export async function searchResources(query: string, limit = 50) {
   return getResources({ search: query, limit })
 }
-
-/**
- * Get total count of active resources
- */
-export async function getResourceCount(): Promise<{
-  data: number | null
-  error: Error | null
-}> {
-  try {
-    const result = await sqlClient<{ count: string }[]>`
-      SELECT COUNT(*) as count FROM resources WHERE status = 'active'
-    `
-
-    return { data: parseInt(result[0]?.count || '0', 10), error: null }
-  } catch (error) {
-    console.error('Unexpected error in getResourceCount:', error)
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error'),
-    }
-  }
+export async function getResourceCount() {
+  return getResourcesCount()
 }
-
-/**
- * Get count of resources matching filters
- */
 export async function getResourcesCount(
   options: Omit<GetResourcesOptions, 'limit' | 'offset' | 'page'> = {}
-): Promise<{
-  data: number | null
-  error: Error | null
-}> {
+): Promise<{ data: number | null; error: Error | null }> {
   try {
-    const {
-      search,
-      categories,
-      tags,
-      city,
-      state,
-      latitude,
-      longitude,
-      radius_miles,
-      min_rating,
-      verified_only,
-      accepts_records,
-      appointment_required,
-    } = options
-
-    // If location is provided, use RPC to get nearby IDs first
-    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
-      const nearbyResult = await sqlClient<{ id: string }[]>`
-        SELECT id FROM get_resources_near(${latitude}, ${longitude}, ${radius_miles})
-      `
-
-      if (!nearbyResult || nearbyResult.length === 0) {
-        return { data: 0, error: null }
-      }
-
-      const resourceIds = nearbyResult.map((item) => item.id)
-
-      const conditions = buildResourceConditions(
-        {
-          search,
-          categories,
-          city,
-          state,
-          min_rating,
-          verified_only,
-          accepts_records,
-          appointment_required,
-        },
-        resourceIds,
-        'with_primary_category'
-      )
-      const whereClause = combineConditions(conditions)
-
-      const result = await sqlClient<{ count: string }[]>`
-        SELECT COUNT(*) as count FROM resources
-        WHERE ${whereClause}
-      `
-
-      return { data: parseInt(result[0]?.count || '0', 10), error: null }
-    }
-
-    // No location - use standard query
-    const conditions = buildResourceConditions({
-      search,
-      categories,
-      tags,
-      city,
-      state,
-      min_rating,
-      verified_only,
-      accepts_records,
-      appointment_required,
-    })
-    const whereClause = combineConditions(conditions)
-
-    const result = await sqlClient<{ count: string }[]>`
-      SELECT COUNT(*) as count FROM resources
-      WHERE ${whereClause}
-    `
-
-    return { data: parseInt(result[0]?.count || '0', 10), error: null }
+    const where = combineConditions(await buildResourceConditions(options))
+    const result = await sqlClient<
+      { count: string }[]
+    >`SELECT COUNT(*) AS count FROM resources WHERE ${where}`
+    return { data: Number(result[0]?.count || 0), error: null }
   } catch (error) {
-    console.error('Unexpected error in getResourcesCount:', error)
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error'),
-    }
+    console.error('getResourcesCount failed:', error)
+    return errorResult(error)
   }
 }
-
-/**
- * Get count of resources per category
- */
 export async function getCategoryCounts(
-  options: {
-    search?: string
-    city?: string
-    state?: string
-    latitude?: number
-    longitude?: number
-    radius_miles?: number
-  } = {}
-): Promise<{
-  data: Partial<Record<ResourceCategory, number>> | null
-  error: Error | null
-}> {
+  options: GetResourcesOptions = {}
+): Promise<{ data: Partial<Record<ResourceCategory, number>> | null; error: Error | null }> {
   try {
-    const { search, city, state, latitude, longitude, radius_miles } = options
-
-    let resourceList: { categories: string[] | null }[] = []
-
-    // If location filtering is provided, get nearby resources first
-    if (latitude !== undefined && longitude !== undefined && radius_miles !== undefined) {
-      const nearbyResult = await sqlClient<{ id: string }[]>`
-        SELECT id FROM get_resources_near(${latitude}, ${longitude}, ${radius_miles})
-      `
-
-      if (!nearbyResult || nearbyResult.length === 0) {
-        return { data: {}, error: null }
-      }
-
-      const resourceIds = nearbyResult.map((item) => item.id)
-
-      const conditions = buildResourceConditions(
-        { search, city, state },
-        resourceIds,
-        'with_primary_category'
-      )
-      const whereClause = combineConditions(conditions)
-
-      resourceList = await sqlClient<{ categories: string[] | null }[]>`
-        SELECT categories FROM resources
-        WHERE ${whereClause}
-      `
-    } else {
-      // No location filtering - get all active resources
-      const conditions = buildResourceConditions(
-        { search, city, state },
-        undefined,
-        'with_primary_category'
-      )
-      const whereClause = combineConditions(conditions)
-
-      resourceList = await sqlClient<{ categories: string[] | null }[]>`
-        SELECT categories FROM resources
-        WHERE ${whereClause}
-      `
-    }
-
-    // Count resources per category
+    const where = combineConditions(await buildResourceConditions(options))
+    const data = await sqlClient<
+      { primary_category: ResourceCategory; categories: ResourceCategory[] | null }[]
+    >`SELECT primary_category,categories FROM resources WHERE ${where}`
     const counts: Partial<Record<ResourceCategory, number>> = {}
-
-    resourceList.forEach((resource) => {
-      if (resource.categories && Array.isArray(resource.categories)) {
-        resource.categories.forEach((category) => {
-          const cat = category as ResourceCategory
-          counts[cat] = (counts[cat] || 0) + 1
-        })
-      }
-    })
-
+    for (const resource of data) {
+      for (const category of new Set(
+        [resource.primary_category, ...(resource.categories || [])].filter(Boolean)
+      ))
+        counts[category] = (counts[category] || 0) + 1
+    }
     return { data: counts, error: null }
   } catch (error) {
-    console.error('Unexpected error in getCategoryCounts:', error)
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error'),
-    }
+    console.error('getCategoryCounts failed:', error)
+    return errorResult(error)
   }
 }

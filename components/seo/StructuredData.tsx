@@ -4,6 +4,7 @@
  */
 
 import type { Resource } from '@/lib/types/database'
+import { serializeJsonLd } from '@/lib/utils/structured-data'
 
 interface BreadcrumbListProps {
   items: Array<{
@@ -27,7 +28,7 @@ export function BreadcrumbList({ items }: BreadcrumbListProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
     />
   )
 }
@@ -76,7 +77,7 @@ export function LocalBusiness({ resource }: LocalBusinessProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
     />
   )
 }
@@ -124,7 +125,7 @@ export function ItemList({ name, description, url, resources }: ItemListProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
     />
   )
 }
@@ -157,7 +158,7 @@ export function CollectionPage({ name, description, url, numberOfItems }: Collec
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
     />
   )
 }

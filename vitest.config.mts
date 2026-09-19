@@ -8,6 +8,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Force test mode so React loads its development build (which exposes
+    // React.act). On the production server the ambient NODE_ENV=production
+    // otherwise leaks in and breaks every component test with
+    // "React.act is not a function".
+    env: { NODE_ENV: 'test' },
     setupFiles: ['./vitest.setup.ts'],
     exclude: ['**/node_modules/**', '**/e2e/**', '**/playwright-report/**'],
     coverage: {

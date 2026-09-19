@@ -3,71 +3,38 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { TextField, MenuItem, ListItemIcon, ListItemText, CircularProgress } from '@mui/material'
 import { MyLocation as MyLocationIcon, Place as PlaceIcon } from '@mui/icons-material'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { getPathLocation, resolveSearchLocation } from '@/lib/utils/search-location'
 import { initializeGoogleMaps } from '@/lib/google-maps'
+import { isValidCoordinates } from '@/lib/hooks/useLocation'
 import { useUserLocation } from '@/lib/context/LocationContext'
-
+import { parseStateLocationName, resolveVisibleLocationName } from '@/lib/utils/location-scope'
 interface LocationInputProps {
   fullWidth?: boolean
   size?: 'small' | 'medium'
-}
-
-interface CachedGeoIPData {
-  data: {
-    city: string
-    region: string
-    latitude: number
-    longitude: number
-  }
-  timestamp: number
-}
-
-interface UserSelectedLocation {
-  coords: {
-    latitude: number
-    longitude: number
-  }
-  locationName: string
-  timestamp: number
+  onValidityChange?: (valid: boolean) => void
 }
 
 /**
  * LocationInput with "Current Location" option and Google Places Autocomplete
  * Dropdown location picker for header search
  */
-export function LocationInput({ fullWidth = false, size = 'medium' }: LocationInputProps) {
-  const {
-    displayName,
-    requestLocation,
-    setManualLocation: setManualLocationBase,
-    loading,
-    coordinates,
-    source,
-  } = useUserLocation()
+export function LocationInput({
+  fullWidth = false,
+  size = 'medium',
+  onValidityChange,
+}: LocationInputProps) {
+  const { displayName, requestLocation, setManualLocation, loading, coordinates, source, error } =
+    useUserLocation()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const locationScope = resolveSearchLocation(searchParams, pathname)
+  const urlLocationName = locationScope.label === 'Nationwide' ? null : locationScope.label
+  const useHomeDefault = pathname === '/'
 
-  // localStorage keys for location persistence
-  const USER_SELECTED_LOCATION_KEY = 'reentry-map-user-selected-location'
-
-  // Wrapper that saves manual location selections to localStorage
-  const setManualLocation = useCallback(
-    (coords: { latitude: number; longitude: number }, locationName: string) => {
-      // Call the base function from useLocation hook
-      setManualLocationBase(coords, locationName)
-
-      // Save to localStorage for persistence across refreshes
-      localStorage.setItem(
-        USER_SELECTED_LOCATION_KEY,
-        JSON.stringify({
-          coords,
-          locationName,
-          timestamp: Date.now(),
-        })
-      )
-    },
-    [setManualLocationBase]
-  )
+  const geolocationRequested = useRef(false)
+  const [locationError, setLocationError] = useState('')
   const [inputValue, setInputValue] = useState('')
   const [hoverText, setHoverText] = useState('')
   const [placesLibrary, setPlacesLibrary] = useState<google.maps.PlacesLibrary | null>(null)
@@ -84,18 +51,34 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   const updateURLWithLocation = useCallback(
     (lat: number, lng: number, locationName: string, distance?: number) => {
       const params = new URLSearchParams(searchParams.toString())
-      params.set('lat', lat.toString())
-      params.set('lng', lng.toString())
       params.set('locationName', locationName)
-      if (distance) {
-        params.set('distance', distance.toString())
-      } else if (!params.has('distance')) {
-        // Set default distance if not present
-        params.set('distance', '25')
+      for (const key of ['north', 'south', 'east', 'west', 'page', 'city', 'state'])
+        params.delete(key)
+      if (params.get('sort') === 'distance-asc') params.delete('sort')
+
+      const stateLocation = parseStateLocationName(locationName)
+
+      if (stateLocation) {
+        params.delete('lat')
+        params.delete('lng')
+        params.delete('distance')
+      } else {
+        params.set('lat', lat.toString())
+        params.set('lng', lng.toString())
+        if (distance) {
+          params.set('distance', distance.toString())
+        } else if (!params.has('distance')) {
+          // Set default distance if not present
+          params.set('distance', '25')
+        }
       }
-      router.push(`?${params.toString()}`, { scroll: false })
+      const routeCategory = pathname.match(/\/category\/([^/]+)/)?.[1]
+      if (routeCategory) params.set('categories', routeCategory)
+      router.push(`${getPathLocation(pathname) ? '/search' : ''}?${params.toString()}`, {
+        scroll: false,
+      })
     },
-    [router, searchParams]
+    [router, searchParams, pathname]
   )
 
   // Initialize Google Maps services (singleton - safe to call from multiple instances)
@@ -110,102 +93,42 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
       })
   }, [])
 
-  // Smart location pre-fill with localStorage persistence
-  // Priority: 1. User's last selection, 2. GeoIP auto-detect, 3. Default
-  useEffect(() => {
-    // Only pre-fill if we don't have a location yet
-    if (coordinates || displayName) return
-
-    const GEOIP_CACHE_KEY = 'reentry-map-geoip-location'
-    const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
-
-    const fetchGeoIPLocation = async () => {
-      try {
-        // FIRST: Check if user has manually selected a location before
-        const userSelected = localStorage.getItem(USER_SELECTED_LOCATION_KEY)
-        if (userSelected) {
-          try {
-            const { coords, locationName } = JSON.parse(userSelected) as UserSelectedLocation
-            setInputValue(locationName)
-            setManualLocationBase(coords, locationName)
-            // Don't update URL on restore - only when user manually selects
-            return
-          } catch {
-            console.debug(
-              '[LocationInput] Failed to parse user-selected location, falling back to GeoIP'
-            )
-            localStorage.removeItem(USER_SELECTED_LOCATION_KEY)
-          }
-        }
-
-        // SECOND: Check GeoIP cache
-        const cached = localStorage.getItem(GEOIP_CACHE_KEY)
-        if (cached) {
-          const parsedCache = JSON.parse(cached) as CachedGeoIPData
-          const { data, timestamp } = parsedCache
-          const age = Date.now() - timestamp
-
-          // Use cache if less than 24 hours old
-          if (age < CACHE_DURATION) {
-            const locationText = `${data.city}, ${data.region}`
-            setInputValue(locationText)
-            setManualLocation({ latitude: data.latitude, longitude: data.longitude }, locationText)
-            // Don't update URL on automatic detection - only when user manually selects location
-            return
-          }
-        }
-
-        // Cache miss or expired - fetch from API
-        const response = await fetch('/api/location/ip')
-        if (!response.ok) throw new Error('GeoIP fetch failed')
-
-        const data = (await response.json()) as {
-          city: string
-          region: string
-          latitude: number
-          longitude: number
-        }
-
-        // Cache the result
-        localStorage.setItem(
-          GEOIP_CACHE_KEY,
-          JSON.stringify({
-            data,
-            timestamp: Date.now(),
-          })
-        )
-
-        // Apply location
-        const locationText = `${data.city}, ${data.region}`
-        setInputValue(locationText)
-        setManualLocation({ latitude: data.latitude, longitude: data.longitude }, locationText)
-        // Don't update URL on automatic detection - only when user manually selects location
-      } catch (err) {
-        console.debug('GeoIP pre-fill skipped:', err)
-        // Silently fail - user can still enter location manually
-      }
-    }
-
-    fetchGeoIPLocation()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only run on mount - intentionally excluding dependencies to fetch GeoIP only once
-
   // Update input value when displayName changes
   useEffect(() => {
-    if (displayName) {
-      setInputValue(displayName)
-    }
-  }, [displayName])
+    const nextVisibleLocation = resolveVisibleLocationName(
+      urlLocationName,
+      useHomeDefault ? displayName : null
+    )
+    setInputValue(nextVisibleLocation || '')
+    onValidityChange?.(true)
+  }, [displayName, urlLocationName, useHomeDefault, onValidityChange])
+
+  useEffect(() => {
+    if (!error || !geolocationRequested.current) return
+    geolocationRequested.current = false
+    setLocationError('Location unavailable. Enter a city, state, or ZIP.')
+    setInputValue(urlLocationName || '')
+    onValidityChange?.(true)
+  }, [error, urlLocationName, onValidityChange])
 
   // Reverse geocode when we get geolocation coordinates
   useEffect(() => {
-    if (!coordinates || source !== 'geolocation' || !geocodingLibrary || isReverseGeocoding) {
+    if (
+      !geolocationRequested.current ||
+      loading ||
+      !coordinates ||
+      source !== 'geolocation' ||
+      !geocodingLibrary ||
+      isReverseGeocoding
+    ) {
       return
     }
 
     const reverseGeocode = async () => {
+      geolocationRequested.current = false
       setIsReverseGeocoding(true)
       setInputValue('Getting location...')
+      let formattedLocation = 'Current Location'
 
       try {
         const { Geocoder } = geocodingLibrary
@@ -237,20 +160,14 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           }
 
           // Format as "City, State"
-          const formattedLocation =
-            city && state ? `${city}, ${state}` : cityResult.formatted_address
-
-          // Update the location with the geocoded city/state
-          setManualLocation(coordinates, formattedLocation)
-          setInputValue(formattedLocation)
-          // Update URL with location params
-          updateURLWithLocation(coordinates.latitude, coordinates.longitude, formattedLocation)
+          formattedLocation = city && state ? `${city}, ${state}` : cityResult.formatted_address
         }
       } catch (err) {
-        console.error('Reverse geocoding error:', err)
-        // Fall back to "Current Location"
-        setInputValue('Current Location')
+        console.debug('Location name unavailable; using GPS coordinates:', err)
       } finally {
+        onValidityChange?.(true)
+        setInputValue(formattedLocation)
+        updateURLWithLocation(coordinates.latitude, coordinates.longitude, formattedLocation)
         setIsReverseGeocoding(false)
       }
     }
@@ -259,10 +176,11 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   }, [
     coordinates,
     source,
+    loading,
     geocodingLibrary,
     isReverseGeocoding,
-    setManualLocation,
     updateURLWithLocation,
+    onValidityChange,
   ])
 
   // Reset selected index when predictions change
@@ -275,8 +193,7 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
     if (!showDropdown) return
 
     // Total items = 1 (Current Location) + predictions.length + (1 if user input shown)
-    const hasUserInput = inputValue.trim() && predictions.length === 0 && !loading
-    const totalItems = 1 + predictions.length + (hasUserInput ? 1 : 0)
+    const totalItems = 1 + predictions.length
 
     switch (e.key) {
       case 'ArrowDown':
@@ -289,7 +206,11 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         break
       case 'Enter':
         e.preventDefault()
-        if (selectedIndex === -1) return
+        if (selectedIndex === -1) {
+          const first = predictions[0]
+          if (first) handlePlaceSelect(first.place_id, first.description)
+          return
+        }
 
         // Index 0 = Current Location
         if (selectedIndex === 0) {
@@ -299,10 +220,6 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
         else if (selectedIndex <= predictions.length) {
           const prediction = predictions[selectedIndex - 1]
           handlePlaceSelect(prediction.place_id, prediction.description)
-        }
-        // Last index = user's typed input (if shown)
-        else if (hasUserInput && selectedIndex === totalItems - 1) {
-          setShowDropdown(false)
         }
         break
       case 'Escape':
@@ -316,6 +233,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
   // Handle input change and fetch predictions
   const handleInputChange = async (value: string) => {
     setInputValue(value)
+    setLocationError('')
+    onValidityChange?.(false)
 
     if (!value.trim()) {
       setPredictions([])
@@ -332,7 +251,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
         const request = {
           input: value,
-          componentRestrictions: { country: 'us' }, // US only for now
+          componentRestrictions: { country: 'us' },
+          types: ['(regions)'],
         }
 
         const response = await service.getPlacePredictions(request)
@@ -346,6 +266,9 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
 
   // Handle "Current Location" selection
   const handleCurrentLocation = () => {
+    geolocationRequested.current = true
+    setLocationError('')
+    onValidityChange?.(false)
     setHoverText('') // Clear hover text immediately to prevent flash
     setInputValue('Getting location...') // Show loading state
     setShowDropdown(false)
@@ -373,7 +296,14 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           longitude: place.location.lng(),
         }
 
+        if (!isValidCoordinates(coords) || !description.trim()) {
+          setLocationError('Location unavailable. Choose another suggestion.')
+          onValidityChange?.(false)
+          return
+        }
+
         // Use description as display name (e.g., "Oakland, CA" or "94601")
+        onValidityChange?.(true)
         setManualLocation(coords, description)
         // Update URL with location params
         updateURLWithLocation(coords.latitude, coords.longitude, description)
@@ -408,7 +338,10 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
             setSelectedIndex(-1)
           }, 200)
         }}
-        placeholder="Enter location or zip"
+        label="Where?"
+        helperText={locationError || undefined}
+        error={Boolean(locationError)}
+        placeholder="City, state, or ZIP"
         size={size}
         fullWidth={fullWidth}
         autoComplete="off"
@@ -428,15 +361,6 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           '& .MuiOutlinedInput-root': {
             backgroundColor: 'transparent',
           },
-          '& .MuiOutlinedInput-notchedOutline': {
-            border: 'none',
-          },
-          '&:hover .MuiOutlinedInput-notchedOutline': {
-            border: 'none',
-          },
-          '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
-            border: 'none',
-          },
         }}
       />
 
@@ -449,8 +373,8 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
           style={{
             position: 'absolute',
             top: '100%',
-            left: '-20px',
-            right: '-20px',
+            left: 0,
+            right: 0,
             zIndex: 1300,
             marginTop: '8px',
             backgroundColor: 'white',
@@ -546,45 +470,9 @@ export function LocationInput({ fullWidth = false, size = 'medium' }: LocationIn
             </MenuItem>
           ))}
 
-          {/* User's typed input as fallback option */}
           {inputValue.trim() && predictions.length === 0 && !loading && (
-            <MenuItem
-              id="location-option-1"
-              role="option"
-              aria-selected={selectedIndex === 1}
-              onClick={() => {
-                setHoverText('')
-                setShowDropdown(false)
-                // Keep the user's typed input - they can search with it as-is
-              }}
-              onMouseEnter={() => {
-                setHoverText(inputValue)
-                setSelectedIndex(1) // Index 1 since Current Location is 0
-              }}
-              onMouseLeave={() => setHoverText('')}
-              sx={{
-                py: 1.5,
-                px: 2,
-                backgroundColor: selectedIndex === 1 ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>
-                <PlaceIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-              </ListItemIcon>
-              <ListItemText
-                primary={inputValue}
-                primaryTypographyProps={{
-                  sx: {
-                    color: 'text.primary',
-                    fontSize: '0.95rem',
-                    fontWeight: 500,
-                    textAlign: 'left',
-                  },
-                }}
-              />
+            <MenuItem disabled sx={{ whiteSpace: 'normal', fontSize: '0.875rem' }}>
+              Type a city, state, or ZIP and choose a suggestion.
             </MenuItem>
           )}
         </div>

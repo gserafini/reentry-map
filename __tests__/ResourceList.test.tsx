@@ -4,6 +4,11 @@ import { describe, it, expect, vi } from 'vitest'
 import ResourceList from '@/components/resources/ResourceList'
 import { LocationProvider } from '@/lib/context/LocationContext'
 
+vi.mock('@/lib/context/LocationContext', () => ({
+  LocationProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useUserLocation: () => ({ coordinates: null }),
+}))
+
 // Mock NextAuth session (needed by child components like FavoriteButton)
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: null, status: 'unauthenticated' }),

@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { env } from '@/lib/env'
 import { db } from '@/lib/db/client'
-import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { resources, resourceSuggestions } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
+import { buildGeocodingAddress, hasPlausibleStreetAddress } from '@/lib/utils/resource-location'
+import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 /**
  * POST /api/admin/flagged-resources/[id]/approve-with-corrections
@@ -141,9 +143,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (address_type === 'physical') {
       // Physical addresses require valid coordinates
       if (!latitude || !longitude) {
-        if (!mergedData.address) {
+        if (!hasPlausibleStreetAddress(mergedData.address, mergedData.city, mergedData.state)) {
           return NextResponse.json(
-            { error: 'Cannot approve physical resource: missing address and coordinates' },
+            { error: 'Cannot approve physical resource: missing street-level address' },
             { status: 400 }
           )
         }
@@ -233,9 +235,52 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           { status: 400 }
         )
       }
-      // Coordinates are optional for these types
-      latitude = null
-      longitude = null
+
+      if (!latitude || !longitude) {
+        const geocodingAddress = buildGeocodingAddress({
+          addressType: address_type,
+          address: mergedData.address,
+          city: mergedData.city,
+          state: mergedData.state,
+          zip: mergedData.zip,
+        })
+
+        if (!geocodingAddress) {
+          return NextResponse.json(
+            { error: `${address_type} resources require city/state for approximate geocoding` },
+            { status: 400 }
+          )
+        }
+
+        if (env.GOOGLE_MAPS_KEY) {
+          try {
+            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(geocodingAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+            const geocodeResponse = await fetch(geocodeUrl)
+            const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+            if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+              latitude = geocodeData.results[0].geometry.location.lat
+              longitude = geocodeData.results[0].geometry.location.lng
+            } else {
+              return NextResponse.json(
+                {
+                  error: `Cannot geocode locality "${geocodingAddress}"`,
+                  geocode_status: geocodeData.status,
+                },
+                { status: 400 }
+              )
+            }
+          } catch (error) {
+            console.error('Locality geocoding error:', error)
+            return NextResponse.json({ error: 'Geocoding service unavailable' }, { status: 500 })
+          }
+        } else {
+          return NextResponse.json(
+            { error: 'Geocoding not configured (GOOGLE_MAPS_KEY missing)' },
+            { status: 500 }
+          )
+        }
+      }
     }
 
     // Extract verification source from correction_notes for tracking
@@ -302,25 +347,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       })
       .where(eq(resourceSuggestions.id, id))
 
-    // Update verification log to mark as human reviewed
-    // First find the most recent log for this suggestion
-    const [latestLog] = await db
-      .select({ id: verificationLogs.id })
-      .from(verificationLogs)
-      .where(eq(verificationLogs.suggestionId, id))
-      .orderBy(desc(verificationLogs.createdAt))
-      .limit(1)
-
-    if (latestLog) {
-      await db
-        .update(verificationLogs)
-        .set({
-          humanReviewed: true,
-          humanReviewerId: auth.userId || null,
-          humanDecision: 'approved_with_corrections',
-        })
-        .where(eq(verificationLogs.id, latestLog.id))
-    }
+    await markVerificationLogHumanReview({
+      suggestionId: id,
+      reviewerId: auth.userId || null,
+      decision: 'approved_with_corrections',
+      notes: correction_notes,
+    })
 
     return NextResponse.json({
       success: true,

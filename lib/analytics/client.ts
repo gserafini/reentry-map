@@ -6,6 +6,7 @@
  */
 
 import { track } from './queue'
+import { recordSearchContact } from './search-journey'
 
 /**
  * Track page view
@@ -23,8 +24,8 @@ export function trackPageView(pageTitle?: string, loadTimeMs?: number) {
  */
 export function trackSearch(query: string, filters: Record<string, unknown>, resultsCount: number) {
   track('search', {
-    query,
-    filters: filters as Record<string, string | number | boolean>,
+    has_query: Boolean(query.trim()),
+    has_filters: Object.keys(filters).length > 0,
     results_count: resultsCount,
   })
 }
@@ -49,6 +50,8 @@ export function trackResourceAction(
   resourceId: string,
   action: 'call' | 'directions' | 'website' | 'favorite_add' | 'favorite_remove'
 ) {
+  if (action === 'call' || action === 'directions' || action === 'website')
+    recordSearchContact(action)
   track(`resource_${action}`, {
     resource_id: resourceId,
   })
@@ -64,8 +67,7 @@ export function trackMapMove(
   visibleMarkers: number
 ) {
   track('map_move', {
-    center_lat: centerLat,
-    center_lng: centerLng,
+    has_center: Number.isFinite(centerLat) && Number.isFinite(centerLng),
     zoom_level: zoomLevel,
     visible_markers: visibleMarkers,
   })

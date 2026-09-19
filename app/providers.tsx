@@ -1,5 +1,6 @@
 'use client'
 
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter'
 import { ThemeProvider as MuiThemeProvider, createTheme, CssBaseline } from '@mui/material'
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
 import { SessionProvider } from 'next-auth/react'
@@ -12,6 +13,7 @@ import { PWAWrapper } from '@/components/pwa/PWAWrapper'
 const lightTheme = createTheme({
   palette: {
     mode: 'light',
+    primary: { main: '#1565c0' },
   },
 })
 
@@ -42,23 +44,25 @@ function MuiThemeWrapper({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
-      <NextThemesProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
-        <MuiThemeWrapper>
-          <CssBaseline />
-          <LocationProvider>
-            <FavoritesProvider>
-              {children}
-              <PWAWrapper />
-            </FavoritesProvider>
-          </LocationProvider>
-        </MuiThemeWrapper>
-      </NextThemesProvider>
-    </SessionProvider>
+    <AppRouterCacheProvider>
+      <SessionProvider>
+        <NextThemesProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <MuiThemeWrapper>
+            <CssBaseline />
+            <LocationProvider>
+              <FavoritesProvider>
+                {children}
+                <PWAWrapper />
+              </FavoritesProvider>
+            </LocationProvider>
+          </MuiThemeWrapper>
+        </NextThemesProvider>
+      </SessionProvider>
+    </AppRouterCacheProvider>
   )
 }

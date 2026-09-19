@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { env } from '@/lib/env'
 import { db } from '@/lib/db/client'
-import { resources, resourceSuggestions, verificationLogs } from '@/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { resources, resourceSuggestions } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
-import { requiresServiceArea } from '@/lib/utils/resource-location'
+import { buildGeocodingAddress, requiresServiceArea } from '@/lib/utils/resource-location'
+import { markVerificationLogHumanReview } from '@/lib/utils/verification-log-human-review'
 
 interface BatchResult {
   id: string
@@ -125,59 +126,48 @@ async function approveSuggestion(
   const addressType = suggestion.addressType || 'physical'
   const serviceArea = suggestion.serviceArea || null
 
-  if (addressType === 'physical' && (!latitude || !longitude)) {
-    if (!suggestion.address) {
-      return { id, status: 'failed', error: 'Missing address and coordinates' }
-    }
-
-    const fullAddress = [suggestion.address, suggestion.city, suggestion.state, suggestion.zip]
-      .filter(Boolean)
-      .join(', ')
-
-    if (env.GOOGLE_MAPS_KEY) {
-      try {
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${env.GOOGLE_MAPS_KEY}`
-        const geocodeResponse = await fetch(geocodeUrl)
-        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
-
-        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
-          latitude = geocodeData.results[0].geometry.location.lat
-          longitude = geocodeData.results[0].geometry.location.lng
-        } else {
-          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
-        }
-      } catch {
-        return { id, status: 'failed', error: 'Geocoding service unavailable' }
-      }
-    } else {
-      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
-    }
-  } else if (addressType === 'confidential' && (!latitude || !longitude)) {
-    if (!suggestion.city || !suggestion.state) {
-      return { id, status: 'failed', error: 'Missing city/state for confidential resource' }
-    }
-
-    if (env.GOOGLE_MAPS_KEY) {
-      try {
-        const cityAddress = `${suggestion.city}, ${suggestion.state}`
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cityAddress)}&key=${env.GOOGLE_MAPS_KEY}`
-        const geocodeResponse = await fetch(geocodeUrl)
-        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
-
-        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
-          latitude = geocodeData.results[0].geometry.location.lat
-          longitude = geocodeData.results[0].geometry.location.lng
-        } else {
-          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
-        }
-      } catch {
-        return { id, status: 'failed', error: 'Geocoding service unavailable' }
-      }
-    } else {
-      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
-    }
-  } else if (requiresServiceArea(addressType) && !serviceArea) {
+  if (requiresServiceArea(addressType) && !serviceArea) {
     return { id, status: 'failed', error: `${addressType} resources require service_area` }
+  }
+
+  if (!latitude || !longitude) {
+    const geocodingAddress = buildGeocodingAddress({
+      addressType,
+      address: suggestion.address,
+      city: suggestion.city,
+      state: suggestion.state,
+      zip: suggestion.zip,
+    })
+
+    if (!geocodingAddress) {
+      return {
+        id,
+        status: 'failed',
+        error:
+          addressType === 'physical'
+            ? 'Physical resources require a street-level address'
+            : `${addressType} resources require city/state for approximate geocoding`,
+      }
+    }
+
+    if (env.GOOGLE_MAPS_KEY) {
+      try {
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(geocodingAddress)}&key=${env.GOOGLE_MAPS_KEY}`
+        const geocodeResponse = await fetch(geocodeUrl)
+        const geocodeData = (await geocodeResponse.json()) as GoogleMapsGeocodingResponse
+
+        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+          latitude = geocodeData.results[0].geometry.location.lat
+          longitude = geocodeData.results[0].geometry.location.lng
+        } else {
+          return { id, status: 'failed', error: `Geocoding failed: ${geocodeData.status}` }
+        }
+      } catch {
+        return { id, status: 'failed', error: 'Geocoding service unavailable' }
+      }
+    } else {
+      return { id, status: 'failed', error: 'GOOGLE_MAPS_KEY not configured' }
+    }
   }
 
   // Create resource
@@ -232,24 +222,11 @@ async function approveSuggestion(
     })
     .where(eq(resourceSuggestions.id, id))
 
-  // Update verification log
-  const [latestLog] = await db
-    .select({ id: verificationLogs.id })
-    .from(verificationLogs)
-    .where(eq(verificationLogs.suggestionId, id))
-    .orderBy(desc(verificationLogs.createdAt))
-    .limit(1)
-
-  if (latestLog) {
-    await db
-      .update(verificationLogs)
-      .set({
-        humanReviewed: true,
-        humanReviewerId: auth.userId || null,
-        humanDecision: 'approved',
-      })
-      .where(eq(verificationLogs.id, latestLog.id))
-  }
+  await markVerificationLogHumanReview({
+    suggestionId: id,
+    reviewerId: auth.userId || null,
+    decision: 'approved',
+  })
 
   return { id, status: 'approved', resource_id: resource.id }
 }
@@ -303,24 +280,12 @@ async function rejectSuggestion(
     })
     .where(eq(resourceSuggestions.id, id))
 
-  // Update verification log
-  const [latestLog] = await db
-    .select({ id: verificationLogs.id })
-    .from(verificationLogs)
-    .where(eq(verificationLogs.suggestionId, id))
-    .orderBy(desc(verificationLogs.createdAt))
-    .limit(1)
-
-  if (latestLog) {
-    await db
-      .update(verificationLogs)
-      .set({
-        humanReviewed: true,
-        humanReviewerId: auth.userId || null,
-        humanDecision: status,
-      })
-      .where(eq(verificationLogs.id, latestLog.id))
-  }
+  await markVerificationLogHumanReview({
+    suggestionId: id,
+    reviewerId: auth.userId || null,
+    decision: status,
+    notes: reviewNotes,
+  })
 
   return { id, status }
 }

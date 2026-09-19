@@ -2,8 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const PROJECT_ROOT = '/home/reentrymap/reentry-map-prod'
+const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const RESOURCE_PAYLOAD = [
   {
     name: 'CLI Import Test Resource',

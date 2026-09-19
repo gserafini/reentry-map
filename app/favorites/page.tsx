@@ -1,145 +1,120 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Container, Typography, Box, Grid, CircularProgress, Alert, Button } from '@mui/material'
-import { FavoriteBorder as FavoriteBorderIcon } from '@mui/icons-material'
+import { Container, Typography, Box, CircularProgress, Alert, Button, Stack } from '@mui/material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { ResourceCard } from '@/components/resources/ResourceCard'
-import type { Database } from '@/lib/types/database'
-
-type ResourceWithFavorite = {
-  id: string
-  user_id: string
-  resource_id: string
-  notes: string | null
-  created_at: string
-  resource: Database['public']['Tables']['resources']['Row']
-}
+import { useFavorites } from '@/lib/context/FavoritesContext'
+import { SavedSupportList } from '@/components/user/SavedSupportList'
+import {
+  snapshotResource,
+  type SavedResource,
+  type SavedResourceInput,
+} from '@/lib/utils/saved-resources'
 
 export default function FavoritesPage() {
-  const { user, isLoading: authLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
-  const [favorites, setFavorites] = useState<ResourceWithFavorite[]>([])
-  const [loading, setLoading] = useState(true)
+  const { user, isAuthenticated } = useAuth()
+  const {
+    savedResources,
+    removeDeviceFavorite,
+    clearDeviceFavorites,
+    error: deviceError,
+    favoriteIds,
+    toggleFavorite,
+  } = useFavorites()
+  const [accountResources, setAccountResources] = useState<SavedResource[]>([])
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login?redirect=/favorites')
-    }
-  }, [authLoading, isAuthenticated, router])
-
-  // Fetch favorites
-  useEffect(() => {
-    async function fetchFavorites() {
-      if (!user) return
-
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch('/api/favorites')
-        const result = (await response.json()) as { data?: ResourceWithFavorite[]; error?: string }
-
-        if (!response.ok) {
-          setError('Failed to load favorites. Please try again.')
-          console.error(result.error)
-        } else {
-          setFavorites(result.data || [])
+    if (!isAuthenticated || !user?.id) return
+    let active = true
+    setLoading(true)
+    fetch('/api/favorites')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Account favorites unavailable')
+        const result = (await response.json()) as {
+          data?: { resource_id: string; resource: SavedResourceInput; created_at: string }[]
         }
-      } catch (fetchError) {
-        setError('Failed to load favorites. Please try again.')
-        console.error(fetchError)
-      }
-
-      setLoading(false)
+        if (active)
+          setAccountResources(
+            (result.data || [])
+              .filter((favorite) => favorite.resource)
+              .map((favorite) =>
+                snapshotResource(favorite.resource_id, favorite.resource, favorite.created_at)
+              )
+          )
+      })
+      .catch(() => {
+        if (active)
+          setError('Your account list could not load. Device copies below remain available.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
     }
-
-    if (user) {
-      fetchFavorites()
-    }
-  }, [user])
-
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
-    )
-  }
-
-  // Don't render if not authenticated (redirect will happen)
-  if (!isAuthenticated || !user) {
-    return null
-  }
+  }, [isAuthenticated, user?.id])
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          My Favorites
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Resources you&apos;ve saved for quick access
-        </Typography>
-      </Box>
-
-      {/* Error State */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
+    <Container maxWidth="md" sx={{ py: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Saved resources
+      </Typography>
+      <Typography sx={{ mb: 2 }}>
+        Keep phone numbers and next steps together for when you need them.
+      </Typography>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Device saves stay in this browser. They are not uploaded, publicly shared, or automatically
+        added to an account. On a shared phone, clear your list when finished. Downloads remain
+        until you delete them.
+      </Alert>
+      <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1} sx={{ mb: 3 }} data-print-hide>
+        <Button href="/resources">Find more help</Button>
+        <Button href="/offline.html">Open offline contact page</Button>
+      </Stack>
+      {deviceError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {deviceError}
         </Alert>
       )}
-
-      {/* Loading State */}
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
+      <Typography variant="h5" component="h2" gutterBottom>
+        On this device ({savedResources.length})
+      </Typography>
+      <SavedSupportList
+        resources={savedResources}
+        onRemove={removeDeviceFavorite}
+        onClear={clearDeviceFavorites}
+      />
+      {isAuthenticated && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h5" component="h2" gutterBottom>
+            In your account
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            Account favorites are separate and need an internet connection.
+          </Typography>
+          {error && <Alert severity="error">{error}</Alert>}
+          {loading ? (
+            <CircularProgress aria-label="Loading account favorites" />
+          ) : (
+            !error && (
+              <SavedSupportList
+                resources={accountResources.filter((resource) => favoriteIds.has(resource.id))}
+                onRemove={(id) => {
+                  void toggleFavorite(id)
+                }}
+              />
+            )
+          )}
         </Box>
       )}
-
-      {/* Empty State */}
-      {!loading && !error && favorites.length === 0 && (
-        <Box
-          sx={{
-            textAlign: 'center',
-            py: 8,
-            px: 2,
-          }}
-        >
-          <FavoriteBorderIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" gutterBottom>
-            No favorites yet
+      {!isAuthenticated && (
+        <Box sx={{ mt: 3 }} data-print-hide>
+          <Typography variant="body2" color="text.secondary">
+            Already have account favorites?
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Start exploring resources and save your favorites for easy access
-          </Typography>
-          <Button variant="contained" onClick={() => router.push('/resources')}>
-            Browse Resources
-          </Button>
+          <Button href="/auth/login?redirect=/favorites">Sign in to view your account list</Button>
         </Box>
-      )}
-
-      {/* Favorites Grid */}
-      {!loading && !error && favorites.length > 0 && (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {favorites.length} {favorites.length === 1 ? 'resource' : 'resources'} saved
-          </Typography>
-          <Grid container spacing={3}>
-            {favorites.map((fav) => (
-              <Grid key={fav.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                <ResourceCard resource={fav.resource} />
-              </Grid>
-            ))}
-          </Grid>
-        </>
       )}
     </Container>
   )

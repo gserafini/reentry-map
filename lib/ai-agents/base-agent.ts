@@ -1,6 +1,6 @@
 import { sql } from '@/lib/db/client'
-import OpenAI from 'openai'
-import { env } from '@/lib/env'
+import { ollamaChat, ollamaHealthCheck } from './ollama-client'
+import type { OllamaMessage } from './ollama-client'
 
 export type AgentType = 'discovery' | 'enrichment' | 'verification'
 export type AgentStatus = 'success' | 'failure' | 'partial'
@@ -20,36 +20,34 @@ interface AgentLogData {
  * Base AI Agent class
  *
  * Provides common functionality for all AI agents:
- * - OpenAI client initialization
+ * - Local Ollama model integration (primary, free)
  * - Logging to ai_agent_logs table
  * - Cost tracking
  * - Error handling
  */
 export abstract class BaseAgent {
-  protected openai: OpenAI
   protected agentType: AgentType
   protected logId: string | null = null
+  protected startedAtMs: number | null = null
 
   constructor(agentType: AgentType) {
     this.agentType = agentType
-
-    // Initialize OpenAI client if API key is available
-    if (env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: env.OPENAI_API_KEY,
-      })
-    } else {
-      throw new Error('OPENAI_API_KEY is not configured')
-    }
   }
 
   /**
    * Start agent execution and create log entry
    */
   protected async startLog(): Promise<string> {
+    this.startedAtMs = Date.now()
+
     const rows = await sql<{ id: string }[]>`
-      INSERT INTO ai_agent_logs (agent_type, status, resources_processed, resources_added, resources_updated)
-      VALUES (${this.agentType}, ${'success'}, ${0}, ${0}, ${0})
+      INSERT INTO ai_agent_logs (agent_type, action, input, success)
+      VALUES (
+        ${this.agentType},
+        ${'run'},
+        ${JSON.stringify({ status: 'started' })}::jsonb,
+        ${null}
+      )
       RETURNING id
     `
 
@@ -68,16 +66,40 @@ export abstract class BaseAgent {
     if (!this.logId) return
 
     try {
+      const successValue =
+        logData.status === 'success' ? true : logData.status === 'failure' ? false : null
+
+      const outputPayload = {
+        ...(logData.status ? { status: logData.status } : {}),
+        ...(typeof logData.resources_processed === 'number'
+          ? { resources_processed: logData.resources_processed }
+          : {}),
+        ...(typeof logData.resources_added === 'number'
+          ? { resources_added: logData.resources_added }
+          : {}),
+        ...(typeof logData.resources_updated === 'number'
+          ? { resources_updated: logData.resources_updated }
+          : {}),
+        ...(logData.metadata ? { metadata: logData.metadata } : {}),
+      }
+
+      const durationMs =
+        typeof this.startedAtMs === 'number' ? Math.max(Date.now() - this.startedAtMs, 0) : null
+      const costUsd =
+        typeof logData.cost_cents === 'number'
+          ? Number((logData.cost_cents / 100).toFixed(4))
+          : null
+
       await sql`
         UPDATE ai_agent_logs SET
-          status = COALESCE(${logData.status ?? null}, status),
-          resources_processed = COALESCE(${logData.resources_processed ?? null}, resources_processed),
-          resources_added = COALESCE(${logData.resources_added ?? null}, resources_added),
-          resources_updated = COALESCE(${logData.resources_updated ?? null}, resources_updated),
+          success = COALESCE(${successValue}, success),
           error_message = COALESCE(${logData.error_message ?? null}, error_message),
-          metadata = COALESCE(${logData.metadata ? JSON.stringify(logData.metadata) : null}::jsonb, metadata),
-          cost_cents = COALESCE(${logData.cost_cents ?? null}, cost_cents),
-          completed_at = NOW()
+          output = COALESCE(
+            ${Object.keys(outputPayload).length > 0 ? JSON.stringify(outputPayload) : null}::jsonb,
+            output
+          ),
+          cost = COALESCE(${costUsd}, cost),
+          duration_ms = COALESCE(${durationMs}, duration_ms)
         WHERE id = ${this.logId}
       `
     } catch (error) {
@@ -86,20 +108,18 @@ export abstract class BaseAgent {
   }
 
   /**
-   * Calculate cost based on token usage
-   * GPT-4o-mini pricing: $0.150 per 1M input tokens, $0.600 per 1M output tokens
+   * Calculate cost — local models are free, return 0
    */
-  protected calculateCost(inputTokens: number, outputTokens: number): number {
-    const inputCost = (inputTokens / 1_000_000) * 0.15
-    const outputCost = (outputTokens / 1_000_000) * 0.6
-    return Math.round((inputCost + outputCost) * 100) // Return cost in cents
+  protected calculateCost(_inputTokens: number, _outputTokens: number): number {
+    return 0 // Local Ollama models = free
   }
 
   /**
-   * Call OpenAI API with error handling and cost tracking
+   * Call local Ollama model with error handling and cost tracking.
+   * This replaces the old callOpenAI method.
    */
-  protected async callOpenAI(
-    messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  protected async callOllama(
+    messages: OllamaMessage[],
     options?: {
       model?: string
       temperature?: number
@@ -109,24 +129,36 @@ export abstract class BaseAgent {
     content: string
     costCents: number
   }> {
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: options?.model || 'gpt-4o-mini',
-        messages,
-        temperature: options?.temperature ?? 0.7,
-        max_tokens: options?.maxTokens,
-      })
-
-      const content = response.choices[0]?.message?.content || ''
-      const usage = response.usage
-
-      const costCents = usage ? this.calculateCost(usage.prompt_tokens, usage.completion_tokens) : 0
-
-      return { content, costCents }
-    } catch (error) {
-      console.error('OpenAI API error:', error)
-      throw error
+    const health = await ollamaHealthCheck(options?.model)
+    if (!health.available) {
+      throw new Error(`Ollama model not available: ${health.error}`)
     }
+
+    const result = await ollamaChat(messages, {
+      model: options?.model,
+      temperature: options?.temperature ?? 0.7,
+      maxTokens: options?.maxTokens,
+    })
+
+    return { content: result.content, costCents: 0 }
+  }
+
+  /**
+   * @deprecated Use callOllama instead. Kept for backward compatibility during migration.
+   */
+  protected async callOpenAI(
+    messages: Array<{ role: string; content: string }>,
+    options?: {
+      model?: string
+      temperature?: number
+      maxTokens?: number
+    }
+  ): Promise<{
+    content: string
+    costCents: number
+  }> {
+    // Route through Ollama instead of OpenAI
+    return this.callOllama(messages as OllamaMessage[], options)
   }
 
   /**

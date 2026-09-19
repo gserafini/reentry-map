@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import type { Resource } from '@/lib/types/database'
 
+vi.mock('@/components/map', () => ({ SingleResourceMap: () => <div>Map</div> }))
+vi.mock('@/components/user/ReviewsList', () => ({ ReviewsList: () => <div>Reviews</div> }))
+vi.mock('@/components/user/RatingStars', () => ({ RatingStars: () => <div>Rate</div> }))
+
 // Mock NextAuth session (needed by child components like FavoriteButton)
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: null, status: 'unauthenticated' }),
@@ -89,9 +93,10 @@ describe('ResourceDetail', () => {
     expect(screen.getByText('Resume help')).toBeInTheDocument()
   })
 
-  it('shows verified badge when verified', () => {
+  it('does not label an undated verified flag as an automated check', () => {
     render(<ResourceDetail resource={mockResource} />)
-    expect(screen.getByText('Verified')).toBeInTheDocument()
+    expect(screen.queryByText('AI Verified')).not.toBeInTheDocument()
+    expect(screen.getByText(/Check date unavailable/)).toBeInTheDocument()
   })
 
   it('displays rating information', () => {
@@ -101,5 +106,26 @@ describe('ResourceDetail', () => {
       .getByText(/4.5/)
       .closest('[itemtype="https://schema.org/LocalBusiness"]')
     expect(container).toHaveTextContent('10')
+  })
+
+  it('shows statewide coverage clearly and hides directions for statewide resources', () => {
+    render(
+      <ResourceDetail
+        resource={
+          {
+            ...mockResource,
+            address: '',
+            city: 'Lubbock',
+            state: 'TX',
+            address_type: 'regional',
+            service_area: { type: 'statewide', values: ['Texas'] },
+          } as Resource
+        }
+      />
+    )
+
+    expect(screen.getByText('Statewide resource')).toBeInTheDocument()
+    expect(screen.getByText('Serves all of Texas')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /get directions/i })).not.toBeInTheDocument()
   })
 })

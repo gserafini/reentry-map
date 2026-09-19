@@ -1,144 +1,156 @@
-import { Container, Box, Typography, Button, Card, CardContent, Chip, Grid } from '@mui/material'
+import { Suspense } from 'react'
 import {
-  Work as WorkIcon,
-  Home as HomeIcon,
-  Restaurant as FoodIcon,
-  LocalHospital as HealthIcon,
-  Checkroom as ClothingIcon,
-  Gavel as LegalIcon,
-  DirectionsBus as TransportIcon,
-  School as EducationIcon,
-} from '@mui/icons-material'
+  Container,
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Grid,
+  Link as MuiLink,
+} from '@mui/material'
 import Link from 'next/link'
 import { getResources, getResourceCount } from '@/lib/api/resources'
 import { HeroSearch } from '@/components/search/HeroSearch'
-import { FeaturedResourcesList } from '@/components/resources/FeaturedResourcesList'
-import {
-  generateNationalCategoryUrl,
-  generateCityUrl,
-  generateCategoryInCityUrl,
-} from '@/lib/utils/urls'
-import type { ResourceCategory } from '@/lib/types/database'
+import { LocationUrlSync } from '@/components/search/LocationUrlSync'
+import { ResourceList } from '@/components/resources/ResourceList'
 import { PageViewTracker } from '@/components/analytics/PageViewTracker'
+import { getAllCategories, getCategoryLabel, getCategoryDescription } from '@/lib/utils/categories'
+import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
+import { US_STATE_CODE_TO_NAME } from '@/lib/utils/resource-location'
+import { resolveSearchLocation } from '@/lib/utils/search-location'
+import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
 
-// Force dynamic rendering since we fetch data from database
 export const dynamic = 'force-dynamic'
 
-export default async function HomePage() {
-  // Fetch some featured resources and total count
-  const [{ data: featuredResources }, { data: resourceCount }] = await Promise.all([
-    getResources({ limit: 6, sort: { field: 'rating_average', direction: 'desc' } }),
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<ResourcesPageSearchParams>
+}) {
+  const params = await searchParams
+  const locationParams = new URLSearchParams()
+  for (const key of [
+    'lat',
+    'lng',
+    'distance',
+    'locationName',
+    'north',
+    'south',
+    'east',
+    'west',
+  ] as const) {
+    if (params[key]) locationParams.set(key, params[key])
+  }
+  const location = resolveSearchLocation(locationParams)
+  const hasLocation = Boolean(location.coordinates || location.state || location.viewportBounds)
+  const [{ data: localResources, error }, { data: resourceCount }] = await Promise.all([
+    hasLocation
+      ? getResources({ ...buildResourcesQueryOptions(params), limit: 6 })
+      : Promise.resolve({ data: null, error: null }),
     getResourceCount(),
   ])
-
-  const categories = [
-    { name: 'Employment', icon: WorkIcon, slug: 'employment', color: '#1976d2' },
-    { name: 'Housing', icon: HomeIcon, slug: 'housing', color: '#388e3c' },
-    { name: 'Food', icon: FoodIcon, slug: 'food', color: '#f57c00' },
-    { name: 'Healthcare', icon: HealthIcon, slug: 'healthcare', color: '#d32f2f' },
-    { name: 'Clothing', icon: ClothingIcon, slug: 'clothing', color: '#7b1fa2' },
-    { name: 'Legal Aid', icon: LegalIcon, slug: 'legal-aid', color: '#0288d1' },
-    { name: 'Transportation', icon: TransportIcon, slug: 'transportation', color: '#689f38' },
-    { name: 'Education', icon: EducationIcon, slug: 'education', color: '#f57c00' },
-  ]
+  const browseUrl = '/resources' + (locationParams.size ? '?' + locationParams.toString() : '')
+  const userLocation = location.coordinates
+    ? { lat: location.coordinates.latitude, lng: location.coordinates.longitude }
+    : null
 
   return (
     <>
       <PageViewTracker pageTitle="Home - Find Reentry Resources" />
-      {/* Hero Section */}
-      <Box
-        sx={{
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
-          py: { xs: 6, md: 10 },
-        }}
-      >
+      <Suspense fallback={null}>
+        <LocationUrlSync />
+      </Suspense>
+      <Box sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', py: { xs: 3, md: 6 } }}>
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box sx={{ textAlign: 'center' }}>
             <Typography
               variant="h2"
               component="h1"
-              gutterBottom
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: '2rem', md: '3.5rem' },
-              }}
+              sx={{ fontWeight: 700, fontSize: { xs: '1.9rem', md: '3rem' }, mb: 1.5 }}
             >
-              Find what you need to succeed
+              Find help for your next step
             </Typography>
-            <Typography
-              variant="h5"
-              component="h2"
-              sx={{
-                mb: 4,
-                color: '#fff',
-                fontSize: { xs: '1.1rem', md: '1.5rem' },
-              }}
-            >
-              Employment, housing, food, healthcare, and more in your community
+            <Typography sx={{ mb: 3, color: '#fff', fontSize: { xs: '1rem', md: '1.25rem' } }}>
+              Housing, jobs, food, healthcare, and support near you.
             </Typography>
-
-            {/* Search Bar */}
-            <Box sx={{ maxWidth: 700, mx: 'auto' }}>
+            <Box sx={{ maxWidth: 760, mx: 'auto' }}>
               <HeroSearch />
             </Box>
-
-            {/* Resource count */}
-            {resourceCount !== null && (
-              <Typography sx={{ mt: 3, color: '#fff' }}>
-                <strong>{resourceCount}</strong> active resources available
-              </Typography>
-            )}
+            <Typography variant="body2" sx={{ mt: 2, color: '#fff' }}>
+              Free to search. No account needed.
+              {resourceCount != null
+                ? ' ' + resourceCount.toLocaleString('en-US') + ' listings across the U.S.'
+                : ''}
+            </Typography>
           </Box>
         </Container>
       </Box>
 
-      {/* Categories Section */}
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Typography variant="h4" component="h2" gutterBottom sx={{ mb: 4, fontWeight: 600 }}>
-          I&apos;m looking for...
+      {hasLocation && (
+        <Container maxWidth="lg" component="section" sx={{ py: 3 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              mb: 2,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Typography variant="h5" component="h2" sx={{ fontWeight: 700 }}>
+              {location.state ? 'Help across ' : 'Help near '}
+              {location.label}
+            </Typography>
+            <Button href={browseUrl} variant="outlined">
+              See all results
+            </Button>
+          </Box>
+          {localResources?.length ? (
+            <ResourceList resources={localResources} userLocation={userLocation} />
+          ) : (
+            <Typography color="text.secondary">
+              {error
+                ? 'We could not load local suggestions. Please try your search again.'
+                : 'Choose a service below or try a nearby location to find more options.'}
+            </Typography>
+          )}
+        </Container>
+      )}
+
+      <Container maxWidth="lg" component="section" sx={{ py: 3 }}>
+        <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 700 }}>
+          What do you need help with?
         </Typography>
-        <Grid container spacing={3}>
-          {categories.map((category) => {
-            const Icon = category.icon
+        <Grid container spacing={1.5}>
+          {getAllCategories().map((category) => {
+            const Icon = getCategoryIcon(category)
+            const query = new URLSearchParams(locationParams)
+            query.set('categories', category)
             return (
-              <Grid size={{ xs: 6, sm: 4, md: 3 }} key={category.slug}>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }} key={category}>
                 <Link
-                  href={generateNationalCategoryUrl(category.slug as ResourceCategory)}
+                  href={'/resources?' + query.toString()}
                   style={{ textDecoration: 'none', height: '100%', display: 'block' }}
                 >
                   <Card
+                    variant="outlined"
                     sx={{
                       height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      cursor: 'pointer',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: 4,
-                      },
+                      borderRadius: 2,
+                      '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
                     }}
                   >
-                    <CardContent sx={{ textAlign: 'center', flexGrow: 1 }}>
-                      <Box
-                        sx={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: '50%',
-                          bgcolor: category.color,
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          mx: 'auto',
-                          mb: 2,
-                        }}
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Icon sx={{ fontSize: 28, color: getCategoryColor(category), mb: 0.5 }} />
+                      <Typography sx={{ fontWeight: 600 }}>{getCategoryLabel(category)}</Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 0.5, display: { xs: 'none', sm: 'block' } }}
                       >
-                        <Icon sx={{ fontSize: 32 }} />
-                      </Box>
-                      <Typography variant="h6" component="div">
-                        {category.name}
+                        {getCategoryDescription(category)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -149,113 +161,65 @@ export default async function HomePage() {
         </Grid>
       </Container>
 
-      {/* Featured Resources Section */}
-      {featuredResources && featuredResources.length > 0 && (
-        <Box sx={{ bgcolor: 'background.default', py: 6 }}>
-          <Container maxWidth="lg">
-            <Box
-              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}
-            >
-              <Typography variant="h4" component="h2" sx={{ fontWeight: 600 }}>
-                Top-Rated Resources
-              </Typography>
-              <Link href="/resources" style={{ textDecoration: 'none' }}>
-                <Button variant="outlined">View All</Button>
-              </Link>
-            </Box>
-            <FeaturedResourcesList resources={featuredResources} />
-          </Container>
-        </Box>
-      )}
-
-      {/* Call to Action Section */}
-      <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
-        <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 600 }}>
-          Know a Great Resource?
-        </Typography>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{ mb: 3, maxWidth: 600, mx: 'auto' }}
-        >
-          Help us build a comprehensive directory by suggesting resources that have helped you or
-          others in your community.
-        </Typography>
-        <Link href="/suggest-resource" style={{ textDecoration: 'none' }}>
-          <Button variant="contained" size="large">
-            Suggest a Resource
-          </Button>
-        </Link>
-      </Container>
-
-      {/* SEO Footer - Find Resources by Location */}
-      <Box sx={{ bgcolor: 'background.default', py: 4, borderTop: 1, borderColor: 'divider' }}>
+      <Box
+        component="section"
+        sx={{ bgcolor: 'background.default', borderTop: 1, borderColor: 'divider', py: 3 }}
+      >
         <Container maxWidth="lg">
-          <Typography variant="h6" gutterBottom>
-            Find Resources by Location
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, mb: 1 }}>
+            Find help in another state
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Browse verified reentry resources in Bay Area cities
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Planning a move or helping someone elsewhere? Browse by state.
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Link href={generateCityUrl('Oakland', 'CA')} style={{ textDecoration: 'none' }}>
-              <Chip label="Oakland, CA" clickable color="primary" />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl('Oakland', 'CA', 'employment' as ResourceCategory)}
-              style={{ textDecoration: 'none' }}
+          <Box component="details">
+            <Box
+              component="summary"
+              sx={{
+                cursor: 'pointer',
+                minHeight: 44,
+                display: 'list-item',
+                fontWeight: 600,
+                color: 'primary.main',
+                pt: 1,
+              }}
             >
-              <Chip label="Employment in Oakland" clickable />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl('Oakland', 'CA', 'housing' as ResourceCategory)}
-              style={{ textDecoration: 'none' }}
+              Browse all states and Washington, DC
+            </Box>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+                gap: 1,
+              }}
             >
-              <Chip label="Housing in Oakland" clickable />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl('Oakland', 'CA', 'food' as ResourceCategory)}
-              style={{ textDecoration: 'none' }}
-            >
-              <Chip label="Food in Oakland" clickable />
-            </Link>
-            <Link href={generateCityUrl('San Francisco', 'CA')} style={{ textDecoration: 'none' }}>
-              <Chip label="San Francisco, CA" clickable />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl(
-                'San Francisco',
-                'CA',
-                'employment' as ResourceCategory
-              )}
-              style={{ textDecoration: 'none' }}
-            >
-              <Chip label="Employment in San Francisco" clickable />
-            </Link>
-            <Link href={generateCityUrl('Berkeley', 'CA')} style={{ textDecoration: 'none' }}>
-              <Chip label="Berkeley, CA" clickable />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl('Berkeley', 'CA', 'housing' as ResourceCategory)}
-              style={{ textDecoration: 'none' }}
-            >
-              <Chip label="Housing in Berkeley" clickable />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl('Oakland', 'CA', 'legal-aid' as ResourceCategory)}
-              style={{ textDecoration: 'none' }}
-            >
-              <Chip label="Legal Aid in Oakland" clickable />
-            </Link>
-            <Link
-              href={generateCategoryInCityUrl('Oakland', 'CA', 'mental-health' as ResourceCategory)}
-              style={{ textDecoration: 'none' }}
-            >
-              <Chip label="Mental Health in Oakland" clickable />
-            </Link>
+              {Object.entries(US_STATE_CODE_TO_NAME)
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .map(([code, name]) => (
+                  <MuiLink
+                    key={code}
+                    href={'/' + code.toLowerCase()}
+                    sx={{ minHeight: 44, display: 'flex', alignItems: 'center' }}
+                  >
+                    {name}
+                  </MuiLink>
+                ))}
+            </Box>
           </Box>
         </Container>
       </Box>
+
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography variant="h6" component="h2" gutterBottom>
+          Help keep the directory useful
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          Know a resource we should add? Share it with us for review.
+        </Typography>
+        <Button href="/suggest-resource" variant="outlined">
+          Suggest a resource
+        </Button>
+      </Container>
     </>
   )
 }

@@ -4,6 +4,11 @@ import { describe, it, expect, vi } from 'vitest'
 import ResourceCard from '@/components/resources/ResourceCard'
 import { LocationProvider } from '@/lib/context/LocationContext'
 
+vi.mock('@/lib/context/LocationContext', () => ({
+  LocationProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useUserLocation: () => ({ coordinates: null }),
+}))
+
 // Mock NextAuth session (needed by FavoriteButton in ResourceCard)
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: null, status: 'unauthenticated' }),
@@ -57,35 +62,34 @@ describe('ResourceCard', () => {
     expect(favoriteButtons.length).toBeGreaterThan(0)
   })
 
-  it('shows "No ratings" when rating_average is null', () => {
+  it('omits rating placeholders when there are no ratings', () => {
     render(
       <LocationProvider>
         <ResourceCard resource={{ ...mockResource, rating_average: null, rating_count: 0 }} />
       </LocationProvider>
     )
 
-    expect(screen.getByText('No ratings')).toBeInTheDocument()
+    expect(screen.queryByText('No ratings')).not.toBeInTheDocument()
   })
 
-  it('shows rating count of 0 when rating_count is null', () => {
+  it('omits stars when rating count is unknown', () => {
     render(
       <LocationProvider>
         <ResourceCard resource={{ ...mockResource, rating_count: null }} />
       </LocationProvider>
     )
 
-    // rating_count || 0 should show (0)
-    expect(screen.getByText('(0)')).toBeInTheDocument()
+    expect(screen.queryByText('(0)')).not.toBeInTheDocument()
   })
 
-  it('shows "No address" when address is not provided', () => {
+  it('shows "Location details unavailable" when address is not provided', () => {
     render(
       <LocationProvider>
         <ResourceCard resource={{ ...mockResource, address: null }} />
       </LocationProvider>
     )
 
-    expect(screen.getByText('No address')).toBeInTheDocument()
+    expect(screen.getByText('Location details unavailable')).toBeInTheDocument()
   })
 
   it('renders city and state with comma separator', () => {
@@ -151,5 +155,26 @@ describe('ResourceCard', () => {
     )
 
     expect(screen.getByText('Test Resource')).toBeInTheDocument()
+  })
+
+  it('shows statewide coverage clearly instead of saying no address', () => {
+    render(
+      <LocationProvider>
+        <ResourceCard
+          resource={{
+            ...mockResource,
+            address: null,
+            city: 'Lubbock',
+            state: 'TX',
+            address_type: 'regional',
+            service_area: { type: 'statewide', values: ['Texas'] },
+          }}
+        />
+      </LocationProvider>
+    )
+
+    expect(screen.getByText('Statewide resource')).toBeInTheDocument()
+    expect(screen.getByText('Serves all of Texas')).toBeInTheDocument()
+    expect(screen.queryByText('Location details unavailable')).not.toBeInTheDocument()
   })
 })

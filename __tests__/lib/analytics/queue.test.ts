@@ -107,7 +107,41 @@ describe('Analytics Queue', () => {
   }
 
   describe('Enable/Disable', () => {
-    it('should be enabled by default', async () => {
+    it('requires explicit consent and respects browser privacy signals', async () => {
+      setupWindowMock()
+      setupNavigatorMock()
+      setupDocumentMock()
+      const { analytics, enableAnalytics } = await import('@/lib/analytics/queue')
+      expect(analytics.isTrackingEnabled()).toBe(false)
+      enableAnalytics()
+      expect(analytics.isTrackingEnabled()).toBe(true)
+      setupNavigatorMock({ doNotTrack: '1' })
+      expect(analytics.isTrackingEnabled()).toBe(false)
+      analytics.destroy()
+    })
+
+    it('does not include search words or precise locations in feature referrers', async () => {
+      setupWindowMock()
+      const navigator = setupNavigatorMock()
+      setupDocumentMock()
+      Object.defineProperty(global, 'document', {
+        value: { referrer: 'https://reentrymap.org/search?search=private&lat=32.77#token' },
+        configurable: true,
+      })
+      const blobs: string[] = []
+      global.Blob = vi.fn().mockImplementation(function (content: string[]) {
+        blobs.push(content[0])
+        return {}
+      }) as unknown as typeof Blob
+      const { analytics, enableAnalytics } = await import('@/lib/analytics/queue')
+      enableAnalytics()
+      for (let i = 0; i < 50; i++) analytics.track('feature_search_results')
+      expect(navigator.sendBeacon).toHaveBeenCalled()
+      expect(blobs.join('')).not.toMatch(/private|lat=|token/)
+      analytics.destroy()
+    })
+
+    it('does not set a consent choice by default', async () => {
       setupWindowMock()
       setupNavigatorMock()
       setupDocumentMock()
@@ -532,10 +566,15 @@ describe('Analytics Queue', () => {
       setupNavigatorMock()
       setupDocumentMock()
 
-      global.Blob = vi.fn().mockImplementation((content: unknown[], options: { type: string }) => ({
-        content,
-        type: options?.type,
-      })) as unknown as typeof Blob
+      global.Blob = vi.fn().mockImplementation(function (
+        content: unknown[],
+        options: { type: string }
+      ) {
+        return {
+          content,
+          type: options?.type,
+        }
+      }) as unknown as typeof Blob
 
       const { analytics, enableAnalytics } = await import('@/lib/analytics/queue')
       enableAnalytics()
@@ -556,10 +595,12 @@ describe('Analytics Queue', () => {
       setupDocumentMock()
 
       // Mock Blob
-      global.Blob = vi.fn().mockImplementation((content, options) => ({
-        content,
-        type: options?.type,
-      })) as unknown as typeof Blob
+      global.Blob = vi.fn().mockImplementation(function (content, options) {
+        return {
+          content,
+          type: options?.type,
+        }
+      }) as unknown as typeof Blob
 
       const { analytics, enableAnalytics } = await import('@/lib/analytics/queue')
       enableAnalytics()
@@ -584,10 +625,15 @@ describe('Analytics Queue', () => {
       setupNavigatorMock({ sendBeacon: mockSendBeacon })
       setupDocumentMock()
 
-      global.Blob = vi.fn().mockImplementation((content: unknown[], options: { type: string }) => ({
-        content,
-        type: options?.type,
-      })) as unknown as typeof Blob
+      global.Blob = vi.fn().mockImplementation(function (
+        content: unknown[],
+        options: { type: string }
+      ) {
+        return {
+          content,
+          type: options?.type,
+        }
+      }) as unknown as typeof Blob
       global.fetch = mockFetch
 
       const { analytics, enableAnalytics } = await import('@/lib/analytics/queue')
@@ -652,7 +698,7 @@ describe('Analytics Queue', () => {
       const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
 
       // Make Blob constructor throw to trigger error in flush
-      global.Blob = vi.fn().mockImplementation(() => {
+      global.Blob = vi.fn().mockImplementation(function () {
         throw new Error('Blob error')
       }) as unknown as typeof Blob
 
@@ -673,7 +719,7 @@ describe('Analytics Queue', () => {
       setupNavigatorMock()
       setupDocumentMock()
 
-      global.Blob = vi.fn().mockImplementation(() => {
+      global.Blob = vi.fn().mockImplementation(function () {
         throw new Error('Blob error')
       }) as unknown as typeof Blob
 

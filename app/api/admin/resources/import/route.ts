@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { db } from '@/lib/db/client'
 import { resources } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
-import { checkForDuplicate, detectParentChildRelationships } from '@/lib/utils/deduplication'
+import { eq } from 'drizzle-orm'
+import { checkForDuplicate, getCanonicalOrganizationName } from '@/lib/utils/deduplication'
 import type { NewResource, Resource } from '@/lib/db/schema'
 import type { GoogleMapsGeocodingResponse } from '@/lib/types/google-maps'
 import {
+  buildGeocodingAddress,
+  hasPlausibleStreetAddress,
   normalizeAddressType,
   normalizeServiceArea,
   requiresServiceArea,
@@ -17,16 +19,12 @@ import {
  * Server-side geocoding using Google Maps REST API
  */
 async function geocodeResource(
-  address: string,
-  city: string | null,
-  state: string | null,
-  zip: string | null
+  query: string
 ): Promise<{ latitude: number; longitude: number; formattedAddress: string } | null> {
   const apiKey = process.env.GOOGLE_MAPS_KEY
   if (!apiKey) return null
 
-  const fullAddress = [address, city, state, zip].filter(Boolean).join(', ')
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`
 
   try {
     const response = await fetch(url)
@@ -40,7 +38,7 @@ async function geocodeResource(
       }
     }
   } catch (err) {
-    console.error(`Geocoding failed for "${fullAddress}":`, err)
+    console.error(`Geocoding failed for "${query}":`, err)
   }
   return null
 }
@@ -87,6 +85,7 @@ export async function POST(request: NextRequest) {
         sourceData.discovered_by || sourceData.name || sourceData.research_method || 'admin_import'
       const addressType = normalizeAddressType(resource.address_type)
       const serviceArea = normalizeServiceArea(resource.service_area)
+      const orgName = getCanonicalOrganizationName(resource)
 
       // Build initial change_log entry with full provenance
       const initialChangeLog = [
@@ -126,6 +125,7 @@ export async function POST(request: NextRequest) {
         address: resource.address || '',
         addressType,
         serviceArea,
+        orgName,
         city: resource.city || null,
         state: resource.state || 'CA',
         zip: resource.zip || resource.zip_code || null,
@@ -163,23 +163,15 @@ export async function POST(request: NextRequest) {
     const updatedResourceObjects: Resource[] = []
     const errorDetails: string[] = []
 
-    // Auto-detect parent-child relationships
-    const multiLocationOrgs = await detectParentChildRelationships(validResources)
-    const parentChildMap = new Map<string, string>() // resource name -> parent org name
-
-    // Mark resources that should be children
-    multiLocationOrgs.forEach((locations, orgName) => {
-      locations.forEach((location) => {
-        parentChildMap.set(location.name, orgName)
-      })
-    })
-
     // Process each resource with deduplication
     for (const resource of validResources) {
       try {
-        if (requiresStreetAddress(resource.addressType || 'physical') && !resource.address) {
+        if (
+          requiresStreetAddress(resource.addressType || 'physical') &&
+          !hasPlausibleStreetAddress(resource.address, resource.city, resource.state)
+        ) {
           errors++
-          errorDetails.push(`${resource.name}: physical resources require a street address`)
+          errorDetails.push(`${resource.name}: physical resources require a street-level address`)
           continue
         }
 
@@ -239,95 +231,19 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Check if this should be a child location
-        const parentOrgName = parentChildMap.get(resource.name)
-        if (parentOrgName && multiLocationOrgs.has(parentOrgName)) {
-          const siblings = multiLocationOrgs.get(parentOrgName)!
+        // Create new standalone resource
+        try {
+          const [newData] = await db.insert(resources).values(resource).returning()
 
-          // Check if parent already exists
-          const [existingParent] = await db
-            .select({ id: resources.id })
-            .from(resources)
-            .where(and(eq(resources.orgName, parentOrgName), eq(resources.isParent, true)))
-            .limit(1)
-
-          let parentId: string | null = null
-
-          if (!existingParent) {
-            // Create parent resource (virtual aggregation)
-            // Use first location's data as template
-            // firstLocation is ImportResource with camelCase keys from our validResources mapping
-            const firstLocation = siblings[0] as unknown as NewResource
-            try {
-              const [newParent] = await db
-                .insert(resources)
-                .values({
-                  name: parentOrgName,
-                  orgName: parentOrgName,
-                  isParent: true,
-                  description: `${parentOrgName} serves the community through multiple locations.`,
-                  primaryCategory: firstLocation.primaryCategory,
-                  categories: firstLocation.categories,
-                  address: firstLocation.address, // Use first location's address as primary
-                  city: firstLocation.city,
-                  state: firstLocation.state,
-                  zip: firstLocation.zip,
-                  latitude: firstLocation.latitude,
-                  longitude: firstLocation.longitude,
-                  phone: firstLocation.phone,
-                  website: firstLocation.website,
-                  status: 'active',
-                  source: 'auto_created_parent',
-                } satisfies NewResource)
-                .returning({ id: resources.id })
-
-              parentId = newParent?.id || null
-            } catch (parentError) {
-              const parErrMsg =
-                parentError instanceof Error ? parentError.message : String(parentError)
-              console.error(`Error creating parent for ${parentOrgName}:`, parentError)
-              errorDetails.push(`${resource.name} (parent create): ${parErrMsg}`)
-            }
-          } else {
-            parentId = existingParent.id
+          created++
+          if (newData) {
+            createdResources.push(newData)
           }
-
-          // Create child with parent reference
-          try {
-            const [childData] = await db
-              .insert(resources)
-              .values({
-                ...resource,
-                parentResourceId: parentId,
-                orgName: parentOrgName,
-                locationName: resource.name.replace(parentOrgName, '').trim(),
-              })
-              .returning()
-
-            created++
-            if (childData) {
-              createdResources.push(childData)
-            }
-          } catch (childError) {
-            console.error(`Error creating child ${resource.name}:`, childError)
-            errors++
-          }
-        } else {
-          // Create new standalone resource
-          try {
-            const [newData] = await db.insert(resources).values(resource).returning()
-
-            created++
-            if (newData) {
-              createdResources.push(newData)
-            }
-          } catch (insertError) {
-            const insErrMsg =
-              insertError instanceof Error ? insertError.message : String(insertError)
-            console.error(`Error inserting ${resource.name}:`, insertError)
-            errors++
-            errorDetails.push(`${resource.name} (insert): ${insErrMsg}`)
-          }
+        } catch (insertError) {
+          const insErrMsg = insertError instanceof Error ? insertError.message : String(insertError)
+          console.error(`Error inserting ${resource.name}:`, insertError)
+          errors++
+          errorDetails.push(`${resource.name} (insert): ${insErrMsg}`)
         }
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error)
@@ -347,28 +263,24 @@ export async function POST(request: NextRequest) {
           return false
         }
 
-        return (r.addressType || 'physical') === 'physical' || r.addressType === 'confidential'
+        return (
+          (r.addressType || 'physical') === 'physical' ||
+          r.addressType === 'confidential' ||
+          requiresServiceArea(r.addressType || 'physical')
+        )
       })
 
       if (ungeocodedResources.length > 0) {
         for (const resource of ungeocodedResources) {
           try {
-            if ((resource.addressType || 'physical') === 'physical' && !resource.address) {
+            const geocodingAddress = buildGeocodingAddress(resource)
+
+            if (!geocodingAddress) {
               geocodeErrors.push(resource.name)
               continue
             }
 
-            if (resource.addressType === 'confidential' && (!resource.city || !resource.state)) {
-              geocodeErrors.push(resource.name)
-              continue
-            }
-
-            const result = await geocodeResource(
-              resource.addressType === 'confidential' ? '' : resource.address,
-              resource.city,
-              resource.state,
-              resource.zip
-            )
+            const result = await geocodeResource(geocodingAddress)
             if (result) {
               await db
                 .update(resources)
@@ -396,7 +308,7 @@ export async function POST(request: NextRequest) {
     const warnings: string[] = []
     if (geocodeErrors.length > 0) {
       warnings.push(
-        `${geocodeErrors.length} physical/confidential resource(s) could not be geocoded and may not appear in location-based search: ${geocodeErrors.join(', ')}`
+        `${geocodeErrors.length} resource(s) could not be geocoded from their available address or locality and may not appear in location-based search: ${geocodeErrors.join(', ')}`
       )
     }
 
@@ -416,7 +328,7 @@ export async function POST(request: NextRequest) {
         skipped: skippedResources,
         updated: updatedResources,
       },
-      multiLocationOrgs: Array.from(multiLocationOrgs.keys()),
+      multiLocationOrgs: [],
       ...(errorDetails.length > 0 && { error_details: errorDetails }),
       ...(warnings.length > 0 && { warnings }),
     })

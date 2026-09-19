@@ -5,6 +5,7 @@
  */
 
 import { sql } from '@/lib/db/client'
+import { cache } from 'react'
 import type { ResourceCategory } from '@/lib/types/database'
 
 export interface CityPageData {
@@ -186,24 +187,89 @@ export async function getCategoryInCityPages(): Promise<CategoryInCityPageData[]
 }
 
 /**
- * Get data for a specific city hub page
+ * Single-city render data stays bounded to the selected city. The larger
+ * sitemap-generation thresholds do not make a linked small city a 404.
+ * React cache shares this query between metadata and the page in one render.
  */
-export async function getCityPageData(city: string, state: string): Promise<CityPageData | null> {
-  const pages = await getCityPages()
-  return pages.find((p) => p.city === city && p.state === state) || null
-}
+export const getCityPageData = cache(
+  async (city: string, state: string): Promise<CityPageData | null> => {
+    const resources = await sql<
+      {
+        id: string
+        name: string
+        primary_category: ResourceCategory
+        categories: ResourceCategory[] | null
+        rating_average: number | null
+        created_at: string
+      }[]
+    >`
+      SELECT id, name, primary_category, categories, rating_average, created_at
+      FROM resources WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
+    `
+    if (!resources.length) return null
 
-/**
- * Get data for a specific category in city page
- */
-export async function getCategoryInCityPageData(
-  city: string,
-  state: string,
-  category: ResourceCategory
-): Promise<CategoryInCityPageData | null> {
-  const pages = await getCategoryInCityPages()
-  return pages.find((p) => p.city === city && p.state === state && p.category === category) || null
-}
+    const categoryCounts = {} as Record<ResourceCategory, number>
+    for (const resource of resources) {
+      for (const category of new Set([resource.primary_category, ...(resource.categories || [])])) {
+        if (category) categoryCounts[category] = (categoryCounts[category] || 0) + 1
+      }
+    }
+    const topRated = resources
+      .filter((resource) => resource.rating_average && resource.rating_average > 0)
+      .sort((a, b) => (b.rating_average || 0) - (a.rating_average || 0))[0]
+    const newest = [...resources].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0]
+    return {
+      city,
+      state,
+      slug: `${city.toLowerCase().replace(/\s+/g, '-')}-${state.toLowerCase()}`,
+      totalResources: resources.length,
+      categoryCounts,
+      topRatedResourceId: topRated?.id,
+      topRatedResourceName: topRated?.name,
+      topRatedResourceRating: topRated?.rating_average || undefined,
+      newestResourceId: newest?.id,
+      newestResourceName: newest?.name,
+      newestResourceDate: newest?.created_at,
+    }
+  }
+)
+
+/** A single city/category lookup includes secondary categories, as the results do. */
+export const getCategoryInCityPageData = cache(
+  async (
+    city: string,
+    state: string,
+    category: ResourceCategory
+  ): Promise<CategoryInCityPageData | null> => {
+    const resources = await sql<
+      {
+        id: string
+        name: string
+        rating_average: number | null
+      }[]
+    >`
+      SELECT id, name, rating_average FROM resources
+      WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
+      AND (primary_category = ${category} OR ${category} = ANY(categories))
+    `
+    if (!resources.length) return null
+    const topRated = resources
+      .filter((resource) => resource.rating_average && resource.rating_average > 0)
+      .sort((a, b) => (b.rating_average || 0) - (a.rating_average || 0))[0]
+    return {
+      city,
+      state,
+      category,
+      slug: `${city.toLowerCase().replace(/\s+/g, '-')}-${state.toLowerCase()}/${category}`,
+      resourceCount: resources.length,
+      topRatedResourceId: topRated?.id,
+      topRatedResourceName: topRated?.name,
+      topRatedResourceRating: topRated?.rating_average || undefined,
+    }
+  }
+)
 
 /**
  * Parse city-state slug to components

@@ -354,19 +354,32 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verification events (verification_events table may not exist — use verification_logs)
+    // Verification events — try verification_events first (real-time progress),
+    // fall back to verification_logs (completed summaries) if table doesn't exist
     if (shouldFetch('verification')) {
       queries.push(
         safeQuery(async () => {
           const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-          const rows = await sql<VerificationEventRow[]>`
-            SELECT id, resource_id as suggestion_id, verification_type as event_type,
-                   COALESCE(details, '{}'::jsonb) as event_data, created_at
-            FROM verification_logs
-            WHERE created_at >= ${oneHourAgo}
-            ORDER BY created_at ASC
-          `
-          results.verificationEvents = rows || []
+          try {
+            const rows = await sql<VerificationEventRow[]>`
+              SELECT id, suggestion_id, event_type, event_data, created_at
+              FROM verification_events
+              WHERE created_at >= ${oneHourAgo}
+              ORDER BY created_at ASC
+            `
+            results.verificationEvents = rows || []
+          } catch {
+            // verification_events table may not exist — fall back to verification_logs
+            const rows = await sql<VerificationEventRow[]>`
+              SELECT id, suggestion_id, decision as event_type,
+                     jsonb_build_object('score', overall_score, 'reason', decision_reason) as event_data,
+                     created_at
+              FROM verification_logs
+              WHERE created_at >= ${oneHourAgo}
+              ORDER BY created_at ASC
+            `
+            results.verificationEvents = rows || []
+          }
         })
       )
     }

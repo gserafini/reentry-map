@@ -138,7 +138,7 @@ async function coverageTargets(args) {
 
   const limit = parseInt(values.limit) || 10
 
-  // Direct DB query — replicates get-next-targets.mjs logic
+  // Use the view that joins live resource counts (not stale table values)
   const sql = getDb()
 
   try {
@@ -148,7 +148,7 @@ async function coverageTargets(args) {
         population, priority_score, priority_tier,
         current_resource_count, target_resource_count,
         status, research_status, strategic_rationale
-      FROM expansion_priorities
+      FROM expansion_priorities_with_progress
       WHERE 1=1
         ${values.status ? sql`AND status = ${values.status}` : sql``}
         ${values['research-status'] ? sql`AND research_status = ${values['research-status']}` : sql``}

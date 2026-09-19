@@ -8,6 +8,7 @@ interface SortOption {
 }
 
 export const SORT_OPTIONS: SortOption[] = [
+  { value: 'relevance', label: 'Recommended', field: 'relevance', direction: 'asc' },
   {
     value: 'name-asc',
     label: 'Name (A-Z)',

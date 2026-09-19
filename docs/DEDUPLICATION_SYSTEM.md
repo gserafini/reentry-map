@@ -1,6 +1,8 @@
 # Resource Deduplication & Parent-Child System
 
-**Status**: ✅ Schema + Core Logic Complete | 🚧 Import Integration + Admin UI Pending
+**Status**: Legacy reference. Coverage-aware non-physical deduplication is now tracked in [COVERAGE_AWARE_DEDUPLICATION_PLAN.md](./COVERAGE_AWARE_DEDUPLICATION_PLAN.md).
+
+> Important: synthetic parent-row auto-creation is no longer the intended direction for service-area resources. Same-name non-physical siblings should remain standalone live resources when their coverage differs.
 
 ---
 

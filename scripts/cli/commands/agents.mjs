@@ -4,6 +4,7 @@
  * Subcommands:
  *   discovery               Trigger resource discovery agent
  *   enrichment              Trigger resource enrichment agent
+ *   recheck-unreachable     Re-run UNREACHABLE batch-log entries via the Mac pathway
  *   process-queue [--batch N]  Process AI agent verification queue
  */
 import { parseArgs } from 'node:util'
@@ -17,6 +18,10 @@ agents - AI agent control
 Subcommands:
   discovery                 Trigger resource discovery agent
   enrichment                Trigger resource enrichment agent
+  recheck-unreachable       Re-run UNREACHABLE batch-log entries via the Mac pathway
+    --log PATH              Batch enrich log file to parse
+    --outdir PATH           Output directory for CSV/TXT report (default: /tmp/reentrymap-unreachable-rechecks)
+    --limit N               Optional cap on how many unreachable entries to recheck
   process-queue [--batch N] Process AI agent verification queue
     --batch N               Batch size (default: 10)
 `)
@@ -35,6 +40,8 @@ export async function run(args) {
       return await triggerDiscovery(args)
     case 'enrichment':
       return await triggerEnrichment(args)
+    case 'recheck-unreachable':
+      return await recheckUnreachable(args)
     case 'process-queue':
       return await processQueue(args)
     default:
@@ -62,6 +69,12 @@ async function triggerEnrichment(args) {
     success('Enrichment agent triggered.')
     output(data)
   }
+}
+
+async function recheckUnreachable(args) {
+  const { runCli } = await import('../../recheck-unreachable-via-mac.mjs')
+  const result = await runCli(args)
+  output(result)
 }
 
 async function processQueue(args) {

@@ -4,6 +4,11 @@ import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import { getAISystemStatus } from '@/lib/api/settings'
 import type { ResourceSuggestion } from '@/lib/types/database'
 import {
+  buildNonPhysicalCoverageKey,
+  getCanonicalOrganizationName,
+} from '@/lib/utils/deduplication'
+import {
+  hasPlausibleStreetAddress,
   normalizeAddressType,
   normalizeServiceArea,
   requiresServiceArea,
@@ -41,6 +46,50 @@ interface BatchResourceInput {
   longitude?: number
   discovered_via?: string
   discovery_notes?: string
+}
+
+type CoverageCandidateRow = {
+  id: string
+  name: string
+  address: string | null
+  city: string | null
+  state: string | null
+  address_type: string | null
+  service_area: unknown
+  org_name?: string | null
+}
+
+function findMatchingCoverageCandidate(
+  candidates: CoverageCandidateRow[],
+  resource: {
+    name: string
+    city?: string | null
+    state?: string | null
+    addressType: string
+    serviceArea: unknown
+  }
+): CoverageCandidateRow | null {
+  const targetCoverageKey = buildNonPhysicalCoverageKey({
+    name: resource.name,
+    city: resource.city,
+    state: resource.state,
+    addressType: resource.addressType,
+    serviceArea: resource.serviceArea,
+  })
+
+  return (
+    candidates.find(
+      (candidate) =>
+        buildNonPhysicalCoverageKey({
+          name: candidate.name,
+          org_name: candidate.org_name,
+          city: candidate.city,
+          state: candidate.state,
+          address_type: candidate.address_type,
+          service_area: candidate.service_area,
+        }) === targetCoverageKey
+    ) || null
+  )
 }
 
 /**
@@ -128,10 +177,13 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        if (requiresStreetAddress(addressType) && !address) {
-          console.error('Missing required street address:', { name, addressType })
+        if (
+          requiresStreetAddress(addressType) &&
+          !hasPlausibleStreetAddress(address, city, state)
+        ) {
+          console.error('Missing required street-level address:', { name, addressType, address })
           results.errors++
-          results.error_details.push(`${name}: physical resources require a street address`)
+          results.error_details.push(`${name}: physical resources require a street-level address`)
           continue
         }
 
@@ -145,26 +197,41 @@ export async function POST(request: NextRequest) {
         }
 
         // Check for existing resource (avoid suggesting duplicates)
-        const existingResource =
-          addressType === 'physical' && address
-            ? await sql`
-                SELECT id, name, address FROM resources
-                WHERE LOWER(name) = LOWER(${name})
-                  AND LOWER(address) = LOWER(${address})
-                  AND city = ${city}
-                  AND state = ${state}
-                LIMIT 1
-              `
-            : await sql`
-                SELECT id, name, address FROM resources
-                WHERE LOWER(name) = LOWER(${name})
-                  AND city = ${city}
-                  AND state = ${state}
-                  AND COALESCE(address_type, 'physical') = ${addressType}
-                LIMIT 1
-              `
+        let existingResource: CoverageCandidateRow | null = null
 
-        if (existingResource.length > 0) {
+        if (addressType === 'physical' && address) {
+          const physicalResourceRows = await sql<CoverageCandidateRow[]>`
+            SELECT id, name, address, city, state, NULL::text AS address_type, NULL::jsonb AS service_area, NULL::text AS org_name
+            FROM resources
+            WHERE LOWER(name) = LOWER(${name})
+              AND LOWER(address) = LOWER(${address})
+              AND city = ${city}
+              AND state = ${state}
+            LIMIT 1
+          `
+
+          existingResource = physicalResourceRows[0] || null
+        } else {
+          const nonPhysicalResourceRows = await sql<CoverageCandidateRow[]>`
+            SELECT id, name, address, city, state, address_type, service_area, org_name
+            FROM resources
+            WHERE LOWER(COALESCE(org_name, name)) = LOWER(${getCanonicalOrganizationName({ name })})
+              AND LOWER(COALESCE(city, '')) = LOWER(${city})
+              AND LOWER(COALESCE(state, '')) = LOWER(${state})
+              AND LOWER(COALESCE(address_type, 'physical')) = LOWER(${addressType})
+              AND status = 'active'
+          `
+
+          existingResource = findMatchingCoverageCandidate(nonPhysicalResourceRows, {
+            name,
+            city,
+            state,
+            addressType,
+            serviceArea,
+          })
+        }
+
+        if (existingResource) {
           results.skipped_duplicates++
           results.verification_results.push({
             name,
@@ -175,26 +242,40 @@ export async function POST(request: NextRequest) {
         }
 
         // Check for existing pending suggestion
-        const existingSuggestion =
-          addressType === 'physical' && address
-            ? await sql`
-                SELECT id, name, address FROM resource_suggestions
-                WHERE LOWER(name) = LOWER(${name})
-                  AND LOWER(address) = LOWER(${address})
-                  AND status = 'pending'
-                LIMIT 1
-              `
-            : await sql`
-                SELECT id, name, address FROM resource_suggestions
-                WHERE LOWER(name) = LOWER(${name})
-                  AND city = ${city}
-                  AND state = ${state}
-                  AND status = 'pending'
-                  AND COALESCE(address_type, 'physical') = ${addressType}
-                LIMIT 1
-              `
+        let existingSuggestion: CoverageCandidateRow | null = null
 
-        if (existingSuggestion.length > 0) {
+        if (addressType === 'physical' && address) {
+          const physicalSuggestionRows = await sql<CoverageCandidateRow[]>`
+            SELECT id, name, address, city, state, NULL::text AS address_type, NULL::jsonb AS service_area, NULL::text AS org_name
+            FROM resource_suggestions
+            WHERE LOWER(name) = LOWER(${name})
+              AND LOWER(address) = LOWER(${address})
+              AND status = 'pending'
+            LIMIT 1
+          `
+
+          existingSuggestion = physicalSuggestionRows[0] || null
+        } else {
+          const nonPhysicalSuggestionRows = await sql<CoverageCandidateRow[]>`
+            SELECT id, name, address, city, state, address_type, service_area, NULL::text AS org_name
+            FROM resource_suggestions
+            WHERE LOWER(name) = LOWER(${name})
+              AND LOWER(COALESCE(city, '')) = LOWER(${city})
+              AND LOWER(COALESCE(state, '')) = LOWER(${state})
+              AND status = 'pending'
+              AND LOWER(COALESCE(address_type, 'physical')) = LOWER(${addressType})
+          `
+
+          existingSuggestion = findMatchingCoverageCandidate(nonPhysicalSuggestionRows, {
+            name,
+            city,
+            state,
+            addressType,
+            serviceArea,
+          })
+        }
+
+        if (existingSuggestion) {
           results.skipped_duplicates++
           results.verification_results.push({
             name,

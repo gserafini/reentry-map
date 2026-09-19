@@ -4,6 +4,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { DistanceFilter } from '@/components/search/DistanceFilter'
 import {
   render,
+  getMockRouter,
   resetRouterMocks,
   setMockSearchParams,
   setMockPathname,
@@ -11,7 +12,8 @@ import {
 
 // Mock use-debounce to not debounce in tests
 vi.mock('use-debounce', () => ({
-  useDebouncedCallback: (callback: (...args: unknown[]) => void) => callback,
+  useDebouncedCallback: (callback: (...args: unknown[]) => void) =>
+    Object.assign(callback, { cancel: vi.fn() }),
 }))
 
 describe('DistanceFilter', () => {
@@ -62,21 +64,20 @@ describe('DistanceFilter', () => {
 
   it('updates URL when slider value changes', async () => {
     const user = userEvent.setup()
-    const mockReplaceState = vi.fn()
-    window.history.replaceState = mockReplaceState
+    const mockPush = getMockRouter().push
     setMockSearchParams({ distance: '20' })
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
     // Verify initial state
-    expect(mockReplaceState).toHaveBeenCalledTimes(0)
+    expect(mockPush).toHaveBeenCalledTimes(0)
 
     // Test the clear button interaction which updates URL
-    const clearButton = screen.getByLabelText(/clear distance filter/i)
+    const clearButton = screen.getByLabelText(/reset distance/i)
     await user.click(clearButton)
 
     await waitFor(() => {
-      expect(mockReplaceState).toHaveBeenCalled()
-      const [[, , url]] = mockReplaceState.mock.calls
+      expect(mockPush).toHaveBeenCalled()
+      const [[url]] = mockPush.mock.calls
       expect(url).toBe('/search')
     })
   })
@@ -100,30 +101,29 @@ describe('DistanceFilter', () => {
 
     render(<DistanceFilter hasLocation={true} />)
 
-    expect(screen.getByLabelText(/clear distance filter/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/reset distance/i)).toBeInTheDocument()
   })
 
   it('does not show clear button when filter is inactive', () => {
     render(<DistanceFilter hasLocation={true} />)
 
-    expect(screen.queryByLabelText(/clear distance filter/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/reset distance/i)).not.toBeInTheDocument()
   })
 
   it('clears filter and resets to default when clear button clicked', async () => {
     const user = userEvent.setup()
-    const mockReplaceState = vi.fn()
-    window.history.replaceState = mockReplaceState
+    const mockPush = getMockRouter().push
     setMockSearchParams({ distance: '35' })
     localStorage.setItem('preferredDistance', '35')
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
-    const clearButton = screen.getByLabelText(/clear distance filter/i)
+    const clearButton = screen.getByLabelText(/reset distance/i)
     await user.click(clearButton)
 
     await waitFor(() => {
-      expect(mockReplaceState).toHaveBeenCalled()
-      const [[, , url]] = mockReplaceState.mock.calls
+      expect(mockPush).toHaveBeenCalled()
+      const [[url]] = mockPush.mock.calls
       expect(url).toBe('/search')
       expect(localStorage.getItem('preferredDistance')).toBeNull()
     })
@@ -131,18 +131,17 @@ describe('DistanceFilter', () => {
 
   it('preserves other search params when updating distance', async () => {
     const user = userEvent.setup()
-    const mockReplaceState = vi.fn()
-    window.history.replaceState = mockReplaceState
+    const mockPush = getMockRouter().push
     setMockSearchParams({ q: 'housing', category: 'housing', distance: '20' })
 
     render(<DistanceFilter hasLocation={true} />)
 
-    const clearButton = screen.getByLabelText(/clear distance filter/i)
+    const clearButton = screen.getByLabelText(/reset distance/i)
     await user.click(clearButton)
 
     await waitFor(() => {
-      expect(mockReplaceState).toHaveBeenCalled()
-      const [[, , calledUrl]] = mockReplaceState.mock.calls
+      expect(mockPush).toHaveBeenCalled()
+      const [[calledUrl]] = mockPush.mock.calls
       expect(calledUrl).toContain('q=housing')
       expect(calledUrl).toContain('category=housing')
       expect(calledUrl).not.toContain('distance')
@@ -151,31 +150,30 @@ describe('DistanceFilter', () => {
 
   it('removes page param when distance changes', async () => {
     const user = userEvent.setup()
-    const mockReplaceState = vi.fn()
-    window.history.replaceState = mockReplaceState
+    const mockPush = getMockRouter().push
     setMockSearchParams({ distance: '20', page: '3' })
 
     render(<DistanceFilter hasLocation={true} />)
 
-    const clearButton = screen.getByLabelText(/clear distance filter/i)
+    const clearButton = screen.getByLabelText(/reset distance/i)
     await user.click(clearButton)
 
     await waitFor(() => {
-      expect(mockReplaceState).toHaveBeenCalled()
-      const [[, , calledUrl]] = mockReplaceState.mock.calls
+      expect(mockPush).toHaveBeenCalled()
+      const [[calledUrl]] = mockPush.mock.calls
       expect(calledUrl).not.toContain('page')
     })
   })
 
-  it('loads distance from localStorage when URL param is not present', () => {
+  it('uses the query default rather than an unapplied localStorage distance', () => {
     localStorage.setItem('preferredDistance', '40')
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 
     const slider = screen.getByRole('slider') as HTMLInputElement
-    expect(slider.value).toBe('40')
+    expect(slider.value).toBe('25')
     // Use getAllByText since the value appears in both the value label and helper text
-    const milesTexts = screen.getAllByText(/40 miles/i)
+    const milesTexts = screen.getAllByText(/25 miles/i)
     expect(milesTexts.length).toBeGreaterThan(0)
   })
 
@@ -206,7 +204,7 @@ describe('DistanceFilter', () => {
   })
 
   it('ignores out-of-range distance values from URL', () => {
-    setMockSearchParams({ distance: '100' })
+    setMockSearchParams({ distance: '999' })
 
     render(<DistanceFilter hasLocation={true} defaultDistance={25} />)
 

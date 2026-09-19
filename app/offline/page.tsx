@@ -1,44 +1,54 @@
-import { Container, Typography, Box, Button } from '@mui/material'
-import { WifiOff as OfflineIcon } from '@mui/icons-material'
+'use client'
 
-/**
- * Offline fallback page
- *
- * Shown when user is offline and tries to navigate to an uncached page
- */
+import { useEffect, useState } from 'react'
+import { Alert, Container, Typography, Box, Button, Stack } from '@mui/material'
+import { WifiOff } from '@mui/icons-material'
+import { useFavorites } from '@/lib/context/FavoritesContext'
+import { SavedSupportList } from '@/components/user/SavedSupportList'
+
 export default function OfflinePage() {
+  const { savedResources, removeDeviceFavorite, clearDeviceFavorites, error } = useFavorites()
+  const [online, setOnline] = useState(false)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    update()
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '60vh',
-          textAlign: 'center',
-          gap: 3,
-        }}
-      >
-        <OfflineIcon sx={{ fontSize: 80, color: 'text.secondary' }} />
-
-        <Typography variant="h4" component="h1" gutterBottom>
-          You&apos;re Offline
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+        <WifiOff />
+        <Typography variant="h4" component="h1">
+          Keep your next steps close
         </Typography>
-
-        <Typography variant="body1" color="text.secondary">
-          It looks like you&apos;ve lost your internet connection. Some features may not be
-          available until you&apos;re back online.
-        </Typography>
-
-        <Typography variant="body2" color="text.secondary">
-          Pages you&apos;ve visited previously should still be accessible.
-        </Typography>
-
-        <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
-          Try Again
-        </Button>
       </Box>
+      <Alert severity={online ? 'info' : 'warning'} sx={{ mb: 2 }}>
+        {online
+          ? 'Your connection is available. Try opening the online list again.'
+          : 'You are offline. Saved contacts on this device are available below.'}
+      </Alert>
+      <Typography sx={{ mb: 2 }}>
+        Saved copies may be out of date. Confirm intake, hours and availability before visiting.
+      </Typography>
+      <Stack direction="row" spacing={1} sx={{ mb: 3 }} data-print-hide>
+        <Button variant="contained" href="/favorites">
+          Try online list
+        </Button>
+        <Button variant="outlined" href="/offline.html">
+          Offline contact page
+        </Button>
+      </Stack>
+      {error && <Alert severity="error">{error}</Alert>}
+      <SavedSupportList
+        resources={savedResources}
+        onRemove={removeDeviceFavorite}
+        onClear={clearDeviceFavorites}
+      />
     </Container>
   )
 }
