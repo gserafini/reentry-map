@@ -17,6 +17,7 @@ import { getResourcesCount } from '@/lib/api/resources'
 import { BreadcrumbList, CollectionPage } from '@/components/seo/StructuredData'
 import { parseStateSlug, generateCityUrl, generateStateUrl } from '@/lib/utils/urls'
 import { US_STATE_CODE_TO_NAME } from '@/lib/utils/resource-location'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 import type { Metadata } from 'next'
 
 interface StatePageProps {
@@ -116,11 +117,20 @@ export async function generateMetadata({ params }: StatePageProps): Promise<Meta
     stateName +
     '. Browse by city or view all resources.'
   const url = 'https://reentrymap.org' + generateStateUrl(state)
+  const { count } = await getStateDirectory(state)
+  const image = createOpenGraphImage({
+    kind: 'state',
+    eyebrow: 'Statewide resource directory',
+    title: `Find reentry help in ${stateName}`,
+    description,
+    location: stateName,
+    count: count.error ? null : count.data,
+  })
   return {
     title,
     description,
-    openGraph: { title, description, type: 'website', url },
-    twitter: { card: 'summary_large_image', title, description },
+    openGraph: { title, description, type: 'website', url, images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
     alternates: { canonical: url },
   }
 }

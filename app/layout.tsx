@@ -10,9 +10,16 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { Footer } from '@/components/layout/Footer'
 import { AuthButton } from '@/components/auth-button'
 import { AdminStatusBar } from '@/components/admin/AdminStatusBar'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 import '../styles/tailwind.css'
 
 const defaultUrl = env.NEXT_PUBLIC_APP_URL || 'https://reentrymap.org'
+const defaultSocialImage = createOpenGraphImage({
+  kind: 'home',
+  eyebrow: 'Free nationwide reentry directory',
+  title: 'Find help for your next step',
+  description: 'Housing, jobs, food, healthcare, and practical support near you.',
+})
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
@@ -47,12 +54,14 @@ export const metadata: Metadata = {
     title: 'Reentry Map - Find Resources for Reentry',
     description:
       'Find employment, housing, food, healthcare, and support services in your community. Mobile-first resource directory for individuals navigating reentry.',
+    images: [defaultSocialImage],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Reentry Map - Find Resources for Reentry',
     description:
       'Find employment, housing, food, healthcare, and support services in your community. Mobile-first resource directory for individuals navigating reentry.',
+    images: [defaultSocialImage],
   },
 }
 

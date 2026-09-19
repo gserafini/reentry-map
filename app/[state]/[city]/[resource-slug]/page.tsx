@@ -3,12 +3,14 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { sql } from '@/lib/db/client'
 import type { Metadata } from 'next'
-import type { Resource } from '@/lib/types/database'
+import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import { parseStateSlug, parseCitySlug, generateResourceSlug } from '@/lib/utils/urls'
 import { LocalBusiness } from '@/components/seo/StructuredData'
 import { SmartBreadcrumbs } from '@/components/navigation/SmartBreadcrumbs'
 import { ResourceViewTracker } from '@/components/analytics/ResourceViewTracker'
+import { getCategoryLabel } from '@/lib/utils/categories'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 
 interface ResourcePageProps {
   params: Promise<{
@@ -103,6 +105,14 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
   const description =
     resource.description?.slice(0, 160) ||
     `Find contact information, hours, and reviews for ${resource.name} in ${city}, ${state}.`
+  const image = createOpenGraphImage({
+    kind: 'resource',
+    eyebrow: `${getCategoryLabel(resource.primary_category as ResourceCategory)} provider`,
+    title: resource.name,
+    description,
+    location: `${city}, ${state}`,
+    category: resource.primary_category,
+  })
 
   return {
     title,
@@ -119,11 +129,13 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
       description,
       type: 'website',
       url: `https://reentrymap.org/${stateSlug}/${citySlug}/${resourceSlug}`,
+      images: [image],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: [image],
     },
     alternates: {
       canonical: `https://reentrymap.org/${stateSlug}/${citySlug}/${resourceSlug}`,

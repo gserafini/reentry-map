@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResultsExplorer } from '@/components/search/ResultsExplorer'
-import { getCategoryLabel, getAllCategories } from '@/lib/utils/categories'
+import { getCategoryDescription, getCategoryLabel, getAllCategories } from '@/lib/utils/categories'
 import { BreadcrumbList, CollectionPage, ItemList } from '@/components/seo/StructuredData'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 import type { ResourceCategory } from '@/lib/types/database'
 
 interface CategoryPageProps {
@@ -87,6 +88,15 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const categoryLabel = getCategoryLabel(category as ResourceCategory)
   const title = `${categoryLabel} Reentry Resources | Reentry Map`
   const description = `Find ${categoryLabel.toLowerCase()} resources for individuals navigating reentry. Compare services and contact providers in your area.`
+  const count = await getResourcesCount({ categories: [category as ResourceCategory] })
+  const image = createOpenGraphImage({
+    kind: 'category',
+    eyebrow: `${categoryLabel} services`,
+    title: `${categoryLabel} resources`,
+    description: getCategoryDescription(category as ResourceCategory),
+    category,
+    count: count.error ? null : count.data,
+  })
   return {
     title,
     description,
@@ -95,7 +105,9 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       description,
       type: 'website',
       url: `https://reentrymap.org/category/${category}`,
+      images: [image],
     },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
     alternates: { canonical: `https://reentrymap.org/category/${category}` },
   }
 }

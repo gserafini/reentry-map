@@ -14,6 +14,7 @@ import {
   generateStateUrl,
 } from '@/lib/utils/urls'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 import type { Metadata } from 'next'
 import type { ResourceCategory } from '@/lib/types/database'
 
@@ -127,6 +128,15 @@ export async function generateMetadata({ params }: CategoryInCityPageProps): Pro
   const title = `${categoryLabel} in ${city}, ${state} | Reentry Map`
   const description = `Find ${count.data || 0} ${categoryLabel.toLowerCase()} resources in ${city}, ${state}. Browse programs, services, and support for individuals navigating reentry.`
   const categoryUrl = generateCategoryInCityUrl(city, state, category as ResourceCategory)
+  const image = createOpenGraphImage({
+    kind: 'city-category',
+    eyebrow: 'Local resource directory',
+    title: `${categoryLabel} help in ${city}, ${state}`,
+    description,
+    location: `${city}, ${state}`,
+    category,
+    count: count.error ? null : count.data,
+  })
 
   return {
     title,
@@ -143,11 +153,13 @@ export async function generateMetadata({ params }: CategoryInCityPageProps): Pro
       description,
       type: 'website',
       url: `https://reentrymap.org${categoryUrl}`,
+      images: [image],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: [image],
     },
     alternates: {
       canonical: `https://reentrymap.org${categoryUrl}`,

@@ -9,6 +9,9 @@ import {
 import { ResourcesView } from './ResourcesView'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from './params'
 import { interpretSearch } from '@/lib/utils/search-intent'
+import { getCategoryLabel } from '@/lib/utils/categories'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import type { Metadata } from 'next'
 
 interface ResourcesPageProps {
   searchParams: Promise<ResourcesPageSearchParams>
@@ -54,4 +57,33 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
       />
     </Container>
   )
+}
+
+export async function generateMetadata({ searchParams }: ResourcesPageProps): Promise<Metadata> {
+  const params = await searchParams
+  const query = buildResourcesQueryOptions(params)
+  const category = query.categories?.length === 1 ? query.categories[0] : undefined
+  const intent = interpretSearch(query.search)
+  const subject = category
+    ? `${getCategoryLabel(category)} resources`
+    : intent.label || (query.search ? `Help with “${query.search}”` : 'Find reentry help')
+  const imageTitle = `${subject}${query.locationName ? ` in ${query.locationName}` : ''}`
+  const title = `${imageTitle} | Reentry Map`
+  const description =
+    'Browse practical community services, compare options, and contact providers directly.'
+  const image = createOpenGraphImage({
+    kind: query.search ? 'search' : 'directory',
+    eyebrow: query.locationName ? 'Local resource directory' : 'Nationwide resource directory',
+    title: imageTitle,
+    description,
+    location: query.locationName,
+    category: category || intent.categories[0],
+  })
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: 'website', siteName: 'Reentry Map', images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
+  }
 }

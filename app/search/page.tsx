@@ -5,6 +5,8 @@ import { ResultsExplorer } from '@/components/search/ResultsExplorer'
 import { SearchPageHeader } from '@/components/search/SearchPageHeader'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
 import { interpretSearch } from '@/lib/utils/search-intent'
+import { getCategoryLabel } from '@/lib/utils/categories'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 import type { Metadata } from 'next'
 
 interface SearchPageProps {
@@ -48,13 +50,35 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
 export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
   const params = await searchParams
-  const title = `${params.search ? params.search + ' — ' : ''}Find help${params.locationName ? ' in ' + params.locationName : ''} | Reentry Map`
+  const query = buildResourcesQueryOptions(params)
+  const intent = interpretSearch(query.search)
+  const explicitCategory = query.categories?.length === 1 ? query.categories[0] : undefined
+  const category = explicitCategory || intent.categories[0]
+  const subject = explicitCategory
+    ? getCategoryLabel(explicitCategory)
+    : intent.label || (query.search ? `Help with “${query.search}”` : 'Find reentry help')
+  const imageTitle = `${subject}${query.locationName ? ` in ${query.locationName}` : ''}`
+  const title = `${imageTitle} | Reentry Map`
   const description =
     'Find employment, housing, food, healthcare, and support services. Compare resources, check service areas, and contact a provider.'
+  const image = createOpenGraphImage({
+    kind: 'search',
+    eyebrow: query.locationName ? 'Local search results' : 'Resource search',
+    title: imageTitle,
+    description,
+    location: query.locationName,
+    category,
+  })
   return {
     title,
     description,
-    openGraph: { title, description, type: 'website', siteName: 'Reentry Map' },
-    twitter: { card: 'summary_large_image', title, description },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      siteName: 'Reentry Map',
+      images: [image],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
   }
 }

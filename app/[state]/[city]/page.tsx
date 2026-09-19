@@ -7,6 +7,7 @@ import { ResultsExplorer } from '@/components/search/ResultsExplorer'
 import { BreadcrumbList, CollectionPage, ItemList } from '@/components/seo/StructuredData'
 import { parseStateSlug, parseCitySlug, generateCityUrl, generateStateUrl } from '@/lib/utils/urls'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 import type { Metadata } from 'next'
 
 interface CityPageProps {
@@ -100,6 +101,14 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
   const title = `Reentry Resources in ${city}, ${state} | Reentry Map`
   const description = `Find ${cityData.totalResources} reentry resources in ${city}, ${state}. Browse employment, housing, food, healthcare, and support services.`
   const cityUrl = generateCityUrl(city, state)
+  const image = createOpenGraphImage({
+    kind: 'city',
+    eyebrow: 'Local resource directory',
+    title: `Reentry resources in ${city}, ${state}`,
+    description,
+    location: `${city}, ${state}`,
+    count: cityData.totalResources,
+  })
 
   return {
     title,
@@ -117,11 +126,13 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
       description,
       type: 'website',
       url: `https://reentrymap.org${cityUrl}`,
+      images: [image],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: [image],
     },
     alternates: {
       canonical: `https://reentrymap.org${cityUrl}`,

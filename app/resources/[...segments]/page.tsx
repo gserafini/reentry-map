@@ -2,8 +2,10 @@ import { Container } from '@mui/material'
 import { notFound } from 'next/navigation'
 import { sql } from '@/lib/db/client'
 import type { Metadata } from 'next'
-import type { Resource } from '@/lib/types/database'
+import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
+import { getCategoryLabel } from '@/lib/utils/categories'
+import { createOpenGraphImage } from '@/lib/seo/open-graph'
 
 interface ResourceDetailPageProps {
   params: Promise<{
@@ -75,33 +77,66 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
 export async function generateMetadata({ params }: ResourceDetailPageProps): Promise<Metadata> {
   const { segments } = await params
 
-  let resourceName = 'Resource'
+  let resource:
+    | Pick<Resource, 'name' | 'primary_category' | 'city' | 'state' | 'description'>
+    | undefined
+  let fallbackName = 'Resource'
 
-  // Fetch resource name based on URL format
   if (segments.length === 1) {
     const [id] = segments
-    const rows = await sql<{ name: string; primary_category: string }[]>`
-      SELECT name, primary_category FROM resources
+    const rows = await sql<
+      Pick<Resource, 'name' | 'primary_category' | 'city' | 'state' | 'description'>[]
+    >`
+      SELECT name, primary_category, city, state, description FROM resources
       WHERE id = ${id} AND status = 'active' LIMIT 1
     `
-    resourceName = rows[0]?.name || 'Resource'
+    resource = rows[0]
   } else if (segments.length === 3) {
     const [state, city, slug] = segments
-    const rows = await sql<{ name: string; primary_category: string }[]>`
-      SELECT name, primary_category FROM resources
+    const rows = await sql<
+      Pick<Resource, 'name' | 'primary_category' | 'city' | 'state' | 'description'>[]
+    >`
+      SELECT name, primary_category, city, state, description FROM resources
       WHERE slug = ${slug} AND state = ${state} AND city = ${city} AND status = 'active'
       LIMIT 1
     `
-    resourceName =
-      rows[0]?.name ||
-      slug
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ')
+    resource = rows[0]
+    fallbackName = slug
+      .split('-')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
   }
+
+  const resourceName = resource?.name || fallbackName
+  const location = [resource?.city, resource?.state].filter(Boolean).join(', ') || undefined
+  const description =
+    resource?.description?.slice(0, 160) ||
+    `Information about ${resourceName} and how to access their services.`
+  const image = createOpenGraphImage({
+    kind: 'resource',
+    eyebrow: resource?.primary_category
+      ? `${getCategoryLabel(resource.primary_category as ResourceCategory)} provider`
+      : 'Community resource',
+    title: resourceName,
+    description,
+    location,
+    category: resource?.primary_category,
+  })
 
   return {
     title: `${resourceName} | Reentry Map`,
-    description: `Information about ${resourceName} and how to access their services.`,
+    description,
+    openGraph: {
+      title: `${resourceName} | Reentry Map`,
+      description,
+      type: 'website',
+      images: [image],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${resourceName} | Reentry Map`,
+      description,
+      images: [image],
+    },
   }
 }
