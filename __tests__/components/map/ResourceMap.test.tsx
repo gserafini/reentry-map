@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { ResourceMap } from '@/components/map/ResourceMap'
 import type { Resource } from '@/lib/types/database'
 
@@ -20,17 +21,27 @@ vi.mock('@/lib/env', () => ({
   },
 }))
 
+const mapListeners = new Map<string, () => void>()
+const fitBounds = vi.fn()
+
 // Mock Google Maps global objects
 global.google = {
   maps: {
     Map: vi.fn(function MapMock() {
       return {
-        addListener: vi.fn(),
+        addListener: vi.fn((eventName: string, listener: () => void) => {
+          mapListeners.set(eventName, listener)
+          return {}
+        }),
         setCenter: vi.fn(),
         setZoom: vi.fn(),
-        fitBounds: vi.fn(),
+        fitBounds,
         panTo: vi.fn(),
         getZoom: vi.fn().mockReturnValue(12),
+        getBounds: vi.fn().mockReturnValue({
+          getNorthEast: () => ({ lat: () => 38, lng: () => -121 }),
+          getSouthWest: () => ({ lat: () => 37, lng: () => -123 }),
+        }),
       }
     }),
     InfoWindow: vi.fn(function InfoWindowMock() {
@@ -169,6 +180,7 @@ describe('ResourceMap', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mapListeners.clear()
   })
 
   it('renders without crashing', () => {
@@ -272,5 +284,36 @@ describe('ResourceMap', () => {
 
     expect(global.google.maps.Polygon).toHaveBeenCalled()
     expect(global.google.maps.marker.AdvancedMarkerElement).not.toHaveBeenCalled()
+  })
+
+  it('preserves a user zoom when publishing new viewport bounds rerenders the parent', async () => {
+    function ViewportHarness() {
+      const [, setViewportBounds] = useState<{
+        north: number
+        south: number
+        east: number
+        west: number
+      } | null>(null)
+
+      return (
+        <ResourceMap
+          resources={mockResources}
+          fitToResources
+          onResourceClick={() => undefined}
+          onViewportBoundsChange={setViewportBounds}
+        />
+      )
+    }
+
+    render(<ViewportHarness />)
+
+    await waitFor(() => expect(fitBounds).toHaveBeenCalledTimes(1))
+
+    // Complete the initial programmatic fit, then reproduce a user clicking +.
+    act(() => mapListeners.get('idle')?.())
+    act(() => mapListeners.get('zoom_changed')?.())
+    act(() => mapListeners.get('idle')?.())
+
+    await waitFor(() => expect(fitBounds).toHaveBeenCalledTimes(1))
   })
 })

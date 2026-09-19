@@ -311,6 +311,11 @@ export function ResourceMap({
   const radiusCircleRef = useRef<google.maps.Circle | null>(null)
   const pendingViewportSyncRef = useRef(false)
   const suppressViewportSyncRef = useRef(false)
+  const userAdjustedViewportRef = useRef(false)
+  const onResourceClickRef = useRef(onResourceClick)
+  const onViewportBoundsChangeRef = useRef(onViewportBoundsChange)
+  const lastFramingResourcesRef = useRef<ResourceMapResource[] | null>(null)
+  const lastFramingScopeRef = useRef<string | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -325,6 +330,14 @@ export function ResourceMap({
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  useEffect(() => {
+    onResourceClickRef.current = onResourceClick
+  }, [onResourceClick])
+
+  useEffect(() => {
+    onViewportBoundsChangeRef.current = onViewportBoundsChange
+  }, [onViewportBoundsChange])
 
   // Initialize map
   useEffect(() => {
@@ -385,11 +398,13 @@ export function ResourceMap({
         })
 
         const dragStartListener = map.addListener('dragstart', () => {
+          userAdjustedViewportRef.current = true
           pendingViewportSyncRef.current = true
         })
 
         const zoomChangedListener = map.addListener('zoom_changed', () => {
           if (suppressViewportSyncRef.current) return
+          userAdjustedViewportRef.current = true
           pendingViewportSyncRef.current = true
         })
 
@@ -400,7 +415,7 @@ export function ResourceMap({
             return
           }
 
-          if (!pendingViewportSyncRef.current || !onViewportBoundsChange) return
+          if (!pendingViewportSyncRef.current || !onViewportBoundsChangeRef.current) return
 
           const bounds = map.getBounds()
           if (!bounds) return
@@ -409,7 +424,7 @@ export function ResourceMap({
           const southWest = bounds.getSouthWest()
 
           pendingViewportSyncRef.current = false
-          onViewportBoundsChange(
+          onViewportBoundsChangeRef.current(
             normalizeViewportBounds({
               north: northEast.lat(),
               south: southWest.lat(),
@@ -464,7 +479,7 @@ export function ResourceMap({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted, onViewportBoundsChange]) // Only initialize once on mount - userLocation handled separately below
+  }, [isMounted]) // Only initialize once on mount - prop callbacks are read through refs
 
   // Re-center map when userLocation changes (separate effect for efficiency).
   // Skipped on place-scoped pages (fitToResources) so the city stays framed.
@@ -501,6 +516,24 @@ export function ResourceMap({
   useEffect(() => {
     if (!mapInstanceRef.current || isLoading || resources.length === 0) {
       return
+    }
+
+    const framingScope = [
+      userLocation?.latitude ?? '',
+      userLocation?.longitude ?? '',
+      viewportBounds?.north ?? '',
+      viewportBounds?.south ?? '',
+      viewportBounds?.east ?? '',
+      viewportBounds?.west ?? '',
+      fitToResources ? 'fit' : 'center',
+    ].join('|')
+    const framingDataChanged =
+      lastFramingResourcesRef.current !== resources || lastFramingScopeRef.current !== framingScope
+
+    if (framingDataChanged) {
+      userAdjustedViewportRef.current = false
+      lastFramingResourcesRef.current = resources
+      lastFramingScopeRef.current = framingScope
     }
 
     let cancelled = false
@@ -599,8 +632,8 @@ export function ResourceMap({
             buildInfoContent(resource, distance, approximateLocation?.label || null),
             anchor
           )
-          if (onResourceClick) {
-            onResourceClick(resource.id)
+          if (onResourceClickRef.current) {
+            onResourceClickRef.current(resource.id)
           }
         }
 
@@ -722,6 +755,7 @@ export function ResourceMap({
 
       if (
         renderableCount > 0 &&
+        !userAdjustedViewportRef.current &&
         shouldAutoFitBounds({
           hasUserLocation: hasValidUserLocation(userLocation),
           hasViewportBounds: Boolean(viewportBounds),
@@ -754,15 +788,7 @@ export function ResourceMap({
       cancelled = true
       clearOverlays()
     }
-  }, [
-    resources,
-    userLocation,
-    viewportBounds,
-    selectedResourceId,
-    isLoading,
-    onResourceClick,
-    fitToResources,
-  ])
+  }, [resources, userLocation, viewportBounds, selectedResourceId, isLoading, fitToResources])
 
   // Create user location marker (blue dot)
   useEffect(() => {

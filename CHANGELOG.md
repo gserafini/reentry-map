@@ -2,6 +2,7 @@
 
 ## 2026-09-18
 
+- Preserve deliberate map zoom and pan changes while the page publishes pending viewport bounds, so the Google Maps controls no longer snap back to the automatic results framing.
 - Rebuilt the public search-to-contact journey: everyday need matching, consistent category filters and counts, explicit location scope, list-first phone results, linked map/list selection, and useful empty-result recovery.
 - Match statewide and county services by declared coverage instead of treating approximate map anchors as nearby offices. Correct physical distances at identical coordinates and retain scope across shared links, filters, and map navigation.
 - Put service summaries, eligibility notes, and Call/Details/Save actions ahead of maps and feedback. Replace unsupported walk-in, blanket verification, and empty-rating claims with evidence and dated automated-check labels.
