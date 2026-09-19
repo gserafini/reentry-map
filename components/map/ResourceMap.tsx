@@ -130,6 +130,15 @@ const DEFAULT_CENTER = {
 }
 const DEFAULT_ZOOM = 12
 
+function getRadiusZoom(radiusMiles: number | undefined): number | null {
+  if (!radiusMiles) return null
+  if (radiusMiles <= 2) return 14
+  if (radiusMiles <= 5) return 12
+  if (radiusMiles <= 10) return 11
+  if (radiusMiles <= 25) return 10
+  return 9
+}
+
 function normalizeCountyName(county: string | null | undefined): string {
   return (county || '')
     .trim()
@@ -319,6 +328,19 @@ export function ResourceMap({
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const validUserLocation = hasValidUserLocation(userLocation)
+  const userLatitude = validUserLocation ? userLocation.latitude : null
+  const userLongitude = validUserLocation ? userLocation.longitude : null
+  const viewportNorth = viewportBounds?.north ?? null
+  const viewportSouth = viewportBounds?.south ?? null
+  const viewportEast = viewportBounds?.east ?? null
+  const viewportWest = viewportBounds?.west ?? null
+  const hasViewportBounds =
+    viewportNorth !== null &&
+    viewportSouth !== null &&
+    viewportEast !== null &&
+    viewportWest !== null
+  const radiusZoom = getRadiusZoom(radiusMiles)
 
   // Type for map instance with cleanup function
   interface MapWithCleanup extends google.maps.Map {
@@ -362,14 +384,14 @@ export function ResourceMap({
         }
 
         // Determine map center
-        const center = hasValidUserLocation(userLocation)
-          ? { lat: userLocation.latitude, lng: userLocation.longitude }
+        const center = validUserLocation
+          ? { lat: userLatitude!, lng: userLongitude! }
           : DEFAULT_CENTER
 
         // Create map instance with Map ID for Advanced Markers
         const map = new google.maps.Map(mapRef.current, {
           center,
-          zoom: DEFAULT_ZOOM,
+          zoom: validUserLocation && radiusZoom !== null ? radiusZoom : DEFAULT_ZOOM,
           mapId: 'e3b80f3f5c95c2958f1264e8', // Map ID for Advanced Markers
           mapTypeControl: false,
           streetViewControl: false,
@@ -487,30 +509,38 @@ export function ResourceMap({
     if (
       !mapInstanceRef.current ||
       !shouldPanToUserLocation({
-        hasUserLocation: hasValidUserLocation(userLocation),
+        hasUserLocation: validUserLocation,
         fitToResources,
       })
     )
       return
 
-    const newCenter = { lat: userLocation!.latitude, lng: userLocation!.longitude }
+    const newCenter = { lat: userLatitude!, lng: userLongitude! }
 
     // Smooth pan to new location with animation
     mapInstanceRef.current.panTo(newCenter)
-  }, [userLocation, fitToResources])
+  }, [userLatitude, userLongitude, validUserLocation, fitToResources])
 
   // Restore an explicit sharable viewport when present
   useEffect(() => {
-    if (!mapInstanceRef.current || !viewportBounds) return
+    if (!mapInstanceRef.current || !hasViewportBounds) return
 
     suppressViewportSyncRef.current = true
-    mapInstanceRef.current.fitBounds(viewportBounds, {
-      top: 50,
-      right: 50,
-      bottom: 50,
-      left: 50,
-    })
-  }, [viewportBounds])
+    mapInstanceRef.current.fitBounds(
+      {
+        north: viewportNorth!,
+        south: viewportSouth!,
+        east: viewportEast!,
+        west: viewportWest!,
+      },
+      {
+        top: 50,
+        right: 50,
+        bottom: 50,
+        left: 50,
+      }
+    )
+  }, [hasViewportBounds, viewportNorth, viewportSouth, viewportEast, viewportWest])
 
   // Create markers when resources or map changes
   useEffect(() => {
@@ -519,12 +549,12 @@ export function ResourceMap({
     }
 
     const framingScope = [
-      userLocation?.latitude ?? '',
-      userLocation?.longitude ?? '',
-      viewportBounds?.north ?? '',
-      viewportBounds?.south ?? '',
-      viewportBounds?.east ?? '',
-      viewportBounds?.west ?? '',
+      userLatitude ?? '',
+      userLongitude ?? '',
+      viewportNorth ?? '',
+      viewportSouth ?? '',
+      viewportEast ?? '',
+      viewportWest ?? '',
       fitToResources ? 'fit' : 'center',
     ].join('|')
     const framingDataChanged =
@@ -618,10 +648,10 @@ export function ResourceMap({
         }
         const approximateLocation = getApproximateLocationPresentation(resource)
         let distance: number | null = null
-        if (hasValidUserLocation(userLocation)) {
+        if (validUserLocation) {
           distance = calculateDistance(
             { latitude: resource.latitude, longitude: resource.longitude },
-            userLocation
+            { latitude: userLatitude!, longitude: userLongitude! }
           )
           if (!Number.isFinite(distance)) distance = null
         }
@@ -757,8 +787,8 @@ export function ResourceMap({
         renderableCount > 0 &&
         !userAdjustedViewportRef.current &&
         shouldAutoFitBounds({
-          hasUserLocation: hasValidUserLocation(userLocation),
-          hasViewportBounds: Boolean(viewportBounds),
+          hasUserLocation: validUserLocation,
+          hasViewportBounds,
           fitToResources,
         })
       ) {
@@ -788,11 +818,24 @@ export function ResourceMap({
       cancelled = true
       clearOverlays()
     }
-  }, [resources, userLocation, viewportBounds, selectedResourceId, isLoading, fitToResources])
+  }, [
+    resources,
+    userLatitude,
+    userLongitude,
+    validUserLocation,
+    hasViewportBounds,
+    viewportNorth,
+    viewportSouth,
+    viewportEast,
+    viewportWest,
+    selectedResourceId,
+    isLoading,
+    fitToResources,
+  ])
 
   // Create user location marker (blue dot)
   useEffect(() => {
-    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation)) {
+    if (!mapInstanceRef.current || !validUserLocation) {
       // Remove marker if no location
       if (userLocationMarkerRef.current) {
         userLocationMarkerRef.current.map = null
@@ -824,16 +867,16 @@ export function ResourceMap({
     // Create new marker
     userLocationMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
       map,
-      position: { lat: userLocation.latitude, lng: userLocation.longitude },
+      position: { lat: userLatitude!, lng: userLongitude! },
       content: userMarkerElement,
       title: 'Your Location',
       zIndex: 1000, // Always on top of resource markers
     })
-  }, [userLocation])
+  }, [userLatitude, userLongitude, validUserLocation, isLoading])
 
   // Draw radius circle around user location
   useEffect(() => {
-    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation) || !radiusMiles) {
+    if (!mapInstanceRef.current || !validUserLocation || !radiusMiles) {
       // Remove circle if no location or radius
       if (radiusCircleRef.current) {
         radiusCircleRef.current.setMap(null)
@@ -855,7 +898,7 @@ export function ResourceMap({
     // Create new circle
     radiusCircleRef.current = new google.maps.Circle({
       map,
-      center: { lat: userLocation.latitude, lng: userLocation.longitude },
+      center: { lat: userLatitude!, lng: userLongitude! },
       radius: radiusMeters,
       strokeColor: '#1976d2',
       strokeOpacity: 0.8,
@@ -864,7 +907,7 @@ export function ResourceMap({
       fillOpacity: 0.15,
       clickable: false,
     })
-  }, [userLocation, radiusMiles])
+  }, [userLatitude, userLongitude, validUserLocation, radiusMiles, isLoading])
 
   // Open info window for selected resource
   useEffect(() => {
@@ -879,32 +922,17 @@ export function ResourceMap({
 
   // Adjust zoom based on radius changes (smooth zoom)
   useEffect(() => {
-    if (!mapInstanceRef.current || !hasValidUserLocation(userLocation) || !radiusMiles) return
+    if (!mapInstanceRef.current || !validUserLocation || radiusZoom === null) return
 
     const map = mapInstanceRef.current
 
-    // Calculate appropriate zoom level based on radius
-    // Zoom levels: 1 mile ≈ zoom 14, 5 miles ≈ zoom 12, 10 miles ≈ zoom 11, 25 miles ≈ zoom 10, 50 miles ≈ zoom 9
-    let targetZoom: number
-    if (radiusMiles <= 2) {
-      targetZoom = 14
-    } else if (radiusMiles <= 5) {
-      targetZoom = 12
-    } else if (radiusMiles <= 10) {
-      targetZoom = 11
-    } else if (radiusMiles <= 25) {
-      targetZoom = 10
-    } else {
-      targetZoom = 9
-    }
-
     // Smoothly animate to the new zoom level
     const currentZoom = map.getZoom() || DEFAULT_ZOOM
-    if (currentZoom !== targetZoom) {
+    if (currentZoom !== radiusZoom) {
       suppressViewportSyncRef.current = true
-      map.setZoom(targetZoom)
+      map.setZoom(radiusZoom)
     }
-  }, [radiusMiles, userLocation])
+  }, [radiusMiles, radiusZoom, userLatitude, userLongitude, validUserLocation])
 
   // Cleanup on unmount
   useEffect(() => {

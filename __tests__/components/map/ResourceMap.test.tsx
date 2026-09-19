@@ -23,6 +23,8 @@ vi.mock('@/lib/env', () => ({
 
 const mapListeners = new Map<string, () => void>()
 const fitBounds = vi.fn()
+const panTo = vi.fn()
+const setZoom = vi.fn()
 
 // Mock Google Maps global objects
 global.google = {
@@ -34,9 +36,9 @@ global.google = {
           return {}
         }),
         setCenter: vi.fn(),
-        setZoom: vi.fn(),
+        setZoom,
         fitBounds,
-        panTo: vi.fn(),
+        panTo,
         getZoom: vi.fn().mockReturnValue(12),
         getBounds: vi.fn().mockReturnValue({
           getNorthEast: () => ({ lat: () => 38, lng: () => -121 }),
@@ -315,5 +317,56 @@ describe('ResourceMap', () => {
     act(() => mapListeners.get('idle')?.())
 
     await waitFor(() => expect(fitBounds).toHaveBeenCalledTimes(1))
+  })
+
+  it('preserves map controls when a location search rerenders with equivalent coordinates', async () => {
+    function LocationSearchHarness() {
+      const [viewportBounds, setViewportBounds] = useState<{
+        north: number
+        south: number
+        east: number
+        west: number
+      } | null>(null)
+
+      return (
+        <>
+          <ResourceMap
+            resources={mockResources}
+            userLocation={{ latitude: 30.2672, longitude: -97.7431 }}
+            radiusMiles={25}
+            onViewportBoundsChange={setViewportBounds}
+          />
+          <output>{viewportBounds ? 'bounds published' : 'waiting'}</output>
+        </>
+      )
+    }
+
+    render(<LocationSearchHarness />)
+
+    await waitFor(() => expect(global.google.maps.marker.AdvancedMarkerElement).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByText(/Loading map/i)).not.toBeInTheDocument())
+    const markerCountBeforeZoom = vi.mocked(global.google.maps.marker.AdvancedMarkerElement).mock
+      .calls.length
+    const circleCountBeforeZoom = vi.mocked(global.google.maps.Circle).mock.calls.length
+    const [, mapOptions] = vi.mocked(global.google.maps.Map).mock.calls.at(-1) as [
+      HTMLElement,
+      { zoom: number },
+    ]
+    expect(mapOptions.zoom).toBe(10)
+    expect(panTo).not.toHaveBeenCalled()
+    expect(setZoom).not.toHaveBeenCalled()
+
+    // Reproduce a user clicking a Google Maps zoom control and the resulting
+    // idle event publishing the viewport back to ResultsExplorer.
+    act(() => mapListeners.get('zoom_changed')?.())
+    act(() => mapListeners.get('idle')?.())
+
+    await screen.findByText('bounds published')
+    expect(panTo).not.toHaveBeenCalled()
+    expect(setZoom).not.toHaveBeenCalled()
+    expect(global.google.maps.marker.AdvancedMarkerElement).toHaveBeenCalledTimes(
+      markerCountBeforeZoom
+    )
+    expect(global.google.maps.Circle).toHaveBeenCalledTimes(circleCountBeforeZoom)
   })
 })
