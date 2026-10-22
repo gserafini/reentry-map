@@ -40,8 +40,8 @@ Edit `.env.local` with your credentials:
 # ============================================================================
 
 # PostgreSQL connection (self-hosted on dc3-1)
-DATABASE_URL=postgresql://reentrymap:yourpassword@dc3-1.serafinihosting.com:5432/reentry_map
-DIRECT_DATABASE_URL=postgresql://reentrymap:yourpassword@dc3-1.serafinihosting.com:5432/reentry_map
+DATABASE_URL=postgresql://reentrymap:yourpassword@100.108.148.1:5432/reentry_map
+DIRECT_DATABASE_URL=postgresql://reentrymap:yourpassword@100.108.148.1:5432/reentry_map
 
 # NextAuth.js configuration
 NEXTAUTH_URL=http://localhost:3003

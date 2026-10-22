@@ -812,7 +812,7 @@ ssh -p 22022 root@dc3-1.serafinihosting.com \
 ### Database Connections
 
 - **On server** (localhost, no SSL): `postgresql://reentrymap:PASSWORD@localhost:5432/reentry_map`
-- **From local dev** (remote, SSL required): `postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map`
+- **From local dev** (Tailscale only, SSL required; 5432 is firewalled from the internet): `postgresql://reentrymap:PASSWORD@100.108.148.1:5432/reentry_map`
 - **All scripts** in `scripts/` auto-detect localhost vs remote and set SSL accordingly
 
 ---
@@ -847,7 +847,7 @@ ssh -p 22022 root@dc3-1.serafinihosting.com \
 
 ```bash
 # From local machine (SSL required)
-psql "postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map?sslmode=require"
+psql "postgresql://reentrymap:PASSWORD@100.108.148.1:5432/reentry_map?sslmode=require"
 
 # From server (localhost, no SSL)
 ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "psql -U reentrymap reentry_map"'

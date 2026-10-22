@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-22
+
+- Production PostgreSQL is no longer reachable from the internet. Local development reaches it over Tailscale at `100.108.148.1:5432` (SSL still required); the setup, deployment, and environment examples now use that host.
+
 ## 2026-09-18
 
 - Replace the generic framework social preview with branded, page-specific Open Graph cards that show the shared location, service type, provider, and listing count when available.

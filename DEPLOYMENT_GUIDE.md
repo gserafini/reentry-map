@@ -215,7 +215,7 @@ psql -U reentrymap reentry_map
 
 ```bash
 # Direct connection (requires SSL)
-psql "postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map?sslmode=require"
+psql "postgresql://reentrymap:PASSWORD@100.108.148.1:5432/reentry_map?sslmode=require"
 ```
 
 ### From Scripts
@@ -245,8 +245,8 @@ DIRECT_DATABASE_URL=postgresql://reentrymap:PASSWORD@localhost:5432/reentry_map
 
 ```bash
 # Database (remote, SSL required)
-DATABASE_URL=postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map
-DIRECT_DATABASE_URL=postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map
+DATABASE_URL=postgresql://reentrymap:PASSWORD@100.108.148.1:5432/reentry_map
+DIRECT_DATABASE_URL=postgresql://reentrymap:PASSWORD@100.108.148.1:5432/reentry_map
 ```
 
 ---
@@ -365,7 +365,7 @@ node node_modules/next/dist/bin/next start -p 3007
 psql -U reentrymap reentry_map -c "SELECT 1;"
 
 # Test remote connection (from local machine)
-psql "postgresql://reentrymap:PASSWORD@dc3-1.serafinihosting.com:5432/reentry_map?sslmode=require" -c "SELECT 1;"
+psql "postgresql://reentrymap:PASSWORD@100.108.148.1:5432/reentry_map?sslmode=require" -c "SELECT 1;"
 
 # Check PostgreSQL is running
 systemctl status postgresql
