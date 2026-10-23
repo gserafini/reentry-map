@@ -122,7 +122,9 @@ describe('SingleResourceMap', () => {
       />
     )
 
-    await waitFor(() => expect(global.google.maps.Map).toHaveBeenCalled())
+    // The circle is drawn by a follow-up effect once loading finishes, a render
+    // after the Map constructor runs; wait for that final state, not just the map.
+    await waitFor(() => expect(global.google.maps.Circle).toHaveBeenCalled())
 
     const [, options] = vi.mocked(global.google.maps.Map).mock.calls.at(-1) as [
       HTMLElement,
