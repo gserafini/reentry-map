@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-03
+
+- Batch enrichment no longer has a Mac residential-IP tier. The cron runs as `reentrymap`, which cannot reach the Mac, so that tier only ever failed, and it built its SSH command by interpolating the resource URL into a shell string. Sites that block the server are still rechecked from the Mac by the root-run `scripts/recheck-unreachable-via-mac.mjs`, which passes the URL safely.
+
 ## 2026-11-02
 
 - Resource verification, website screenshots, batch enrichment and periodic verification now open third-party resource sites in the server's dnf-patched Google Chrome (156) with Chrome's sandbox on. They previously used Playwright's bundled Chromium 145 with the sandbox explicitly disabled. All launches share one policy in `lib/utils/browser-launch.mjs`. The sandbox is turned off only for root, which Chrome cannot sandbox. A guard test blocks sandbox-off flags anywhere else.
