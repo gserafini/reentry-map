@@ -6,18 +6,17 @@
 
 import { chromium } from 'playwright'
 
+import { browserLaunchOptions } from '../lib/utils/browser-launch.mjs'
+
 const url = 'https://www.ceoworks.org/locations/oakland-ca'
 
 console.log(`Testing URL: ${url}\n`)
 
-const browser = await chromium.launch({
-  headless: true,
-  args: [
-    '--disable-blink-features=AutomationControlled',
-    '--disable-dev-shm-usage',
-    '--no-sandbox',
-  ],
-})
+const browser = await chromium.launch(
+  browserLaunchOptions({
+    args: ['--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage'],
+  })
+)
 
 const context = await browser.newContext({
   userAgent:

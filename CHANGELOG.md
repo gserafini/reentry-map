@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-02
+
+- Resource verification, website screenshots, batch enrichment and periodic verification now open third-party resource sites in the server's dnf-patched Google Chrome (156) with Chrome's sandbox on. They previously used Playwright's bundled Chromium 145 with the sandbox explicitly disabled. All launches share one policy in `lib/utils/browser-launch.mjs`. The sandbox is turned off only for root, which Chrome cannot sandbox. A guard test blocks sandbox-off flags anywhere else.
+- The Mac residential-IP fallbacks (batch-enrich and unreachable rechecks) now launch the Mac's auto-updating system Chrome with the sandbox on, instead of Patchright's bundled engine.
+
 ## 2026-10-22
 
 - Production PostgreSQL is no longer reachable from the internet. Local development reaches it over Tailscale at `100.108.148.1:5432` (SSL still required); the setup, deployment, and environment examples now use that host.

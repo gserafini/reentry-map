@@ -15,6 +15,7 @@
  * - Google Maps verification
  */
 
+import { browserLaunchOptions } from './browser-launch.mjs'
 import { geocodeAddress } from './geocoding'
 import { trackAICost } from '@/lib/ai-agents/verification-events'
 import {
@@ -66,14 +67,14 @@ export async function checkUrlReachable(url: string): Promise<{
     try {
       // Use Playwright with stealth settings to avoid bot detection
       const { chromium } = await import('playwright')
-      const browser = await chromium.launch({
-        headless: true,
-        args: [
-          '--disable-blink-features=AutomationControlled', // Hide automation
-          '--disable-dev-shm-usage',
-          '--no-sandbox',
-        ],
-      })
+      const browser = await chromium.launch(
+        browserLaunchOptions({
+          args: [
+            '--disable-blink-features=AutomationControlled', // Hide automation
+            '--disable-dev-shm-usage',
+          ],
+        })
+      )
       const context = await browser.newContext({
         // Use realistic browser fingerprint
         userAgent:

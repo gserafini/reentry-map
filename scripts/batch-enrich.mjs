@@ -28,6 +28,7 @@ import {
   createOutcomeCounts,
   formatOutcomeSummary,
 } from './lib/batch-enrich-outcomes.mjs'
+import { browserLaunchOptions } from '../lib/utils/browser-launch.mjs'
 import { buildMacPatchrightFetchCommand } from './lib/batch-enrich-fetch.mjs'
 import { groundExtraction } from './lib/batch-enrich-validate.mjs'
 import {
@@ -145,7 +146,7 @@ async function fetchPageWithBrowser(url) {
     }
     if (!_patchright) return null
 
-    const browser = await _patchright.chromium.launch({ headless: true, args: ['--no-sandbox'] })
+    const browser = await _patchright.chromium.launch(browserLaunchOptions())
     try {
       const page = await browser.newPage()
       await page.goto(url, { waitUntil: 'networkidle', timeout: 15_000 })

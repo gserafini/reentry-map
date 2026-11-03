@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import pg from 'pg'
+import { MAC_CHROME_LAUNCH_OPTIONS, MAC_PATCHRIGHT_MODULE } from './lib/batch-enrich-fetch.mjs'
 import {
   buildStatusCounts,
   classifyMacRecheckResult,
@@ -16,7 +17,6 @@ const execFileAsync = promisify(execFile)
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(__dirname, '..')
 const envPath = resolve(projectRoot, '.env.local')
-const macPatchrightModule = '/Users/gserafini/.claude/scripts/social/node_modules/patchright'
 const defaultOutputDir = '/tmp/reentrymap-unreachable-rechecks'
 
 function getArg(args, flag) {
@@ -55,9 +55,9 @@ async function queryResources(names) {
 
 async function recheckViaMac(url) {
   const js = [
-    `const { chromium } = require(${JSON.stringify(macPatchrightModule)});`,
+    `const { chromium } = require(${JSON.stringify(MAC_PATCHRIGHT_MODULE)});`,
     '(async () => {',
-    '  const browser = await chromium.launch({ headless: true });',
+    `  const browser = await chromium.launch(${MAC_CHROME_LAUNCH_OPTIONS});`,
     '  try {',
     '    const page = await browser.newPage();',
     `    await page.goto(${JSON.stringify(url)}, { waitUntil: 'networkidle', timeout: 15000 });`,
