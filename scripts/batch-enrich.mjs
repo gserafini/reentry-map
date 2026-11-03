@@ -29,7 +29,6 @@ import {
   formatOutcomeSummary,
 } from './lib/batch-enrich-outcomes.mjs'
 import { browserLaunchOptions } from '../lib/utils/browser-launch.mjs'
-import { buildMacPatchrightFetchCommand } from './lib/batch-enrich-fetch.mjs'
 import { groundExtraction } from './lib/batch-enrich-validate.mjs'
 import {
   buildEnrichmentProvenance,
@@ -161,25 +160,15 @@ async function fetchPageWithBrowser(url) {
   }
 }
 
-/** Tier 3: Patchright on Mac via Tailscale — residential IP for datacenter-blocked sites */
-async function fetchPageViaMac(url) {
-  try {
-    const { execSync } = await import('child_process')
-    const cmd = buildMacPatchrightFetchCommand(url)
-    const text = execSync(cmd, { timeout: 25_000, encoding: 'utf-8' })
-    return { html: '', text, status: 200 }
-  } catch {
-    return null
-  }
-}
-
 /**
- * Fetch a page with 3-tier escalation:
+ * Fetch a page with 2-tier escalation:
  * 1. Simple fetch (fast, works for 80%+ of sites)
  * 2. Patchright on dc3-1 (JS rendering, basic bot evasion)
- * 3. Patchright via Mac (residential IP for datacenter blocks)
  *
  * Escalates when content is suspiciously thin (<100 chars) or fetch fails.
+ * Sites that block dc3-1 are rechecked from the Mac's residential IP by the
+ * root-run scripts/recheck-unreachable-via-mac.mjs; the cron user cannot reach
+ * the Mac.
  */
 async function fetchPage(url) {
   // Tier 1: Simple fetch
@@ -192,12 +181,6 @@ async function fetchPage(url) {
   const browserResult = await fetchPageWithBrowser(url)
   if (browserResult?.text && browserResult.text.length >= 100) {
     return { html: browserResult.html, text: browserResult.text }
-  }
-
-  // Tier 3: Mac residential IP (datacenter IP blocks)
-  const macResult = await fetchPageViaMac(url)
-  if (macResult?.text && macResult.text.length >= 100) {
-    return { html: macResult.html || '', text: macResult.text }
   }
 
   // All tiers failed — return whatever we got (even if thin)

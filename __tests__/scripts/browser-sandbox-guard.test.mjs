@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { buildMacPatchrightFetchCommand } from '../../scripts/lib/batch-enrich-fetch.mjs'
+import * as batchEnrichFetch from '../../scripts/lib/batch-enrich-fetch.mjs'
 
 // server_ops B1924: every browser that loads resource websites goes through
 // lib/utils/browser-launch.mjs (system Chrome, sandbox on unless root).
@@ -39,10 +39,23 @@ describe('browser sandbox guard', () => {
     expect(read(rel)).toMatch(/\.launch\(\s*browserLaunchOptions\(/)
   })
 
-  it('runs the Mac residential fallbacks on sandboxed system Chrome', () => {
-    const sandboxedChrome = "channel: 'chrome', chromiumSandbox: true"
+  it('runs the root Mac recheck on sandboxed system Chrome from the known Patchright install', () => {
+    const recheck = read('scripts/recheck-unreachable-via-mac.mjs')
 
-    expect(buildMacPatchrightFetchCommand('https://example.org/test')).toContain(sandboxedChrome)
-    expect(read('scripts/recheck-unreachable-via-mac.mjs')).toContain('MAC_CHROME_LAUNCH_OPTIONS')
+    expect(batchEnrichFetch.MAC_CHROME_LAUNCH_OPTIONS).toContain(
+      "channel: 'chrome', chromiumSandbox: true"
+    )
+    expect(recheck).toContain('MAC_CHROME_LAUNCH_OPTIONS')
+    expect(recheck).toContain('MAC_PATCHRIGHT_MODULE')
+    expect(recheck).not.toContain("require('patchright')")
+  })
+
+  // The cron runs as reentrymap, which cannot reach the Mac, and the dropped tier
+  // interpolated resource URLs into a double-quoted shell command.
+  it('keeps batch enrichment on dc3-1, with no Mac shell tier', () => {
+    expect(batchEnrichFetch).not.toHaveProperty('buildMacPatchrightFetchCommand')
+    expect(read('scripts/batch-enrich.mjs')).not.toMatch(
+      /fetchPageViaMac|buildMacPatchrightFetchCommand|execSync/
+    )
   })
 })
