@@ -9,10 +9,12 @@ export function LocationUrlSync() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { coordinates, displayName } = useUserLocation()
+  const { coordinates, displayName, source } = useUserLocation()
   const hasSynced = useRef(false)
   useEffect(() => {
-    if (hasSynced.current || !coordinates) return
+    // IP lookup is a draft suggestion, not permission to navigate. Its delayed
+    // result must never replace a category or search the visitor just opened.
+    if (hasSynced.current || !coordinates || source === 'geoip') return
     if (['lat', 'lng', 'locationName', 'north', 'scope'].some((key) => searchParams.has(key))) {
       hasSynced.current = true
       return
@@ -27,6 +29,6 @@ export function LocationUrlSync() {
     if (!params.has('sort')) params.set('sort', 'distance-asc')
     params.delete('page')
     router.replace(`${pathname}?${params}`, { scroll: false })
-  }, [coordinates, displayName, searchParams, pathname, router])
+  }, [coordinates, displayName, source, searchParams, pathname, router])
   return null
 }
