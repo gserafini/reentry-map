@@ -55,3 +55,5 @@ Apply the two staging includes first and pass the authenticated staging acceptan
 6. Roll back on failed application acceptance or any availability regression: restore each exact beforeimage, or remove only the newly installed exact file whose absence was recorded. Do not remove pre-existing directories or other includes. Require configtest, then the same graceful-only workflow and frontdoor/browser checks. Retain candidate, before/after hashes, receipts, and the reason for rollback.
 
 No application role, credential, shared WAF policy, database schema, or request-method workaround is changed by this repair.
+
+Inspect every captured JPEG before closing the release. Use the image viewer's `high` detail mode; the current orchestration image-forwarder rejects `low` even if its advertised argument list includes it. Keep screenshot paths and fixture cleanup receipts with the private deployment evidence, and never print cookies or raw response headers.
