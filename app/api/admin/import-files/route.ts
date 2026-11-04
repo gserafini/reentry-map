@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
+import { POST as submitBatch } from '@/app/api/resources/suggest-batch/route'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -124,18 +125,19 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Post to API endpoint (internal call)
-        const response = await fetch(`${request.nextUrl.origin}/api/resources/suggest-batch`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            resources: data.resources,
-            submitter: data.submitter || 'file_import',
-            notes: data.notes || `Imported from ${filename}`,
-          }),
-        })
+        // Call the batch handler in process. Retain the authenticated request headers;
+        // never forward credentials over the network to a Host-derived origin.
+        const response = await submitBatch(
+          new NextRequest(request, {
+            method: 'POST',
+            headers: new Headers(request.headers),
+            body: JSON.stringify({
+              resources: data.resources,
+              submitter: data.submitter || 'file_import',
+              notes: data.notes || `Imported from ${filename}`,
+            }),
+          })
+        )
 
         const result = (await response.json()) as {
           message?: string

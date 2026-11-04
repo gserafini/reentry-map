@@ -28,7 +28,7 @@ import {
   createOutcomeCounts,
   formatOutcomeSummary,
 } from './lib/batch-enrich-outcomes.mjs'
-import { browserLaunchOptions } from '../lib/utils/browser-launch.mjs'
+import { fetchPublicUrl, openPublicBrowser } from '../lib/utils/public-network.mjs'
 import { groundExtraction } from './lib/batch-enrich-validate.mjs'
 import {
   buildEnrichmentProvenance,
@@ -121,7 +121,7 @@ function htmlToText(html) {
 /** Tier 1: Simple HTTP fetch — fast (~0.5s), works for most static sites */
 async function fetchPageSimple(url) {
   try {
-    const resp = await fetch(url, {
+    const resp = await fetchPublicUrl(url, {
       headers: { 'User-Agent': 'ReentryMap-Enrichment/1.0' },
       signal: AbortSignal.timeout(10_000),
       redirect: 'follow',
@@ -136,18 +136,12 @@ async function fetchPageSimple(url) {
   }
 }
 
-/** Tier 2: Patchright headless browser on dc3-1 — handles JS rendering + basic bot evasion (~3-5s) */
-let _patchright = null
+/** Tier 2: Fresh sandboxed browser with bounded public-only egress. */
 async function fetchPageWithBrowser(url) {
   try {
-    if (!_patchright) {
-      _patchright = await import('patchright').catch(() => null)
-    }
-    if (!_patchright) return null
-
-    const browser = await _patchright.chromium.launch(browserLaunchOptions())
+    const browser = await openPublicBrowser()
     try {
-      const page = await browser.newPage()
+      const page = await browser.context.newPage()
       await page.goto(url, { waitUntil: 'networkidle', timeout: 15_000 })
       const html = await page.content()
       const text = await page.evaluate(() => document.body.innerText)

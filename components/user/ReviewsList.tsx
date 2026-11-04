@@ -21,8 +21,7 @@ import type { Database } from '@/lib/types/database'
 type ResourceReview = Database['public']['Tables']['resource_reviews']['Row'] & {
   user?: {
     id: string
-    email: string | null
-    phone: string | null
+    name: string | null
   }
 }
 

@@ -15,7 +15,7 @@
  * - Google Maps verification
  */
 
-import { browserLaunchOptions } from './browser-launch.mjs'
+import { fetchPublicUrl, openPublicBrowser, resolvePublicUrl } from './public-network.mjs'
 import { geocodeAddress } from './geocoding'
 import { trackAICost } from '@/lib/ai-agents/verification-events'
 import {
@@ -55,8 +55,9 @@ export async function checkUrlReachable(url: string): Promise<{
   const start = Date.now()
 
   try {
-    // Validate URL format
-    new URL(url)
+    // Reject unsafe destinations before allocating a browser. The egress proxy
+    // independently checks and pins every subsequent connection as well.
+    await resolvePublicUrl(url)
 
     // STEP 1: Direct check from our server
     let directCheck: { pass: boolean; status_code?: number; error?: string } = {
@@ -65,17 +66,7 @@ export async function checkUrlReachable(url: string): Promise<{
     }
 
     try {
-      // Use Playwright with stealth settings to avoid bot detection
-      const { chromium } = await import('playwright')
-      const browser = await chromium.launch(
-        browserLaunchOptions({
-          args: [
-            '--disable-blink-features=AutomationControlled', // Hide automation
-            '--disable-dev-shm-usage',
-          ],
-        })
-      )
-      const context = await browser.newContext({
+      const browser = await openPublicBrowser({
         // Use realistic browser fingerprint
         userAgent:
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -88,16 +79,8 @@ export async function checkUrlReachable(url: string): Promise<{
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         },
       })
-      const page = await context.newPage()
-
-      // Override navigator.webdriver to hide automation
-      await page.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', {
-          get: () => undefined,
-        })
-      })
-
       try {
+        const page = await browser.context.newPage()
         const response = await page.goto(url, {
           waitUntil: 'domcontentloaded',
           timeout: 15000, // Increased timeout to 15s for slower sites
@@ -239,11 +222,11 @@ export async function captureWebsiteScreenshot(_url: string): Promise<string | n
  */
 export async function extractWebsiteContent(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url, {
+    const response = await fetchPublicUrl(url, {
       headers: {
         'User-Agent': 'ReentryMap-Verification/1.0',
       },
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10000,
     })
 
     if (!response.ok) return null

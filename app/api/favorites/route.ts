@@ -22,7 +22,7 @@ export async function GET() {
     const { data, error } = await getUserFavorites(session.user.id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to load saved resources' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -50,7 +50,10 @@ export async function POST(request: NextRequest) {
     const { data, error } = await addFavorite(session.user.id, resourceId, notes)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error.message === 'Resource is unavailable') {
+        return NextResponse.json({ error: 'Resource is unavailable' }, { status: 404 })
+      }
+      return NextResponse.json({ error: 'Failed to save resource' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -78,7 +81,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await removeFavorite(session.user.id, resourceId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to remove saved resource' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/utils/admin-auth', () => ({
+  checkAdminAuth: vi.fn().mockResolvedValue({ isAuthorized: false }),
+}))
 
 describe('suggest-batch location types', () => {
   beforeEach(() => {

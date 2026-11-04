@@ -121,9 +121,14 @@ describe('middleware', () => {
   })
 
   describe('rate limiting', () => {
-    it('does not rate limit GET requests', () => {
+    it('does not rate limit ordinary GET requests', () => {
       const request = createMockRequest('/api/resources', 'GET')
       middleware(request)
+      expect(mockRateLimit).not.toHaveBeenCalled()
+    })
+
+    it('does not rate limit routine NextAuth session polling', () => {
+      middleware(createMockRequest('/api/auth/session', 'GET'))
       expect(mockRateLimit).not.toHaveBeenCalled()
     })
 
@@ -195,6 +200,25 @@ describe('middleware', () => {
       expect(mockRateLimit).toHaveBeenCalledWith(expect.any(String), 5, 15 * 60 * 1000)
     })
 
+    it('rate limits auth callbacks more strictly than general API requests', () => {
+      middleware(createMockRequest('/api/auth/callback/credentials', 'POST'))
+      expect(mockRateLimit).toHaveBeenCalledWith(expect.any(String), 5, 15 * 60 * 1000)
+    })
+
+    it('rate limits sign-in POSTs more strictly than general API requests', () => {
+      middleware(createMockRequest('/api/auth/signin/credentials', 'POST'))
+      expect(mockRateLimit).toHaveBeenCalledWith(expect.any(String), 5, 15 * 60 * 1000)
+    })
+
+    it.each([
+      ['/api/gravatar/check', 30],
+      ['/api/location/ip', 30],
+      ['/api/analytics/health', 10],
+    ])('rate limits GET requests to %s', (path, limit) => {
+      middleware(createMockRequest(path, 'GET'))
+      expect(mockRateLimit).toHaveBeenCalledWith(expect.any(String), limit, 60 * 1000)
+    })
+
     it('uses default limits for general API routes', () => {
       const request = createMockRequest('/api/something', 'POST', {
         'x-forwarded-for': '1.2.3.4',
@@ -204,22 +228,31 @@ describe('middleware', () => {
       expect(mockRateLimit).toHaveBeenCalledWith(expect.any(String), 60, 60 * 1000)
     })
 
-    it('extracts client IP from x-forwarded-for header', () => {
+    it('uses the trusted rightmost Apache X-Forwarded-For address', () => {
       const request = createMockRequest('/api/suggestions', 'POST', {
         'x-forwarded-for': '203.0.113.1, 70.41.3.18',
       })
       middleware(request)
       const callArgs = mockRateLimit.mock.calls[0]
-      expect(callArgs[0]).toContain('203.0.113.1')
+      expect(callArgs[0]).toContain('70.41.3.18')
     })
 
-    it('falls back to x-real-ip header', () => {
+    it('does not trust x-real-ip when the proxy header is missing', () => {
       const request = createMockRequest('/api/suggestions', 'POST', {
         'x-real-ip': '198.51.100.1',
       })
       middleware(request)
       const callArgs = mockRateLimit.mock.calls[0]
-      expect(callArgs[0]).toContain('198.51.100.1')
+      expect(callArgs[0]).toContain('unknown')
+    })
+
+    it('uses unknown for a malformed proxy address', () => {
+      middleware(
+        createMockRequest('/api/suggestions', 'POST', {
+          'x-forwarded-for': 'spoofed, also-not-an-ip',
+        })
+      )
+      expect(mockRateLimit.mock.calls[0][0]).toContain('unknown')
     })
 
     it('allows requests within rate limit', () => {

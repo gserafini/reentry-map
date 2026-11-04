@@ -8,6 +8,8 @@
  * so this wraps it with our cost-tracking and error-handling conventions.
  */
 
+import { fetchPublicUrl } from '@/lib/utils/public-network.mjs'
+
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
 const OLLAMA_ENRICHMENT_MODEL = process.env.OLLAMA_ENRICHMENT_MODEL || 'qwen3-coder:30b'
 
@@ -295,9 +297,9 @@ export async function toolFetchUrl(args: Record<string, unknown>): Promise<strin
   }
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchPublicUrl(url, {
       headers: { 'User-Agent': 'ReentryMap-Verification/1.0' },
-      signal: AbortSignal.timeout(10_000),
+      timeoutMs: 10_000,
       redirect: 'follow',
     })
 

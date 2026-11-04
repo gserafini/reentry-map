@@ -247,13 +247,13 @@ describe('favorites API', () => {
       expect(result.error).toBeNull()
     })
 
-    it('handles empty result from INSERT', async () => {
+    it('reports unavailable resources when INSERT selects no active row', async () => {
       mockSql.mockResolvedValue([])
 
       const result = await addFavorite('user1', 'res1')
 
       expect(result.data).toBeNull()
-      expect(result.error).toBeNull()
+      expect(result.error?.message).toBe('Resource is unavailable')
     })
   })
 })

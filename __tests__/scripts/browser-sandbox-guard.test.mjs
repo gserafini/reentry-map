@@ -43,14 +43,28 @@ describe('browser sandbox guard', () => {
     expect(offenders).toEqual([])
   })
 
+  it.each(['lib/utils/public-network.mjs', 'scripts/test-playwright-url.mjs'])(
+    '%s launches through browserLaunchOptions',
+    (rel) => {
+      expect(read(rel)).toMatch(/\.launch\(\s*(?:\{\s*\.\.\.)?browserLaunchOptions\(/)
+    }
+  )
+
   it.each([
     'lib/utils/verification.ts',
     'lib/utils/screenshot.ts',
     'scripts/batch-enrich.mjs',
     'scripts/periodic-verification.mjs',
-    'scripts/test-playwright-url.mjs',
-  ])('%s launches through browserLaunchOptions', (rel) => {
-    expect(read(rel)).toMatch(/\.launch\(\s*browserLaunchOptions\(/)
+  ])('%s uses the shared public-only browser boundary', (rel) => {
+    expect(read(rel)).toContain('openPublicBrowser(')
+    expect(read(rel)).not.toMatch(/chromium\.launch\(|browser\.newContext\(/)
+  })
+
+  it('keeps enrichment website fetches guarded while allowing configured local Ollama calls', () => {
+    const source = read('scripts/batch-enrich.mjs')
+    expect(source).toContain('fetchPublicUrl(url,')
+    expect(source).not.toMatch(/\bfetch\(url[,)]/)
+    expect(source).toContain('fetch(`${OLLAMA_BASE}/v1/chat/completions`')
   })
 
   it('runs the root Mac recheck on sandboxed system Chrome from the known Patchright install', () => {

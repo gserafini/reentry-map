@@ -7,11 +7,6 @@ vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }))
 
-// Mock avatar utility
-vi.mock('@/lib/utils/avatar', () => ({
-  getUserDisplayName: (email: string | null, phone: string | null) => email || phone || 'Anonymous',
-}))
-
 import { ReviewCard } from '@/components/user/ReviewCard'
 
 const baseReview = {
@@ -34,8 +29,7 @@ const baseReview = {
   moderation_notes: null,
   user: {
     id: 'user-1',
-    email: 'reviewer@example.com',
-    phone: null,
+    name: 'Community reviewer',
   },
 }
 
@@ -49,9 +43,9 @@ describe('ReviewCard', () => {
     global.fetch = vi.fn()
   })
 
-  it('renders reviewer name from email', () => {
+  it('renders the public reviewer name', () => {
     render(<ReviewCard review={baseReview} />)
-    expect(screen.getByText('reviewer@example.com')).toBeInTheDocument()
+    expect(screen.getByText('Community reviewer')).toBeInTheDocument()
   })
 
   it('renders review text', () => {

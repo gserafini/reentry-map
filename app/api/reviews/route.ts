@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
     const { data, error } = await getResourceReviews(resourceId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in GET /api/reviews:', error)
+      return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -95,7 +96,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in POST /api/reviews:', error)
+      return NextResponse.json({ error: 'Failed to submit review' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -136,7 +138,8 @@ export async function PATCH(request: NextRequest) {
     })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in PATCH /api/reviews:', error)
+      return NextResponse.json({ error: 'Failed to update review' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -164,7 +167,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await deleteReview(reviewId, session.user.id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in DELETE /api/reviews:', error)
+      return NextResponse.json({ error: 'Failed to delete review' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

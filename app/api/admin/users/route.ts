@@ -4,6 +4,18 @@ import { db } from '@/lib/db/client'
 import { users } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 
+// Account credentials never belong in management API responses.
+const safeUserProjection = {
+  id: users.id,
+  email: users.email,
+  phone: users.phone,
+  name: users.name,
+  avatarUrl: users.avatarUrl,
+  isAdmin: users.isAdmin,
+  createdAt: users.createdAt,
+  updatedAt: users.updatedAt,
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkAdminAuth(request)
@@ -16,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all users
-    const allUsers = await db.select().from(users).orderBy(desc(users.createdAt))
+    const allUsers = await db.select(safeUserProjection).from(users).orderBy(desc(users.createdAt))
 
     // Note: Email addresses are stored in the users table now (after NextAuth migration)
     return NextResponse.json(allUsers)
@@ -72,7 +84,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update user
-    const [data] = await db.update(users).set(updates).where(eq(users.id, userId)).returning()
+    const [data] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning(safeUserProjection)
 
     if (!data) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })

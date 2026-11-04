@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     if (statsOnly) {
       const { data, error } = await getRatingStats(resourceId)
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error('Error in GET /api/ratings:', error)
+        return NextResponse.json({ error: 'Failed to load rating statistics' }, { status: 500 })
       }
       return NextResponse.json({ stats: data })
     }
@@ -71,7 +72,8 @@ export async function POST(request: NextRequest) {
     const { data, error } = await submitRating(session.user.id, resourceId, rating)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in POST /api/ratings:', error)
+      return NextResponse.json({ error: 'Failed to submit rating' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -99,7 +101,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await deleteRating(session.user.id, resourceId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in DELETE /api/ratings:', error)
+      return NextResponse.json({ error: 'Failed to delete rating' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

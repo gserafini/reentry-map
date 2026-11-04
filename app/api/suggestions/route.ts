@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { submitSuggestion, getUserSuggestions, getPendingSuggestions } from '@/lib/api/suggestions'
 import { checkAdminAuth } from '@/lib/utils/admin-auth'
-import type { ResourceSuggestionInsert } from '@/lib/types/database'
+import { publicSuggestionSchema } from '@/lib/validation/suggestion'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -34,10 +34,30 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  let body: unknown
   try {
-    const suggestion = (await request.json()) as ResourceSuggestionInsert
-    const result = await submitSuggestion(suggestion)
-    return NextResponse.json(result, { status: result.error ? 500 : 201 })
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ data: null, error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = publicSuggestionSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ data: null, error: 'Invalid suggestion content' }, { status: 400 })
+  }
+  try {
+    const session = await getServerSession(authOptions)
+    const result = await submitSuggestion({
+      ...parsed.data,
+      suggested_by: session?.user?.id || null,
+      status: 'pending',
+    })
+    if (result.error) {
+      return NextResponse.json(
+        { data: null, error: 'Failed to submit suggestion' },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ data: result.data, error: null }, { status: 201 })
   } catch {
     return NextResponse.json({ data: null, error: 'Failed to submit suggestion' }, { status: 500 })
   }

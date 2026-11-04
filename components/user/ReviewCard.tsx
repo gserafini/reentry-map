@@ -19,15 +19,13 @@ import {
   ThumbDownOutlined as ThumbDownOutlinedIcon,
 } from '@mui/icons-material'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { getUserDisplayName } from '@/lib/utils/avatar'
 import { useRouter } from 'next/navigation'
 import type { Database } from '@/lib/types/database'
 
 type ResourceReview = Database['public']['Tables']['resource_reviews']['Row'] & {
   user?: {
     id: string
-    email: string | null
-    phone: string | null
+    name: string | null
   }
 }
 
@@ -92,9 +90,7 @@ export function ReviewCard({ review, userVote, onVoteChange }: ReviewCardProps) 
     }
   }
 
-  const reviewerName = review.user
-    ? getUserDisplayName(review.user.email, review.user.phone)
-    : 'Anonymous'
+  const reviewerName = review.user?.name?.trim() || 'Anonymous'
 
   const reviewDate = review.created_at
     ? new Date(review.created_at).toLocaleDateString('en-US', {

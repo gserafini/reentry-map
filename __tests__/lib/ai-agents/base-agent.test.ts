@@ -1,14 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockSql, MockOpenAI } = vi.hoisted(() => ({
+const { mockSql } = vi.hoisted(() => ({
   mockSql: vi.fn(),
-  MockOpenAI: class {
-    chat = {
-      completions: {
-        create: vi.fn(),
-      },
-    }
-  },
 }))
 
 vi.mock('@/lib/db/client', () => ({
@@ -19,10 +12,6 @@ vi.mock('@/lib/env', () => ({
   env: {
     OPENAI_API_KEY: 'test-openai-key',
   },
-}))
-
-vi.mock('openai', () => ({
-  default: MockOpenAI,
 }))
 
 describe('BaseAgent logging', () => {

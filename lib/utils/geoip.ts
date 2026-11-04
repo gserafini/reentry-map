@@ -1,4 +1,5 @@
 import geoip from 'geoip-lite'
+import { getTrustedClientIP } from '@/lib/utils/client-ip'
 
 export interface GeoIPLocation {
   latitude: number
@@ -52,23 +53,6 @@ export function getLocationFromIP(ip: string): GeoIPLocation | null {
  * Checks common proxy headers first
  */
 export function getClientIP(headers: Headers): string | null {
-  // Check common proxy headers
-  const forwardedFor = headers.get('x-forwarded-for')
-  if (forwardedFor) {
-    // x-forwarded-for can contain multiple IPs, take the first one
-    return forwardedFor.split(',')[0].trim()
-  }
-
-  const realIP = headers.get('x-real-ip')
-  if (realIP) {
-    return realIP
-  }
-
-  const cfConnectingIP = headers.get('cf-connecting-ip')
-  if (cfConnectingIP) {
-    return cfConnectingIP
-  }
-
-  // Fallback - will be localhost in development
-  return null
+  const ip = getTrustedClientIP(headers)
+  return ip === 'unknown' ? null : ip
 }

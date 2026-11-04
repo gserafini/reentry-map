@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
+import { getSignupPoolOptions } from '@/lib/utils/signup-db-options'
 
 // Database connection (lazy initialization)
 let pool: Pool | null = null
@@ -17,12 +18,7 @@ function getPool(): Pool {
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is required')
     }
-    const isLocalhost =
-      connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
-    pool = new Pool({
-      connectionString,
-      ssl: isLocalhost ? false : { rejectUnauthorized: false },
-    })
+    pool = new Pool(getSignupPoolOptions(connectionString))
   }
   return pool
 }

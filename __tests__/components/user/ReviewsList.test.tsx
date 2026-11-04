@@ -7,11 +7,6 @@ vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }))
 
-// Mock avatar utility
-vi.mock('@/lib/utils/avatar', () => ({
-  getUserDisplayName: (email: string | null, phone: string | null) => email || phone || 'Anonymous',
-}))
-
 import { ReviewsList } from '@/components/user/ReviewsList'
 
 const sampleReviews = [
@@ -33,7 +28,7 @@ const sampleReviews = [
     helpful_count: 10,
     not_helpful_count: 0,
     moderation_notes: null,
-    user: { id: 'user-1', email: 'reviewer1@example.com', phone: null },
+    user: { id: 'user-1', name: 'First reviewer' },
   },
   {
     id: 'review-2',
@@ -53,7 +48,7 @@ const sampleReviews = [
     helpful_count: 2,
     not_helpful_count: 3,
     moderation_notes: null,
-    user: { id: 'user-2', email: 'reviewer2@example.com', phone: null },
+    user: { id: 'user-2', name: 'Second reviewer' },
   },
 ]
 

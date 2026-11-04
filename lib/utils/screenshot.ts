@@ -6,10 +6,9 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { chromium } from 'playwright'
 import sharp from 'sharp'
 
-import { browserLaunchOptions } from './browser-launch.mjs'
+import { openPublicBrowser, resolvePublicUrl } from './public-network.mjs'
 
 /** Directory where screenshots are stored (served statically by Next.js) */
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'public', 'screenshots')
@@ -33,23 +32,16 @@ export async function captureWebsiteScreenshot(
   let browser = null
 
   try {
-    // Validate URL
-    const url = new URL(websiteUrl)
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      console.error('Invalid URL protocol:', url.protocol)
-      return null
-    }
+    await resolvePublicUrl(websiteUrl)
 
     // Launch headless browser
-    browser = await chromium.launch(browserLaunchOptions())
-
-    const context = await browser.newContext({
+    browser = await openPublicBrowser({
       viewport: { width: 1920, height: 1080 },
       userAgent:
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     })
 
-    const page = await context.newPage()
+    const page = await browser.context.newPage()
 
     // Set timeout and navigate
     await page.goto(websiteUrl, {

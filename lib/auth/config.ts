@@ -13,6 +13,7 @@ import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Database connection pool (lazy initialization for build compatibility)
 let pool: Pool | null = null
@@ -26,10 +27,9 @@ function getPool(): Pool {
     pool = new Pool({
       connectionString,
       // SSL required for remote connections to PostgreSQL 16
-      ssl:
-        connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
-          ? false
-          : { rejectUnauthorized: false },
+      ssl: ['localhost', '127.0.0.1', '[::1]'].includes(new URL(connectionString).hostname)
+        ? false
+        : { rejectUnauthorized: true },
     })
   }
   return pool
@@ -132,25 +132,20 @@ export async function createUser(data: {
  */
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   const normalizedPhone = normalizePhone(phone)
+  // Account keys cannot be changed by spoofing forwarded IP headers.
+  if (!rateLimit(`auth:otp:${normalizedPhone}`, 10, 10 * 60 * 1000).allowed) return false
 
   const { rows } = await getPool().query(
-    `SELECT id FROM phone_otps
+    `UPDATE phone_otps SET verified = true
      WHERE phone = $1
        AND code = $2
        AND expires_at > NOW()
        AND verified = false
-     LIMIT 1`,
+     RETURNING id`,
     [normalizedPhone, code]
   )
 
-  if (rows.length === 0) {
-    return false
-  }
-
-  // Mark OTP as verified
-  await getPool().query('UPDATE phone_otps SET verified = true WHERE id = $1', [rows[0].id])
-
-  return true
+  return rows.length > 0
 }
 
 /**
@@ -171,7 +166,8 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const email = credentials.email as string
+        const email = (credentials.email as string).toLowerCase().trim()
+        if (!rateLimit(`auth:password:${email}`, 10, 15 * 60 * 1000).allowed) return null
         const password = credentials.password as string
 
         const user = await getUserByEmail(email)
@@ -258,6 +254,16 @@ export const authOptions: NextAuthOptions = {
           token.name = dbUser.name
           token.picture = dbUser.avatar_url
           token.created_at = dbUser.created_at?.toISOString() || null
+        } else {
+          // A deleted account must not retain an identity or recreate its profile.
+          delete token.id
+          delete token.sub
+          delete token.isAdmin
+          delete token.phone
+          delete token.name
+          delete token.email
+          delete token.picture
+          delete token.created_at
         }
       }
 

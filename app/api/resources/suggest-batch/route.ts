@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
 import { sql } from '@/lib/db/client'
 import { VerificationAgent } from '@/lib/ai-agents/verification-agent'
 import { getAISystemStatus } from '@/lib/api/settings'
@@ -111,15 +112,31 @@ function findMatchingCoverageCandidate(
  * - Autonomous quality assurance
  * - Adversarial verification
  */
+let activeTrustedBatches = 0
+const MAX_ACTIVE_TRUSTED_BATCHES = 2
+
 export async function POST(request: NextRequest) {
+  let trusted = false
+  let reserved = false
   try {
-    const body = (await request.json()) as {
+    let rawBody: unknown
+    try {
+      rawBody = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    }
+    if (!rawBody || typeof rawBody !== 'object') {
+      return NextResponse.json({ error: 'Invalid batch' }, { status: 400 })
+    }
+    const body = rawBody as {
       resources: unknown[]
       submitter?: string
       notes?: string
     }
 
     const { resources, submitter = 'ai_agent', notes } = body
+    const auth = await checkAdminAuth(request)
+    trusted = auth.isAuthorized
 
     if (!Array.isArray(resources) || resources.length === 0) {
       return NextResponse.json({ error: 'Resources must be a non-empty array' }, { status: 400 })
@@ -127,6 +144,17 @@ export async function POST(request: NextRequest) {
 
     if (resources.length > 100) {
       return NextResponse.json({ error: 'Maximum 100 resources per batch' }, { status: 400 })
+    }
+
+    if (trusted) {
+      if (activeTrustedBatches >= MAX_ACTIVE_TRUSTED_BATCHES) {
+        return NextResponse.json(
+          { error: 'Verification capacity is busy. Please retry shortly.' },
+          { status: 429, headers: { 'Retry-After': '30' } }
+        )
+      }
+      activeTrustedBatches++
+      reserved = true
     }
 
     const results = {
@@ -150,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     // Check AI system status
     const aiStatus = await getAISystemStatus()
-    const verificationEnabled = aiStatus.isVerificationActive
+    const verificationEnabled = trusted && aiStatus.isVerificationActive
 
     // Initialize Verification Agent (only if enabled)
     const verificationAgent = verificationEnabled ? new VerificationAgent() : null
@@ -335,7 +363,9 @@ export async function POST(request: NextRequest) {
           suggestion = insertResult[0] as Record<string, unknown>
         } catch (insertError) {
           const errorMessage =
-            insertError instanceof Error ? insertError.message : JSON.stringify(insertError)
+            trusted && insertError instanceof Error
+              ? insertError.message
+              : 'Unable to save suggestion'
           console.error('Error creating suggestion:', insertError)
           results.errors++
           results.error_details.push(`${r.name}: ${errorMessage}`)
@@ -362,8 +392,9 @@ export async function POST(request: NextRequest) {
             name,
             status: 'flagged',
             suggestion_id: suggestionId,
-            decision_reason:
-              'AI verification is currently disabled. All submissions require manual admin review. Enable AI systems in admin settings to activate autonomous verification.',
+            decision_reason: trusted
+              ? 'AI verification is currently disabled. Submission is pending manual admin review.'
+              : 'Public submissions are pending manual admin review. Automatic verification requires administrator authentication.',
           })
           continue
         }
@@ -447,7 +478,7 @@ export async function POST(request: NextRequest) {
         results.errors++
         const resourceName = (resource as BatchResourceInput)?.name || 'Unknown resource'
         results.error_details.push(
-          `${resourceName}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `${resourceName}: ${trusted && error instanceof Error ? error.message : 'Unable to process suggestion'}`
         )
       }
     }
@@ -456,12 +487,14 @@ export async function POST(request: NextRequest) {
       success: true,
       message: verificationEnabled
         ? `Processed ${results.submitted} resources: ${results.auto_approved} auto-approved, ${results.flagged_for_human} flagged for review, ${results.auto_rejected} rejected`
-        : `Processed ${results.submitted} resources: AI verification disabled, all flagged for manual review`,
+        : `Processed ${results.submitted} resources: all pending manual review`,
       ai_systems: {
         verification_enabled: verificationEnabled,
         status: verificationEnabled
           ? 'Ready for autonomous verification'
-          : 'AI systems currently disabled - all submissions require manual review',
+          : trusted
+            ? 'AI systems currently disabled - all submissions require manual review'
+            : 'Public submissions require manual review',
       },
       stats: {
         total_received: resources.length,
@@ -478,16 +511,20 @@ export async function POST(request: NextRequest) {
         ? results.auto_approved > 0
           ? `${results.auto_approved} resources auto-approved and published. ${results.flagged_for_human} resources flagged for human review in admin panel.`
           : 'All resources flagged for human review in admin panel.'
-        : 'AI verification is currently disabled. All submissions are pending manual admin review. Enable AI systems in /admin/settings to activate autonomous verification.',
+        : trusted
+          ? 'AI verification is currently disabled. All submissions are pending manual admin review.'
+          : 'Public submissions are pending manual admin review.',
     })
   } catch (error) {
     console.error('Error in batch suggest:', error)
     return NextResponse.json(
       {
         error: 'Failed to submit suggestions',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: trusted && error instanceof Error ? error.message : 'Unable to process batch',
       },
       { status: 500 }
     )
+  } finally {
+    if (reserved) activeTrustedBatches--
   }
 }

@@ -1,3 +1,5 @@
+vi.mock('next-auth', () => ({ getServerSession: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/auth/config', () => ({ authOptions: {} }))
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 

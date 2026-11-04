@@ -25,7 +25,6 @@ export interface ResourceReviewWithUser extends ResourceReview {
   user: {
     id: string
     name: string | null
-    phone: string | null
     avatar_url: string | null
   } | null
 }
@@ -68,10 +67,11 @@ export async function getResourceReviews(resourceId: string) {
         rr.helpful_count,
         rr.created_at::text,
         rr.updated_at::text,
-        json_build_object('id', u.id, 'name', u.name, 'phone', u.phone, 'avatar_url', u.avatar_url) as user
+        json_build_object('id', u.id, 'name', u.name, 'avatar_url', u.avatar_url) as user
       FROM resource_reviews rr
       LEFT JOIN users u ON rr.user_id = u.id
-      WHERE rr.resource_id = ${resourceId}
+      JOIN resources r ON rr.resource_id = r.id AND r.status = 'active'
+      WHERE rr.resource_id = ${resourceId} AND rr.status = 'approved'
       ORDER BY rr.created_at DESC
     `
 

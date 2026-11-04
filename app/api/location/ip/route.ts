@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { env } from '@/lib/env'
 import { monitorGeoIPService } from '@/lib/monitoring/dependency-monitor'
+import { getTrustedClientIP } from '@/lib/utils/client-ip'
 
 interface GeoIPResponse {
   city?: string
@@ -51,13 +52,8 @@ export async function GET() {
   try {
     const headersList = await headers()
 
-    // Get client IP from various proxy headers
-    const forwardedFor = headersList.get('x-forwarded-for')
-    const realIp = headersList.get('x-real-ip')
-    const cfConnectingIp = headersList.get('cf-connecting-ip') // Cloudflare
-
-    // Extract first IP if multiple (x-forwarded-for can be a list)
-    const ip = forwardedFor?.split(',')[0]?.trim() || realIp || cfConnectingIp || '127.0.0.1'
+    // Apache appends the observed client IP as the rightmost forwarded value.
+    const ip = getTrustedClientIP(headersList)
 
     // Check if IP is private/local/reserved (can't be geolocated)
     const isPrivateIP = (ipAddr: string): boolean => {
@@ -70,6 +66,7 @@ export async function GET() {
       }
 
       return (
+        ipAddr === 'unknown' ||
         // IPv4 localhost
         checkAddr === '127.0.0.1' ||
         checkAddr === 'localhost' ||

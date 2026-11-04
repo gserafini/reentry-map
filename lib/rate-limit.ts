@@ -9,6 +9,7 @@ interface RateLimitEntry {
 }
 
 const store = new Map<string, RateLimitEntry>()
+const MAX_ENTRIES = 10_000
 
 // Clean up expired entries every 5 minutes
 const CLEANUP_INTERVAL = 5 * 60 * 1000
@@ -44,6 +45,17 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   const entry = store.get(key)
 
   if (!entry || now > entry.resetAt) {
+    if (!entry && store.size >= MAX_ENTRIES) {
+      for (const [storedKey, storedEntry] of store) {
+        if (now > storedEntry.resetAt) store.delete(storedKey)
+      }
+    }
+    if (!entry && store.size >= MAX_ENTRIES) {
+      // Do not allocate another attacker-controlled key. Fail closed until an
+      // existing window expires and cleanup can reclaim an entry.
+      const earliestReset = Math.min(...Array.from(store.values(), (item) => item.resetAt))
+      return { allowed: false, remaining: 0, resetAt: Math.max(now + 1, earliestReset) }
+    }
     store.set(key, { count: 1, resetAt: now + windowMs })
     return { allowed: true, remaining: limit - 1, resetAt: now + windowMs }
   }

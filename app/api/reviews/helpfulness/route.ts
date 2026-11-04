@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
     const { data, error } = await getUserHelpfulnessVotes(session.user.id, reviewIds)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in GET /api/reviews/helpfulness:', error)
+      return NextResponse.json({ error: 'Failed to load helpfulness votes' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -71,7 +72,8 @@ export async function POST(request: NextRequest) {
     const { data, error } = await voteReviewHelpfulness(session.user.id, reviewId, isHelpful)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in POST /api/reviews/helpfulness:', error)
+      return NextResponse.json({ error: 'Failed to submit helpfulness vote' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -99,7 +101,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await removeHelpfulnessVote(session.user.id, reviewId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error in DELETE /api/reviews/helpfulness:', error)
+      return NextResponse.json({ error: 'Failed to remove helpfulness vote' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

@@ -2,6 +2,10 @@
 
 ## 2026-11-04
 
+- Recheck current administrator privileges on every privileged request, exclude password hashes and reviewer phone numbers from API responses, and enforce approved-review and active-listing visibility. Profile editing now uses the canonical full name stored in the database.
+- Restrict public suggestions to bounded editable fields and manual moderation; reserve automatic batch verification for authenticated administrators. Verification fetches, screenshots, and AI website tools now use a bounded public-only network boundary with pinned DNS and redirect checks.
+- Generate secure phone codes, consume them atomically, limit authentication and external-work requests, constrain login redirects, and bind analytics attribution to the server session. Verify certificates on remote database connections.
+- Remove seven unused direct dependencies and upgrade compatible vulnerable packages. Production dependency audits report no findings; remaining moderate development-tool advisories are itemized in the security report and B004.
 - Upgrade Next.js and its matching lint/build tooling to 16.4.5, and deduplicate sharp onto 0.35.5 with librsvg 2.63.2, addressing the image optimization and App Router security advisories tracked in B063. Use Next's native flat ESLint configuration; React Compiler lint adoption is itemized separately in I036.
 - Pin Next's WebAssembly compiler and use supported Webpack builds on the server's glibc 2.28 platform, which cannot load the newer native SWC binary. Dependency installation explicitly denies unused esbuild/unrs-resolver install scripts.
 - Run the browser release gate on maintained system Chrome with its sandbox enabled. Root resource-site browsers use the server's unprivileged Chrome wrapper instead of disabling the sandbox.

@@ -78,8 +78,7 @@ export async function GET(request: NextRequest) {
     console.error('Error in duplicate check:', error)
     return NextResponse.json(
       {
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        error: 'Failed to check for duplicate resources',
       },
       { status: 500 }
     )

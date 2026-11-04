@@ -25,13 +25,14 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { getInitials, getAvatarColor, getUserDisplayName } from '@/lib/utils/avatar'
 import { useGravatar } from '@/lib/hooks/useGravatar'
 import { useRouter } from 'next/navigation'
-import type { User } from '@/lib/types/database'
+import type { Profile } from '@/lib/types/profile'
+import { MAX_PROFILE_NAME_LENGTH } from '@/lib/types/profile'
 
 export default function ProfilePage() {
   const { user: authUser, isLoading: authLoading, isAuthenticated, signOut } = useAuth()
   const router = useRouter()
 
-  const [profile, setProfile] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -39,8 +40,7 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState<string | null>(null)
 
   // Form state
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
+  const [name, setName] = useState('')
 
   const { gravatarUrl, hasGravatar } = useGravatar(authUser?.email, 160)
 
@@ -73,14 +73,13 @@ export default function ProfilePage() {
           throw new Error(errorData.error || `Failed to fetch profile (${res.status})`)
         }
 
-        const { data } = (await res.json()) as { data: User | null }
+        const { data } = (await res.json()) as { data: Profile | null }
 
         if (cancelled) return
 
         if (data) {
           setProfile(data)
-          setFirstName(data.first_name || '')
-          setLastName(data.last_name || '')
+          setName(data.name || '')
         }
       } catch (err) {
         if (cancelled) return
@@ -117,10 +116,7 @@ export default function ProfilePage() {
       const res = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          first_name: firstName,
-          last_name: lastName,
-        }),
+        body: JSON.stringify({ name }),
       })
 
       if (!res.ok) {
@@ -128,9 +124,10 @@ export default function ProfilePage() {
         throw new Error(errorData.error || `Failed to update profile (${res.status})`)
       }
 
-      const { data } = (await res.json()) as { data: User }
+      const { data } = (await res.json()) as { data: Profile }
 
       setProfile(data)
+      setName(data.name || '')
       setSuccess('Profile updated successfully!')
       setIsEditing(false)
     } catch (err) {
@@ -142,8 +139,7 @@ export default function ProfilePage() {
   }
 
   const handleCancel = () => {
-    setFirstName(profile?.first_name || '')
-    setLastName(profile?.last_name || '')
+    setName(profile?.name || '')
     setIsEditing(false)
     setError(null)
     setSuccess(null)
@@ -157,21 +153,19 @@ export default function ProfilePage() {
     )
   }
 
-  if (!authUser || !profile) {
-    return null
+  if (!authUser) return null
+  if (!profile) {
+    return error ? (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    ) : null
   }
 
-  const displayName = getUserDisplayName(
-    profile.first_name,
-    profile.last_name,
-    authUser.email,
-    authUser.phone
-  )
-  const identifier = profile.first_name || authUser.email || authUser.phone || 'user'
-  const initials = getInitials(
-    profile.first_name || authUser.email || authUser.phone || 'user',
-    profile.last_name
-  )
+  const displayName =
+    profile.name?.trim() || getUserDisplayName(null, null, authUser.email, authUser.phone)
+  const identifier = profile.name || authUser.email || authUser.phone || 'user'
+  const initials = getInitials(profile.name || authUser.email || authUser.phone || 'user')
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -237,18 +231,12 @@ export default function ProfilePage() {
           {isEditing ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
               <TextField
-                label="First Name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                label="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 fullWidth
                 variant="outlined"
-              />
-              <TextField
-                label="Last Name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                fullWidth
-                variant="outlined"
+                inputProps={{ maxLength: MAX_PROFILE_NAME_LENGTH }}
               />
               {/* Email displayed read-only in edit mode */}
               {authUser.email && (
@@ -267,15 +255,9 @@ export default function ProfilePage() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  First Name
+                  Name
                 </Typography>
-                <Typography>{profile.first_name || '\u2014'}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Last Name
-                </Typography>
-                <Typography>{profile.last_name || '\u2014'}</Typography>
+                <Typography>{profile.name || '\u2014'}</Typography>
               </Box>
               {authUser.email && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

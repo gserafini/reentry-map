@@ -9,9 +9,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import type { AnalyticsEvent } from '@/lib/analytics/queue'
+import type { AnalyticsEventSchema as AnalyticsEvent } from '@/lib/analytics/schemas'
 import { analyticsEventBatchSchema } from '@/lib/analytics/schemas'
 import { sql } from '@/lib/db/client'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
 
 export const maxDuration = 1 // Max 1 second (forces fast return)
 
@@ -40,7 +42,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const events = validationResult.data as AnalyticsEvent[]
+    const session = await getServerSession(authOptions)
+    const events: AnalyticsEvent[] = validationResult.data.map((event) => ({
+      ...event,
+      user_id: session?.user?.id || null,
+      is_admin: session?.user?.isAdmin === true,
+    }))
 
     // IMMEDIATELY return 202 Accepted (don't wait for processing)
     const response = NextResponse.json(
@@ -251,9 +258,7 @@ async function updateSessionMetadata(events: EnrichedAnalyticsEvent[]) {
     await sql`
       INSERT INTO analytics_sessions (session_id, user_id, anonymous_id, is_admin, device_type, browser, os, city, state, country, started_at, referrer)
       VALUES (${s.session_id ?? null}, ${s.user_id ?? null}, ${s.anonymous_id ?? null}, ${s.is_admin ?? false}, ${s.device_type ?? null}, ${s.browser ?? null}, ${s.os ?? null}, ${s.city ?? null}, ${s.region ?? null}, ${s.country ?? null}, ${s.started_at ?? null}, ${s.referrer ?? null})
-      ON CONFLICT (session_id) DO UPDATE SET
-        user_id = COALESCE(EXCLUDED.user_id, analytics_sessions.user_id),
-        anonymous_id = COALESCE(EXCLUDED.anonymous_id, analytics_sessions.anonymous_id)
+      ON CONFLICT (session_id) DO NOTHING
     `
   }
 }

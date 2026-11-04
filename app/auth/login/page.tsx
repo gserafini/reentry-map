@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Container, Box, Typography } from '@mui/material'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { safeRelativeRedirect } from '@/lib/utils/safe-redirect'
 
 export default function LoginPage() {
   const [modalOpen, setModalOpen] = useState(true)
@@ -16,13 +17,15 @@ export default function LoginPage() {
     // If user is already authenticated, redirect them
     if (!isLoading && isAuthenticated) {
       // Check if there's a redirect parameter
-      const redirect = searchParams.get('redirect') || sessionStorage.getItem('redirectAfterLogin')
+      const redirect = safeRelativeRedirect(
+        searchParams.get('redirect') || sessionStorage.getItem('redirectAfterLogin')
+      )
 
       // Clear the redirect from sessionStorage
       sessionStorage.removeItem('redirectAfterLogin')
 
       // Redirect to the intended page or home
-      router.push(redirect || '/')
+      router.push(redirect)
     }
   }, [isAuthenticated, isLoading, router, searchParams])
 

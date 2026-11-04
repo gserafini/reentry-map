@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
+import { getTrustedClientIP } from '@/lib/utils/client-ip'
 
 // Rate limit configurations per route pattern
 const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   // Auth endpoints - strict limits to prevent brute force
   '/api/auth/signup': { limit: 5, windowMs: 15 * 60 * 1000 }, // 5 per 15 min
   '/api/auth/otp/send': { limit: 5, windowMs: 15 * 60 * 1000 }, // 5 per 15 min
+  '/api/auth/callback/': { limit: 5, windowMs: 15 * 60 * 1000 },
+  '/api/auth/signin': { limit: 5, windowMs: 15 * 60 * 1000 },
 
   // Public write endpoints
   '/api/suggestions': { limit: 10, windowMs: 60 * 1000 }, // 10 per min
@@ -16,16 +19,13 @@ const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   '/api/resources/suggest-batch': { limit: 5, windowMs: 60 * 1000 },
   '/api/analytics/batch': { limit: 30, windowMs: 60 * 1000 },
 
+  // Public GET endpoints that can trigger network or database work
+  '/api/gravatar/check': { limit: 30, windowMs: 60 * 1000 },
+  '/api/location/ip': { limit: 30, windowMs: 60 * 1000 },
+  '/api/analytics/health': { limit: 10, windowMs: 60 * 1000 },
+
   // General API - generous but bounded
   '/api/': { limit: 60, windowMs: 60 * 1000 }, // 60 per min default
-}
-
-function getClientIP(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
-  )
 }
 
 function findRateLimit(pathname: string): { limit: number; windowMs: number } | null {
@@ -93,14 +93,21 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Only rate limit API routes (POST, PUT, DELETE - not GET)
+  // Limit mutating API calls generally, plus selected GET routes that perform
+  // database or outbound network work.
   const isApiRoute = pathname.startsWith('/api/')
   const isMutatingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method)
+  const isExpensiveGet =
+    request.method === 'GET' &&
+    ['/api/gravatar/check', '/api/location/ip', '/api/analytics/health'].some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    )
+  const isAuthCallback = pathname.startsWith('/api/auth/callback/')
 
-  if (isApiRoute && isMutatingMethod) {
+  if (isApiRoute && (isMutatingMethod || isExpensiveGet || isAuthCallback)) {
     const config = findRateLimit(pathname)
     if (config) {
-      const ip = getClientIP(request)
+      const ip = getTrustedClientIP(request.headers)
       const key = `${ip}:${pathname}`
       const result = rateLimit(key, config.limit, config.windowMs)
 

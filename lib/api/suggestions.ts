@@ -1,8 +1,14 @@
 import { sql } from '@/lib/db/client'
+import { publicSuggestionSchema } from '@/lib/validation/suggestion'
 
 interface ResourceSuggestionInsert {
   suggested_by?: string | null
   name: string
+  address_type?: 'physical' | 'confidential' | 'regional' | 'online' | 'mobile'
+  service_area?: {
+    type: 'city' | 'county' | 'statewide' | 'region' | 'nationwide'
+    values: string[]
+  } | null
   address?: string | null
   city?: string | null
   state?: string | null
@@ -81,7 +87,12 @@ interface ResourceSuggestionRow {
  */
 export async function submitSuggestion(suggestion: ResourceSuggestionInsert) {
   try {
-    const insertData: Record<string, unknown> = { ...suggestion }
+    const insertData: Record<string, unknown> = {
+      ...publicSuggestionSchema.parse(suggestion),
+      suggested_by: suggestion.suggested_by || null,
+      status: 'pending',
+    }
+    if (insertData.service_area) insertData.service_area = JSON.stringify(insertData.service_area)
     if (insertData.hours) {
       insertData.hours = JSON.stringify(insertData.hours)
     }

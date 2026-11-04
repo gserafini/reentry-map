@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
         primaryCategory: resources.primaryCategory,
       })
       .from(resources)
-      .where(and(eq(resources.city, city), eq(resources.state, state)))
+      .where(
+        and(eq(resources.city, city), eq(resources.state, state), eq(resources.status, 'active'))
+      )
       .orderBy(resources.name)
 
     return NextResponse.json({
@@ -88,13 +90,17 @@ export async function POST(request: NextRequest) {
         primaryCategory: resources.primaryCategory,
       })
       .from(resources)
-      .where(and(eq(resources.city, city), eq(resources.state, state)))
+      .where(
+        and(eq(resources.city, city), eq(resources.state, state), eq(resources.status, 'active'))
+      )
       .orderBy(resources.name)
 
     const [countResult] = await db
       .select({ value: count() })
       .from(resources)
-      .where(and(eq(resources.city, city), eq(resources.state, state)))
+      .where(
+        and(eq(resources.city, city), eq(resources.state, state), eq(resources.status, 'active'))
+      )
 
     const currentCount = countResult?.value || 0
 
@@ -337,7 +343,6 @@ Save as: **${city.toLowerCase().replace(/\s+/g, '-')}-resources-batch-${batchNum
     return NextResponse.json(
       {
         error: 'Failed to generate prompt',
-        message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )

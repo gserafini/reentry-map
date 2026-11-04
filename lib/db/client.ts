@@ -24,11 +24,15 @@ function createSqlClient(): ReturnType<typeof postgres> {
     throw new Error('DATABASE_URL environment variable is required. Set it in .env.local')
   }
 
-  const isLocalhost =
-    connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
+  const parsed = new URL(connectionString)
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('DATABASE_URL must be a PostgreSQL URL with a database host')
+  }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase()
+  const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 
   return postgres(connectionString, {
-    ssl: isLocalhost ? false : 'require',
+    ssl: isLoopback ? false : { rejectUnauthorized: true },
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,

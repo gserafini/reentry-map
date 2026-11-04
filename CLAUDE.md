@@ -272,10 +272,10 @@ node scripts/check-console.mjs /path/to/page
 
 **When debugging fails:**
 
-1. Kill ALL node processes: `killall -9 node`
-2. Delete build cache: `rm -rf .next`
-3. Restart dev server fresh
-4. Re-check console logs
+1. Inspect the dev-server listener: `lsof -nP -iTCP:3003 -sTCP:LISTEN` (or port 3004 for `dev:test`).
+2. Stop only the verified project PID with `kill <PID>`; never kill all Node processes.
+3. Delete the build cache: `rm -rf .next`
+4. Restart the dev server and re-check console logs
 
 ---
 
@@ -290,13 +290,13 @@ node scripts/check-console.mjs /path/to/page
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4.0
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 3
 - **UI Components**: Material UI v7 (@mui/material, @mui/icons-material) + Lucide React icons
 - **Backend**: Next.js API Routes, Self-hosted PostgreSQL 16 (Drizzle ORM), NextAuth.js
-- **Maps**: Google Maps JavaScript API (@googlemaps/js-api-loader)
-- **AI**: OpenAI SDK (gpt-4o-mini for cost-effectiveness)
-- **PWA**: @ducanh2912/next-pwa
-- **Forms**: react-hook-form + zod
+- **Maps**: Google Maps JavaScript API with the existing loader and @googlemaps/markerclusterer; Leaflet for coverage overlays
+- **AI**: Local Ollama with the existing Anthropic fallback; no OpenAI SDK
+- **PWA**: Handwritten public/sw.js registered by PWAWrapper; no next-pwa build plugin
+- **Forms**: React state and Zod validation
 - **Hosting**: Self-hosted on dc3-1.serafinihosting.com (PM2 + Apache)
 - **Testing**: Vitest (unit), Playwright (E2E), @vitest/coverage-v8
 - **Code Quality**: Prettier, ESLint, husky, lint-staged, @total-typescript/ts-reset
@@ -320,7 +320,7 @@ Required environment variables (see `.env.example` and `SETUP_GUIDE.md`):
 - `NEXTAUTH_SECRET` - NextAuth session encryption key
 - `NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Google Maps API key (client)
 - `GOOGLE_MAPS_KEY` - Google Maps API key (server)
-- `OPENAI_API_KEY` - OpenAI API key for AI agents
+- `ANTHROPIC_API_KEY` - Optional configured AI fallback; primary work uses local Ollama
 - `ADMIN_API_KEY` - Admin API authentication key
 - `NEXT_PUBLIC_APP_URL` - Public application URL
 
@@ -495,7 +495,7 @@ Use `process.env` for environment variables. Key variables:
 - `NEXTAUTH_SECRET` - Session encryption key
 - `NEXT_PUBLIC_GOOGLE_MAPS_KEY` - Client-side Maps key
 - `GOOGLE_MAPS_KEY` - Server-side Maps key
-- `OPENAI_API_KEY` - OpenAI API key
+- `ANTHROPIC_API_KEY` - Optional configured AI fallback
 - `ADMIN_API_KEY` - Admin API authentication
 - `NEXT_PUBLIC_APP_URL` - Public application URL
 
@@ -733,7 +733,7 @@ test('search for resources', async ({ page }) => {
 - E2E tests run **headless by default** for fast feedback
 - Only use `npm run test:e2e:ui` when demoing to user
 - Test critical paths: auth, search, favorites, reviews, admin flows
-- Mock external APIs (Google Maps, OpenAI) in tests
+- Mock external APIs (Google Maps, Ollama, Anthropic) in tests
 - Use test IDs for stable selectors: `data-testid="resource-card"`
 
 ## AI Agent System
@@ -745,6 +745,10 @@ Three primary agents:
 3. **Verification Agent** - Quarterly checks on phone numbers, websites, business status
 
 All agent actions logged to `ai_agent_logs` table with success/failure, cost tracking.
+
+Resource websites are untrusted. Use `fetchPublicUrl()` and `openPublicBrowser()` from `lib/utils/public-network.mjs` for website retrieval, redirects, screenshots, and model website tools. Do not replace these with raw fetch or a browser launch: DNS pinning, public-address restrictions, TLS verification, and resource budgets live at that boundary. Configured internal Ollama endpoints remain a separate trusted connection.
+
+The 2026-11-04 dependency review removed unused pg-adapter, next-pwa, react-leaflet, OpenAI SDK, eslintrc compatibility, Cheerio, and Maps loader packages. Do not reinstall them based on old setup notes. `pg`, `ipaddr.js`, and `@types/google.maps` are intentional direct dependencies. Keep Node 24 or newer for the current GeoIP package. See `docs/security/redteam-2026-11-04.md` and B004 before addressing the remaining development-only advisories; do not accept audit suggestions that downgrade Next tooling or Drizzle.
 
 ## Common Commands
 

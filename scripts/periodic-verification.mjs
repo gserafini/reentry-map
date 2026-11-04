@@ -16,7 +16,7 @@ import postgres from 'postgres'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { browserLaunchOptions } from '../lib/utils/browser-launch.mjs'
+import { openPublicBrowser } from '../lib/utils/public-network.mjs'
 
 // Load environment variables from .env.local
 const __filename = fileURLToPath(import.meta.url)
@@ -62,15 +62,12 @@ async function checkUrlWithRedundancy(url) {
 
   try {
     // Use Playwright to check URL (renders like real browser, bypasses bot detection)
-    const { chromium } = await import('playwright')
-    const browser = await chromium.launch(browserLaunchOptions())
-    const context = await browser.newContext({
+    const browser = await openPublicBrowser({
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     })
-    const page = await context.newPage()
-
     try {
+      const page = await browser.context.newPage()
       const response = await page.goto(url, {
         waitUntil: 'domcontentloaded',
         timeout: 10000,

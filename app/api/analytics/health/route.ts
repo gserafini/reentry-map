@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { sql } from '@/lib/db/client'
+import { checkAdminAuth } from '@/lib/utils/admin-auth'
 
 export const maxDuration = 10 // Allow longer for health check
 
@@ -19,7 +21,12 @@ interface CountResult {
  *
  * Used for monitoring and alerting in production.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await checkAdminAuth(request)
+  if (!auth.isAuthorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -150,7 +157,6 @@ export async function GET() {
       {
         status: 'error',
         message: 'Failed to retrieve analytics health metrics',
-        error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
       },
       { status: 500 }

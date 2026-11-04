@@ -5,7 +5,7 @@
  */
 
 import { sql as sqlClient } from '@/lib/db/client'
-import type { Resource } from '@/lib/types/database'
+import type { SavedResourceInput } from '@/lib/utils/saved-resources'
 
 export interface UserFavoriteWithResource {
   id: string
@@ -13,7 +13,7 @@ export interface UserFavoriteWithResource {
   resource_id: string
   notes: string | null
   created_at: string
-  resource: Resource | null
+  resource: SavedResourceInput | null
 }
 
 /**
@@ -28,9 +28,27 @@ export async function getUserFavorites(userId: string) {
         uf.resource_id,
         uf.notes,
         uf.created_at::text,
-        row_to_json(r.*) as resource
+        json_build_object(
+          'id', r.id,
+          'name', r.name,
+          'description', r.description,
+          'phone', r.phone,
+          'website', r.website,
+          'address', r.address,
+          'address_type', r.address_type,
+          'service_area', r.service_area,
+          'city', r.city,
+          'state', r.state,
+          'zip', r.zip,
+          'slug', r.slug,
+          'services_offered', r.services_offered,
+          'eligibility_requirements', r.eligibility_requirements,
+          'appointment_required', r.appointment_required,
+          'verified_date', r.verified_date,
+          'ai_last_verified', r.ai_last_verified
+        ) as resource
       FROM user_favorites uf
-      LEFT JOIN resources r ON uf.resource_id = r.id
+      JOIN resources r ON uf.resource_id = r.id AND r.status = 'active'
       WHERE uf.user_id = ${userId}
       ORDER BY uf.created_at DESC
     `
@@ -75,11 +93,13 @@ export async function addFavorite(userId: string, resourceId: string, notes?: st
       }[]
     >`
       INSERT INTO user_favorites (user_id, resource_id, notes)
-      VALUES (${userId}, ${resourceId}, ${notes || null})
+      SELECT ${userId}, id, ${notes || null}
+      FROM resources WHERE id = ${resourceId} AND status = 'active'
       RETURNING id, user_id, resource_id, notes, created_at::text
     `
 
-    return { data: data[0] || null, error: null }
+    if (!data[0]) return { data: null, error: new Error('Resource is unavailable') }
+    return { data: data[0], error: null }
   } catch (error) {
     console.error('Error adding favorite:', error)
     return { data: null, error: error as Error }

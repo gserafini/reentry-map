@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+const mockRateLimit = vi.fn()
+vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...args: unknown[]) => mockRateLimit(...args) }))
+
 // Mock pg Pool - must be a proper class constructor
 const mockQuery = vi.fn()
 vi.mock('pg', () => {
@@ -46,6 +49,7 @@ interface TestCredentialsProvider {
 describe('auth/config', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRateLimit.mockReturnValue({ allowed: true })
   })
 
   describe('normalizePhone', () => {
@@ -166,15 +170,22 @@ describe('auth/config', () => {
   })
 
   describe('verifyOtp', () => {
+    it('blocks exhausted phone attempts before querying or consuming a code', async () => {
+      mockRateLimit.mockReturnValue({ allowed: false })
+      expect(await verifyOtp('5551234567', '123456')).toBe(false)
+      expect(mockQuery).not.toHaveBeenCalled()
+    })
+
     it('returns true and marks OTP as verified when valid', async () => {
-      mockQuery
-        .mockResolvedValueOnce({ rows: [{ id: 'otp-1' }] }) // Find OTP
-        .mockResolvedValueOnce({ rows: [] }) // Mark verified
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 'otp-1' }] }) // Find OTP
 
       const result = await verifyOtp('5551234567', '123456')
       expect(result).toBe(true)
       // Should update the OTP record
-      expect(mockQuery).toHaveBeenCalledTimes(2)
+      expect(mockQuery).toHaveBeenCalledTimes(1)
+      expect(mockQuery.mock.calls[0][0]).toMatch(
+        /UPDATE phone_otps[\s\S]*verified = false[\s\S]*RETURNING id/
+      )
     })
 
     it('returns false when OTP not found or expired', async () => {
@@ -192,6 +203,25 @@ describe('auth/config', () => {
         expect.stringContaining('phone'),
         expect.arrayContaining(['+15551234567'])
       )
+    })
+  })
+
+  describe('revoked identity', () => {
+    it('removes deleted users from JWT and session identity', async () => {
+      mockQuery.mockResolvedValue({ rows: [] })
+      const jwt = authOptions.callbacks!.jwt!
+      const token = await jwt({
+        token: { id: 'deleted', sub: 'deleted', isAdmin: true, phone: '+15551234567' },
+      } as Parameters<typeof jwt>[0])
+      expect(token.id).toBeUndefined()
+      expect(token.sub).toBeUndefined()
+      expect(token.isAdmin).toBeFalsy()
+      const callback = authOptions.callbacks!.session!
+      const session = await callback({
+        token,
+        session: { user: { id: 'deleted' }, expires: 'later' },
+      } as Parameters<typeof callback>[0])
+      expect(session.user?.id).toBeFalsy()
     })
   })
 
@@ -253,6 +283,16 @@ describe('auth/config', () => {
     })
 
     describe('credentials provider - email/password', () => {
+      it('blocks exhausted account attempts before querying or comparing passwords', async () => {
+        mockRateLimit.mockReturnValue({ allowed: false })
+        const provider = authOptions.providers[0] as TestCredentialsProvider
+        expect(
+          await provider.options.authorize({ email: 'USER@example.com', password: 'password' })
+        ).toBeNull()
+        expect(mockQuery).not.toHaveBeenCalled()
+        expect(mockBcryptCompare).not.toHaveBeenCalled()
+      })
+
       it('rejects login without email', async () => {
         const provider = authOptions.providers[0] as TestCredentialsProvider
         const result = await provider.options.authorize({ password: 'test' })
@@ -357,7 +397,6 @@ describe('auth/config', () => {
       it('creates new user on first phone login', async () => {
         mockQuery
           .mockResolvedValueOnce({ rows: [{ id: 'otp-1' }] }) // Find OTP
-          .mockResolvedValueOnce({ rows: [] }) // Mark OTP verified
           .mockResolvedValueOnce({ rows: [] }) // getUserByPhone - not found
           .mockResolvedValueOnce({
             rows: [{ id: 'new-user', phone: '+15551234567', name: null, avatar_url: null }],

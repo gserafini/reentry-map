@@ -98,4 +98,13 @@ describe('rateLimit', () => {
     expect(retryAfterSeconds).toBeGreaterThan(0)
     expect(retryAfterSeconds).toBeLessThanOrEqual(15 * 60)
   })
+
+  it('fails closed rather than allocating unbounded distinct keys', () => {
+    let last
+    for (let index = 0; index < 10_010; index++) {
+      last = rateLimit(`capacity-test-${index}`, 2, 60_000)
+    }
+    expect(last?.allowed).toBe(false)
+    expect(last?.remaining).toBe(0)
+  })
 })

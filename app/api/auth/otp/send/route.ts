@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 /**
  * POST /api/auth/otp/send
  *
@@ -16,11 +17,12 @@ function getPool(): Pool {
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is required')
     }
-    const isLocalhost =
-      connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
+    const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(
+      new URL(connectionString).hostname
+    )
     pool = new Pool({
       connectionString,
-      ssl: isLocalhost ? false : { rejectUnauthorized: false },
+      ssl: isLocalhost ? false : { rejectUnauthorized: true },
     })
   }
   return pool
@@ -59,7 +61,7 @@ function normalizePhone(phone: string): string {
  * Generate a 6-digit OTP code
  */
 function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return randomInt(100000, 1000000).toString()
 }
 
 interface OtpSendRequest {
