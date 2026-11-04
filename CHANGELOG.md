@@ -2,6 +2,7 @@
 
 ## 2026-11-04
 
+- Add a native-tested Apache policy for the API's 15 existing PUT/PATCH/DELETE handlers, restoring profile saves and authenticated management actions while retaining method checks for other routes and all other WAF protections.
 - Recheck current administrator privileges on every privileged request, exclude password hashes and reviewer phone numbers from API responses, and enforce approved-review and active-listing visibility. Profile editing now uses the canonical full name stored in the database.
 - Restrict public suggestions to bounded editable fields and manual moderation; reserve automatic batch verification for authenticated administrators. Verification fetches, screenshots, and AI website tools now use a bounded public-only network boundary with pinned DNS and redirect checks.
 - Generate secure phone codes, consume them atomically, limit authentication and external-work requests, constrain login redirects, and bind analytics attribution to the server session. Verify certificates on remote database connections.
