@@ -1,13 +1,7 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { FlatCompat } from '@eslint/eslintrc'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-})
+import nextVitals from 'eslint-config-next/core-web-vitals'
+import nextTypescript from 'eslint-config-next/typescript'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
+import prettierRecommended from 'eslint-plugin-prettier/recommended'
 
 const eslintConfig = [
   {
@@ -28,11 +22,18 @@ const eslintConfig = [
       'tailwind.config.ts', // Config file uses require()
     ],
   },
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
-  ...compat.extends('plugin:jsx-a11y/recommended'),
-  ...compat.extends('plugin:prettier/recommended'), // Must be last to override other configs
+  ...nextVitals,
+  ...nextTypescript,
+  // Next registers jsx-a11y; extend its rules without registering a second instance.
+  { rules: jsxA11y.configs.recommended.rules },
+  prettierRecommended, // Must be last to override other configs
   {
     rules: {
+      // I036 tracks adoption of these new Compiler checks. The app does not
+      // enable React Compiler; retain the established Hooks lint policy here.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/purity': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {

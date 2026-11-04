@@ -15,7 +15,7 @@ DEV_CHECK_PORT=3004
 lsof -ti:$DEV_CHECK_PORT | xargs kill -9 2>/dev/null || true
 
 # Start dev server in background and capture output
-(lsof -ti:$DEV_CHECK_PORT | xargs kill -9 2>/dev/null || true) && concurrently "npm:tailwind:watch" "node node_modules/next/dist/bin/next dev --turbopack --port $DEV_CHECK_PORT" > /tmp/dev-check.log 2>&1 &
+(lsof -ti:$DEV_CHECK_PORT | xargs kill -9 2>/dev/null || true) && concurrently "npm:tailwind:watch" "node node_modules/next/dist/bin/next dev --webpack --port $DEV_CHECK_PORT" > /tmp/dev-check.log 2>&1 &
 DEV_PID=$!
 
 # Set up trap to kill dev server on script exit

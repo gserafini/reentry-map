@@ -30,10 +30,11 @@ describe('browserLaunchOptions', () => {
     expect(options.args).toEqual(['--disable-dev-shm-usage'])
   })
 
-  it('disables the sandbox only for root, which Chrome cannot sandbox', () => {
-    const options = browserLaunchOptions({ exists: chromeInstalled, uid: 0 })
+  it('runs root through the unprivileged wrapper with the sandbox enabled', () => {
+    const options = browserLaunchOptions({ exists: () => true, uid: 0 })
 
-    expect(options.chromiumSandbox).toBe(false)
-    expect(options.args).toContain('--no-sandbox')
+    expect(options.chromiumSandbox).toBe(true)
+    expect(options.executablePath).toBe('/usr/local/bin/chrome-agentbrowser')
+    expect(options.args).not.toContain('--no-sandbox')
   })
 })

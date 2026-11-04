@@ -50,9 +50,17 @@ async function runCheck({
   } catch (error) {
     escapedError = error
   }
-  return { process, browser, page, console, escapedError }
+  return { process, browser, page, console, escapedError, chromium }
 }
 describe('browser console release gate', () => {
+  it('uses maintained system Chrome with its sandbox enabled', async () => {
+    const result = await runCheck()
+    expect(result.chromium.launch).toHaveBeenCalledWith({
+      headless: true,
+      executablePath: '/usr/local/bin/chrome-agentbrowser',
+      chromiumSandbox: true,
+    })
+  })
   it('passes a clean page after DOM readiness without waiting for network idle', async () => {
     const result = await runCheck()
     expect(result.process.exitCode).toBe(0)

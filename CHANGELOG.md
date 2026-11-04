@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-04
+
+- Upgrade Next.js and its matching lint/build tooling to 16.4.5, and deduplicate sharp onto 0.35.5 with librsvg 2.63.2, addressing the image optimization and App Router security advisories tracked in B063. Use Next's native flat ESLint configuration; React Compiler lint adoption is itemized separately in I036.
+- Pin Next's WebAssembly compiler and use supported Webpack builds on the server's glibc 2.28 platform, which cannot load the newer native SWC binary. Dependency installation explicitly denies unused esbuild/unrs-resolver install scripts.
+- Run the browser release gate on maintained system Chrome with its sandbox enabled. Root resource-site browsers use the server's unprivileged Chrome wrapper instead of disabling the sandbox.
+
 ## 2026-11-03
 
 - Batch enrichment no longer has a Mac residential-IP tier. The cron runs as `reentrymap`, which cannot reach the Mac, so that tier only ever failed, and it built its SSH command by interpolating the resource URL into a shell string. Sites that block the server are still rechecked from the Mac by the root-run `scripts/recheck-unreachable-via-mac.mjs`, which passes the URL safely.

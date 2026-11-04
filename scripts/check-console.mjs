@@ -39,7 +39,12 @@ function checkResponse(response) {
 }
 
 try {
-  browser = await chromium.launch({ headless: true })
+  // The server wrapper also drops privileges when this gate runs as root.
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: '/usr/local/bin/chrome-agentbrowser',
+    chromiumSandbox: true,
+  })
   const context = await browser.newContext()
   const page = await context.newPage()
   page.on('console', (message) => {

@@ -35,7 +35,7 @@ Reentry Map is self-hosted on dc3-1.serafinihosting.com using PM2 + Apache rever
 | **SSH**              | `ssh -p 22022 root@dc3-1.serafinihosting.com`              |
 | **cPanel user**      | `reentrymap`                                               |
 | **App directory**    | `/home/reentrymap/reentry-map-prod`                        |
-| **Node.js**          | v20.20.0 (via nvm)                                         |
+| **Node.js**          | v24.22.1 (`/opt/node/24/bin/node`)                         |
 | **Process manager**  | PM2 (app: `reentry-map-prod`, port 3007)                   |
 | **Web server**       | Apache reverse proxy → localhost:3007                      |
 | **Database**         | PostgreSQL localhost:5432, database `reentry_map`          |
@@ -47,46 +47,44 @@ Reentry Map is self-hosted on dc3-1.serafinihosting.com using PM2 + Apache rever
 
 ## Deploying Changes
 
-### Standard Deploy (from local machine)
+### Staging-first deployment
 
 ```bash
-# 1. Push code to GitHub
-git push origin main
+# Develop and run npm run quality as reentrymap in reentry-map-staging.
+# Browse the compiled artifact on port 3004 before committing.
+# After committing and pushing the exact reviewed revision:
+~/.claude/scripts/reentry-map/cli.sh deploy staging --local --revision <full-SHA> --dry-run
+~/.claude/scripts/reentry-map/cli.sh deploy staging --local --revision <full-SHA>
 
-# 2. SSH to server and deploy as reentrymap user
-ssh -p 22022 root@dc3-1.serafinihosting.com
-
-su - reentrymap
-cd ~/reentry-map-prod
-git pull origin main
-npm install
-npm run build
-pm2 restart reentry-map-prod
+# Verify staging before promoting the same revision into production main.
+~/.claude/scripts/reentry-map/cli.sh deploy production --local --revision <full-SHA>
 ```
 
-### One-liner Deploy (from local machine)
+The CLI owns `npm ci`, the production build, and the PM2 restart together. It refuses a dirty tree or a local revision mismatch. It runs under the service account; do not merge a root agent's environment into PM2.
 
-```bash
-# Push first, then deploy remotely
-git push origin main && \
-ssh -p 22022 root@dc3-1.serafinihosting.com \
-  'su - reentrymap -c "cd ~/reentry-map-prod && git pull origin main && npm install && npm run build && pm2 restart reentry-map-prod"'
-```
+### Compiler compatibility and release smoke checks
+
+The server has glibc 2.28. Next 16.4.5's native SWC requires `GLIBC_2.29`; Turbopack therefore cannot build here. Use `npm run build`, which selects Next's supported `--webpack` mode with an exact, lockfile-pinned `@next/swc-wasm-nodejs` dependency. Development scripts use the same supported mode. Do not downgrade the security release or replace the system libc to silence the native binding warning.
+
+`npm run typecheck` generates the current Next route types before checking TypeScript. `next-env.d.ts` is generated and gitignored; do not commit it or restore an older generated copy after a build. This keeps deployed worktrees clean when Next adds generated type imports.
+
+Verify home, search, a resource detail, map zoom controls, `/_next/image`, and a page-specific `/api/og` image on the compiled artifact and both deployed origins. Decode the returned image bytes and check dimensions, rather than accepting HTTP 200 alone. With sharp 0.35, `sharp/package.json` is not exported: inspect `require('sharp').versions.sharp` and `.rsvg` for the effective native versions, including resolution from Next's package.
+
+For browser tests, a card's Details link is named `View details for <resource name>` through its accessible label. Scope the locator to that resource's card ID because names can repeat across states. Do not assume the accessible name is just `Details`.
 
 ### Verify Deploy
 
 ```bash
-# Check PM2 status
-ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "pm2 status"'
-
-# Check recent logs
-ssh -p 22022 root@dc3-1.serafinihosting.com 'tail -20 /home/reentrymap/logs/reentry-map-prod-out.log'
+# Check current PM2/HTTP status and logs, with credentials redacted.
+~/.claude/scripts/reentry-map/cli.sh deploy status --target production
+~/.claude/scripts/reentry-map/cli.sh deploy check-logs --target production --lines 50 \
+  | node ~/.claude/scripts/redact-secrets/cli.js
 
 # Check deployed commit
 ssh -p 22022 root@dc3-1.serafinihosting.com 'su - reentrymap -c "cd ~/reentry-map-prod && git log --oneline -1"'
 
 # Verify site is up
-curl -sI https://reentrymap.org | head -5
+curl -sS -o /dev/null -w '%{http_code}\n' https://reentrymap.org
 ```
 
 ---

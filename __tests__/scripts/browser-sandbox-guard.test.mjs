@@ -3,9 +3,10 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import * as batchEnrichFetch from '../../scripts/lib/batch-enrich-fetch.mjs'
+import { browserLaunchOptions } from '../../lib/utils/browser-launch.mjs'
 
 // server_ops B1924: every browser that loads resource websites goes through
-// lib/utils/browser-launch.mjs (system Chrome, sandbox on unless root).
+// lib/utils/browser-launch.mjs (system Chrome, with an unprivileged root wrapper).
 const root = path.resolve(__dirname, '../..')
 const POLICY = 'lib/utils/browser-launch.mjs'
 const SANDBOX_OFF = /['"`]--(no-sandbox|disable-setuid-sandbox)['"`]/
@@ -21,6 +22,19 @@ function sourceFiles(dir) {
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8')
 
 describe('browser sandbox guard', () => {
+  it('keeps the sandbox enabled for root through the unprivileged wrapper', () => {
+    const options = browserLaunchOptions({ uid: 0, exists: () => true })
+    expect(options.chromiumSandbox).toBe(true)
+    expect(options.executablePath).toBe('/usr/local/bin/chrome-agentbrowser')
+    expect(options.args).not.toContain('--no-sandbox')
+  })
+
+  it('keeps service-user launches sandboxed on the maintained system Chrome', () => {
+    const options = browserLaunchOptions({ uid: 1000, exists: () => true })
+    expect(options.chromiumSandbox).toBe(true)
+    expect(options.executablePath).toBe('/opt/google/chrome/chrome')
+  })
+
   it('turns the sandbox off nowhere except the shared launch policy', () => {
     const offenders = ['lib', 'app', 'scripts']
       .flatMap(sourceFiles)

@@ -3,9 +3,10 @@ import { sql } from '@/lib/db/client'
 import type { Resource } from '@/lib/types/database'
 import { EditResourceClient } from './EditResourceClient'
 
-export default async function EditResourcePage({ params }: { params: { id: string } }) {
+export default async function EditResourcePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const rows = await sql<Resource[]>`
-    SELECT * FROM resources WHERE id = ${params.id} LIMIT 1
+    SELECT * FROM resources WHERE id = ${id} LIMIT 1
   `
   const resource = rows[0]
 
