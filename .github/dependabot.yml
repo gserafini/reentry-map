@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Actions are pinned to full commit SHAs (a tag can be moved to other code);
+  # Dependabot proposes the SHA of each new minor or patch release.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:47'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      compatible-actions:
+        update-types: [minor, patch]
