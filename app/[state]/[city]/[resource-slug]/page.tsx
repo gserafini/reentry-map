@@ -1,5 +1,5 @@
 import { Container } from '@mui/material'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { sql } from '@/lib/db/client'
 import type { Metadata } from 'next'
@@ -11,6 +11,41 @@ import { SmartBreadcrumbs } from '@/components/navigation/SmartBreadcrumbs'
 import { ResourceViewTracker } from '@/components/analytics/ResourceViewTracker'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import type { Json } from '@/lib/types/database'
+import { resolveDuplicateResourceRedirect } from '@/lib/server/duplicate-resource-redirect'
+
+type ResourceWithProvenance = Resource & { provenance?: Json | null }
+
+async function findResourceOrDuplicateRedirect(
+  state: string,
+  city: string,
+  resourceSlug: string
+): Promise<{ resource: Resource } | { redirectUrl: string } | null> {
+  const activeResources = await sql<Resource[]>`
+    SELECT * FROM resources
+    WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
+  `
+  const activeResource = activeResources?.find(
+    (resource) => generateResourceSlug(resource.name) === resourceSlug.toLowerCase()
+  )
+  if (activeResource) return { resource: activeResource }
+
+  const inactiveResources = await sql<ResourceWithProvenance[]>`
+    SELECT * FROM resources
+    WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'inactive'
+  `
+  const duplicateMatches =
+    inactiveResources?.filter(
+      (resource) => generateResourceSlug(resource.name) === resourceSlug.toLowerCase()
+    ) ?? []
+  // Inactive records are only redirect sources when the requested slug identifies
+  // exactly one source. Multiple merged records may have different canonicals.
+  if (duplicateMatches.length !== 1) return null
+  const duplicate = duplicateMatches[0]
+
+  const redirectUrl = await resolveDuplicateResourceRedirect(duplicate)
+  return redirectUrl ? { redirectUrl } : null
+}
 
 interface ResourcePageProps {
   params: Promise<{
@@ -41,23 +76,10 @@ export default async function ResourcePage({ params }: ResourcePageProps) {
   const city = parseCitySlug(citySlug)
 
   // City slugs normalize capitalization; match stored city names case-insensitively.
-  const cityResources = await sql<Resource[]>`
-    SELECT * FROM resources
-    WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
-  `
-
-  if (!cityResources || cityResources.length === 0) {
-    notFound()
-  }
-
-  // Find the resource that matches the slug
-  const resource = cityResources.find(
-    (r) => generateResourceSlug(r.name) === resourceSlug.toLowerCase()
-  )
-
-  if (!resource) {
-    notFound()
-  }
+  const match = await findResourceOrDuplicateRedirect(state, city, resourceSlug)
+  if (match && 'redirectUrl' in match) redirect(match.redirectUrl)
+  const resource = match?.resource
+  if (!resource) notFound()
 
   return (
     <>
@@ -86,14 +108,9 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
   const city = parseCitySlug(citySlug)
 
   // Find resource
-  const cityResources = await sql<Resource[]>`
-    SELECT * FROM resources
-    WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
-  `
-
-  const resource = cityResources?.find(
-    (r) => generateResourceSlug(r.name) === resourceSlug.toLowerCase()
-  )
+  const match = await findResourceOrDuplicateRedirect(state, city, resourceSlug)
+  if (match && 'redirectUrl' in match) redirect(match.redirectUrl)
+  const resource = match?.resource
 
   if (!resource) {
     return {

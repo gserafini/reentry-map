@@ -73,7 +73,13 @@ export async function POST(request: NextRequest) {
     const resourceList = body.resources
 
     if (!Array.isArray(resourceList)) {
-      return NextResponse.json({ error: 'Resources must be an array' }, { status: 400 })
+      return NextResponse.json(
+        {
+          error:
+            'Resource import expects a JSON array [{...}] or envelope {"resources":[{...}]}; for a single resource object, use POST /api/admin/resources.',
+        },
+        { status: 400 }
+      )
     }
 
     // Validate and prepare resources for import with provenance tracking

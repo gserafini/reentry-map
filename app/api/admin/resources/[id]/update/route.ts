@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    if (!verification_notes) {
+    if (typeof verification_notes !== 'string' || !verification_notes.trim()) {
       return NextResponse.json(
         {
           error: 'verification_notes is required',
@@ -90,9 +90,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
     }
 
+    const explicitCorrectionNotes = updates.correctionNotes
+    const hasExplicitCorrectionNotes =
+      typeof explicitCorrectionNotes === 'string' && explicitCorrectionNotes.trim().length > 0
+    const existingCorrectionNotes =
+      typeof resource.correctionNotes === 'string' ? resource.correctionNotes : ''
+    const correctionNotes = hasExplicitCorrectionNotes
+      ? explicitCorrectionNotes
+      : existingCorrectionNotes.trim()
+        ? `${existingCorrectionNotes}\n\nVerification update: ${verification_notes.trim()}`
+        : verification_notes.trim()
+
     // Build update object with tracking fields
     const updateData = {
       ...updates,
+      correctionNotes,
       verificationSource: verification_source,
       lastVerifiedAt: new Date(),
       verifiedBy: auth.userId || null,
@@ -100,8 +112,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Update resource
     await db.update(resources).set(updateData).where(eq(resources.id, id))
-
-    // Log the verification notes (could add to audit log table in future)
 
     return NextResponse.json({
       success: true,

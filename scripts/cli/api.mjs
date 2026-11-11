@@ -89,6 +89,21 @@ export async function apiPut(path, body = {}) {
 }
 
 /**
+ * PATCH request with JSON body.
+ * @param {string} path - API path
+ * @param {object} body - Request body
+ */
+export async function apiPatch(path, body = {}) {
+  const url = buildUrl(path, {})
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: headers(true),
+    body: JSON.stringify(body),
+  })
+  return handleResponse(response)
+}
+
+/**
  * DELETE request.
  * @param {string} path - API path
  */

@@ -282,9 +282,12 @@ describe('ResourceMap', () => {
       />
     )
 
-    await waitFor(() => expect(global.google.maps.Map).toHaveBeenCalled())
+    // Map creation completes before the county feature fetch and overlay effect.
+    await waitFor(() => {
+      expect(global.google.maps.Map).toHaveBeenCalled()
+      expect(global.google.maps.Polygon).toHaveBeenCalled()
+    })
 
-    expect(global.google.maps.Polygon).toHaveBeenCalled()
     expect(global.google.maps.marker.AdvancedMarkerElement).not.toHaveBeenCalled()
   })
 

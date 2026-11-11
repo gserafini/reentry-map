@@ -6,6 +6,7 @@
  *   get <id>
  *   import <file.json> [--preview]
  *   update <id> <field=value>...
+ *   review <uuid> <updates.json> --source <URL> --notes <text> [--preview] [--json]
  *   delete <id>
  *   search --name X [--city X --state X]
  *   existing --city X --state X
@@ -13,7 +14,7 @@
 import { parseArgs } from 'node:util'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { apiGet, apiPost, apiPut, apiDelete } from '../api.mjs'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../api.mjs'
 import { table, summary, error, output, success } from '../output.mjs'
 import { PROJECT_ROOT } from '../config.mjs'
 import { coerceUpdateValue } from '../field-coerce.mjs'
@@ -35,6 +36,8 @@ Subcommands:
 
   import <file>        Import resources from JSON file
     --preview          Dry-run: show what would happen without importing
+                       Use a JSON array [{...}] or envelope {"resources":[{...}]}.
+                       For one resource object, use POST /api/admin/resources.
 
   update <id> <field=value>...
                        Update resource fields (e.g., phone=555-1234 status=active)
@@ -42,6 +45,13 @@ Subcommands:
                          categories=housing,general-support,food
                          services_offered='["GED prep","Job training"]'
                        JSON fields (hours) accept a JSON object; latitude/longitude are numeric.
+
+  review <uuid> <updates.json> --source <URL> --notes <text> [--preview] [--json]
+                       Apply reviewed fields through the provenance-tracking PATCH endpoint.
+                       The file is a nonempty JSON object with camelCase resource fields,
+                       e.g. {"primaryCategory":"housing"}; it is sent as the body’s
+                       "updates" value alongside verification_source and verification_notes.
+                       --preview validates and lists the intended fields without an API write.
 
   delete <id>          Delete a resource
 
@@ -72,6 +82,8 @@ export async function run(args) {
       return await importResources(args)
     case 'update':
       return await updateResource(args)
+    case 'review':
+      return await reviewResource(args)
     case 'delete':
       return await deleteResource(args)
     case 'search':
@@ -238,6 +250,129 @@ async function updateResource(args) {
   const data = await apiPut(`/api/admin/resources/${id}`, updates)
   success(`Resource ${id} updated.`)
   output(data)
+}
+
+async function reviewResource(args) {
+  let parsed
+  try {
+    parsed = parseArgs({
+      args,
+      options: {
+        source: { type: 'string' },
+        notes: { type: 'string' },
+        preview: { type: 'boolean' },
+        json: { type: 'boolean' },
+      },
+      allowPositionals: true,
+      strict: true,
+    })
+  } catch (err) {
+    error(`Invalid resource review arguments: ${err.message}`)
+    process.exit(1)
+  }
+
+  const [subcommand, id, filePath, ...extraPositionals] = parsed.positionals
+  if (subcommand !== 'review' || !id || !filePath || extraPositionals.length) {
+    error(
+      'Usage: resource review <uuid> <updates.json> --source <URL> --notes <text> [--preview] [--json]'
+    )
+    process.exit(1)
+  }
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    error('Resource review requires a valid UUID.')
+    process.exit(1)
+  }
+
+  const verificationSource = parsed.values.source?.trim()
+  if (!verificationSource) {
+    error('Resource review requires a nonempty --source URL.')
+    process.exit(1)
+  }
+  let sourceUrl
+  try {
+    sourceUrl = new URL(verificationSource)
+  } catch {
+    error('Resource review --source must be an absolute HTTP(S) URL.')
+    process.exit(1)
+  }
+  if (
+    !['http:', 'https:'].includes(sourceUrl.protocol) ||
+    sourceUrl.username ||
+    sourceUrl.password
+  ) {
+    error('Resource review --source must be an absolute HTTP(S) URL without embedded credentials.')
+    process.exit(1)
+  }
+
+  const verificationNotes = parsed.values.notes?.trim()
+  if (!verificationNotes) {
+    error('Resource review requires nonempty --notes.')
+    process.exit(1)
+  }
+
+  const fullPath = resolve(PROJECT_ROOT, filePath)
+  let updates
+  try {
+    updates = JSON.parse(readFileSync(fullPath, 'utf-8'))
+  } catch (err) {
+    error(`Failed to read updates JSON ${fullPath}: ${err.message}`)
+    process.exit(1)
+  }
+
+  if (
+    updates === null ||
+    typeof updates !== 'object' ||
+    Array.isArray(updates) ||
+    Object.getPrototypeOf(updates) !== Object.prototype
+  ) {
+    error('Resource review updates file must contain a plain JSON object.')
+    process.exit(1)
+  }
+
+  const fields = Object.keys(updates)
+  if (!fields.length) {
+    error('Resource review updates object must be nonempty.')
+    process.exit(1)
+  }
+  const invalidField = fields.find((field) => !/^[a-z][A-Za-z0-9]*$/.test(field))
+  if (invalidField) {
+    error(`Resource review update field "${invalidField}" must use camelCase.`)
+    process.exit(1)
+  }
+
+  if (parsed.values.preview) {
+    const preview = {
+      preview: true,
+      id,
+      verification_source: verificationSource,
+      verification_notes: verificationNotes,
+      updated_fields: fields,
+    }
+    if (parsed.values.json) {
+      output(preview)
+    } else {
+      summary('Resource Review Preview', {
+        'Resource ID': id,
+        Source: verificationSource,
+        Notes: verificationNotes,
+        Fields: fields.join(', '),
+      })
+    }
+    return
+  }
+
+  const data = await apiPatch(`/api/admin/resources/${id}/update`, {
+    updates,
+    verification_source: verificationSource,
+    verification_notes: verificationNotes,
+  })
+
+  if (parsed.values.json) {
+    output(data)
+  } else {
+    success(`Resource ${id} reviewed and updated (${fields.join(', ')}).`)
+  }
 }
 
 async function deleteResource(args) {

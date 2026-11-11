@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-11
+
+- Preserve old links for merged duplicate resources only when explicit provenance names a different active canonical record. Nonactive short-URL identities and invalid or unavailable merge targets remain unavailable; generated canonical paths require safe local state, city, and resource slugs with unambiguous source and target routes.
+- Persist verified review notes in correctionNotes, appending to prior notes unless the update supplies an explicit nonempty correctionNotes value. Add native resource review CLI support for previewing and applying source-backed updates, including provenance holds.
+
 ## 2026-11-10
 
 - Assign counties from the same cached local boundary data used by search when geocoding omits county metadata. This removes reliance on an absent legacy database function, keeps uncovered or invalid coordinates unassigned, and needs no paid reverse-geocoding request.
