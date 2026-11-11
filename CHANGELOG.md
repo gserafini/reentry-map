@@ -2,8 +2,8 @@
 
 ## 2026-11-10
 
+- Assign counties from the same cached local boundary data used by search when geocoding omits county metadata. This removes reliance on an absent legacy database function, keeps uncovered or invalid coordinates unassigned, and needs no paid reverse-geocoding request.
 - Preserve source-review holds in both enrichment paths, including holds set while a job is running. Reviewed unknowns stay under independent review; offline local extraction leaves data unchanged without a redundant fallback attempt.
-
 - Resource details expose sourced fees and documents to bring with honest contact-first guidance for unknowns, and show weekday hours in Monday-to-Sunday order.
 - Resolve detail links and share metadata for mixed-case city names such as McAllen without weakening state or active-listing filters.
 - Resource detail pages now display the recorded manual website-review date when no legacy review date exists, instead of saying the check date is unavailable. Manual timestamps use the provider’s timezone with safe UTC fallback; legacy date-only values retain their calendar day. Invalid dates fall back safely, and automated checks retain their availability and eligibility caveat.

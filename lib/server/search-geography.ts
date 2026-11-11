@@ -1,12 +1,10 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 import booleanIntersects from '@turf/boolean-intersects'
-import type { Feature, FeatureCollection, Polygon, MultiPolygon } from 'geojson'
+import type { Feature, Polygon, MultiPolygon } from 'geojson'
 import type { MapViewportBounds } from '@/lib/utils/map-viewport'
 import { cache } from 'react'
 import type { SearchGeography } from '@/lib/utils/service-coverage'
 import { parseStateLocationName } from '@/lib/utils/location-scope'
+import { findCountyForCoordinates, getCountyFeatures } from './county-geometry.mjs'
 
 type CountyProperties = {
   fips_code: string
@@ -14,7 +12,6 @@ type CountyProperties = {
   state_name: string
   county_name: string
 }
-let counties: FeatureCollection<Polygon | MultiPolygon, CountyProperties> | undefined
 /** Cached bundled boundaries keep scope independent of reverse-geocoding availability or IP location. */
 export const resolveSearchGeography = cache(
   (
@@ -34,31 +31,21 @@ export const resolveSearchGeography = cache(
       city: city || (!namedState && parts.length > 1 ? parts[0] : undefined),
     }
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      counties ||= JSON.parse(
-        readFileSync(join(process.cwd(), 'public/data/us-counties.geojson'), 'utf8')
-      ) as FeatureCollection<Polygon | MultiPolygon, CountyProperties>
-      const county = counties.features.find(
-        (feature) =>
-          (!state || feature.properties.state_code === state) &&
-          booleanPointInPolygon([longitude!, latitude!], feature)
-      )
+      const county = findCountyForCoordinates(latitude, longitude, state)
       if (county)
         return {
           ...area,
-          state: county.properties.state_code,
-          stateName: county.properties.state_name,
-          county: county.properties.county_name,
-          countyFips: county.properties.fips_code,
+          state: county.state_code,
+          stateName: county.state_name,
+          county: county.county_name,
+          countyFips: county.fips_code,
         }
     }
     // A label from Places can supply a state for city URLs without coordinates.
     if (!area.state && parts.length > 1 && /^[A-Z]{2}$/.test(parts[1])) area.state = parts[1]
     if (area.state) {
-      counties ||= JSON.parse(
-        readFileSync(join(process.cwd(), 'public/data/us-counties.geojson'), 'utf8')
-      ) as FeatureCollection<Polygon | MultiPolygon, CountyProperties>
-      area.stateName = counties.features.find(
-        (f) => f.properties.state_code === area.state
+      area.stateName = getCountyFeatures().find(
+        (feature) => feature.properties.state_code === area.state
       )?.properties.state_name
     }
     return area
@@ -140,10 +127,7 @@ export function resolveViewportGeographies(bounds: MapViewportBounds): SearchGeo
       ],
     })
   )
-  counties ||= JSON.parse(
-    readFileSync(join(process.cwd(), 'public/data/us-counties.geojson'), 'utf8')
-  ) as FeatureCollection<Polygon | MultiPolygon, CountyProperties>
-  return counties.features
+  return getCountyFeatures()
     .filter((feature) => {
       const county = getCountyBounds(feature)
       return parts.some(

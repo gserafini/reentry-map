@@ -2,10 +2,11 @@
  * County assignment utilities for resources
  *
  * Automatically determines county from geocoding results or coordinates
- * Uses Google geocoding county data first, falls back to PostGIS
+ * Uses Google geocoding county data first, then bundled county polygons
  */
 
 import { sql } from '@/lib/db/client'
+import { findCountyForCoordinates } from '@/lib/server/county-geometry.mjs'
 
 export interface CountyResult {
   county: string // Clean name without " County" suffix (e.g., "Alameda")
@@ -42,34 +43,21 @@ export async function lookupCountyFips(
 }
 
 /**
- * Determine county from coordinates using database query
+ * Determine county from coordinates using the shared bundled county polygons
  *
- * Note: This is a server-side function that requires database access.
- * For client-side usage, call the API endpoint instead.
+ * This is server-side because it reads the bundled GeoJSON file.
  */
 export async function determineCountyFromCoordinates(
   latitude: number | null,
   longitude: number | null
 ): Promise<CountyResult | null> {
-  if (!latitude || !longitude) return null
+  if (latitude === null || longitude === null) return null
 
   try {
-    // Use PostGIS ST_Contains for accurate point-in-polygon testing
-    // This is a database query, so it's slower than city lookup but more accurate
-    const rows = await sql<{ county_name: string; fips_code: string }[]>`
-      SELECT county_name, fips_code
-      FROM find_county_for_point(${latitude}, ${longitude})
-    `
-
-    if (rows.length > 0) {
-      return {
-        county: rows[0].county_name,
-        county_fips: rows[0].fips_code,
-        method: 'coordinates',
-      }
-    }
-
-    return null
+    const county = findCountyForCoordinates(latitude, longitude)
+    return county
+      ? { county: county.county_name, county_fips: county.fips_code, method: 'coordinates' }
+      : null
   } catch (error) {
     console.error('Error in determineCountyFromCoordinates:', error)
     return null
@@ -105,7 +93,7 @@ export async function determineCounty(
   }
 
   // Strategy 2: Coordinate-based lookup (fallback for missing geocoding data)
-  if (latitude && longitude) {
+  if (latitude !== null && longitude !== null) {
     return await determineCountyFromCoordinates(latitude, longitude)
   }
 

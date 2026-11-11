@@ -8,6 +8,7 @@
  */
 
 import postgres from 'postgres'
+import { findCountyForCoordinates } from '../lib/server/county-geometry.mjs'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -124,21 +125,13 @@ async function lookupCountyFips(countyName, stateCode) {
 }
 
 /**
- * Determine county from coordinates using PostGIS
+ * Determine county from coordinates using the shared bundled county polygons
  */
 async function determineCountyFromCoordinates(latitude, longitude) {
   if (!latitude || !longitude) return null
 
-  const result = await sql`
-    SELECT county_name, fips_code FROM find_county_for_point(${latitude}, ${longitude})
-  `
-
-  if (result.length === 0) return null
-
-  return {
-    county: result[0].county_name,
-    county_fips: result[0].fips_code,
-  }
+  const county = findCountyForCoordinates(latitude, longitude)
+  return county ? { county: county.county_name, county_fips: county.fips_code } : null
 }
 
 /**
