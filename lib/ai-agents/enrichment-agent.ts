@@ -28,7 +28,7 @@ interface EnrichmentResourceRow {
  * - Google Maps data (photos, reviews, rating)
  * - Phone number validation
  *
- * Uses GPT-4o-mini to extract structured data from unstructured sources
+ * Uses the configured local Ollama model to extract structured data from unstructured sources
  */
 export class EnrichmentAgent extends BaseAgent {
   constructor() {
@@ -87,6 +87,7 @@ export class EnrichmentAgent extends BaseAgent {
                website, services_offered, status, ai_enriched
         FROM resources
         WHERE status = 'active'
+        AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
         AND (latitude IS NULL OR longitude IS NULL OR description IS NULL OR hours IS NULL)
         LIMIT 20
       `
@@ -114,13 +115,15 @@ export class EnrichmentAgent extends BaseAgent {
         try {
           const coords = await geocodeAddress(resource.address)
           if (coords) {
-            await sql`
+            const [updated] = await sql<{ id: string }[]>`
               UPDATE resources SET
                 latitude = ${coords.latitude},
                 longitude = ${coords.longitude}
               WHERE id = ${resource.id}
+                AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
+              RETURNING id
             `
-            fieldsEnriched.push('coordinates')
+            if (updated) fieldsEnriched.push('coordinates')
           }
         } catch (error) {
           console.error('Geocoding error:', error)
@@ -134,25 +137,31 @@ export class EnrichmentAgent extends BaseAgent {
           totalCost += enriched.costCents || 0
 
           if (enriched.hours && !resource.hours) {
-            await sql`
+            const [updated] = await sql<{ id: string }[]>`
               UPDATE resources SET hours = ${JSON.stringify(enriched.hours)}::jsonb
               WHERE id = ${resource.id}
+                AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
+              RETURNING id
             `
-            fieldsEnriched.push('hours')
+            if (updated) fieldsEnriched.push('hours')
           }
           if (enriched.description && !resource.description) {
-            await sql`
+            const [updated] = await sql<{ id: string }[]>`
               UPDATE resources SET description = ${enriched.description}
               WHERE id = ${resource.id}
+                AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
+              RETURNING id
             `
-            fieldsEnriched.push('description')
+            if (updated) fieldsEnriched.push('description')
           }
           if (enriched.services && !resource.services_offered) {
-            await sql`
+            const [updated] = await sql<{ id: string }[]>`
               UPDATE resources SET services_offered = ${enriched.services}
               WHERE id = ${resource.id}
+                AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
+              RETURNING id
             `
-            fieldsEnriched.push('services')
+            if (updated) fieldsEnriched.push('services')
           }
         } catch (error) {
           console.error('Website enrichment error:', error)
@@ -166,6 +175,7 @@ export class EnrichmentAgent extends BaseAgent {
             ai_enriched = true,
             last_verified_at = NOW()
           WHERE id = ${resource.id}
+            AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
         `
       }
 
@@ -184,7 +194,7 @@ export class EnrichmentAgent extends BaseAgent {
   /**
    * Enrich resource data from its website using local Ollama model.
    * Fetches the website, strips HTML, and uses Qwen3 Coder (local) to extract
-   * structured data. Falls back to OpenAI if Ollama is unavailable.
+   * structured data. If local Ollama is unavailable, leave the resource unchanged.
    */
   private async enrichFromWebsite(websiteUrl: string): Promise<{
     hours?: string
@@ -215,100 +225,44 @@ Respond with ONLY valid JSON, no other text:
 }`
 
     try {
-      // Try local Ollama first (free, runs on dc3-1)
       const health = await ollamaHealthCheck()
-      if (health.available) {
-        const result = await ollamaChat(
-          [
-            {
-              role: 'system',
-              content:
-                'You extract structured data from website content. Respond with ONLY valid JSON.',
-            },
-            { role: 'user', content: prompt },
-          ],
-          { temperature: 0.1, maxTokens: 512, timeoutMs: 60_000 }
+      if (!health.available) {
+        console.error(
+          `Ollama unavailable for ${websiteUrl}; retry local Ollama later; no automatic provider fallback`
         )
-
-        const parsed = parseJsonFromOutput<{
-          hours?: string | null
-          description?: string | null
-          services?: string[] | null
-        }>(result.content)
-
-        return {
-          hours: parsed.hours || undefined,
-          description: parsed.description || undefined,
-          services: parsed.services?.length ? parsed.services : undefined,
-          costCents: 0, // Local model = free
-        }
-      }
-
-      // Fallback to OpenAI if Ollama unavailable
-      return await this.extractWebsiteDataViaOpenAI(websiteText, websiteUrl)
-    } catch (error) {
-      console.error(`enrichFromWebsite error for ${websiteUrl}:`, error)
-      // Try OpenAI fallback on Ollama failure
-      try {
-        return await this.extractWebsiteDataViaOpenAI(websiteText, websiteUrl)
-      } catch {
         return {}
       }
-    }
-  }
 
-  /**
-   * Fallback: extract structured data from website content using OpenAI
-   */
-  private async extractWebsiteDataViaOpenAI(
-    content: string,
-    websiteUrl: string
-  ): Promise<{
-    hours?: string
-    description?: string
-    services?: string[]
-    costCents?: number
-  }> {
-    const prompt = `You are analyzing the website content from ${websiteUrl} for a reentry resource directory.
+      const result = await ollamaChat(
+        [
+          {
+            role: 'system',
+            content:
+              'You extract structured data from website content. Respond with ONLY valid JSON.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        { temperature: 0.1, maxTokens: 512, timeoutMs: 60_000 }
+      )
 
-Extract the following information if available:
-- hours: Operating hours (e.g., "Monday-Friday 9am-5pm")
-- description: Brief description of the organization (2-3 sentences)
-- services: Array of specific services offered
-
-Website content:
-${content.substring(0, 4000)}
-
-Respond ONLY with valid JSON in this format:
-{
-  "hours": "string or null",
-  "description": "string or null",
-  "services": ["array of strings or empty array"]
-}`
-
-    try {
-      const { content: responseContent, costCents } = await this.callOpenAI([
-        {
-          role: 'system',
-          content: 'You are a helpful assistant that extracts structured data from websites.',
-        },
-        { role: 'user', content: prompt },
-      ])
-
-      const parsed = JSON.parse(responseContent) as {
+      const parsed = parseJsonFromOutput<{
         hours?: string | null
         description?: string | null
         services?: string[] | null
-      }
+      }>(result.content)
+
       return {
         hours: parsed.hours || undefined,
         description: parsed.description || undefined,
         services: parsed.services?.length ? parsed.services : undefined,
-        costCents,
+        costCents: 0,
       }
     } catch (error) {
-      console.error('Error extracting website data via OpenAI:', error)
-      return { costCents: 0 }
+      const detail = error instanceof Error ? error.message : String(error)
+      console.error(
+        `enrichFromWebsite error for ${websiteUrl}: ${detail}; retry local Ollama later; no automatic provider fallback`
+      )
+      return {}
     }
   }
 }

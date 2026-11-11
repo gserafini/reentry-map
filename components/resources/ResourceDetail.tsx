@@ -62,18 +62,24 @@ interface ResourceDetailProps {
   resource: Resource
 }
 
-function formatReviewDate(value?: string | null): string | null {
+function formatReviewDate(value?: string | null, timezone = 'UTC'): string | null {
   if (!value) return null
 
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
 
-  return date.toLocaleDateString('en-US', {
+  const options: Intl.DateTimeFormatOptions = {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-    timeZone: 'UTC',
-  })
+    timeZone: timezone,
+  }
+
+  try {
+    return date.toLocaleDateString('en-US', options)
+  } catch {
+    return date.toLocaleDateString('en-US', { ...options, timeZone: 'UTC' })
+  }
 }
 
 type ResourceWithLocationMetadata = Resource & {
@@ -95,7 +101,8 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
   const approximateLocation = getApproximateLocationPresentation(resourceWithLocationMetadata)
   const showDirections = shouldShowDirectionsForResource(resourceWithLocationMetadata)
   const reviewedDate =
-    formatReviewDate(resource.last_verified_at) || formatReviewDate(resource.verified_date)
+    formatReviewDate(resource.last_verified_at, resource.timezone || 'UTC') ||
+    formatReviewDate(resource.verified_date)
   const weekdayOrder = [
     'monday',
     'tuesday',

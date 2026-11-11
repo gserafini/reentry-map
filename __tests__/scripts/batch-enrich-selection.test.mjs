@@ -6,6 +6,38 @@ import {
 } from '../../scripts/lib/batch-enrich-selection.mjs'
 
 describe('batch enrich selection', () => {
+  it('never selects a resource explicitly held for source review', () => {
+    const now = new Date('2026-04-14T20:00:00.000Z')
+    const selected = selectResourcesForEnrichment(
+      [
+        {
+          id: 'held-never-attempted',
+          created_at: '2026-01-01T00:00:00.000Z',
+          provenance: { coverage_review: { automation_hold: true } },
+        },
+        {
+          id: 'held-old-retry',
+          created_at: '2025-01-01T00:00:00.000Z',
+          provenance: {
+            coverage_review: { automation_hold: true },
+            enrichment: {
+              last_attempted_at: '2025-01-01T00:00:00.000Z',
+              last_outcome: 'unreachable',
+            },
+          },
+        },
+        {
+          id: 'unheld-never-attempted',
+          created_at: '2026-01-02T00:00:00.000Z',
+          provenance: { coverage_review: { automation_hold: false } },
+        },
+      ],
+      { limit: 10, now, retryDays: 30 }
+    )
+
+    expect(selected.map((resource) => resource.id)).toEqual(['unheld-never-attempted'])
+  })
+
   it('prioritizes never-attempted resources and skips recent retries', () => {
     const now = new Date('2026-04-14T20:00:00.000Z')
 
@@ -58,6 +90,11 @@ describe('batch enrich selection', () => {
         discovered: {
           by: 'research-agent',
         },
+        coverage_review: {
+          automation_hold: true,
+          reviewed_at: '2026-04-14T19:00:00.000Z',
+          review_after: '2026-05-14T00:00:00.000Z',
+        },
       },
       {
         attemptedAt: '2026-04-14T20:00:00.000Z',
@@ -70,6 +107,11 @@ describe('batch enrich selection', () => {
     expect(provenance).toMatchObject({
       discovered: {
         by: 'research-agent',
+      },
+      coverage_review: {
+        automation_hold: true,
+        reviewed_at: '2026-04-14T19:00:00.000Z',
+        review_after: '2026-05-14T00:00:00.000Z',
       },
       enrichment: {
         last_attempted_at: '2026-04-14T20:00:00.000Z',

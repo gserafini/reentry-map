@@ -182,6 +182,51 @@ describe('ResourceDetail', () => {
     expect(screen.getByText(/Listing reviewed Jul 8, 2026/)).toBeInTheDocument()
   })
 
+  it.each(['America/New_York', 'America/Chicago'])(
+    'uses the resource timezone for website review dates (%s)',
+    (timezone) => {
+      render(
+        <ResourceDetail
+          resource={{
+            ...mockResource,
+            timezone,
+            last_verified_at: '2026-11-11T02:00:00Z',
+          }}
+        />
+      )
+
+      expect(screen.getByText(/Listing reviewed Nov 10, 2026/)).toBeInTheDocument()
+    }
+  )
+
+  it('falls back to UTC when the resource timezone is invalid', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          timezone: 'Not/A_Real_Zone',
+          last_verified_at: '2026-11-11T02:00:00Z',
+        }}
+      />
+    )
+
+    expect(screen.getByText(/Listing reviewed Nov 11, 2026/)).toBeInTheDocument()
+  })
+
+  it('keeps a legacy date-only review date on its stated calendar day', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          timezone: 'Pacific/Kiritimati',
+          verified_date: '2026-11-10',
+        }}
+      />
+    )
+
+    expect(screen.getByText(/Listing reviewed Nov 10, 2026/)).toBeInTheDocument()
+  })
+
   it('prefers the website review date over the legacy date when both are valid', () => {
     render(
       <ResourceDetail

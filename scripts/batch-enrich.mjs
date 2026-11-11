@@ -32,6 +32,7 @@ import { fetchPublicUrl, openPublicBrowser } from '../lib/utils/public-network.m
 import { groundExtraction } from './lib/batch-enrich-validate.mjs'
 import {
   buildEnrichmentProvenance,
+  isEnrichmentHeld,
   selectResourcesForEnrichment,
 } from './lib/batch-enrich-selection.mjs'
 
@@ -346,6 +347,7 @@ function buildQuery() {
     FROM resources
     WHERE status = 'active'
       AND website IS NOT NULL AND website != ''
+      AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
       AND ${conditions.join(' AND ')}
   `
 }
@@ -419,7 +421,12 @@ async function updateAgentLog(logId, { success, counts, durationMs, error }) {
 }
 
 async function recordEnrichmentAttempt(resource, outcome, updatedFields = []) {
-  if (DRY_RUN) return
+  if (DRY_RUN) return true
+
+  if (isEnrichmentHeld(resource)) {
+    console.log('  SKIPPED — source-review hold is active; no enrichment changes written')
+    return false
+  }
 
   const attemptedAt = new Date().toISOString()
   const provenance = buildEnrichmentProvenance(resource.provenance, {
@@ -430,15 +437,22 @@ async function recordEnrichmentAttempt(resource, outcome, updatedFields = []) {
     updatedFields,
   })
 
-  await pool.query(
+  const result = await pool.query(
     `UPDATE resources
      SET provenance = $1::jsonb,
          updated_at = NOW()
-     WHERE id = $2`,
+     WHERE id = $2
+       AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb`,
     [JSON.stringify(provenance), resource.id]
   )
 
+  if (result.rowCount === 0) {
+    console.log('  SKIPPED — source-review hold was set during enrichment; no changes written')
+    return false
+  }
+
   resource.provenance = provenance
+  return true
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -595,8 +609,15 @@ async function main() {
 
       // Write to DB
       values.push(resource.id)
-      const updateQuery = `UPDATE resources SET ${updates.join(', ')} WHERE id = $${paramIdx}`
-      await pool.query(updateQuery, values)
+      const updateQuery = `UPDATE resources SET ${updates.join(', ')}
+        WHERE id = $${paramIdx}
+          AND (provenance->'coverage_review'->'automation_hold') IS DISTINCT FROM 'true'::jsonb
+        RETURNING id`
+      const { rows: updatedRows } = await pool.query(updateQuery, values)
+      if (updatedRows.length === 0) {
+        console.log(`${progress} SKIPPED ${resource.name} — source-review hold became active`)
+        continue
+      }
       resource.provenance = provenance
       counts.enriched++
 

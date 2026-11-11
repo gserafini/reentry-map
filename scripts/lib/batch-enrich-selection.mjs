@@ -20,6 +20,10 @@ function getCreatedDate(resource) {
   return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed
 }
 
+export function isEnrichmentHeld(resource) {
+  return resource?.provenance?.coverage_review?.automation_hold === true
+}
+
 export function shouldRetryEnrichment(resource, { now = new Date(), retryDays = 30 } = {}) {
   const lastAttemptedAt = getAttemptDate(resource?.provenance)
   if (!lastAttemptedAt) return true
@@ -32,7 +36,10 @@ export function selectResourcesForEnrichment(
   { limit, now = new Date(), retryDays = 30 } = {}
 ) {
   return [...resources]
-    .filter((resource) => shouldRetryEnrichment(resource, { now, retryDays }))
+    .filter(
+      (resource) =>
+        !isEnrichmentHeld(resource) && shouldRetryEnrichment(resource, { now, retryDays })
+    )
     .sort((left, right) => {
       const leftAttempt = getAttemptDate(left.provenance)
       const rightAttempt = getAttemptDate(right.provenance)
