@@ -93,10 +93,149 @@ describe('ResourceDetail', () => {
     expect(screen.getByText('Resume help')).toBeInTheDocument()
   })
 
+  it('shows sourced fees and nonempty documents to bring', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          fees: 'Free services; some programs use a sliding fee scale.',
+          required_documents: ['Photo ID', '', 'Proof of income', '  '],
+        }}
+      />
+    )
+
+    expect(screen.getByText('Cost and fees')).toBeInTheDocument()
+    expect(
+      screen.getByText('Free services; some programs use a sliding fee scale.')
+    ).toBeInTheDocument()
+    expect(screen.getByText('Documents to bring')).toBeInTheDocument()
+    expect(screen.getByText('Photo ID')).toBeInTheDocument()
+    expect(screen.getByText('Proof of income')).toBeInTheDocument()
+    expect(screen.getByText('Photo ID').closest('ul')?.querySelectorAll('li')).toHaveLength(2)
+  })
+
+  it('gives contact-first guidance when fees or document requirements are missing', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          fees: '  ',
+          required_documents: [],
+        }}
+      />
+    )
+
+    expect(screen.getByText('Cost and fees')).toBeInTheDocument()
+    expect(screen.getByText('Call to ask about costs and fees.')).toBeInTheDocument()
+    expect(screen.getByText('Documents to bring')).toBeInTheDocument()
+    expect(screen.getByText('Call to ask which documents to bring.')).toBeInTheDocument()
+  })
+
+  it('displays hours in weekday order when the stored keys are shuffled', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          hours: {
+            sunday: 'Closed',
+            friday: '9 AM - 5 PM',
+            monday: '9 AM - 5 PM',
+            wednesday: '9 AM - 5 PM',
+            tuesday: '9 AM - 5 PM',
+            saturday: 'Closed',
+            thursday: '9 AM - 5 PM',
+          },
+        }}
+      />
+    )
+
+    const monday = screen.getByText('monday:')
+    const hoursList = monday.closest('ul')
+    expect(hoursList).not.toBeNull()
+    expect(Array.from(hoursList!.children).map((item) => item.textContent)).toEqual([
+      'monday: 9 AM - 5 PM',
+      'tuesday: 9 AM - 5 PM',
+      'wednesday: 9 AM - 5 PM',
+      'thursday: 9 AM - 5 PM',
+      'friday: 9 AM - 5 PM',
+      'saturday: Closed',
+      'sunday: Closed',
+    ])
+  })
+
   it('does not label an undated verified flag as an automated check', () => {
     render(<ResourceDetail resource={mockResource} />)
     expect(screen.queryByText('AI Verified')).not.toBeInTheDocument()
     expect(screen.getByText(/Check date unavailable/)).toBeInTheDocument()
+  })
+
+  it('shows a website review timestamp when the legacy review date is absent', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          verified_date: null,
+          last_verified_at: '2026-07-08T19:30:00Z',
+        }}
+      />
+    )
+    expect(screen.getByText(/Listing reviewed Jul 8, 2026/)).toBeInTheDocument()
+  })
+
+  it('prefers the website review date over the legacy date when both are valid', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          last_verified_at: '2026-07-08T19:30:00Z',
+          verified_date: '2025-02-03T12:00:00Z',
+        }}
+      />
+    )
+    expect(screen.getByText(/Listing reviewed Jul 8, 2026/)).toBeInTheDocument()
+    expect(screen.queryByText(/Listing reviewed Feb 3, 2025/)).not.toBeInTheDocument()
+  })
+
+  it('does not display an invalid website or legacy review date', () => {
+    render(
+      <ResourceDetail
+        resource={{ ...mockResource, last_verified_at: 'invalid', verified_date: 'invalid' }}
+      />
+    )
+    expect(screen.getByText(/Check date unavailable/)).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+  })
+
+  it('falls back to a valid legacy review date when the website review date is invalid', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          last_verified_at: 'not-a-date',
+          verified_date: '2025-02-03T12:00:00Z',
+        }}
+      />
+    )
+    expect(screen.getByText(/Listing reviewed Feb 3, 2025/)).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+  })
+
+  it('keeps automated-check wording when both automated and website review dates exist', () => {
+    render(
+      <ResourceDetail
+        resource={{
+          ...mockResource,
+          ai_last_verified: '2026-09-01T12:00:00Z',
+          last_verified_at: '2026-07-08T19:30:00Z',
+        }}
+      />
+    )
+    expect(
+      screen.getByText(
+        /Public-information checks do not confirm current openings or eligibility for you/
+      )
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Listing reviewed/)).not.toBeInTheDocument()
   })
 
   it('displays rating information', () => {

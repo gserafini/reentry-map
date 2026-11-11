@@ -662,9 +662,12 @@ export type TablesUpdate<T extends keyof Database['public']['Tables']> =
 
 /** Resource table types */
 export type Resource = Tables<'resources'> & {
-  /** Coverage columns added after the original generated row types. */
+  /** Coverage and verification columns added after the original generated row types. */
   address_type?: string | null
   service_area?: { type?: string | null; values?: string[] | null } | null
+  last_verified_at?: string | null
+  fees?: string | null
+  required_documents?: string[] | null
 }
 export type ResourceInsert = TablesInsert<'resources'>
 export type ResourceUpdate = TablesUpdate<'resources'>

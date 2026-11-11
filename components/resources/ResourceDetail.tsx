@@ -62,6 +62,20 @@ interface ResourceDetailProps {
   resource: Resource
 }
 
+function formatReviewDate(value?: string | null): string | null {
+  if (!value) return null
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
 type ResourceWithLocationMetadata = Resource & {
   addressType?: string | null
   address_type?: string | null
@@ -80,6 +94,34 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
   const serviceAreaSummary = getServiceAreaSummary(resourceWithLocationMetadata)
   const approximateLocation = getApproximateLocationPresentation(resourceWithLocationMetadata)
   const showDirections = shouldShowDirectionsForResource(resourceWithLocationMetadata)
+  const reviewedDate =
+    formatReviewDate(resource.last_verified_at) || formatReviewDate(resource.verified_date)
+  const weekdayOrder = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ]
+  const orderedHours = resource.hours
+    ? Object.entries(resource.hours as Record<string, string>).sort(([dayA], [dayB]) => {
+        const orderA = weekdayOrder.indexOf(dayA.toLowerCase())
+        const orderB = weekdayOrder.indexOf(dayB.toLowerCase())
+        const rankA = orderA === -1 ? weekdayOrder.length : orderA
+        const rankB = orderB === -1 ? weekdayOrder.length : orderB
+        return rankA - rankB
+      })
+    : []
+  const fees = resource.fees?.trim()
+  const requiredDocuments = Array.isArray(resource.required_documents)
+    ? resource.required_documents
+        .filter(
+          (document): document is string => typeof document === 'string' && document.trim() !== ''
+        )
+        .map((document) => document.trim())
+    : []
 
   // Check admin status
   useEffect(() => {
@@ -555,23 +597,51 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     </Typography>
                   ) : (
                     <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                      {Object.entries(resource.hours as Record<string, string>).map(
-                        ([day, hours]) => (
-                          <Typography
-                            key={day}
-                            component="li"
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mb: 0.5 }}
-                          >
-                            <strong style={{ textTransform: 'capitalize' }}>{day}:</strong> {hours}
-                          </Typography>
-                        )
-                      )}
+                      {orderedHours.map(([day, hours]) => (
+                        <Typography
+                          key={day}
+                          component="li"
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 0.5 }}
+                        >
+                          <strong style={{ textTransform: 'capitalize' }}>{day}:</strong> {hours}
+                        </Typography>
+                      ))}
                     </Box>
                   )}
                 </Box>
               )}
+
+              <Box>
+                <Typography variant="subtitle2">Cost and fees</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {fees || 'Call to ask about costs and fees.'}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2">Documents to bring</Typography>
+                {requiredDocuments.length > 0 ? (
+                  <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                    {requiredDocuments.map((document, index) => (
+                      <Typography
+                        key={`${document}-${index}`}
+                        component="li"
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.5 }}
+                      >
+                        {document}
+                      </Typography>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Call to ask which documents to bring.
+                  </Typography>
+                )}
+              </Box>
 
               {/* Missing intake details are unknown, not permission to walk in. */}
               <Box>
@@ -628,14 +698,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         <Typography variant="body2" color="text.secondary">
           {resource.ai_last_verified
             ? 'Public-information checks do not confirm current openings or eligibility for you.'
-            : resource.verified_date
+            : reviewedDate
               ? 'Listing reviewed ' +
-                new Date(resource.verified_date).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  timeZone: 'UTC',
-                }) +
+                reviewedDate +
                 '. Contact the organization to confirm current details.'
               : 'Check date unavailable. Contact the organization to confirm current details.'}
         </Typography>

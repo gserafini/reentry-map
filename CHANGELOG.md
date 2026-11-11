@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-10
+
+- Resource details expose sourced fees and documents to bring with honest contact-first guidance for unknowns, and show weekday hours in Monday-to-Sunday order.
+- Resolve detail links and share metadata for mixed-case city names such as McAllen without weakening state or active-listing filters.
+- Resource detail pages now display the recorded manual website-review date when no legacy review date exists, instead of saying the check date is unavailable. Invalid dates fall back safely, and automated checks retain their availability and eligibility caveat.
+
 ## 2026-11-04
 
 - CI pins its GitHub Actions to full commit SHAs (checkout v6.1.0, setup-node v6.5.0), so a

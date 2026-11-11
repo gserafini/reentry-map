@@ -40,10 +40,10 @@ export default async function ResourcePage({ params }: ResourcePageProps) {
   const state = parseStateSlug(stateSlug)
   const city = parseCitySlug(citySlug)
 
-  // Find resource by city, state, and name slug
+  // City slugs normalize capitalization; match stored city names case-insensitively.
   const cityResources = await sql<Resource[]>`
     SELECT * FROM resources
-    WHERE city = ${city} AND state = ${state} AND status = 'active'
+    WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
   `
 
   if (!cityResources || cityResources.length === 0) {
@@ -88,7 +88,7 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
   // Find resource
   const cityResources = await sql<Resource[]>`
     SELECT * FROM resources
-    WHERE city = ${city} AND state = ${state} AND status = 'active'
+    WHERE LOWER(city) = LOWER(${city}) AND state = ${state} AND status = 'active'
   `
 
   const resource = cityResources?.find(
@@ -101,16 +101,17 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
     }
   }
 
-  const title = `${resource.name} in ${city}, ${state} | Reentry Map`
+  const resourceCity = resource.city
+  const title = `${resource.name} in ${resourceCity}, ${state} | Reentry Map`
   const description =
     resource.description?.slice(0, 160) ||
-    `Find contact information, hours, and reviews for ${resource.name} in ${city}, ${state}.`
+    `Find contact information, hours, and reviews for ${resource.name} in ${resourceCity}, ${state}.`
   const image = createOpenGraphImage({
     kind: 'resource',
     eyebrow: `${getCategoryLabel(resource.primary_category as ResourceCategory)} provider`,
     title: resource.name,
     description,
-    location: `${city}, ${state}`,
+    location: `${resourceCity}, ${state}`,
     category: resource.primary_category,
   })
 
@@ -119,8 +120,8 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
     description,
     keywords: [
       resource.name,
-      `${resource.name} ${city}`,
-      `${city} ${state}`,
+      `${resource.name} ${resourceCity}`,
+      `${resourceCity} ${state}`,
       resource.primary_category,
       'reentry resources',
     ].join(', '),
