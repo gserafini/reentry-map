@@ -11,7 +11,6 @@ import {
   CardContent,
   Stack,
   Rating,
-  Alert,
   List,
   ListItem,
   ListItemText,
@@ -122,6 +121,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
       })
     : []
   const fees = resource.fees?.trim()
+  const recordRestrictions = resource.record_restrictions?.trim()
   const requiredDocuments = Array.isArray(resource.required_documents)
     ? resource.required_documents
         .filter(
@@ -263,6 +263,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               maxWidth: '100%',
             }}
           >
+            {resource.reentry_focused === true && (
+              <Chip label="Built for people with records" color="success" variant="outlined" />
+            )}
             {resource.ai_last_verified && <AIVerifiedBadge checkedAt={resource.ai_last_verified} />}
             <FavoriteButton resourceId={resource.id} resource={resource} size="large" />
             {isAdmin && (
@@ -658,21 +661,19 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     'Eligibility details have not been provided. Contact the organization to check.'}
                 </Typography>
               </Box>
+              {/* Only source-backed restrictions; silence is not a promise either way (B085). */}
+              {recordRestrictions && (
+                <Box>
+                  <Typography variant="subtitle2">Record-related restrictions</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {recordRestrictions}
+                  </Typography>
+                </Box>
+              )}
               {!resource.hours && (
                 <Typography variant="body2" color="text.secondary">
                   Hours have not been confirmed. Contact before visiting.
                 </Typography>
-              )}
-
-              {/* Accepts Records */}
-              {resource.accepts_records !== null && (
-                <Alert severity={resource.accepts_records ? 'success' : 'warning'} icon={false}>
-                  <Typography variant="body2">
-                    {resource.accepts_records
-                      ? '✓ Accepts individuals with criminal records'
-                      : '⚠️ May have restrictions for individuals with criminal records'}
-                  </Typography>
-                </Alert>
               )}
             </Stack>
           </CardContent>

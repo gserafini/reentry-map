@@ -41,6 +41,7 @@ export type ResourceCardResource = {
   phone?: string | null
   email?: string | null
   appointment_required?: boolean | null
+  reentry_focused?: boolean | null
   ai_last_verified?: string | null
   verified_date?: string | null
   verified_by?: string | null
@@ -136,6 +137,14 @@ export function ResourceCard({
               label={getCategoryLabel(resource.primary_category as ResourceCategory)}
               size="small"
               data-testid="category-badge"
+            />
+          )}
+          {resource.reentry_focused === true && (
+            <Chip
+              label="Built for people with records"
+              size="small"
+              color="success"
+              variant="outlined"
             />
           )}
           {hasRatings && (

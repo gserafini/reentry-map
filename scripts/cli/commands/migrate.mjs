@@ -2,13 +2,13 @@
  * migrate - Apply SQL migrations to production or staging database.
  *
  * Subcommands:
- *   apply <file>        Apply a migration file to target DB via SSH
+ *   apply <file>        Apply a migration file to target DB via SSH, or --local on the server
  *   list                List all migration files (with applied status if available)
  *   check <file>        Preview migration SQL without applying
  */
 import { parseArgs } from 'node:util'
 import { spawn, execSync } from 'node:child_process'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, openSync, closeSync } from 'node:fs'
 import { resolve, basename } from 'node:path'
 import { error, success, table } from '../output.mjs'
 import { getTargetConfig } from '../targets.mjs'
@@ -28,7 +28,8 @@ Subcommands:
   check <file>     Preview migration SQL without applying
 
 Options:
-  --dry-run        Show the SSH command without executing (for apply)
+  --dry-run        Show the command without executing (for apply)
+  --local          Run psql on this server (dc3-1) instead of over SSH
   --force          Skip confirmation prompt
   --target TARGET  production (default) or staging
 `)
@@ -95,12 +96,48 @@ function resolveMigrationPath(fileArg) {
   process.exit(1)
 }
 
+/**
+ * Build the psql invocation for a migration. The file is fed on stdin (no shell).
+ * ON_ERROR_STOP and --single-transaction make a failing statement abort and roll back
+ * the whole migration with a nonzero exit, instead of exiting 0 after a partial apply.
+ */
+export function buildMigrationCommand(target, migrationPath, { local = false, uid = -1 } = {}) {
+  const psqlArgs = [
+    '-U',
+    target.user,
+    target.dbName,
+    '-v',
+    'ON_ERROR_STOP=1',
+    '--single-transaction',
+  ]
+  if (local) {
+    return uid === 0
+      ? {
+          command: 'su',
+          args: ['-', target.user, '-c', `psql ${psqlArgs.join(' ')}`],
+          input: migrationPath,
+        }
+      : { command: 'psql', args: psqlArgs, input: migrationPath }
+  }
+  return {
+    command: 'ssh',
+    args: [
+      '-p',
+      target.sshPort,
+      target.sshHost,
+      `su - ${target.user} -c "psql ${psqlArgs.join(' ')}"`,
+    ],
+    input: migrationPath,
+  }
+}
+
 async function applyMigration(args) {
   const { values } = parseArgs({
     args,
     options: {
       'dry-run': { type: 'boolean', default: false },
       force: { type: 'boolean', default: false },
+      local: { type: 'boolean', default: false },
       target: { type: 'string', default: 'production' },
     },
     allowPositionals: true,
@@ -129,28 +166,27 @@ async function applyMigration(args) {
   console.log('─'.repeat(60))
   console.log()
 
-  // The SSH command pipes the local file to psql on the remote
-  const sshCmd = `ssh -p ${target.sshPort} ${target.sshHost} 'su - ${target.user} -c "psql -U ${target.user} ${target.dbName}"'`
+  const invocation = buildMigrationCommand(target, migrationPath, {
+    local: values.local === true,
+    uid: typeof process.getuid === 'function' ? process.getuid() : -1,
+  })
 
   if (values['dry-run']) {
-    console.log('Dry run - would execute:')
-    console.log(`cat ${migrationPath} | ${sshCmd}`)
+    console.log('Dry run - would execute (migration file on stdin):')
+    console.log([invocation.command, ...invocation.args].join(' '))
     return
   }
 
   console.log('Applying migration...')
 
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      'sh',
-      [
-        '-c',
-        `cat "${migrationPath}" | ssh -p ${target.sshPort} ${target.sshHost} 'su - ${target.user} -c "psql -U ${target.user} ${target.dbName}"'`,
-      ],
-      { stdio: ['pipe', 'inherit', 'inherit'] }
-    )
+    const stdin = openSync(invocation.input, 'r')
+    const child = spawn(invocation.command, invocation.args, {
+      stdio: [stdin, 'inherit', 'inherit'],
+    })
 
     child.on('close', (code) => {
+      closeSync(stdin)
       if (code === 0) {
         success(`\nMigration ${fileName} applied successfully!`)
         resolve()

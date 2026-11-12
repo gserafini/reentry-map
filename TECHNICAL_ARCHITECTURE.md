@@ -355,7 +355,7 @@ Primary table for all reentry resources and services.
 - **Location**: address, city, state, zip, lat/lng, county (PostGIS indexed)
 - **Schedule**: hours (JSONB), timezone
 - **Categorization**: primary_category, categories[], tags[]
-- **Eligibility**: eligibility_requirements, accepts_records, appointment_required, **required_documents[]**, **fees**
+- **Eligibility**: eligibility_requirements, appointment_required, **record_restrictions** (source-backed only), **reentry_focused**, **required_documents[]**, **fees** (`accepts_records` deprecated, B085)
 - **Accessibility**: languages[], **accessibility_features[]**
 - **Media**: photos[], logo_url, screenshot_url
 - **AI Metadata**: ai_discovered, ai_enriched, ai_verification_score, completeness_score

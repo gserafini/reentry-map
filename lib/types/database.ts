@@ -344,6 +344,8 @@ export type Database = {
         Row: {
           accepts_records: boolean | null
           address: string
+          record_restrictions?: string | null
+          reentry_focused?: boolean | null
           ai_discovered: boolean | null
           ai_enriched: boolean | null
           ai_last_verified: string | null
@@ -393,6 +395,8 @@ export type Database = {
         }
         Insert: {
           accepts_records?: boolean | null
+          record_restrictions?: string | null
+          reentry_focused?: boolean
           address: string
           ai_discovered?: boolean | null
           ai_enriched?: boolean | null
@@ -443,6 +447,8 @@ export type Database = {
         }
         Update: {
           accepts_records?: boolean | null
+          record_restrictions?: string | null
+          reentry_focused?: boolean
           address?: string
           ai_discovered?: boolean | null
           ai_enriched?: boolean | null
@@ -868,7 +874,6 @@ export type ResourceFilters = {
   west?: number
   min_rating?: number
   verified_only?: boolean
-  accepts_records?: boolean
   appointment_required?: boolean | null
 }
 

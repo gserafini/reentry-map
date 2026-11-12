@@ -72,13 +72,15 @@ Primary table for all reentry resources and services.
 
 ### Eligibility & Requirements
 
-| Column                     | Type    | Nullable | Default | Description                                         |
-| -------------------------- | ------- | -------- | ------- | --------------------------------------------------- |
-| `eligibility_requirements` | text    | YES      | -       | Who can access this resource                        |
-| `accepts_records`          | boolean | YES      | `true`  | Whether they accept people with criminal records    |
-| `appointment_required`     | boolean | YES      | `false` | Whether appointment is required                     |
-| `required_documents`       | text[]  | YES      | -       | Documents needed (e.g., ["ID", "Proof of address"]) |
-| `fees`                     | text    | YES      | -       | Cost information or "Free"                          |
+| Column                     | Type    | Nullable | Default | Description                                          |
+| -------------------------- | ------- | -------- | ------- | ---------------------------------------------------- |
+| `eligibility_requirements` | text    | YES      | -       | Who can access this resource                         |
+| `record_restrictions`      | text    | YES      | -       | Source-backed record-related restrictions only       |
+| `reentry_focused`          | boolean | NO       | `false` | Source says it is built for people with records      |
+| `accepts_records`          | boolean | YES      | -       | DEPRECATED (B085): cleared, not shown; to be dropped |
+| `appointment_required`     | boolean | YES      | `false` | Whether appointment is required                      |
+| `required_documents`       | text[]  | YES      | -       | Documents needed (e.g., ["ID", "Proof of address"])  |
+| `fees`                     | text    | YES      | -       | Cost information or "Free"                           |
 
 ### Accessibility & Languages
 

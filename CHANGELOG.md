@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-12
+
+- Remove the "Accepts individuals with criminal records" badge. Every listing exists to serve people coming home, and the flag defaulted to yes on every new row (5,752 active listings said yes, none said no), so it told people nothing. The old column is cleared, no longer defaults to true and is ignored on import; it will be dropped in a later release.
+- Add two source-backed fields in its place: record-related restrictions, shown on the detail page only when a source states one (for example a registry or offense exclusion), and a "Built for people with records" label on detail pages and search cards for programs a source says are specifically for people with records. Admin imports and reviewed updates accept both; silence stays empty and false.
+
 ## 2026-11-11
 
 - Preserve old links for merged duplicate resources only when explicit provenance names a different active canonical record. Nonactive short-URL identities and invalid or unavailable merge targets remain unavailable; generated canonical paths require safe local state, city, and resource slugs with unambiguous source and target routes.

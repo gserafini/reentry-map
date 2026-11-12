@@ -233,8 +233,6 @@ async function buildResourceConditions(opts: GetResourcesOptions): Promise<SqlFr
   if (opts.min_rating !== undefined)
     conditions.push(sqlClient`rating_average >= ${opts.min_rating}`)
   if (opts.verified_only) conditions.push(sqlClient`verified = true`)
-  if (opts.accepts_records != null)
-    conditions.push(sqlClient`accepts_records = ${opts.accepts_records}`)
   if (opts.appointment_required != null)
     conditions.push(sqlClient`appointment_required = ${opts.appointment_required}`)
   return conditions

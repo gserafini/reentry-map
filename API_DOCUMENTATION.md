@@ -190,7 +190,8 @@ GET /api/resources/550e8400-e29b-41d4-a716-446655440000
     "friday": { "open": "09:00", "close": "17:00" }
   },
   "eligibility_requirements": "Open to all adults seeking employment",
-  "accepts_records": true,
+  "record_restrictions": null,
+  "reentry_focused": false,
   "appointment_required": false,
   "rating_average": 4.5,
   "rating_count": 10,
@@ -243,7 +244,8 @@ Create a new resource.
     "monday": { "open": "08:00", "close": "20:00" }
   },
   "eligibility_requirements": "Adults 18+",
-  "accepts_records": true
+  "record_restrictions": null,
+  "reentry_focused": false
 }
 ```
 

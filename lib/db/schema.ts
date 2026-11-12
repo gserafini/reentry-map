@@ -115,7 +115,13 @@ export const resources = pgTable(
 
     // Eligibility & Requirements
     eligibilityRequirements: text('eligibility_requirements'),
-    acceptsRecords: boolean('accepts_records').default(true),
+    // Deprecated (B085): every listing serves people with records, so a yes/no flag carried no
+    // information and defaulted to true. Not displayed or written; dropped in a later release.
+    acceptsRecords: boolean('accepts_records'),
+    // Source-backed record-related restrictions, e.g. registry or offense exclusions. Null = none stated.
+    recordRestrictions: text('record_restrictions'),
+    // True only when a source says the program is specifically for people with records.
+    reentryFocused: boolean('reentry_focused').notNull().default(false),
     appointmentRequired: boolean('appointment_required').default(false),
     requiredDocuments: text('required_documents').array(),
     fees: text('fees'),

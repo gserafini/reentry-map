@@ -110,7 +110,12 @@ All these fields from submissions are copied to the `resources` table when appro
 - **Location**: address, city, state, zip, county, latitude, longitude
 - **Schedule**: hours, timezone
 - **Categories**: primary_category, categories, tags
-- **Eligibility**: eligibility_requirements, accepts_records, appointment_required
+- **Eligibility**: eligibility_requirements, appointment_required, record_restrictions, reentry_focused
+  - `record_restrictions`: only restrictions a current source states (e.g. registry or offense
+    exclusions), in plain words. Leave null when the source is silent; never infer.
+  - `reentry_focused`: true only when a source says the program is specifically for people with
+    criminal records or justice involvement. General public services stay false.
+  - `accepts_records` is deprecated and ignored (every listing serves people with records).
 - **Media**: photos, logo_url
 - **Organization**: org_name, location_name, is_parent, parent_resource_id
 

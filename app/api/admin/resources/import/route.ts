@@ -146,6 +146,12 @@ export async function POST(request: NextRequest) {
           resource.eligibility_criteria || resource.eligibility_requirements || null,
         requiredDocuments: resource.required_documents || null,
         fees: resource.fees || null,
+        // Only what a source states; silence stays null/false (B085). accepts_records is ignored.
+        recordRestrictions:
+          typeof resource.record_restrictions === 'string' && resource.record_restrictions.trim()
+            ? resource.record_restrictions.trim()
+            : null,
+        reentryFocused: resource.reentry_focused === true,
         languages: resource.languages || null,
         accessibilityFeatures: resource.accessibility || resource.accessibility_features || null,
         status: resource.status || 'active',

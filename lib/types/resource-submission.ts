@@ -273,8 +273,9 @@ export const EXAMPLE_COMPLETE_SUBMISSION: ResourceSubmission = {
     'Case management',
   ],
   eligibility_requirements: 'Formerly incarcerated individuals, 18+',
-  accepts_records: true,
   appointment_required: false,
+  record_restrictions: null,
+  reentry_focused: true,
 
   // ===== SCHEDULE =====
   hours: {
@@ -330,8 +331,9 @@ export const FIELD_MAPPING = {
     'tags',
     'services_offered',
     'eligibility_requirements',
-    'accepts_records',
     'appointment_required',
+    'record_restrictions',
+    'reentry_focused',
     'hours',
     'timezone',
     'photos',
