@@ -8,12 +8,12 @@ import { Page } from '@playwright/test'
 export const TEST_USERS = {
   regular: {
     email: 'testuser@example.com',
-    password: 'TestUser123!',
+    password: process.env.E2E_USER_PASSWORD ?? '',
     name: 'Test User',
   },
   admin: {
     email: 'admin@example.com',
-    password: 'AdminUser123!',
+    password: process.env.E2E_ADMIN_PASSWORD ?? '',
     name: 'Admin User',
   },
 } as const
@@ -28,6 +28,12 @@ export async function loginAsTestUser(
   userType: keyof typeof TEST_USERS = 'regular'
 ): Promise<void> {
   const user = TEST_USERS[userType]
+  if (!user.password) {
+    // Test-account passwords are not kept in the repository (see .claude/docs/TEST_USERS.md)
+    throw new Error(
+      `Set ${userType === 'admin' ? 'E2E_ADMIN_PASSWORD' : 'E2E_USER_PASSWORD'} to the ${user.email} password`
+    )
+  }
 
   // Navigate to login page (relative URL uses Playwright's baseURL)
   await page.goto('/auth/login')

@@ -876,7 +876,9 @@ NextAuth.js with credentials provider:
 2. NextAuth validates credentials against `users` table
 3. JWT session created (HTTP-only cookies)
 4. Admin routes check `user.is_admin` flag
-5. Test credentials: `admin@example.com` / `AdminUser123!` (see `e2e/helpers/auth.ts`)
+5. Test accounts `admin@example.com` and `testuser@example.com` exist only in development and staging
+   databases, never production. Their passwords are not in the repository: e2e helpers read
+   `E2E_ADMIN_PASSWORD` and `E2E_USER_PASSWORD` (see `.claude/docs/TEST_USERS.md`).
 
 ## Testing Requirements
 

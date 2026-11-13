@@ -1,6 +1,11 @@
 import { chromium } from '@playwright/test'
 
 const BASE_URL = 'http://localhost:3004'
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
+if (!ADMIN_PASSWORD) {
+  console.error('Set E2E_ADMIN_PASSWORD (see .claude/docs/TEST_USERS.md)')
+  process.exit(1)
+}
 
 async function checkAdminConsole() {
   const browser = await chromium.launch({ headless: true })
@@ -32,7 +37,7 @@ async function checkAdminConsole() {
 
     // Fill in credentials
     await page.fill('input[type="email"]', 'admin@example.com')
-    await page.fill('input[type="password"]', 'AdminUser123!')
+    await page.fill('input[type="password"]', ADMIN_PASSWORD)
 
     // Click login button
     await page.click('button[type="submit"]:has-text("Login")')

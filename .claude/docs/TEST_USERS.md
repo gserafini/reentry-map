@@ -7,7 +7,7 @@ This document describes the test users available for local development and testi
 ### Regular User (Non-Admin)
 
 - **Email:** `testuser@example.com`
-- **Password:** `TestUser123!`
+- **Password:** set `E2E_USER_PASSWORD` (not kept in the repository)
 - **Name:** Test User
 - **Admin:** No
 
@@ -21,7 +21,7 @@ Use this account for testing regular user features like:
 ### Admin User
 
 - **Email:** `admin@example.com`
-- **Password:** `AdminUser123!`
+- **Password:** set `E2E_ADMIN_PASSWORD` (not kept in the repository)
 - **Name:** Admin User
 - **Admin:** Yes
 
@@ -32,29 +32,24 @@ Use this account for testing admin features like:
 - Admin dashboard
 - Approval workflows
 
-## How to Seed Test Users
+## Creating Test Users
 
-The test users are **NOT** included in migrations to prevent them from being pushed to production. Instead, they must be manually seeded in development environments only.
+Create them only in a development or staging database, with a password you choose and keep
+outside the repository. Hash it with bcrypt (cost 12, as the app does), then insert the row:
 
-### Option 1: Using Supabase SQL Editor (Recommended)
-
-1. Open your Supabase project dashboard
-2. Navigate to SQL Editor
-3. Open the file `supabase/seed_test_users_dev.sql`
-4. Copy the entire contents
-5. Paste into SQL Editor and run
-
-### Option 2: Using Supabase MCP (if available)
-
-The test users should already be seeded if you're following along with the development session.
+```bash
+node -e "console.log(require('bcryptjs').hashSync(process.env.E2E_ADMIN_PASSWORD, 12))"
+psql -d <dev-or-staging-db> -c "INSERT INTO users (email, name, password_hash, is_admin) VALUES ('admin@example.com', 'Admin User', '<hash>', true)"
+```
 
 ## Security Notes
 
 ⚠️ **IMPORTANT:**
 
 - These test users are for **development/staging only**
-- Never run `seed_test_users_dev.sql` in production
-- The file is tracked in git for team convenience but clearly marked as dev-only
+- Never create them in production. Until November 2026 production held a copy of the admin
+  account whose password was published in this repository; it has been disabled.
+- Passwords live outside the repository; the old published ones no longer work anywhere.
 - Test user IDs use all-zeros UUIDs to make them easily identifiable
 
 ## Using Test Users in E2E Tests
@@ -92,7 +87,7 @@ test('admin user can access admin dashboard', async ({ page }) => {
 Use the provided script to check for console errors on authenticated routes:
 
 ```bash
-node scripts/check-profile-with-login.mjs
+E2E_USER_PASSWORD=... node scripts/check-profile-with-login.mjs
 ```
 
 This script:

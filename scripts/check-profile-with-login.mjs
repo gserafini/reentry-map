@@ -8,7 +8,11 @@ import { chromium } from '@playwright/test'
 
 const BASE_URL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3003'
 const TEST_EMAIL = 'testuser@example.com'
-const TEST_PASSWORD = 'TestUser123!'
+const TEST_PASSWORD = process.env.E2E_USER_PASSWORD
+if (!TEST_PASSWORD) {
+  console.error('Set E2E_USER_PASSWORD (see .claude/docs/TEST_USERS.md)')
+  process.exit(1)
+}
 
 async function checkProfileWithLogin() {
   console.log('🔍 Testing /profile page with test user authentication...\n')
