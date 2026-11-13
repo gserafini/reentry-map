@@ -24,8 +24,13 @@ import { eq } from 'drizzle-orm'
  *     // ... any resource field
  *   },
  *   verification_source: string,  // REQUIRED: Website URL or search query used
- *   verification_notes: string     // REQUIRED: What was verified/updated
+ *   verification_notes: string,    // REQUIRED: What was verified/updated
+ *   verification_scope?: 'listing' | 'fields'  // default 'listing'
  * }
+ *
+ * Scope 'fields' records a field-specific check (for example record restrictions) without
+ * stamping the whole listing as reviewed: lastVerifiedAt, verifiedBy and verificationSource
+ * are left alone unless the caller restores explicit earlier values.
  *
  * Validation:
  * - verification_source is required (prevents unverified updates)
@@ -49,8 +54,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updates?: Record<string, unknown>
       verification_source: string
       verification_notes?: string
+      verification_scope?: string
     }
-    const { updates = {}, verification_source, verification_notes } = body
+    const {
+      updates = {},
+      verification_source,
+      verification_notes,
+      verification_scope = 'listing',
+    } = body
 
     // Validation: Require verification evidence
     if (!verification_source) {
@@ -75,6 +86,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
+    if (verification_scope !== 'listing' && verification_scope !== 'fields') {
+      return NextResponse.json(
+        { error: 'verification_scope must be "listing" or "fields"' },
+        { status: 400 }
+      )
+    }
+    const fieldOnly = verification_scope === 'fields'
+    const restoredStamp: { lastVerifiedAt?: Date } = {}
+    if (fieldOnly && typeof updates.lastVerifiedAt === 'string') {
+      const stamp = new Date(updates.lastVerifiedAt)
+      if (Number.isNaN(stamp.getTime())) {
+        return NextResponse.json({ error: 'lastVerifiedAt must be a valid date' }, { status: 400 })
+      }
+      restoredStamp.lastVerifiedAt = stamp
+    }
+
     // Validate at least one field is being updated
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -95,20 +122,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       typeof explicitCorrectionNotes === 'string' && explicitCorrectionNotes.trim().length > 0
     const existingCorrectionNotes =
       typeof resource.correctionNotes === 'string' ? resource.correctionNotes : ''
+    const noteLabel = fieldOnly ? 'Field update (not a full listing review)' : 'Verification update'
     const correctionNotes = hasExplicitCorrectionNotes
       ? explicitCorrectionNotes
       : existingCorrectionNotes.trim()
-        ? `${existingCorrectionNotes}\n\nVerification update: ${verification_notes.trim()}`
-        : verification_notes.trim()
+        ? `${existingCorrectionNotes}\n\n${noteLabel}: ${verification_notes.trim()}`
+        : fieldOnly
+          ? `${noteLabel}: ${verification_notes.trim()}`
+          : verification_notes.trim()
 
-    // Build update object with tracking fields
-    const updateData = {
-      ...updates,
-      correctionNotes,
-      verificationSource: verification_source,
-      lastVerifiedAt: new Date(),
-      verifiedBy: auth.userId || null,
-    }
+    // Build update object with tracking fields; a field-only check keeps the listing stamp.
+    const updateData = fieldOnly
+      ? { ...updates, ...restoredStamp, correctionNotes }
+      : {
+          ...updates,
+          correctionNotes,
+          verificationSource: verification_source,
+          lastVerifiedAt: new Date(),
+          verifiedBy: auth.userId || null,
+        }
 
     // Update resource
     await db.update(resources).set(updateData).where(eq(resources.id, id))

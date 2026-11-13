@@ -67,6 +67,48 @@ describe('resource review command', () => {
     expect(fixture.output).toHaveBeenCalledWith({ success: true, updated_fields: ['phone'] })
   })
 
+  it('sends a field-only verification scope when --scope fields is given', async () => {
+    writeFileSync(updatesFile, JSON.stringify({ reentryFocused: true }))
+
+    await run([
+      'review',
+      resourceId,
+      updatesFile,
+      '--source',
+      source,
+      '--notes',
+      notes,
+      '--scope',
+      'fields',
+      '--json',
+    ])
+
+    expect(fixture.apiPatch).toHaveBeenCalledWith(`/api/admin/resources/${resourceId}/update`, {
+      updates: { reentryFocused: true },
+      verification_source: source,
+      verification_notes: notes,
+      verification_scope: 'fields',
+    })
+  })
+
+  it('rejects an unknown --scope value', async () => {
+    writeFileSync(updatesFile, JSON.stringify({ reentryFocused: true }))
+    await expect(
+      run([
+        'review',
+        resourceId,
+        updatesFile,
+        '--source',
+        source,
+        '--notes',
+        notes,
+        '--scope',
+        'all',
+      ])
+    ).rejects.toThrow('process.exit:1')
+    expect(fixture.apiPatch).not.toHaveBeenCalled()
+  })
+
   it('previews compact intended fields without calling the API', async () => {
     writeFileSync(updatesFile, JSON.stringify({ phone: '555-0100', primaryCategory: 'healthcare' }))
 

@@ -46,8 +46,10 @@ Subcommands:
                          services_offered='["GED prep","Job training"]'
                        JSON fields (hours) accept a JSON object; latitude/longitude are numeric.
 
-  review <uuid> <updates.json> --source <URL> --notes <text> [--preview] [--json]
+  review <uuid> <updates.json> --source <URL> --notes <text> [--scope fields] [--preview] [--json]
                        Apply reviewed fields through the provenance-tracking PATCH endpoint.
+                       --scope fields: a field-specific check (e.g. record restrictions) that does
+                       not stamp the whole listing as reviewed; default scope is listing.
                        The file is a nonempty JSON object with camelCase resource fields,
                        e.g. {"primaryCategory":"housing"}; it is sent as the body’s
                        "updates" value alongside verification_source and verification_notes.
@@ -260,6 +262,7 @@ async function reviewResource(args) {
       options: {
         source: { type: 'string' },
         notes: { type: 'string' },
+        scope: { type: 'string' },
         preview: { type: 'boolean' },
         json: { type: 'boolean' },
       },
@@ -311,6 +314,12 @@ async function reviewResource(args) {
     process.exit(1)
   }
 
+  const scope = parsed.values.scope
+  if (scope !== undefined && scope !== 'listing' && scope !== 'fields') {
+    error('Resource review --scope must be "listing" or "fields".')
+    process.exit(1)
+  }
+
   const fullPath = resolve(PROJECT_ROOT, filePath)
   let updates
   try {
@@ -347,6 +356,7 @@ async function reviewResource(args) {
       id,
       verification_source: verificationSource,
       verification_notes: verificationNotes,
+      ...(scope ? { verification_scope: scope } : {}),
       updated_fields: fields,
     }
     if (parsed.values.json) {
@@ -366,6 +376,7 @@ async function reviewResource(args) {
     updates,
     verification_source: verificationSource,
     verification_notes: verificationNotes,
+    ...(scope ? { verification_scope: scope } : {}),
   })
 
   if (parsed.values.json) {

@@ -120,6 +120,59 @@ describe('admin resource update verification notes', () => {
     )
   })
 
+  it('keeps the listing review stamp for a field-only review and records a field note', async () => {
+    prepareDatabase({ id: resourceId, correctionNotes: 'Prior note.' })
+
+    const response = await sendPatch({
+      updates: { reentryFocused: true },
+      verification_source: verificationSource,
+      verification_notes: verificationNotes,
+      verification_scope: 'fields',
+    })
+
+    expect(response.status).toBe(200)
+    const payload = fixture.set.mock.calls[0][0]
+    expect(payload).toMatchObject({
+      reentryFocused: true,
+      correctionNotes: `Prior note.\n\nField update (not a full listing review): ${verificationNotes}`,
+    })
+    expect(payload).not.toHaveProperty('lastVerifiedAt')
+    expect(payload).not.toHaveProperty('verifiedBy')
+    expect(payload).not.toHaveProperty('verificationSource')
+  })
+
+  it('restores an explicit earlier review stamp in a field-only review', async () => {
+    prepareDatabase({ id: resourceId, correctionNotes: null })
+
+    const response = await sendPatch({
+      updates: {
+        lastVerifiedAt: '2026-06-01T10:00:00.000Z',
+        verifiedBy: null,
+        verificationSource: null,
+      },
+      verification_source: verificationSource,
+      verification_notes: verificationNotes,
+      verification_scope: 'fields',
+    })
+
+    expect(response.status).toBe(200)
+    const payload = fixture.set.mock.calls[0][0]
+    expect(payload.lastVerifiedAt).toEqual(new Date('2026-06-01T10:00:00.000Z'))
+    expect(payload.verifiedBy).toBeNull()
+    expect(payload.verificationSource).toBeNull()
+  })
+
+  it('rejects an unknown verification scope before reading the resource', async () => {
+    const response = await sendPatch({
+      updates: { phone: '555-0100' },
+      verification_source: verificationSource,
+      verification_notes: verificationNotes,
+      verification_scope: 'everything',
+    })
+    expect(response.status).toBe(400)
+    expect(fixture.dbSelect).not.toHaveBeenCalled()
+  })
+
   it.each([undefined, null, 123, {}, '   '])(
     'rejects malformed or blank verification notes (%s) before reading the resource',
     async (notes) => {
