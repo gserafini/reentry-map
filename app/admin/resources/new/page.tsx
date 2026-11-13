@@ -39,7 +39,8 @@ export default function NewResourcePage() {
 
   // Form state - minimal required fields for rapid entry
   const [name, setName] = useState('')
-  const [primary_category, setPrimaryCategory] = useState('general_support')
+  // Stored categories are hyphenated (see CATEGORIES)
+  const [primary_category, setPrimaryCategory] = useState('general-support')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [description, setDescription] = useState('')
@@ -47,6 +48,8 @@ export default function NewResourcePage() {
   const [hours, setHours] = useState('')
   const [email, setEmail] = useState('')
   const [services, setServices] = useState('')
+  const [recordRestrictions, setRecordRestrictions] = useState('')
+  const [reentryFocused, setReentryFocused] = useState(false)
   const [verified, setVerified] = useState(false)
   const [status, setStatus] = useState('active')
 
@@ -163,6 +166,8 @@ export default function NewResourcePage() {
         hours: hours.trim() || null,
         email: email.trim() || null,
         services: services ? services.split(',').map((s) => s.trim()) : null,
+        record_restrictions: recordRestrictions.trim() || null,
+        reentry_focused: reentryFocused,
         verified,
         status,
         latitude,
@@ -205,6 +210,8 @@ export default function NewResourcePage() {
     setHours('')
     setEmail('')
     setServices('')
+    setRecordRestrictions('')
+    setReentryFocused(false)
     setLatitude(null)
     setLongitude(null)
     setError(null)
@@ -290,8 +297,9 @@ export default function NewResourcePage() {
 
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth required>
-                <InputLabel>Category</InputLabel>
+                <InputLabel id="new-category-label">Category</InputLabel>
                 <Select
+                  labelId="new-category-label"
                   value={primary_category}
                   label="Category"
                   onChange={(e) => setPrimaryCategory(e.target.value)}
@@ -410,13 +418,46 @@ export default function NewResourcePage() {
               />
             </Grid>
 
+            <Grid size={12}>
+              <TextField
+                label="Record-related restrictions"
+                value={recordRestrictions}
+                onChange={(e) => setRecordRestrictions(e.target.value)}
+                multiline
+                rows={2}
+                fullWidth
+                helperText="Only restrictions the provider states about records, registries, specific offenses, background checks or supervision, in the provider’s words. Leave empty when the provider says nothing."
+              />
+            </Grid>
+
+            <Grid size={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={reentryFocused}
+                    onChange={(e) => setReentryFocused(e.target.checked)}
+                  />
+                }
+                label="Built for people with records"
+              />
+              <Typography variant="caption" color="text.secondary" component="p">
+                Check only when the provider says the program is specifically for people with
+                records or justice involvement.
+              </Typography>
+            </Grid>
+
             <Divider sx={{ width: '100%', my: 2 }} />
 
             {/* Status Options */}
             <Grid size={{ xs: 12, md: 6 }}>
               <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select value={status} label="Status" onChange={(e) => setStatus(e.target.value)}>
+                <InputLabel id="new-status-label">Status</InputLabel>
+                <Select
+                  labelId="new-status-label"
+                  value={status}
+                  label="Status"
+                  onChange={(e) => setStatus(e.target.value)}
+                >
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="pending">Pending Review</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>

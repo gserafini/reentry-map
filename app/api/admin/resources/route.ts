@@ -114,6 +114,8 @@ export async function POST(request: NextRequest) {
       hours?: Record<string, string>
       services?: string[]
       eligibility_requirements?: string
+      record_restrictions?: string
+      reentry_focused?: boolean
       required_documents?: string[]
       fees?: string
       languages?: string[]
@@ -160,6 +162,10 @@ export async function POST(request: NextRequest) {
         hours: body.hours || null,
         servicesOffered: body.services || null,
         eligibilityRequirements: body.eligibility_requirements || null,
+        // Record fields (B085): only what the provider states; silence leaves both unset.
+        recordRestrictions:
+          (typeof body.record_restrictions === 'string' && body.record_restrictions.trim()) || null,
+        reentryFocused: body.reentry_focused === true,
         requiredDocuments: body.required_documents || null,
         fees: body.fees || null,
         languages: body.languages || null,

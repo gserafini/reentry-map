@@ -36,6 +36,66 @@ import { CATEGORIES } from '@/lib/utils/categories'
 import { geocodeAddress } from '@/lib/utils/geocoding'
 import type { Resource } from '@/lib/db/schema'
 
+// The form's values, as loaded and as edited. A save sends only the fields that differ, under
+// the API's field names, so untouched data (such as structured hours) is never rewritten.
+interface EditValues {
+  name: string
+  primary_category: string
+  address: string
+  city: string
+  state: string
+  zip: string
+  phone: string
+  description: string
+  website: string
+  hours: string
+  email: string
+  services: string
+  record_restrictions: string
+  reentry_focused: boolean
+  verified: boolean
+  status: string
+  latitude: number | null
+  longitude: number | null
+}
+
+/** Hours edited as JSON stay structured; anything else is free text. */
+function parseHours(text: string): unknown {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed)
+      if (parsed && typeof parsed === 'object') return parsed
+    } catch {
+      // Not JSON: keep the text
+    }
+  }
+  return trimmed
+}
+
+function changedPayload(original: EditValues, current: EditValues): Record<string, unknown> {
+  const payload: Record<string, unknown> = {}
+  for (const key of Object.keys(current) as (keyof EditValues)[]) {
+    const value = current[key]
+    if (value === original[key]) continue
+    if (key === 'services') {
+      const items = String(value)
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      payload.services_offered = items.length ? items : null
+    } else if (key === 'hours') {
+      payload.hours = parseHours(String(value))
+    } else if (typeof value === 'string') {
+      payload[key] = value.trim() || null
+    } else {
+      payload[key] = value
+    }
+  }
+  return payload
+}
+
 export default function EditResourcePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const router = useRouter()
@@ -48,7 +108,7 @@ export default function EditResourcePage() {
 
   // Form state
   const [name, setName] = useState('')
-  const [primary_category, setPrimaryCategory] = useState('general_support')
+  const [primary_category, setPrimaryCategory] = useState('general-support')
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
@@ -59,8 +119,12 @@ export default function EditResourcePage() {
   const [hours, setHours] = useState('')
   const [email, setEmail] = useState('')
   const [services, setServices] = useState('')
+  const [recordRestrictions, setRecordRestrictions] = useState('')
+  const [reentryFocused, setReentryFocused] = useState(false)
   const [verified, setVerified] = useState(false)
   const [status, setStatus] = useState('active')
+  // Values as loaded, so a save sends only what the editor changed
+  const [original, setOriginal] = useState<EditValues | null>(null)
 
   // Geocoding state
   const [latitude, setLatitude] = useState<number | null>(null)
@@ -107,24 +171,50 @@ export default function EditResourcePage() {
         const { data } = result
 
         // Populate form fields
-        setName(data.name || '')
-        setPrimaryCategory(data.primaryCategory || 'general_support')
-        setAddress(data.address || '')
-        setCity(data.city || '')
-        setState(data.state || '')
-        setZip(data.zip || '')
-        setPhone(data.phone || '')
-        setDescription(data.description || '')
-        setWebsite(data.website || '')
-        setHours(
-          typeof data.hours === 'string' ? data.hours : data.hours ? JSON.stringify(data.hours) : ''
-        )
-        setEmail(data.email || '')
-        setServices(Array.isArray(data.servicesOffered) ? data.servicesOffered.join(', ') : '')
-        setVerified(data.verified || false)
-        setStatus(data.status || 'active')
-        setLatitude(data.latitude)
-        setLongitude(data.longitude)
+        const values: EditValues = {
+          name: data.name || '',
+          primary_category: data.primaryCategory || 'general-support',
+          address: data.address || '',
+          city: data.city || '',
+          state: data.state || '',
+          zip: data.zip || '',
+          phone: data.phone || '',
+          description: data.description || '',
+          website: data.website || '',
+          hours:
+            typeof data.hours === 'string'
+              ? data.hours
+              : data.hours
+                ? JSON.stringify(data.hours)
+                : '',
+          email: data.email || '',
+          services: Array.isArray(data.servicesOffered) ? data.servicesOffered.join(', ') : '',
+          record_restrictions: data.recordRestrictions || '',
+          reentry_focused: data.reentryFocused === true,
+          verified: data.verified || false,
+          status: data.status || 'active',
+          latitude: data.latitude,
+          longitude: data.longitude,
+        }
+        setName(values.name)
+        setPrimaryCategory(values.primary_category)
+        setAddress(values.address)
+        setCity(values.city)
+        setState(values.state)
+        setZip(values.zip)
+        setPhone(values.phone)
+        setDescription(values.description)
+        setWebsite(values.website)
+        setHours(values.hours)
+        setEmail(values.email)
+        setServices(values.services)
+        setRecordRestrictions(values.record_restrictions)
+        setReentryFocused(values.reentry_focused)
+        setVerified(values.verified)
+        setStatus(values.status)
+        setLatitude(values.latitude)
+        setLongitude(values.longitude)
+        setOriginal(values)
       } catch (err) {
         setError('Failed to load resource. Please try again.')
         console.error(err)
@@ -202,29 +292,36 @@ export default function EditResourcePage() {
       return
     }
 
+    if (!original) return
+    const resource = changedPayload(original, {
+      name,
+      primary_category,
+      address,
+      city,
+      state,
+      zip,
+      phone,
+      description,
+      website,
+      hours,
+      email,
+      services,
+      record_restrictions: recordRestrictions,
+      reentry_focused: reentryFocused,
+      verified,
+      status,
+      latitude,
+      longitude,
+    })
+    if (Object.keys(resource).length === 0) {
+      router.push('/admin/resources')
+      return
+    }
+
     setSaving(true)
     setError(null)
 
     try {
-      const resource = {
-        name: name.trim(),
-        primary_category,
-        address: address.trim(),
-        city: city.trim() || null,
-        state: state.trim() || null,
-        zip: zip.trim() || null,
-        phone: phone.trim() || null,
-        description: description.trim() || null,
-        website: website.trim() || null,
-        hours: hours.trim() || null,
-        email: email.trim() || null,
-        services: services ? services.split(',').map((s) => s.trim()) : null,
-        verified,
-        status,
-        latitude,
-        longitude,
-      }
-
       const response = await fetch(`/api/admin/resources/${resourceId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -335,8 +432,9 @@ export default function EditResourcePage() {
 
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth required>
-                <InputLabel>Category</InputLabel>
+                <InputLabel id="edit-category-label">Category</InputLabel>
                 <Select
+                  labelId="edit-category-label"
                   value={primary_category}
                   label="Category"
                   onChange={(e) => setPrimaryCategory(e.target.value)}
@@ -487,15 +585,49 @@ export default function EditResourcePage() {
               />
             </Grid>
 
+            <Grid size={12}>
+              <TextField
+                label="Record-related restrictions"
+                value={recordRestrictions}
+                onChange={(e) => setRecordRestrictions(e.target.value)}
+                multiline
+                rows={2}
+                fullWidth
+                helperText="Only restrictions the provider states about records, registries, specific offenses, background checks or supervision, in the provider’s words. Leave empty when the provider says nothing."
+              />
+            </Grid>
+
+            <Grid size={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={reentryFocused}
+                    onChange={(e) => setReentryFocused(e.target.checked)}
+                  />
+                }
+                label="Built for people with records"
+              />
+              <Typography variant="caption" color="text.secondary" component="p">
+                Check only when the provider says the program is specifically for people with
+                records or justice involvement.
+              </Typography>
+            </Grid>
+
             <Divider sx={{ width: '100%', my: 2 }} />
 
             {/* Status Options */}
             <Grid size={{ xs: 12, md: 6 }}>
               <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select value={status} label="Status" onChange={(e) => setStatus(e.target.value)}>
+                <InputLabel id="edit-status-label">Status</InputLabel>
+                <Select
+                  labelId="edit-status-label"
+                  value={status}
+                  label="Status"
+                  onChange={(e) => setStatus(e.target.value)}
+                >
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="pending">Pending Review</MenuItem>
+                  <MenuItem value="flagged">Flagged</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>
                 </Select>
               </FormControl>

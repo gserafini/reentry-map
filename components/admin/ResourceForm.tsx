@@ -8,6 +8,8 @@ import {
   Button,
   Grid,
   FormControl,
+  FormControlLabel,
+  Checkbox,
   InputLabel,
   Select,
   MenuItem,
@@ -17,6 +19,7 @@ import {
 } from '@mui/material'
 import { Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material'
 import type { Database } from '@/lib/types/database'
+import { CATEGORIES } from '@/lib/utils/categories'
 
 type Resource = Database['public']['Tables']['resources']['Row']
 type ResourceInsert = Database['public']['Tables']['resources']['Insert']
@@ -27,48 +30,95 @@ interface ResourceFormProps {
   onCancel: () => void
 }
 
-const CATEGORIES = [
-  'employment',
-  'housing',
-  'food',
-  'clothing',
-  'healthcare',
-  'mental_health',
-  'substance_abuse',
-  'legal_aid',
-  'transportation',
-  'id_documents',
-  'education',
-  'faith_based',
-  'general_support',
-]
+const STATUS_OPTIONS = ['active', 'inactive', 'flagged', 'pending_verification']
 
-const STATUS_OPTIONS = ['active', 'inactive', 'pending_verification']
+// Keys match the admin resources API (snake_case columns). List fields are edited one item
+// per line.
+interface FormState {
+  name: string
+  description: string
+  services_offered: string
+  primary_category: string
+  status: string
+  phone: string
+  email: string
+  website: string
+  address: string
+  eligibility_requirements: string
+  required_documents: string
+  fees: string
+  record_restrictions: string
+  reentry_focused: boolean
+}
+
+const LIST_FIELDS = new Set<keyof FormState>(['services_offered', 'required_documents'])
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function lines(value: unknown): string {
+  if (Array.isArray(value))
+    return value.filter((item) => typeof item === 'string' && item).join('\n')
+  return text(value)
+}
+
+function initialState(resource?: Resource): FormState {
+  const row = (resource ?? {}) as Record<string, unknown>
+  return {
+    name: text(row.name),
+    description: text(row.description),
+    services_offered: lines(row.services_offered),
+    // Stored categories are hyphenated (general-support); older rows may use underscores.
+    primary_category: text(row.primary_category).replace(/_/g, '-') || 'general-support',
+    status: text(row.status) || 'active',
+    phone: text(row.phone),
+    email: text(row.email),
+    website: text(row.website),
+    address: text(row.address),
+    eligibility_requirements: text(row.eligibility_requirements),
+    required_documents: lines(row.required_documents),
+    fees: text(row.fees),
+    record_restrictions: text(row.record_restrictions),
+    reentry_focused: row.reentry_focused === true,
+  }
+}
+
+/**
+ * The API payload: every field when creating (initial = null), otherwise only the fields the
+ * editor changed, so untouched columns are never rewritten.
+ */
+function toPayload(initial: FormState | null, current: FormState): Partial<ResourceInsert> {
+  const payload: Record<string, unknown> = {}
+  for (const key of Object.keys(current) as (keyof FormState)[]) {
+    const value = current[key]
+    if (initial && value === initial[key]) continue
+    if (typeof value === 'boolean') {
+      payload[key] = value
+    } else if (LIST_FIELDS.has(key)) {
+      const items = value
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      payload[key] = items.length ? items : null
+    } else {
+      payload[key] = value.trim() || null
+    }
+  }
+  return payload as Partial<ResourceInsert>
+}
 
 export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const [formData, setFormData] = useState({
-    name: resource?.name || '',
-    description: resource?.description || '',
-    services: ((resource as Record<string, unknown>)?.services as string | undefined) || '',
-    primary_category: resource?.primary_category || 'general_support',
-    status: resource?.status || 'active',
-    phone: resource?.phone || '',
-    email: resource?.email || '',
-    website: resource?.website || '',
-    address: resource?.address || '',
-    eligibility: ((resource as Record<string, unknown>)?.eligibility as string | undefined) || '',
-    application_process:
-      ((resource as Record<string, unknown>)?.application_process as string | undefined) || '',
-    documents_required:
-      ((resource as Record<string, unknown>)?.documents_required as string | undefined) || '',
-    fees: ((resource as Record<string, unknown>)?.fees as string | undefined) || '',
-  })
-
+  const [initial] = useState(() => initialState(resource))
+  const [formData, setFormData] = useState<FormState>(initial)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const statusOptions = STATUS_OPTIONS.includes(initial.status)
+    ? STATUS_OPTIONS
+    : [...STATUS_OPTIONS, initial.status]
 
   function validate() {
     const newErrors: Record<string, string> = {}
@@ -101,6 +151,11 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
     return Object.keys(newErrors).length === 0
   }
 
+  function done() {
+    router.push('/admin/resources')
+    router.refresh()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -108,15 +163,20 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
       return
     }
 
+    const payload = toPayload(resource ? initial : null, formData)
+    if (Object.keys(payload).length === 0) {
+      done()
+      return
+    }
+
     setSaving(true)
     setError(null)
 
     try {
-      const result = await onSubmit(formData)
+      const result = await onSubmit(payload)
 
       if (result.success) {
-        router.push('/admin/resources')
-        router.refresh()
+        done()
       } else {
         setError(result.error || 'Failed to save resource')
       }
@@ -173,26 +233,27 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
         <Grid size={{ xs: 12 }}>
           <TextField
             label="Services Offered"
-            value={formData.services}
-            onChange={(e) => setFormData({ ...formData, services: e.target.value })}
+            value={formData.services_offered}
+            onChange={(e) => setFormData({ ...formData, services_offered: e.target.value })}
             fullWidth
             multiline
             rows={3}
-            helperText="Describe what services this resource provides"
+            helperText="One service per line"
           />
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6 }}>
           <FormControl fullWidth required>
-            <InputLabel>Primary Category</InputLabel>
+            <InputLabel id="resource-category-label">Primary Category</InputLabel>
             <Select
+              labelId="resource-category-label"
               value={formData.primary_category}
               onChange={(e) => setFormData({ ...formData, primary_category: e.target.value })}
               label="Primary Category"
             >
               {CATEGORIES.map((cat) => (
-                <MenuItem key={cat} value={cat}>
-                  {cat.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                <MenuItem key={cat.value} value={cat.value}>
+                  {cat.label}
                 </MenuItem>
               ))}
             </Select>
@@ -201,13 +262,14 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
 
         <Grid size={{ xs: 12, sm: 6 }}>
           <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
+            <InputLabel id="resource-status-label">Status</InputLabel>
             <Select
+              labelId="resource-status-label"
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               label="Status"
             >
-              {STATUS_OPTIONS.map((status) => (
+              {statusOptions.map((status) => (
                 <MenuItem key={status} value={status}>
                   {status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                 </MenuItem>
@@ -286,8 +348,8 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
         <Grid size={{ xs: 12 }}>
           <TextField
             label="Eligibility Requirements"
-            value={formData.eligibility}
-            onChange={(e) => setFormData({ ...formData, eligibility: e.target.value })}
+            value={formData.eligibility_requirements}
+            onChange={(e) => setFormData({ ...formData, eligibility_requirements: e.target.value })}
             fullWidth
             multiline
             rows={2}
@@ -297,25 +359,13 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
 
         <Grid size={{ xs: 12 }}>
           <TextField
-            label="Application Process"
-            value={formData.application_process}
-            onChange={(e) => setFormData({ ...formData, application_process: e.target.value })}
-            fullWidth
-            multiline
-            rows={2}
-            helperText="How to apply or get started"
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12 }}>
-          <TextField
             label="Documents Required"
-            value={formData.documents_required}
-            onChange={(e) => setFormData({ ...formData, documents_required: e.target.value })}
+            value={formData.required_documents}
+            onChange={(e) => setFormData({ ...formData, required_documents: e.target.value })}
             fullWidth
             multiline
             rows={2}
-            helperText="What documents are needed?"
+            helperText="One document per line"
           />
         </Grid>
 
@@ -327,6 +377,41 @@ export function ResourceForm({ resource, onSubmit, onCancel }: ResourceFormProps
             fullWidth
             helperText="Any costs or fees associated with this resource"
           />
+        </Grid>
+
+        {/* Records */}
+        <Grid size={{ xs: 12 }}>
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+            Criminal records
+          </Typography>
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <TextField
+            label="Record-related restrictions"
+            value={formData.record_restrictions}
+            onChange={(e) => setFormData({ ...formData, record_restrictions: e.target.value })}
+            fullWidth
+            multiline
+            rows={2}
+            helperText="Only restrictions the provider states about records, registries, specific offenses, background checks or supervision, in the provider’s words. Leave empty when the provider says nothing."
+          />
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.reentry_focused}
+                onChange={(e) => setFormData({ ...formData, reentry_focused: e.target.checked })}
+              />
+            }
+            label="Built for people with records"
+          />
+          <Typography variant="caption" color="text.secondary" component="p">
+            Check only when the provider says the program is specifically for people with records or
+            justice involvement.
+          </Typography>
         </Grid>
 
         {/* Actions */}

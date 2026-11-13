@@ -94,6 +94,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         updateData[dbKey] = body[bodyKey] ?? null
       }
     }
+    // Record fields (B085): the provider's stated restrictions (blank means none) and a
+    // label that is true only when explicitly set.
+    if ('record_restrictions' in body) {
+      const restrictions = body.record_restrictions
+      updateData.recordRestrictions =
+        (typeof restrictions === 'string' && restrictions.trim()) || null
+    }
+    if ('reentry_focused' in body) {
+      updateData.reentryFocused = body.reentry_focused === true
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
