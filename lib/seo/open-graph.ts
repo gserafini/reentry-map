@@ -40,10 +40,13 @@ export interface OpenGraphImageInput {
   location?: string
   category?: string
   count?: number | null
+  resourceId?: string
+  resourceVersion?: string
 }
 
 export interface OpenGraphImageModel {
   kind: OpenGraphImageKind
+  resourceId: string | null
   eyebrow: string
   title: string
   description: string
@@ -75,6 +78,12 @@ function cleanText(value: string | null | undefined, maxLength: number): string 
   const wordBoundary =
     lastSpace >= Math.floor(maxLength * 0.6) ? truncated.slice(0, lastSpace) : truncated
   return `${wordBoundary.trimEnd()}…`
+}
+
+export function parseResourceId(value: string | null): string | null {
+  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null
 }
 
 function parseKind(value: string | null): OpenGraphImageKind {
@@ -117,6 +126,13 @@ function buildHighlights(kind: OpenGraphImageKind, count: number | null): string
 export function createOpenGraphImage(input: OpenGraphImageInput): OpenGraphImageMetadata {
   const params = new URLSearchParams()
   params.set('kind', input.kind || 'directory')
+  params.set('v', '2')
+  const resourceId = input.kind === 'resource' ? parseResourceId(input.resourceId || null) : null
+  if (resourceId) {
+    params.set('resourceId', resourceId)
+    const revision = cleanText(input.resourceVersion, 80)
+    if (revision) params.set('revision', revision)
+  }
   params.set('title', cleanText(input.title, 86))
 
   const eyebrow = cleanText(input.eyebrow, 54)
@@ -153,6 +169,7 @@ export function parseOpenGraphImageParams(searchParams: URLSearchParams): OpenGr
 
   return {
     kind,
+    resourceId: kind === 'resource' ? parseResourceId(searchParams.get('resourceId')) : null,
     eyebrow: cleanText(searchParams.get('eyebrow'), 54) || defaultEyebrow(kind),
     title,
     description:

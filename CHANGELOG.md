@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-16
+
+- Resource sharing images now show an attributed street map with one pin at the published physical location. Regional listings, missing coordinates and failed map requests show a readable information panel instead of fabricated roads or pins. Canonical and legacy resource links carry the resource identity and update revision into versioned image URLs; cached preview metadata may need to be fetched again by sharing platforms. On-demand map tiles are bounded and cached for seven days.
+
 ## 2026-11-12
 
 - Admin edit and quick-add forms now include record-related restrictions and the "Built for people with records" label. Both edit screens now send only the fields an editor changed, under the API's field names: before, service edits (and the dashboard form's eligibility and documents) were silently dropped, the dashboard form opened those boxes empty, and every save rewrote untouched fields, which would have turned structured hours into a text string. Category choices use the stored hyphenated values, so picking one no longer writes an unrecognized category. The dashboard form's "Application process" box, which had no database column, is gone.

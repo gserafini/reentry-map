@@ -125,6 +125,8 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
     `Find contact information, hours, and reviews for ${resource.name} in ${resourceCity}, ${state}.`
   const image = createOpenGraphImage({
     kind: 'resource',
+    resourceId: resource.id,
+    resourceVersion: String(resource.updated_at || ''),
     eyebrow: `${getCategoryLabel(resource.primary_category as ResourceCategory)} provider`,
     title: resource.name,
     description,

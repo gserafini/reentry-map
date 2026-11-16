@@ -78,25 +78,34 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
   const { segments } = await params
 
   let resource:
-    | Pick<Resource, 'name' | 'primary_category' | 'city' | 'state' | 'description'>
+    | Pick<
+        Resource,
+        'id' | 'updated_at' | 'name' | 'primary_category' | 'city' | 'state' | 'description'
+      >
     | undefined
   let fallbackName = 'Resource'
 
   if (segments.length === 1) {
     const [id] = segments
     const rows = await sql<
-      Pick<Resource, 'name' | 'primary_category' | 'city' | 'state' | 'description'>[]
+      Pick<
+        Resource,
+        'id' | 'updated_at' | 'name' | 'primary_category' | 'city' | 'state' | 'description'
+      >[]
     >`
-      SELECT name, primary_category, city, state, description FROM resources
+      SELECT id, updated_at, name, primary_category, city, state, description FROM resources
       WHERE id = ${id} AND status = 'active' LIMIT 1
     `
     resource = rows[0]
   } else if (segments.length === 3) {
     const [state, city, slug] = segments
     const rows = await sql<
-      Pick<Resource, 'name' | 'primary_category' | 'city' | 'state' | 'description'>[]
+      Pick<
+        Resource,
+        'id' | 'updated_at' | 'name' | 'primary_category' | 'city' | 'state' | 'description'
+      >[]
     >`
-      SELECT name, primary_category, city, state, description FROM resources
+      SELECT id, updated_at, name, primary_category, city, state, description FROM resources
       WHERE slug = ${slug} AND state = ${state} AND city = ${city} AND status = 'active'
       LIMIT 1
     `
@@ -114,6 +123,8 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
     `Information about ${resourceName} and how to access their services.`
   const image = createOpenGraphImage({
     kind: 'resource',
+    resourceId: resource?.id,
+    resourceVersion: String(resource?.updated_at || ''),
     eyebrow: resource?.primary_category
       ? `${getCategoryLabel(resource.primary_category as ResourceCategory)} provider`
       : 'Community resource',

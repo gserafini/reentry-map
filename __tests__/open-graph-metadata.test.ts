@@ -25,7 +25,8 @@ vi.mock('@/lib/db/client', () => ({
     if (query.includes('GROUP BY city')) return [{ city: 'Dallas', count: 42 }]
     return [
       {
-        id: 'resource-1',
+        id: '78c6d0aa-9acc-446c-bb04-e328c90ebace',
+        updated_at: '2026-11-16T22:48:36Z',
         name: 'Second Chance Employment Center',
         city: 'Dallas',
         state: 'TX',
@@ -90,6 +91,8 @@ describe('landing-page Open Graph metadata', () => {
     expect(urls.cityCategory).toContain('category=employment')
     expect(urls.resource).toContain('title=Second+Chance+Employment+Center')
     expect(urls.resource).toContain('location=Dallas%2C+TX')
+    expect(urls.resource).toContain('resourceId=78c6d0aa-9acc-446c-bb04-e328c90ebace')
+    expect(urls.resource).toContain('revision=2026-11-16T22%3A48%3A36Z')
 
     for (const value of Object.values(metadata)) {
       expect(imageUrl(value, 'twitter')).toBe(imageUrl(value, 'openGraph'))

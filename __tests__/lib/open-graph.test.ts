@@ -76,3 +76,31 @@ describe('Open Graph image metadata', () => {
     ])
   })
 })
+
+describe('resource map identity', () => {
+  it('carries trusted resource identity and revision into a new image URL', () => {
+    const image = createOpenGraphImage({
+      kind: 'resource',
+      title: 'Our Place',
+      resourceId: '78c6d0aa-9acc-446c-bb04-e328c90ebace',
+      resourceVersion: '2026-11-16T22:48:36Z',
+    })
+    const params = new URL(image.url, 'https://reentrymap.org').searchParams
+    expect(params.get('resourceId')).toBe('78c6d0aa-9acc-446c-bb04-e328c90ebace')
+    expect(params.get('revision')).toBe('2026-11-16T22:48:36Z')
+    expect(params.get('v')).toBe('2')
+    expect(parseOpenGraphImageParams(params).resourceId).toBe(params.get('resourceId'))
+  })
+  it('does not accept arbitrary URLs or non-resource map identities', () => {
+    expect(
+      parseOpenGraphImageParams(
+        new URLSearchParams({ kind: 'resource', resourceId: 'https://localhost/private' })
+      ).resourceId
+    ).toBeNull()
+    expect(
+      parseOpenGraphImageParams(
+        new URLSearchParams({ kind: 'city', resourceId: '78c6d0aa-9acc-446c-bb04-e328c90ebace' })
+      ).resourceId
+    ).toBeNull()
+  })
+})

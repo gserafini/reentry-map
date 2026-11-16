@@ -1,11 +1,13 @@
+/* eslint-disable @next/next/no-img-element -- ImageResponse requires native image elements. */
 import { ImageResponse } from 'next/og'
+import { getResourceMapTarget, renderResourceMap } from '@/lib/seo/resource-og-map'
 import {
   OPEN_GRAPH_IMAGE_HEIGHT,
   OPEN_GRAPH_IMAGE_WIDTH,
   parseOpenGraphImageParams,
 } from '@/lib/seo/open-graph'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 function CompassMark() {
   return (
@@ -48,41 +50,10 @@ function CompassMark() {
   )
 }
 
-function MapPin({ left, top, accent }: { left: number; top: number; accent: string }) {
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left,
-        top,
-        width: 42,
-        height: 42,
-        borderRadius: '50% 50% 50% 12%',
-        transform: 'rotate(-45deg)',
-        background: accent,
-        border: '5px solid #ffffff',
-        boxShadow: '0 10px 25px rgba(8, 27, 45, 0.22)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: 999,
-          background: '#ffffff',
-          transform: 'rotate(45deg)',
-          display: 'flex',
-        }}
-      />
-    </div>
-  )
-}
-
 export async function GET(request: Request) {
   const model = parseOpenGraphImageParams(new URL(request.url).searchParams)
+  const target = await getResourceMapTarget(model.resourceId).catch(() => null)
+  const mapImage = target ? await renderResourceMap(target) : null
 
   return new ImageResponse(
     <div
@@ -266,28 +237,65 @@ export async function GET(request: Request) {
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
-              backgroundColor: '#e8f0f6',
-              backgroundImage:
-                'linear-gradient(90deg, rgba(21,101,192,.08) 1px, transparent 1px), linear-gradient(rgba(21,101,192,.08) 1px, transparent 1px)',
-              backgroundSize: '34px 34px',
+              background: '#e8f0f6',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
             }}
           >
-            <div
-              style={{
-                position: 'absolute',
-                left: 45,
-                top: 108,
-                width: 210,
-                height: 4,
-                background: model.accent,
-                opacity: 0.45,
-                transform: 'rotate(-18deg)',
-                display: 'flex',
-              }}
-            />
-            <MapPin left={44} top={82} accent={model.accent} />
-            <MapPin left={145} top={42} accent="#1565c0" />
-            <MapPin left={242} top={92} accent="#f0ad00" />
+            {mapImage ? (
+              <>
+                <img
+                  src={mapImage}
+                  width={286}
+                  height={172}
+                  alt="Street map centered on the published service location"
+                />
+                <svg
+                  width="38"
+                  height="48"
+                  viewBox="0 0 38 48"
+                  style={{ position: 'absolute', left: 124, top: 41 }}
+                >
+                  <path
+                    d="M19 2C9.6 2 2 9.6 2 19c0 12.7 17 26 17 26S36 31.7 36 19C36 9.6 28.4 2 19 2Z"
+                    fill={model.accent}
+                    stroke="white"
+                    strokeWidth="3"
+                  />
+                  <circle cx="19" cy="19" r="6" fill="white" />
+                </svg>
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    background: 'rgba(255,255,255,0.92)',
+                    color: '#183f60',
+                    fontSize: 12,
+                    padding: '3px 5px',
+                    display: 'flex',
+                  }}
+                >
+                  © OpenStreetMap contributors
+                </div>
+              </>
+            ) : (
+              <>
+                <CompassMark />
+                <div
+                  style={{
+                    display: 'flex',
+                    marginTop: 16,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                  }}
+                >
+                  Service information
+                </div>
+              </>
+            )}
           </div>
 
           {(model.categoryLabel || model.location) && (
