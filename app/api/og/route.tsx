@@ -101,7 +101,6 @@ export async function GET(request: Request) {
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          zIndex: 2,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center' }}>
