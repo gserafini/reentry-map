@@ -7,7 +7,11 @@ import {
   getResourcesCount,
 } from '@/lib/api/resources'
 import { ResourcesView } from './ResourcesView'
-import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from './params'
+import {
+  buildResourcesQueryOptions,
+  buildResourcesPageUrl,
+  type ResourcesPageSearchParams,
+} from './params'
 import { interpretSearch } from '@/lib/utils/search-intent'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
@@ -83,7 +87,14 @@ export async function generateMetadata({ searchParams }: ResourcesPageProps): Pr
   return {
     title,
     description,
-    openGraph: { title, description, type: 'website', siteName: 'Reentry Map', images: [image] },
+    openGraph: {
+      title,
+      description,
+      url: buildResourcesPageUrl('/resources', params),
+      type: 'website',
+      siteName: 'Reentry Map',
+      images: [image],
+    },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   }
 }

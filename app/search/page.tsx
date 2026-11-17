@@ -3,7 +3,11 @@ import { Alert, Container, Typography } from '@mui/material'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResultsExplorer } from '@/components/search/ResultsExplorer'
 import { SearchPageHeader } from '@/components/search/SearchPageHeader'
-import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
+import {
+  buildResourcesQueryOptions,
+  buildResourcesPageUrl,
+  type ResourcesPageSearchParams,
+} from '@/app/resources/params'
 import { interpretSearch } from '@/lib/utils/search-intent'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
@@ -73,6 +77,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
     title,
     description,
     openGraph: {
+      url: buildResourcesPageUrl('/search', params),
       title,
       description,
       type: 'website',

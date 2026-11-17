@@ -6,6 +6,7 @@ import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { generateResourceUrl } from '@/lib/utils/urls'
 
 interface ResourceDetailPageProps {
   params: Promise<{
@@ -138,6 +139,7 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
     title: `${resourceName} | Reentry Map`,
     description,
     openGraph: {
+      url: resource ? generateResourceUrl(resource) : '/resources',
       title: `${resourceName} | Reentry Map`,
       description,
       type: 'website',

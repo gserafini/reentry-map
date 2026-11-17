@@ -45,6 +45,7 @@ import { generateMetadata as generateCityCategoryMetadata } from '@/app/[state]/
 import { generateMetadata as generateResourceMetadata } from '@/app/[state]/[city]/[resource-slug]/page'
 import { generateMetadata as generateResourcesMetadata } from '@/app/resources/page'
 import { generateMetadata as generateSearchMetadata } from '@/app/search/page'
+import { generateMetadata as generateLegacyMetadata } from '@/app/resources/[...segments]/page'
 
 function imageUrl(metadata: Metadata, network: 'openGraph' | 'twitter'): string {
   const images = metadata[network]?.images
@@ -121,5 +122,44 @@ describe('landing-page Open Graph metadata', () => {
     expect(searchUrl).not.toBe(resourcesUrl)
     expect(imageUrl(resources, 'twitter')).toBe(resourcesUrl)
     expect(imageUrl(search, 'twitter')).toBe(searchUrl)
+  })
+  it('gives legacy links the canonical resource URL', async () => {
+    const meta = await generateLegacyMetadata({
+      params: Promise.resolve({ segments: ['78c6d0aa-9acc-446c-bb04-e328c90ebace'] }),
+    })
+    expect(meta.openGraph?.url).toBe('/tx/dallas/second-chance-employment-center')
+  })
+
+  it('identifies filtered directory and search URLs without reflecting unrelated parameters', async () => {
+    const input = {
+      search: 'housing & jobs',
+      city: 'Dallas',
+      state: 'TX',
+      lat: '32.7767',
+      lng: '-96.7970',
+      distance: '25',
+      categories: 'housing',
+      page: '2',
+      tracking_token: 'not-a-public-filter',
+    }
+    const resources = await generateResourcesMetadata({ searchParams: Promise.resolve(input) })
+    const search = await generateSearchMetadata({ searchParams: Promise.resolve(input) })
+    for (const [metadata, pathname] of [
+      [resources, '/resources'],
+      [search, '/search'],
+    ] as const) {
+      const url = new URL(String(metadata.openGraph?.url), 'https://reentrymap.org')
+      expect(url.pathname).toBe(pathname)
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        search: 'housing & jobs',
+        city: 'Dallas',
+        state: 'TX',
+        lat: '32.7767',
+        lng: '-96.7970',
+        distance: '25',
+        categories: 'housing',
+        page: '2',
+      })
+    }
   })
 })

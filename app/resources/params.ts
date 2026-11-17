@@ -66,3 +66,32 @@ export function buildResourcesQueryOptions(searchParams: ResourcesPageSearchPara
     isFiltering: Boolean(categories?.length || tags.length),
   }
 }
+
+/** Preserve public result filters in sharing identity, excluding unrelated parameters. */
+export function buildResourcesPageUrl(
+  pathname: '/resources' | '/search',
+  params: ResourcesPageSearchParams
+): string {
+  const query = new URLSearchParams()
+  for (const key of [
+    'search',
+    'categories',
+    'tags',
+    'lat',
+    'lng',
+    'distance',
+    'sort',
+    'locationName',
+    'north',
+    'south',
+    'east',
+    'west',
+    'city',
+    'state',
+    'page',
+  ] as const) {
+    const value = params[key]
+    if (typeof value === 'string' && value) query.set(key, value)
+  }
+  return query.size ? `${pathname}?${query}` : pathname
+}
