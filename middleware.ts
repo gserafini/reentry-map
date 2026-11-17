@@ -121,6 +121,7 @@ export function middleware(request: NextRequest) {
     const canonicalUrl = new URL(request.nextUrl)
     canonicalUrl.protocol = 'https:'
     canonicalUrl.host = 'reentrymap.org'
+    canonicalUrl.port = ''
     return addSecurityHeaders(NextResponse.redirect(canonicalUrl, 308))
   }
 

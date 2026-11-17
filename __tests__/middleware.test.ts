@@ -168,6 +168,19 @@ describe('middleware', () => {
       )
     })
 
+    it.each([
+      ['reentrymap.org', '0', 'http://reentrymap.org:3007/ca/oakland?page=2'],
+      ['www.reentrymap.com', '1', 'http://www.reentrymap.com:3007/ca/oakland?page=2'],
+    ])('removes internal proxy ports for %s', (host, secure, requestUrl) => {
+      middleware(
+        createMockRequest('/ca/oakland?page=2', 'GET', { host, 'x-https': secure }, requestUrl)
+      )
+      expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+        new URL('https://reentrymap.org/ca/oakland?page=2'),
+        308
+      )
+    })
+
     it('does not redirect the canonical HTTPS host', () => {
       middleware(createMockRequest('/', 'GET', { host: 'reentrymap.org', 'x-https': '1' }))
       expect(mockNextResponse.redirect).not.toHaveBeenCalled()
