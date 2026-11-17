@@ -126,7 +126,7 @@ function buildHighlights(kind: OpenGraphImageKind, count: number | null): string
 export function createOpenGraphImage(input: OpenGraphImageInput): OpenGraphImageMetadata {
   const params = new URLSearchParams()
   params.set('kind', input.kind || 'directory')
-  params.set('v', '2')
+  params.set('v', '3')
   const resourceId = input.kind === 'resource' ? parseResourceId(input.resourceId || null) : null
   if (resourceId) {
     params.set('resourceId', resourceId)

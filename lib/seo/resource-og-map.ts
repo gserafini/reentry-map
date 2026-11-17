@@ -20,7 +20,7 @@ export const RESOURCE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const TILE_SIZE = 256
 const ZOOM = 14
 const WIDTH = 286
-const HEIGHT = 172
+const HEIGHT = 228
 
 export async function getResourceMapTarget(id: string | null): Promise<MapTarget | null> {
   if (!id || !RESOURCE_ID_PATTERN.test(id)) return null

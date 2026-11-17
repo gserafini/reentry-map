@@ -55,7 +55,7 @@ describe('resource sharing map truth', () => {
     const result = await renderResourceMap({ latitude: 34.2780364, longitude: -119.2925223 })
     expect(result).toMatch(/^data:image\/png;base64,/)
     const image = await sharp(Buffer.from(result!.split(',')[1], 'base64')).metadata()
-    expect(image).toMatchObject({ width: 286, height: 172, format: 'png' })
+    expect(image).toMatchObject({ width: 286, height: 228, format: 'png' })
     expect(fetcher.mock.calls.length).toBeLessThanOrEqual(6)
     expect(fetcher.mock.calls[0]).toEqual([
       expect.stringMatching(/^https:\/\/tile.openstreetmap.org\/14\/\d+\/\d+\.png$/),

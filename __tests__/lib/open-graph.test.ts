@@ -88,7 +88,7 @@ describe('resource map identity', () => {
     const params = new URL(image.url, 'https://reentrymap.org').searchParams
     expect(params.get('resourceId')).toBe('78c6d0aa-9acc-446c-bb04-e328c90ebace')
     expect(params.get('revision')).toBe('2026-11-16T22:48:36Z')
-    expect(params.get('v')).toBe('2')
+    expect(params.get('v')).toBe('3')
     expect(parseOpenGraphImageParams(params).resourceId).toBe(params.get('resourceId'))
   })
   it('does not accept arbitrary URLs or non-resource map identities', () => {

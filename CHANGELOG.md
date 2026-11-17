@@ -2,6 +2,8 @@
 
 ## 2026-11-16
 
+- Sharing cards now use the authentic Reentry Map wordmark, large bold titles and clearly readable locations. Removed miniature badges, checklists and repeated copy; enlarged real location maps and their attribution. Long values have bounded, large-type layouts. Included local licensed fonts avoid external font requests, and version 3 image URLs distinguish the new design from previously cached previews.
+
 - Resource sharing images now show an attributed street map with one pin at the published physical location. Regional listings, missing coordinates and failed map requests show a readable information panel instead of fabricated roads or pins. Canonical and legacy resource links carry the resource identity and update revision into versioned image URLs; cached preview metadata may need to be fetched again by sharing platforms. On-demand map tiles are bounded and cached for seven days.
 
 ## 2026-11-12
