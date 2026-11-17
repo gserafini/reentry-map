@@ -283,7 +283,9 @@ export function getServiceAreaHeading(resource: {
         ? 'Online resource'
         : addressType === 'mobile'
           ? 'Mobile resource'
-          : 'Regional resource'
+          : addressType === 'hotline'
+            ? 'Hotline'
+            : 'Regional resource'
   }
 }
 

@@ -17,6 +17,7 @@ import { SmartBreadcrumbs } from '@/components/navigation/SmartBreadcrumbs'
 import { ResourceViewTracker } from '@/components/analytics/ResourceViewTracker'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { getResourceMetadata } from '@/lib/seo/resource-metadata'
 import type { Json } from '@/lib/types/database'
 import { resolveDuplicateResourceRedirect } from '@/lib/server/duplicate-resource-redirect'
 
@@ -182,11 +183,7 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
     }
   }
 
-  const resourceCity = resource.city
-  const title = `${resource.name} in ${resourceCity}, ${state} | Reentry Map`
-  const description =
-    resource.description?.slice(0, 160) ||
-    `Find contact information, hours, and reviews for ${resource.name} in ${resourceCity}, ${state}.`
+  const { title, description, location, keywords } = getResourceMetadata(resource)
   const image = createOpenGraphImage({
     kind: 'resource',
     resourceId: resource.id,
@@ -194,20 +191,14 @@ export async function generateMetadata({ params }: ResourcePageProps): Promise<M
     eyebrow: `${getCategoryLabel(resource.primary_category as ResourceCategory)} provider`,
     title: resource.name,
     description,
-    location: `${resourceCity}, ${state}`,
+    location,
     category: resource.primary_category,
   })
 
   return {
     title,
     description,
-    keywords: [
-      resource.name,
-      `${resource.name} ${resourceCity}`,
-      `${resourceCity} ${state}`,
-      resource.primary_category,
-      'reentry resources',
-    ].join(', '),
+    keywords,
     openGraph: {
       title,
       description,

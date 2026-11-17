@@ -107,4 +107,80 @@ describe('distinct resource URL identity', () => {
       Page(params('community-service--33333333-3333-4333-8333-333333333333'))
     ).rejects.toThrow('NOT_FOUND')
   })
+  it('describes nationwide coverage instead of presenting the anchor city as a local office', async () => {
+    fixture.rows = [
+      {
+        ...first,
+        name: '988 Suicide & Crisis Lifeline',
+        slug: null,
+        city: 'Lubbock',
+        state: 'TX',
+        address_type: 'online',
+        service_area: { type: 'nationwide', values: ['United States'] },
+      },
+    ]
+    const meta = await generateMetadata({
+      params: Promise.resolve({
+        state: 'tx',
+        city: 'lubbock',
+        'resource-slug': '988-suicide-crisis-lifeline',
+      }),
+    })
+    expect(meta.title).toBe(
+      '988 Suicide & Crisis Lifeline | Serves people nationwide | Reentry Map'
+    )
+    expect(JSON.stringify(meta.openGraph?.images)).toContain('Serves+people+nationwide')
+    expect(JSON.stringify(meta)).not.toContain('in Lubbock')
+  })
+  it('uses declared coverage on legacy UUID sharing metadata too', async () => {
+    fixture.rows = [
+      {
+        ...first,
+        name: '988 Suicide & Crisis Lifeline',
+        slug: null,
+        city: 'Lubbock',
+        state: 'TX',
+        address_type: 'online',
+        service_area: { type: 'nationwide', values: ['United States'] },
+      },
+    ]
+    const meta = await legacyMetadata({ params: Promise.resolve({ segments: [id] }) })
+    expect(meta.title).toBe(
+      '988 Suicide & Crisis Lifeline | Serves people nationwide | Reentry Map'
+    )
+    expect(JSON.stringify(meta.openGraph?.images)).toContain('Serves+people+nationwide')
+    expect(JSON.stringify(meta.openGraph?.images)).not.toContain('Lubbock')
+  })
+
+  it('keeps unknown nonphysical coverage unknown instead of falling back to an office city', async () => {
+    fixture.rows = [
+      {
+        ...first,
+        name: 'Community Service',
+        slug: null,
+        address_type: 'online',
+        service_area: null,
+        description: null,
+      },
+    ]
+    const meta = await generateMetadata(params('community-service'))
+    expect(meta.title).toBe('Community Service | Online resource | Reentry Map')
+    expect(meta.description).not.toContain('Oakland')
+    expect(JSON.stringify(meta.openGraph?.images)).not.toContain('Oakland')
+  })
+  it('does not assign a regional coverage claim to a hotline with unknown coverage', async () => {
+    fixture.rows = [
+      {
+        ...first,
+        name: 'Community Service',
+        slug: null,
+        address_type: 'hotline',
+        service_area: null,
+        description: null,
+      },
+    ]
+    const meta = await generateMetadata(params('community-service'))
+    expect(meta.title).toBe('Community Service | Hotline | Reentry Map')
+    expect(meta.description).not.toContain('Regional')
+  })
 })

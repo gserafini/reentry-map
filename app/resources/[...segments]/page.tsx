@@ -6,6 +6,7 @@ import type { Resource, ResourceCategory } from '@/lib/types/database'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { getResourceMetadata } from '@/lib/seo/resource-metadata'
 import { generateResourceUrl } from '@/lib/utils/urls'
 
 interface ResourceDetailPageProps {
@@ -93,6 +94,8 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
         | 'city'
         | 'state'
         | 'description'
+        | 'address_type'
+        | 'service_area'
       >
     | undefined
   let fallbackName = 'Resource'
@@ -110,9 +113,11 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
         | 'city'
         | 'state'
         | 'description'
+        | 'address_type'
+        | 'service_area'
       >[]
     >`
-      SELECT id, slug, updated_at, name, primary_category, city, state, description FROM resources
+      SELECT id, slug, updated_at, name, primary_category, city, state, description, address_type, service_area FROM resources
       WHERE id = ${id} AND status = 'active' LIMIT 1
     `
     resource = rows[0]
@@ -129,9 +134,11 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
         | 'city'
         | 'state'
         | 'description'
+        | 'address_type'
+        | 'service_area'
       >[]
     >`
-      SELECT id, slug, updated_at, name, primary_category, city, state, description FROM resources
+      SELECT id, slug, updated_at, name, primary_category, city, state, description, address_type, service_area FROM resources
       WHERE slug = ${slug} AND state = ${state} AND city = ${city} AND status = 'active'
       LIMIT 1
     `
@@ -143,10 +150,15 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
   }
 
   const resourceName = resource?.name || fallbackName
-  const location = [resource?.city, resource?.state].filter(Boolean).join(', ') || undefined
-  const description =
-    resource?.description?.slice(0, 160) ||
-    `Information about ${resourceName} and how to access their services.`
+  const { title, description, location } = getResourceMetadata(
+    resource || {
+      name: fallbackName,
+      city: '',
+      state: '',
+      description: null,
+      primary_category: 'general-support',
+    }
+  )
   const image = createOpenGraphImage({
     kind: 'resource',
     resourceId: resource?.id,
@@ -161,21 +173,21 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
   })
 
   return {
-    title: `${resourceName} | Reentry Map`,
+    title,
     description,
     alternates: resource
       ? { canonical: `https://reentrymap.org${generateResourceUrl(resource)}` }
       : undefined,
     openGraph: {
       url: resource ? generateResourceUrl(resource) : '/resources',
-      title: `${resourceName} | Reentry Map`,
+      title,
       description,
       type: 'website',
       images: [image],
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${resourceName} | Reentry Map`,
+      title,
       description,
       images: [image],
     },
