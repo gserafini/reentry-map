@@ -1,7 +1,7 @@
 import type { Json, Resource } from '@/lib/types/database'
 import {
   generateCitySlug,
-  generateResourceSlug,
+  getResourceSlug,
   generateStateSlug,
   parseCitySlug,
 } from '@/lib/utils/urls'
@@ -13,11 +13,13 @@ export type ResourceMergeSource = Pick<Resource, 'id' | 'status'> & {
   provenance?: Json | null
 }
 
-export type ResourceMergeTarget = Pick<Resource, 'id' | 'name' | 'city' | 'state' | 'status'> & {
-  provenance?: Json | null
-}
+export type ResourceMergeTarget = Pick<Resource, 'id' | 'name' | 'city' | 'state' | 'status'> &
+  Partial<Pick<Resource, 'slug'>> & {
+    provenance?: Json | null
+  }
 
-export type ResourceSlugPeer = Pick<Resource, 'id' | 'name' | 'city' | 'state' | 'status'>
+export type ResourceSlugPeer = Pick<Resource, 'id' | 'name' | 'city' | 'state' | 'status'> &
+  Partial<Pick<Resource, 'slug'>>
 
 function isJsonObject(value: Json | undefined): value is { [key: string]: Json | undefined } {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -86,11 +88,7 @@ export function getDuplicateCanonicalResourceUrl(
   const citySlug = generateCitySlug(canonical.city.trim())
   if (parseCitySlug(citySlug).toLowerCase() !== canonical.city.toLowerCase()) return null
 
-  const segments = [
-    generateStateSlug(canonical.state),
-    citySlug,
-    generateResourceSlug(canonical.name),
-  ]
+  const segments = [generateStateSlug(canonical.state), citySlug, getResourceSlug(canonical)]
   if (
     segments.some(
       (segment) =>
@@ -110,7 +108,7 @@ export function getDuplicateCanonicalResourceUrl(
       peer.status === 'active' &&
       peer.city?.trim().toLowerCase() === canonicalCity &&
       peer.state?.toUpperCase() === canonicalState &&
-      generateResourceSlug(peer.name) === segments[2]
+      getResourceSlug(peer) === segments[2]
   )
   if (
     matchingPeers.length !== 1 ||

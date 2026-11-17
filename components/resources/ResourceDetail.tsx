@@ -50,6 +50,8 @@ import {
 } from '@/lib/utils/urls'
 import { recordSearchContact } from '@/lib/analytics/search-journey'
 import { analytics } from '@/lib/analytics/queue'
+import { buildResourceSchema } from '@/lib/seo/resource-schema'
+import { serializeJsonLd } from '@/lib/utils/structured-data'
 import {
   getApproximateLocationPresentation,
   getServiceAreaHeading,
@@ -154,12 +156,15 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(parts.join(', '))}`
   }
 
-  const handleGetDirections = () => {
+  const handleDirectionsClick = () => {
     recordSearchContact('directions')
     analytics.track('resource_click_directions', {
       resource_id: resource.id,
     })
+  }
 
+  const handleGetDirections = () => {
+    handleDirectionsClick()
     window.open(getDirectionsUrl(), '_blank')
   }
 
@@ -184,68 +189,18 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
     // The ReviewsList component will automatically refresh
   }
 
-  // Generate Schema.org structured data for SEO
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': resource.primary_category === 'healthcare' ? 'MedicalBusiness' : 'LocalBusiness',
-    name: resource.name,
-    description: resource.description,
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: resource.address,
-      addressLocality: resource.city || '',
-      addressRegion: resource.state || '',
-      postalCode: resource.zip || '',
-      addressCountry: 'US',
-    },
-    ...(resource.latitude &&
-      resource.longitude && {
-        geo: {
-          '@type': 'GeoCoordinates',
-          latitude: resource.latitude,
-          longitude: resource.longitude,
-        },
-      }),
-    ...(resource.phone && { telephone: resource.phone }),
-    ...(resource.email && { email: resource.email }),
-    ...(resource.website && { url: resource.website }),
-    ...(resource.rating_average &&
-      resource.rating_count && {
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: resource.rating_average,
-          ratingCount: resource.rating_count,
-          bestRating: 5,
-          worstRating: 1,
-        },
-      }),
-    ...(resource.hours && {
-      openingHours:
-        typeof resource.hours === 'string'
-          ? resource.hours
-          : Object.entries(resource.hours as Record<string, string>).map(
-              ([day, hours]) => `${day.substring(0, 2)} ${hours}`
-            ),
-    }),
-  }
-
   return (
-    <Box component="article" itemScope itemType="https://schema.org/LocalBusiness">
-      {/* JSON-LD Structured Data for SEO */}
+    <Box component="article">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(structuredData).replace(/</g, '\\u003c'),
-        }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildResourceSchema(resource)) }}
       />
-
       {/* Header Section */}
       <Box component="header" sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
           <Typography
             variant="h3"
             component="h1"
-            itemProp="name"
             sx={{
               flexGrow: 1,
               fontSize: { xs: '1.75rem', md: '2.5rem' },
@@ -320,11 +275,11 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <PhoneIcon color="action" aria-label="Phone number" />
                   <MuiLink
+                    onClick={handleCallClick}
                     href={`tel:${resource.phone}`}
                     underline="hover"
                     color="inherit"
                     title={`Call ${resource.phone}`}
-                    itemProp="telephone"
                     sx={{
                       flex: 1,
                       minWidth: 0,
@@ -360,7 +315,6 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                     underline="hover"
                     color="inherit"
                     title={`Email ${resource.email}`}
-                    itemProp="email"
                     sx={{
                       flex: 1,
                       minWidth: 0,
@@ -392,13 +346,13 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <WebsiteIcon color="action" aria-label="Website" />
                   <MuiLink
+                    onClick={handleWebsiteClick}
                     href={resource.website}
                     target="_blank"
                     rel="noopener noreferrer"
                     underline="hover"
                     color="inherit"
                     title={`Visit ${resource.website}`}
-                    itemProp="url"
                     sx={{
                       flex: 1,
                       minWidth: 0,
@@ -444,9 +398,6 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         {/* Address / coverage with optional directions */}
         <Box
           component="address"
-          itemProp="address"
-          itemScope
-          itemType="https://schema.org/PostalAddress"
           sx={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -469,6 +420,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
             {showDirections ? (
               <Tooltip title="Click to open directions in Google Maps" arrow placement="top">
                 <MuiLink
+                  onClick={handleDirectionsClick}
                   href={getDirectionsUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -482,17 +434,17 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                   }}
                 >
                   <Box>
-                    <Typography variant="body1" component="div" itemProp="streetAddress">
+                    <Typography variant="body1" component="div">
                       {resource.address}
                     </Typography>
                     <Typography variant="body1" component="div">
-                      {resource.city && <span itemProp="addressLocality">{resource.city}</span>}
+                      {resource.city && <span>{resource.city}</span>}
                       {resource.city && resource.state && ', '}
-                      {resource.state && <span itemProp="addressRegion">{resource.state}</span>}
+                      {resource.state && <span>{resource.state}</span>}
                       {resource.zip && (
                         <>
                           {' '}
-                          <span itemProp="postalCode">{resource.zip}</span>
+                          <span>{resource.zip}</span>
                         </>
                       )}
                     </Typography>
@@ -518,9 +470,9 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
                 )}
                 {!serviceAreaSummary && (
                   <Typography variant="body1" component="div">
-                    {resource.city && <span itemProp="addressLocality">{resource.city}</span>}
+                    {resource.city && <span>{resource.city}</span>}
                     {resource.city && resource.state && ', '}
-                    {resource.state && <span itemProp="addressRegion">{resource.state}</span>}
+                    {resource.state && <span>{resource.state}</span>}
                   </Typography>
                 )}
               </Box>
@@ -556,12 +508,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               <Typography variant="h6" gutterBottom>
                 About
               </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ lineHeight: 1.6 }}
-                itemProp="description"
-              >
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                 {resource.description}
               </Typography>
             </CardContent>
@@ -714,6 +661,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
         </Typography>
         {resource.website && (
           <MuiLink
+            onClick={handleWebsiteClick}
             href={resource.website}
             target="_blank"
             rel="noopener noreferrer"
@@ -835,12 +783,7 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
       {/* Average Rating */}
       <Box sx={{ mb: 2 }}>
         {(resource.rating_count ?? 0) > 0 && (resource.rating_average ?? 0) > 0 && (
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
-            itemProp="aggregateRating"
-            itemScope
-            itemType="https://schema.org/AggregateRating"
-          >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <Rating
               value={resource.rating_average}
               precision={0.5}
@@ -848,12 +791,10 @@ export function ResourceDetail({ resource }: ResourceDetailProps) {
               aria-label={`Average rating: ${resource.rating_average!.toFixed(1)} out of 5`}
             />
             <Typography variant="body2" color="text.secondary">
-              <span itemProp="ratingValue">{resource.rating_average!.toFixed(1)}</span> (
-              <span itemProp="ratingCount">{resource.rating_count}</span> rating
+              <span>{resource.rating_average!.toFixed(1)}</span> (
+              <span>{resource.rating_count}</span> rating
               {resource.rating_count !== 1 ? 's' : ''})
             </Typography>
-            <meta itemProp="bestRating" content="5" />
-            <meta itemProp="worstRating" content="1" />
           </Box>
         )}
         {/* Interactive Rating - Rate this resource */}

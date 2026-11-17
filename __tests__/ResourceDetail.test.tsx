@@ -286,10 +286,7 @@ describe('ResourceDetail', () => {
   it('displays rating information', () => {
     render(<ResourceDetail resource={mockResource} />)
     expect(screen.getByText(/4.5/)).toBeInTheDocument()
-    const container = screen
-      .getByText(/4.5/)
-      .closest('[itemtype="https://schema.org/LocalBusiness"]')
-    expect(container).toHaveTextContent('10')
+    expect(screen.getAllByText('10').length).toBeGreaterThan(0)
   })
 
   it('shows statewide coverage clearly and hides directions for statewide resources', () => {
@@ -311,5 +308,11 @@ describe('ResourceDetail', () => {
     expect(screen.getByText('Statewide resource')).toBeInTheDocument()
     expect(screen.getByText('Serves all of Texas')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /get directions/i })).not.toBeInTheDocument()
+  })
+
+  it('emits one resource JSON-LD node without duplicate microdata', () => {
+    const { container } = render(<ResourceDetail resource={mockResource} />)
+    expect(container.querySelectorAll('script[type="application/ld+json"]')).toHaveLength(1)
+    expect(container.querySelector('[itemtype]')).toBeNull()
   })
 })

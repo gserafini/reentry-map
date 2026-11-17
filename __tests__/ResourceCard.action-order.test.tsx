@@ -1,12 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ResourceCard from '@/components/resources/ResourceCard'
 const recordSearchContact = vi.hoisted(() => vi.fn())
+const track = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/context/LocationContext', () => ({ useUserLocation: () => ({ coordinates: null }) }))
 vi.mock('@/components/user/FavoriteButton', () => ({ FavoriteButton: () => <button>Save</button> }))
 vi.mock('@/lib/analytics/search-journey', () => ({ recordSearchContact }))
-vi.mock('@/lib/analytics/queue', () => ({ analytics: { track: vi.fn() } }))
+vi.mock('@/lib/analytics/queue', () => ({ analytics: { track } }))
 describe('resource card contact hierarchy', () => {
+  beforeEach(() => {
+    recordSearchContact.mockClear()
+    track.mockClear()
+  })
+
   it('puts contact after the service summary and before address and eligibility details', () => {
     render(
       <ResourceCard
@@ -33,6 +39,36 @@ describe('resource card contact hierarchy', () => {
     ).toBeTruthy()
     fireEvent.click(call)
     expect(recordSearchContact).toHaveBeenCalledWith('call')
+  })
+
+  it.each([
+    ['website', 'resource_click_website'],
+    ['directions', 'resource_click_directions'],
+  ] as const)('records each result-card %s action', (action, event) => {
+    const resourceId = '123e4567-e89b-12d3-a456-426614174000'
+    render(
+      <ResourceCard
+        resource={{
+          id: resourceId,
+          name: 'Housing support',
+          primary_category: 'housing',
+          website: 'https://provider.example/',
+          address: '123 Main Street',
+          city: 'Dallas',
+          state: 'TX',
+          address_type: 'physical',
+        }}
+      />
+    )
+
+    fireEvent.click(
+      action === 'website'
+        ? screen.getByRole('link', { name: 'Visit Housing support website' })
+        : screen.getByTestId('resource-address')
+    )
+
+    expect(recordSearchContact).toHaveBeenCalledWith(action)
+    expect(track).toHaveBeenCalledWith(event, { resource_id: resourceId })
   })
   it('keeps statewide coverage readable without technical map-anchor copy', () => {
     render(

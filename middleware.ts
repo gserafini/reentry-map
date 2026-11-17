@@ -93,6 +93,37 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Apache preserves the public Host header, so use it (or the request URL
+  // when running directly) and never let an arbitrary X-Forwarded-Host choose
+  // the redirect destination. The SSL vhost overwrites X-HTTPS with "1".
+  const requestHost = request.headers.get('host') || request.nextUrl.host
+  let hostname = ''
+  let port = ''
+  try {
+    const parsedHost = new URL(`http://${requestHost}`)
+    hostname = parsedHost.hostname.toLowerCase()
+    port = parsedHost.port
+  } catch {
+    // Invalid or unrecognized Host values are left to the normal app path.
+  }
+
+  const isProductionHost =
+    ['reentrymap.org', 'www.reentrymap.org', 'reentrymap.com', 'www.reentrymap.com'].includes(
+      hostname
+    ) &&
+    (port === '' || port === '443')
+  const isCanonicalHost = hostname === 'reentrymap.org'
+  // Apache overwrites X-HTTPS at the TLS boundary; request URL/proxy protocol
+  // headers can otherwise be influenced by the client.
+  const isSecureRequest = request.headers.get('x-https') === '1'
+
+  if (isProductionHost && (!isCanonicalHost || !isSecureRequest)) {
+    const canonicalUrl = new URL(request.nextUrl)
+    canonicalUrl.protocol = 'https:'
+    canonicalUrl.host = 'reentrymap.org'
+    return addSecurityHeaders(NextResponse.redirect(canonicalUrl, 308))
+  }
+
   // Limit mutating API calls generally, plus selected GET routes that perform
   // database or outbound network work.
   const isApiRoute = pathname.startsWith('/api/')

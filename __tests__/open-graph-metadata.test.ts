@@ -130,7 +130,7 @@ describe('landing-page Open Graph metadata', () => {
     expect(meta.openGraph?.url).toBe('/tx/dallas/second-chance-employment-center')
   })
 
-  it('identifies filtered directory and search URLs without reflecting unrelated parameters', async () => {
+  it('canonicalizes only applied location filters and excludes unrelated parameters', async () => {
     const input = {
       search: 'housing & jobs',
       city: 'Dallas',
@@ -151,14 +151,11 @@ describe('landing-page Open Graph metadata', () => {
       const url = new URL(String(metadata.openGraph?.url), 'https://reentrymap.org')
       expect(url.pathname).toBe(pathname)
       expect(Object.fromEntries(url.searchParams)).toEqual({
-        search: 'housing & jobs',
-        city: 'Dallas',
-        state: 'TX',
-        lat: '32.7767',
-        lng: '-96.7970',
-        distance: '25',
         categories: 'housing',
+        city: 'Dallas',
         page: '2',
+        search: 'housing & jobs',
+        state: 'TX',
       })
     }
   })

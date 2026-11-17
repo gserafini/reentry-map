@@ -20,8 +20,14 @@ import { getCategoryIcon, getCategoryColor } from '@/lib/utils/category-icons'
 import { US_STATE_CODE_TO_NAME } from '@/lib/utils/resource-location'
 import { resolveSearchLocation } from '@/lib/utils/search-location'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
+import { SiteIdentityStructuredData } from '@/components/seo/StructuredData'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  alternates: { canonical: 'https://reentrymap.org/' },
+}
 
 export default async function HomePage({
   searchParams,
@@ -58,6 +64,7 @@ export default async function HomePage({
   return (
     <>
       <PageViewTracker pageTitle="Home - Find Reentry Resources" />
+      <SiteIdentityStructuredData />
       <Suspense fallback={null}>
         <LocationUrlSync />
       </Suspense>

@@ -23,6 +23,14 @@ const { mockRateLimit, mockHeaders, mockNextResponse } = vi.hoisted(() => {
           get: (key: string) => mockHeaders.get(key),
         },
       })),
+      redirect: vi.fn((url: URL, status = 307) => ({
+        headers: {
+          set: (key: string, value: string) => mockHeaders.set(key, value),
+          get: (key: string) => mockHeaders.get(key),
+        },
+        status,
+        location: url.toString(),
+      })),
     },
   }
 })
@@ -42,11 +50,17 @@ import type { NextRequest } from 'next/server'
 function createMockRequest(
   pathname: string,
   method = 'GET',
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  requestUrl = `https://reentrymap.org${pathname}`
 ): NextRequest {
-  const headersMap = new Map(Object.entries(headers))
+  const nextUrl = new URL(requestUrl)
+  // Model the proxy's overwritten TLS marker; explicit headers can exercise
+  // spoofed/conflicting client values.
+  const headersMap = new Map(
+    Object.entries({ 'x-https': nextUrl.protocol === 'https:' ? '1' : '0', ...headers })
+  )
   return {
-    nextUrl: { pathname },
+    nextUrl,
     method,
     headers: {
       get: (key: string) => headersMap.get(key) || null,
@@ -118,6 +132,100 @@ describe('middleware', () => {
       expect(mockHeaders.get('X-Frame-Options')).toBe('DENY')
       expect(mockHeaders.get('X-Content-Type-Options')).toBe('nosniff')
     })
+  })
+
+  describe('canonical host redirects', () => {
+    it.each(['reentrymap.com', 'www.reentrymap.com', 'www.reentrymap.org'])(
+      'permanently redirects %s to the canonical origin while preserving path and query',
+      (host) => {
+        const request = createMockRequest(
+          '/resources/ca?category=housing&page=2',
+          'GET',
+          { host },
+          `https://${host}/resources/ca?category=housing&page=2`
+        )
+        const response = middleware(request)
+        expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+          new URL('https://reentrymap.org/resources/ca?category=housing&page=2'),
+          308
+        )
+        expect(response).toMatchObject({ status: 308 })
+      }
+    )
+
+    it('permanently upgrades the canonical host from HTTP without losing the query', () => {
+      middleware(
+        createMockRequest(
+          '/?q=jobs',
+          'GET',
+          { host: 'reentrymap.org' },
+          'http://reentrymap.org/?q=jobs'
+        )
+      )
+      expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+        new URL('https://reentrymap.org/?q=jobs'),
+        308
+      )
+    })
+
+    it('does not redirect the canonical HTTPS host', () => {
+      middleware(createMockRequest('/', 'GET', { host: 'reentrymap.org', 'x-https': '1' }))
+      expect(mockNextResponse.redirect).not.toHaveBeenCalled()
+      expect(mockNextResponse.next).toHaveBeenCalled()
+    })
+
+    it('uses Apache’s SSL marker to avoid a redirect loop after proxy TLS termination', () => {
+      middleware(
+        createMockRequest(
+          '/',
+          'GET',
+          { host: 'reentrymap.org', 'x-https': '1' },
+          'http://reentrymap.org/'
+        )
+      )
+      expect(mockNextResponse.redirect).not.toHaveBeenCalled()
+      expect(mockNextResponse.next).toHaveBeenCalled()
+    })
+
+    it('does not trust a request URL protocol derived from client forwarded-proto headers', () => {
+      // Next can construct nextUrl with https from X-Forwarded-Proto. On the
+      // Apache HTTP vhost, X-HTTPS: 0 is the trusted overwrite that distinguishes it.
+      middleware(
+        createMockRequest(
+          '/',
+          'GET',
+          {
+            host: 'reentrymap.org',
+            'x-forwarded-proto': 'https',
+            'x-https': '0',
+          },
+          'https://reentrymap.org/'
+        )
+      )
+      expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+        new URL('https://reentrymap.org/'),
+        308
+      )
+    })
+
+    it.each(['staging.reentrymap.org', 'localhost:3000', 'preview.example.net'])(
+      'leaves non-production host %s untouched even when forwarded host claims canonical',
+      (host) => {
+        middleware(
+          createMockRequest(
+            '/',
+            'GET',
+            {
+              host,
+              'x-forwarded-host': 'www.reentrymap.com',
+            },
+            `http://${host}/`
+          )
+        )
+        expect(mockNextResponse.redirect).not.toHaveBeenCalled()
+        expect(mockNextResponse.next).toHaveBeenCalled()
+      }
+    )
   })
 
   describe('rate limiting', () => {

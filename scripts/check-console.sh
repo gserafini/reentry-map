@@ -77,3 +77,7 @@ fi
 PLAYWRIGHT_TEST_BASE_URL="$CONSOLE_CHECK_BASE_URL" node scripts/check-console.mjs /
 PLAYWRIGHT_TEST_BASE_URL="$CONSOLE_CHECK_BASE_URL" node scripts/check-console.mjs /resources
 PLAYWRIGHT_TEST_BASE_URL="$CONSOLE_CHECK_BASE_URL" node scripts/check-console.mjs /admin
+
+# Public trust pages must be rendered, not merely compiled.
+PLAYWRIGHT_TEST_BASE_URL="$CONSOLE_CHECK_BASE_URL" node scripts/check-console.mjs /about
+PLAYWRIGHT_TEST_BASE_URL="$CONSOLE_CHECK_BASE_URL" node scripts/check-console.mjs /methodology

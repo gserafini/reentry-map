@@ -15,6 +15,7 @@ import {
 } from '@/lib/utils/urls'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { buildListingCanonicalPath, buildListingMetadata } from '@/lib/seo/listing-metadata'
 import type { Metadata } from 'next'
 import type { ResourceCategory } from '@/lib/types/database'
 
@@ -58,6 +59,10 @@ export default async function CategoryInCityPage({
   const label = getCategoryLabel(category)
   const cityUrl = generateCityUrl(city, state)
   const categoryUrl = generateCategoryInCityUrl(city, state, category)
+  const listingUrl = buildListingCanonicalPath(categoryUrl, filters, {
+    curated: true,
+    appliedKeys: ['search', 'sort'],
+  })
   return (
     <>
       <BreadcrumbList
@@ -71,14 +76,14 @@ export default async function CategoryInCityPage({
       <CollectionPage
         name={`${label} in ${city}, ${state}`}
         description={`Find ${label.toLowerCase()} services in ${city}.`}
-        url={categoryUrl}
-        numberOfItems={count.data || 0}
+        url={listingUrl}
+        hasItemList={Boolean(result.data?.length)}
       />
       {result.data?.length ? (
         <ItemList
           name={`${label} in ${city}`}
           description="Services for people navigating reentry."
-          url={categoryUrl}
+          url={listingUrl}
           resources={result.data}
         />
       ) : null}
@@ -103,7 +108,10 @@ export default async function CategoryInCityPage({
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: CategoryInCityPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: CategoryInCityPageProps): Promise<Metadata> {
   const { state: stateSlug, city: citySlug, category } = await params
 
   const state = parseStateSlug(stateSlug)
@@ -128,6 +136,11 @@ export async function generateMetadata({ params }: CategoryInCityPageProps): Pro
   const title = `${categoryLabel} in ${city}, ${state} | Reentry Map`
   const description = `Find ${count.data || 0} ${categoryLabel.toLowerCase()} resources in ${city}, ${state}. Browse programs, services, and support for individuals navigating reentry.`
   const categoryUrl = generateCategoryInCityUrl(city, state, category as ResourceCategory)
+  const filters = await searchParams
+  const listingMetadata = buildListingMetadata(categoryUrl, filters, {
+    curated: true,
+    appliedKeys: ['search', 'sort'],
+  })
   const image = createOpenGraphImage({
     kind: 'city-category',
     eyebrow: 'Local resource directory',
@@ -152,7 +165,7 @@ export async function generateMetadata({ params }: CategoryInCityPageProps): Pro
       title,
       description,
       type: 'website',
-      url: `https://reentrymap.org${categoryUrl}`,
+      url: listingMetadata.alternates?.canonical,
       images: [image],
     },
     twitter: {
@@ -161,9 +174,7 @@ export async function generateMetadata({ params }: CategoryInCityPageProps): Pro
       description,
       images: [image],
     },
-    alternates: {
-      canonical: `https://reentrymap.org${categoryUrl}`,
-    },
+    ...listingMetadata,
   }
 }
 

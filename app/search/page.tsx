@@ -3,14 +3,11 @@ import { Alert, Container, Typography } from '@mui/material'
 import { getResources, getCategoryCounts, getResourcesCount } from '@/lib/api/resources'
 import { ResultsExplorer } from '@/components/search/ResultsExplorer'
 import { SearchPageHeader } from '@/components/search/SearchPageHeader'
-import {
-  buildResourcesQueryOptions,
-  buildResourcesPageUrl,
-  type ResourcesPageSearchParams,
-} from '@/app/resources/params'
+import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
 import { interpretSearch } from '@/lib/utils/search-intent'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { buildListingMetadata } from '@/lib/seo/listing-metadata'
 import type { Metadata } from 'next'
 
 interface SearchPageProps {
@@ -73,11 +70,30 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
     location: query.locationName,
     category,
   })
+  const listingMetadata = buildListingMetadata('/search', params, {
+    curated: false,
+    appliedKeys: [
+      'search',
+      'categories',
+      'tags',
+      'lat',
+      'lng',
+      'distance',
+      'sort',
+      'locationName',
+      'north',
+      'south',
+      'east',
+      'west',
+      'city',
+      'state',
+    ],
+  })
   return {
     title,
     description,
     openGraph: {
-      url: buildResourcesPageUrl('/search', params),
+      url: listingMetadata.alternates?.canonical,
       title,
       description,
       type: 'website',
@@ -85,5 +101,6 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
       images: [image],
     },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
+    ...listingMetadata,
   }
 }

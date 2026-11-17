@@ -5,6 +5,17 @@
 
 import type { Resource } from '@/lib/types/database'
 import { serializeJsonLd } from '@/lib/utils/structured-data'
+import { buildResourceSchema, buildSiteIdentitySchema } from '@/lib/seo/resource-schema'
+
+const SITE_URL = 'https://reentrymap.org'
+
+function absolutePageUrl(url: string): string {
+  return new URL(url, `${SITE_URL}/`).toString()
+}
+
+function itemListId(url: string): string {
+  return `${absolutePageUrl(url)}#item-list`
+}
 
 interface BreadcrumbListProps {
   items: Array<{
@@ -38,41 +49,7 @@ interface LocalBusinessProps {
 }
 
 export function LocalBusiness({ resource }: LocalBusinessProps) {
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: resource.name,
-    description: resource.description,
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: resource.address,
-      addressLocality: resource.city,
-      addressRegion: resource.state,
-      postalCode: resource.zip,
-      addressCountry: 'US',
-    },
-    ...(resource.latitude &&
-      resource.longitude && {
-        geo: {
-          '@type': 'GeoCoordinates',
-          latitude: resource.latitude,
-          longitude: resource.longitude,
-        },
-      }),
-    ...(resource.phone && { telephone: resource.phone }),
-    ...(resource.website && { url: resource.website }),
-    ...(resource.email && { email: resource.email }),
-    ...(resource.rating_average &&
-      resource.rating_count && {
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: resource.rating_average,
-          ratingCount: resource.rating_count,
-          bestRating: 5,
-          worstRating: 1,
-        },
-      }),
-  }
+  const structuredData = buildResourceSchema(resource)
 
   return (
     <script
@@ -95,31 +72,13 @@ export function ItemList({ name, description, url, resources }: ItemListProps) {
     '@type': 'ItemList',
     name,
     description,
-    url: `https://reentrymap.org${url}`,
-    numberOfItems: resources.length,
-    itemListElement: resources.slice(0, 20).map((resource, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      item: {
-        '@type': 'LocalBusiness',
-        name: resource.name,
-        description: resource.description,
-        address: {
-          '@type': 'PostalAddress',
-          streetAddress: resource.address,
-          addressLocality: resource.city,
-          addressRegion: resource.state,
-        },
-        ...(resource.rating_average &&
-          resource.rating_count && {
-            aggregateRating: {
-              '@type': 'AggregateRating',
-              ratingValue: resource.rating_average,
-              ratingCount: resource.rating_count,
-            },
-          }),
-      },
-    })),
+    '@id': itemListId(url),
+    url: absolutePageUrl(url),
+    numberOfItems: resources.slice(0, 20).length,
+    itemListElement: resources.slice(0, 20).map((resource, index) => {
+      const { ['@context']: _context, ...item } = buildResourceSchema(resource)
+      return { '@type': 'ListItem', position: index + 1, item }
+    }),
   }
 
   return (
@@ -130,29 +89,47 @@ export function ItemList({ name, description, url, resources }: ItemListProps) {
   )
 }
 
+export function SiteIdentityStructuredData() {
+  const structuredData = buildSiteIdentitySchema()
+  return (
+    <>
+      {structuredData.map((item) => (
+        <script
+          key={String(item['@type'])}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(item) }}
+        />
+      ))}
+    </>
+  )
+}
+
 interface CollectionPageProps {
   name: string
   description: string
   url: string
-  numberOfItems: number
+  hasItemList?: boolean
 }
 
-export function CollectionPage({ name, description, url, numberOfItems }: CollectionPageProps) {
+export function CollectionPage({
+  name,
+  description,
+  url,
+  hasItemList = false,
+}: CollectionPageProps) {
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
+    '@id': `${absolutePageUrl(url)}#collection`,
     name,
     description,
-    url: `https://reentrymap.org${url}`,
+    url: absolutePageUrl(url),
     about: {
       '@type': 'Thing',
       name: 'Reentry Resources',
       description: 'Community resources for individuals navigating reentry',
     },
-    mainEntity: {
-      '@type': 'ItemList',
-      numberOfItems,
-    },
+    ...(hasItemList ? { mainEntity: { '@id': itemListId(url) } } : {}),
   }
 
   return (

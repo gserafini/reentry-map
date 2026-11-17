@@ -8,6 +8,7 @@ import { getCategoryDescription, getCategoryLabel, getAllCategories } from '@/li
 import { BreadcrumbList, CollectionPage, ItemList } from '@/components/seo/StructuredData'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { buildListingCanonicalPath, buildListingMetadata } from '@/lib/seo/listing-metadata'
 import type { ResourceCategory } from '@/lib/types/database'
 
 interface CategoryPageProps {
@@ -36,6 +37,24 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       </Container>
     )
   const description = `Browse ${categoryLabel.toLowerCase()} resources${query.locationName ? ' in ' + query.locationName : ' across the United States'}.`
+  const listingUrl = buildListingCanonicalPath(`/category/${category}`, search, {
+    curated: true,
+    appliedKeys: [
+      'search',
+      'tags',
+      'lat',
+      'lng',
+      'distance',
+      'sort',
+      'locationName',
+      'north',
+      'south',
+      'east',
+      'west',
+      'city',
+      'state',
+    ],
+  })
   return (
     <>
       <BreadcrumbList
@@ -47,14 +66,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       <CollectionPage
         name={`${categoryLabel} Reentry Resources`}
         description={description}
-        url={`/category/${category}`}
-        numberOfItems={count.data || 0}
+        url={listingUrl}
+        hasItemList={Boolean(result.data?.length)}
       />
       {result.data?.length ? (
         <ItemList
           name={`${categoryLabel} Resources`}
           description={description}
-          url={`/category/${category}`}
+          url={listingUrl}
           resources={result.data}
         />
       ) : null}
@@ -81,13 +100,35 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   )
 }
 
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: CategoryPageProps): Promise<Metadata> {
   const { category } = await params
   if (!getAllCategories().includes(category as ResourceCategory))
     return { title: 'Category Not Found | Reentry Map' }
   const categoryLabel = getCategoryLabel(category as ResourceCategory)
   const title = `${categoryLabel} Reentry Resources | Reentry Map`
   const description = `Find ${categoryLabel.toLowerCase()} resources for individuals navigating reentry. Compare services and contact providers in your area.`
+  const filters = await searchParams
+  const listingMetadata = buildListingMetadata(`/category/${category}`, filters, {
+    curated: true,
+    appliedKeys: [
+      'search',
+      'tags',
+      'lat',
+      'lng',
+      'distance',
+      'sort',
+      'locationName',
+      'north',
+      'south',
+      'east',
+      'west',
+      'city',
+      'state',
+    ],
+  })
   const count = await getResourcesCount({ categories: [category as ResourceCategory] })
   const image = createOpenGraphImage({
     kind: 'category',
@@ -103,12 +144,12 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     openGraph: {
       title,
       description,
+      url: listingMetadata.alternates?.canonical,
       type: 'website',
-      url: `https://reentrymap.org/category/${category}`,
       images: [image],
     },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
-    alternates: { canonical: `https://reentrymap.org/category/${category}` },
+    ...listingMetadata,
   }
 }
 

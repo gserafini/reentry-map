@@ -1,22 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   render,
   screen,
-  waitFor,
   resetRouterMocks,
   setMockPathname,
   setMockSearchParams,
-  getMockRouter,
 } from '@/__tests__/test-utils'
-import userEvent from '@testing-library/user-event'
 import { Pagination } from '@/components/search/Pagination'
 
 describe('Pagination', () => {
   beforeEach(() => {
     resetRouterMocks()
     setMockPathname('/search')
-    // Mock window.scrollTo
-    window.scrollTo = vi.fn()
   })
 
   it('renders pagination controls with correct page count', () => {
@@ -74,81 +69,50 @@ describe('Pagination', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('navigates to correct page when clicking page number', async () => {
-    const user = userEvent.setup()
-
+  it('renders page numbers as real href links', () => {
     render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
 
-    // Find and click page 2 button
-    const page2Button = screen.getByRole('button', { name: 'Go to page 2' })
-    await user.click(page2Button)
-
-    expect(getMockRouter().push).toHaveBeenCalledWith('/search?page=2')
+    expect(screen.getByRole('link', { name: 'Go to page 2' })).toHaveAttribute(
+      'href',
+      '/search?page=2'
+    )
   })
 
-  it('removes page param when navigating to page 1', async () => {
-    const user = userEvent.setup()
+  it('keeps unavailable first and previous controls disabled on page one', () => {
+    render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
 
+    expect(screen.getByRole('button', { name: 'Go to first page' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Go to previous page' })).toBeDisabled()
+  })
+
+  it('uses the clean URL for page one', () => {
     render(<Pagination currentPage={2} totalPages={5} totalCount={100} pageSize={20} />)
 
-    // Find and click page 1 button
-    const page1Button = screen.getByRole('button', { name: 'Go to page 1' })
-    await user.click(page1Button)
-
-    expect(getMockRouter().push).toHaveBeenCalledWith('/search')
+    expect(screen.getByRole('link', { name: 'Go to page 1' })).toHaveAttribute('href', '/search')
   })
 
-  it('preserves existing search params when changing page', async () => {
-    const user = userEvent.setup()
+  it('preserves known result filters but drops unknown query parameters', () => {
     setMockSearchParams({ category: 'housing', search: 'test' })
 
     render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
 
-    const page2Button = screen.getByRole('button', { name: 'Go to page 2' })
-    await user.click(page2Button)
-
-    expect(getMockRouter().push).toHaveBeenCalledWith('/search?category=housing&search=test&page=2')
-  })
-
-  it('scrolls to top when page changes by default', async () => {
-    const user = userEvent.setup()
-
-    render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
-
-    const page2Button = screen.getByRole('button', { name: 'Go to page 2' })
-    await user.click(page2Button)
-
-    await waitFor(() => {
-      expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
-    })
-  })
-
-  it('does not scroll when scrollToTop is false', async () => {
-    const user = userEvent.setup()
-
-    render(
-      <Pagination
-        currentPage={1}
-        totalPages={5}
-        totalCount={100}
-        pageSize={20}
-        scrollToTop={false}
-      />
+    expect(screen.getByRole('link', { name: 'Go to page 2' })).toHaveAttribute(
+      'href',
+      '/search?search=test&page=2'
     )
-
-    const page2Button = screen.getByRole('button', { name: 'Go to page 2' })
-    await user.click(page2Button)
-
-    await waitFor(() => {
-      expect(window.scrollTo).not.toHaveBeenCalled()
-    })
   })
 
-  it('renders first and last page buttons', () => {
+  it('renders first and last page links', () => {
     render(<Pagination currentPage={3} totalPages={10} totalCount={200} pageSize={20} />)
 
-    expect(screen.getByRole('button', { name: 'Go to first page' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Go to last page' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to first page' })).toHaveAttribute(
+      'href',
+      '/search'
+    )
+    expect(screen.getByRole('link', { name: 'Go to last page' })).toHaveAttribute(
+      'href',
+      '/search?page=10'
+    )
   })
 
   it('has accessible button sizes (minimum 44x44px)', () => {
@@ -159,5 +123,66 @@ describe('Pagination', () => {
     // Material UI Pagination should apply our custom sx styles for min-width and height
     // We're checking that the button is rendered (actual size testing is better in E2E)
     expect(page1Button).toBeInTheDocument()
+  })
+})
+
+describe('Pagination links', () => {
+  beforeEach(() => {
+    resetRouterMocks()
+    setMockPathname('/ca/san-francisco')
+  })
+
+  it('renders real page links with only filters applied on this route', () => {
+    setMockSearchParams({
+      search: 'housing',
+      categories: 'food',
+      sort: 'rating-desc',
+      utm_source: 'x',
+    })
+    render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
+
+    expect(screen.getByRole('link', { name: 'Go to page 2' })).toHaveAttribute(
+      'href',
+      '/ca/san-francisco?search=housing&categories=food&sort=rating-desc&page=2'
+    )
+  })
+
+  it('uses the fixed category route and applied filters to build category page links', () => {
+    setMockPathname('/category/housing')
+    setMockSearchParams({ tags: 'reentry', categories: 'food', search: 'shelter', unknown: 'drop' })
+    render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
+
+    expect(screen.getByRole('link', { name: 'Go to page 2' })).toHaveAttribute(
+      'href',
+      '/category/housing?tags=reentry&search=shelter&page=2'
+    )
+  })
+
+  it('keeps only search and sort on a city category route', () => {
+    setMockPathname('/ca/san-francisco/category/housing')
+    setMockSearchParams({
+      search: 'shelter',
+      sort: 'rating-desc',
+      categories: 'food',
+      tags: 'reentry',
+    })
+    render(<Pagination currentPage={1} totalPages={5} totalCount={100} pageSize={20} />)
+
+    expect(screen.getByRole('link', { name: 'Go to page 2' })).toHaveAttribute(
+      'href',
+      '/ca/san-francisco/category/housing?search=shelter&sort=rating-desc&page=2'
+    )
+  })
+
+  it('keeps current page and ellipses accessible without pretending they navigate', () => {
+    render(<Pagination currentPage={3} totalPages={10} totalCount={200} pageSize={20} />)
+
+    expect(screen.getByRole('button', { name: 'page 3' })).toHaveAttribute('aria-current', 'page')
+    const ellipses = document.querySelectorAll('.MuiPaginationItem-ellipsis')
+    expect(ellipses.length).toBeGreaterThan(0)
+    ellipses.forEach((ellipsis) => {
+      expect(ellipsis.tagName).not.toBe('A')
+      expect(ellipsis).not.toHaveAttribute('href')
+    })
   })
 })

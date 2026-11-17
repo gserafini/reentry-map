@@ -43,6 +43,24 @@ export function Footer() {
           <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
             <MuiLink
               component={Link}
+              href="/about"
+              variant="body2"
+              color="text.secondary"
+              underline="hover"
+            >
+              About Reentry Map
+            </MuiLink>
+            <MuiLink
+              component={Link}
+              href="/methodology"
+              variant="body2"
+              color="text.secondary"
+              underline="hover"
+            >
+              How information is checked
+            </MuiLink>
+            <MuiLink
+              component={Link}
               href="/suggest-resource"
               variant="body2"
               color="text.secondary"

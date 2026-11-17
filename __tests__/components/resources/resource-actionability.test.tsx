@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ResourceCard } from '@/components/resources/ResourceCard'
 import { ResourceDetail } from '@/components/resources/ResourceDetail'
 import { recordSearchContact } from '@/lib/analytics/search-journey'
+import { analytics } from '@/lib/analytics/queue'
 import ResourceList from '@/components/resources/ResourceList'
 import type { Resource } from '@/lib/types/database'
 
@@ -50,6 +51,27 @@ const resource = {
 } as Resource
 
 describe('Resource actionability and honest evidence', () => {
+  it.each([
+    ['214-555-0100', 'call'],
+    ['https://example.org', 'website'],
+    ['Click to open directions in Google Maps', 'directions'],
+    ['Check the organization’s website', 'website'],
+  ] as const)(
+    'records the visible contact link %s using the consent-gated queue',
+    (name, action) => {
+      vi.mocked(analytics.track).mockClear()
+      vi.mocked(recordSearchContact).mockClear()
+      render(<ResourceDetail resource={resource} />)
+      const link = screen.getByRole('link', { name })
+      link.addEventListener('click', (event) => event.preventDefault())
+      fireEvent.click(link)
+      expect(recordSearchContact).toHaveBeenCalledWith(action)
+      expect(analytics.track).toHaveBeenCalledWith('resource_click_' + action, {
+        resource_id: resource.id,
+      })
+    }
+  )
+
   it('records search contact attempts from the actual result card action', () => {
     vi.mocked(recordSearchContact).mockClear()
     render(<ResourceCard resource={resource} />)

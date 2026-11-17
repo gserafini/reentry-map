@@ -18,6 +18,7 @@ import { BreadcrumbList, CollectionPage } from '@/components/seo/StructuredData'
 import { parseStateSlug, generateCityUrl, generateStateUrl } from '@/lib/utils/urls'
 import { US_STATE_CODE_TO_NAME } from '@/lib/utils/resource-location'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { buildListingMetadata } from '@/lib/seo/listing-metadata'
 import type { Metadata } from 'next'
 
 interface StatePageProps {
@@ -57,7 +58,6 @@ export default async function StatePage({ params }: StatePageProps) {
         name={'Reentry resources in ' + stateName}
         description={'Community services covering ' + stateName}
         url={generateStateUrl(state)}
-        numberOfItems={totalResources}
       />
       <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
@@ -131,7 +131,7 @@ export async function generateMetadata({ params }: StatePageProps): Promise<Meta
     description,
     openGraph: { title, description, type: 'website', url, images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
-    alternates: { canonical: url },
+    ...buildListingMetadata(generateStateUrl(state), {}, { curated: true }),
   }
 }
 export async function generateStaticParams() {

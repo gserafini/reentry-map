@@ -8,6 +8,7 @@ import { BreadcrumbList, CollectionPage, ItemList } from '@/components/seo/Struc
 import { parseStateSlug, parseCitySlug, generateCityUrl, generateStateUrl } from '@/lib/utils/urls'
 import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from '@/app/resources/params'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { buildListingCanonicalPath, buildListingMetadata } from '@/lib/seo/listing-metadata'
 import type { Metadata } from 'next'
 
 interface CityPageProps {
@@ -43,6 +44,10 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
       </Container>
     )
   const cityUrl = generateCityUrl(city, state)
+  const listingUrl = buildListingCanonicalPath(cityUrl, filters, {
+    curated: true,
+    appliedKeys: ['search', 'categories', 'sort'],
+  })
   return (
     <>
       <BreadcrumbList
@@ -55,14 +60,14 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
       <CollectionPage
         name={`Reentry Resources in ${city}, ${state}`}
         description={`Find help in ${city}, ${state}.`}
-        url={cityUrl}
-        numberOfItems={count.data || 0}
+        url={listingUrl}
+        hasItemList={Boolean(result.data?.length)}
       />
       {result.data?.length ? (
         <ItemList
           name={`Resources in ${city}`}
           description="Services for people navigating reentry."
-          url={cityUrl}
+          url={listingUrl}
           resources={result.data}
         />
       ) : null}
@@ -87,7 +92,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: CityPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CityPageProps): Promise<Metadata> {
   const { state: stateSlug, city: citySlug } = await params
 
   const state = parseStateSlug(stateSlug)
@@ -101,6 +106,11 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
   const title = `Reentry Resources in ${city}, ${state} | Reentry Map`
   const description = `Find ${cityData.totalResources} reentry resources in ${city}, ${state}. Browse employment, housing, food, healthcare, and support services.`
   const cityUrl = generateCityUrl(city, state)
+  const filters = await searchParams
+  const listingMetadata = buildListingMetadata(cityUrl, filters, {
+    curated: true,
+    appliedKeys: ['search', 'categories', 'sort'],
+  })
   const image = createOpenGraphImage({
     kind: 'city',
     eyebrow: 'Local resource directory',
@@ -125,7 +135,7 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
       title,
       description,
       type: 'website',
-      url: `https://reentrymap.org${cityUrl}`,
+      url: listingMetadata.alternates?.canonical,
       images: [image],
     },
     twitter: {
@@ -134,9 +144,7 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
       description,
       images: [image],
     },
-    alternates: {
-      canonical: `https://reentrymap.org${cityUrl}`,
-    },
+    ...listingMetadata,
   }
 }
 

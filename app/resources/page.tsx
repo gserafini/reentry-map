@@ -7,14 +7,11 @@ import {
   getResourcesCount,
 } from '@/lib/api/resources'
 import { ResourcesView } from './ResourcesView'
-import {
-  buildResourcesQueryOptions,
-  buildResourcesPageUrl,
-  type ResourcesPageSearchParams,
-} from './params'
+import { buildResourcesQueryOptions, type ResourcesPageSearchParams } from './params'
 import { interpretSearch } from '@/lib/utils/search-intent'
 import { getCategoryLabel } from '@/lib/utils/categories'
 import { createOpenGraphImage } from '@/lib/seo/open-graph'
+import { buildListingMetadata } from '@/lib/seo/listing-metadata'
 import type { Metadata } from 'next'
 
 interface ResourcesPageProps {
@@ -83,6 +80,25 @@ export async function generateMetadata({ searchParams }: ResourcesPageProps): Pr
     location: query.locationName,
     category: category || intent.categories[0],
   })
+  const listingMetadata = buildListingMetadata('/resources', params, {
+    curated: false,
+    appliedKeys: [
+      'search',
+      'categories',
+      'tags',
+      'lat',
+      'lng',
+      'distance',
+      'sort',
+      'locationName',
+      'north',
+      'south',
+      'east',
+      'west',
+      'city',
+      'state',
+    ],
+  })
 
   return {
     title,
@@ -90,11 +106,12 @@ export async function generateMetadata({ searchParams }: ResourcesPageProps): Pr
     openGraph: {
       title,
       description,
-      url: buildResourcesPageUrl('/resources', params),
+      url: listingMetadata.alternates?.canonical,
       type: 'website',
       siteName: 'Reentry Map',
       images: [image],
     },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
+    ...listingMetadata,
   }
 }

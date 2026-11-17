@@ -217,7 +217,11 @@ export function ResourceCard({
             variant="contained"
             sx={{ minHeight: 44 }}
             aria-label={'Visit ' + resource.name + ' website'}
-            onClick={() => recordSearchContact('website')}
+            onClick={() => {
+              recordSearchContact('website')
+              if (resource.id)
+                analytics.track('resource_click_website', { resource_id: resource.id })
+            }}
           >
             Website
           </Button>
@@ -255,7 +259,11 @@ export function ResourceCard({
             underline="hover"
             color="text.secondary"
             title={'Get directions to ' + fullAddress}
-            onClick={() => recordSearchContact('directions')}
+            onClick={() => {
+              recordSearchContact('directions')
+              if (resource.id)
+                analytics.track('resource_click_directions', { resource_id: resource.id })
+            }}
             data-testid="resource-address"
             sx={{ display: 'block' }}
           >

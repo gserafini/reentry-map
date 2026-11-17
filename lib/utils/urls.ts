@@ -101,8 +101,24 @@ export function generateTagSlug(tag: string): string {
  * Pattern: /{state}/{city}/{resource-slug}
  * Example: /ca/oakland/oakland-job-center
  */
+/** Identity-qualified slugs are explicitly assigned to colliding records only.
+ * Keep unused legacy stored slugs from changing established URLs site-wide.
+ */
+export function getResourceSlug(
+  resource: Pick<Resource, 'id' | 'name'> & Partial<Pick<Resource, 'slug'>>
+): string {
+  const stored = resource.slug
+  if (
+    stored &&
+    /^[a-z0-9][a-z0-9-]*--[0-9a-f-]{36}$/.test(stored) &&
+    stored.endsWith(`--${resource.id.toLowerCase()}`)
+  )
+    return stored
+  return generateResourceSlug(resource.name)
+}
+
 export function generateResourceUrl(
-  resource: Pick<Resource, 'id' | 'name' | 'city' | 'state'>
+  resource: Pick<Resource, 'id' | 'name' | 'city' | 'state'> & Partial<Pick<Resource, 'slug'>>
 ): string {
   if (!resource.city || !resource.state) {
     // Fallback to short URL if no location
@@ -111,7 +127,7 @@ export function generateResourceUrl(
 
   const stateSlug = generateStateSlug(resource.state)
   const citySlug = generateCitySlug(resource.city)
-  const resourceSlug = generateResourceSlug(resource.name)
+  const resourceSlug = getResourceSlug(resource)
 
   return `/${stateSlug}/${citySlug}/${resourceSlug}`
 }

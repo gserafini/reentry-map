@@ -1,7 +1,7 @@
 'use client'
 
-import { Pagination as MuiPagination, Box, Typography } from '@mui/material'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { Pagination as MuiPagination, PaginationItem, Box, Typography } from '@mui/material'
+import { useSearchParams, usePathname } from 'next/navigation'
 
 interface PaginationProps {
   /**
@@ -23,18 +23,37 @@ interface PaginationProps {
    * Number of items per page
    */
   pageSize: number
+}
 
-  /**
-   * Whether to scroll to top when page changes
-   * @default true
-   */
-  scrollToTop?: boolean
+const resourceQueryKeys = [
+  'search',
+  'categories',
+  'tags',
+  'lat',
+  'lng',
+  'distance',
+  'sort',
+  'locationName',
+  'north',
+  'south',
+  'east',
+  'west',
+  'city',
+  'state',
+]
 
-  /**
-   * Element to scroll to when page changes
-   * @default window
-   */
-  scrollTarget?: string
+function getAppliedQueryKeys(pathname: string): Set<string> {
+  if (pathname === '/resources' || pathname === '/search') return new Set(resourceQueryKeys)
+  if (/^\/category\/[^/]+\/?$/.test(pathname)) {
+    return new Set(resourceQueryKeys.filter((key) => key !== 'categories'))
+  }
+  if (/^\/[^/]+\/[^/]+\/category\/[^/]+\/?$/.test(pathname)) {
+    return new Set(['search', 'sort'])
+  }
+  if (/^\/[^/]+\/[^/]+\/?$/.test(pathname)) {
+    return new Set(['search', 'categories', 'sort'])
+  }
+  return new Set()
 }
 
 /**
@@ -58,15 +77,7 @@ interface PaginationProps {
  * />
  * ```
  */
-export function Pagination({
-  currentPage,
-  totalPages,
-  totalCount,
-  pageSize,
-  scrollToTop = true,
-  scrollTarget,
-}: PaginationProps) {
-  const router = useRouter()
+export function Pagination({ currentPage, totalPages, totalCount, pageSize }: PaginationProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -74,29 +85,15 @@ export function Pagination({
   const startItem = (currentPage - 1) * pageSize + 1
   const endItem = Math.min(currentPage * pageSize, totalCount)
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
-    // Create new search params with updated page
+  const getPageUrl = (page: number) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (page === 1) {
-      // Remove page param for page 1 (cleaner URLs)
-      params.delete('page')
-    } else {
-      params.set('page', page.toString())
+    const allowedParams = getAppliedQueryKeys(pathname)
+    for (const key of [...params.keys()]) {
+      if (key !== 'page' && !allowedParams.has(key)) params.delete(key)
     }
-
-    // Update URL
-    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
-    router.push(newUrl)
-
-    // Scroll to top or target element
-    if (scrollToTop) {
-      if (scrollTarget) {
-        const element = document.querySelector(scrollTarget)
-        element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-      }
-    }
+    if (page <= 1) params.delete('page')
+    else params.set('page', String(page))
+    return params.size ? `${pathname}?${params.toString()}` : pathname
   }
 
   // Don't render if there's only one page or no results
@@ -123,13 +120,18 @@ export function Pagination({
       <MuiPagination
         count={totalPages}
         page={currentPage}
-        onChange={handlePageChange}
         color="primary"
         size="large"
         showFirstButton
         showLastButton
         siblingCount={1}
         boundaryCount={1}
+        renderItem={(item) => {
+          if (item.disabled || item.selected || item.page === null) {
+            return <PaginationItem {...item} />
+          }
+          return <PaginationItem {...item} component="a" href={getPageUrl(item.page)} />
+        }}
         sx={{
           '& .MuiPaginationItem-root': {
             fontSize: '1rem',

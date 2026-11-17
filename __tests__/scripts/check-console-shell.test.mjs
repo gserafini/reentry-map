@@ -134,6 +134,8 @@ describe('console gate server ownership', () => {
     expect(result.remainingPids).toEqual([])
     expect(result.commands).toContain('check scripts/check-console.mjs /resources')
     expect(result.commands).toContain('check scripts/check-console.mjs /admin')
+    expect(result.commands).toContain('check scripts/check-console.mjs /about')
+    expect(result.commands).toContain('check scripts/check-console.mjs /methodology')
   })
   it('preserves a failing checker status and still stops its process group', () => {
     const result = runGate({ checkExit: 17 })

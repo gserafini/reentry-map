@@ -1,5 +1,5 @@
 import { Container } from '@mui/material'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { sql } from '@/lib/db/client'
 import type { Metadata } from 'next'
 import type { Resource, ResourceCategory } from '@/lib/types/database'
@@ -32,6 +32,8 @@ interface ResourceDetailPageProps {
  */
 export default async function ResourceDetailPage({ params }: ResourceDetailPageProps) {
   const { segments } = await params
+  if (segments.length === 3 && /^[a-z]{2}$/i.test(segments[0]))
+    permanentRedirect('/' + segments.map(encodeURIComponent).join('/'))
 
   let resource
 
@@ -77,11 +79,20 @@ export default async function ResourceDetailPage({ params }: ResourceDetailPageP
 // Generate metadata for SEO
 export async function generateMetadata({ params }: ResourceDetailPageProps): Promise<Metadata> {
   const { segments } = await params
+  if (segments.length === 3 && /^[a-z]{2}$/i.test(segments[0]))
+    permanentRedirect('/' + segments.map(encodeURIComponent).join('/'))
 
   let resource:
     | Pick<
         Resource,
-        'id' | 'updated_at' | 'name' | 'primary_category' | 'city' | 'state' | 'description'
+        | 'id'
+        | 'slug'
+        | 'updated_at'
+        | 'name'
+        | 'primary_category'
+        | 'city'
+        | 'state'
+        | 'description'
       >
     | undefined
   let fallbackName = 'Resource'
@@ -91,10 +102,17 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
     const rows = await sql<
       Pick<
         Resource,
-        'id' | 'updated_at' | 'name' | 'primary_category' | 'city' | 'state' | 'description'
+        | 'id'
+        | 'slug'
+        | 'updated_at'
+        | 'name'
+        | 'primary_category'
+        | 'city'
+        | 'state'
+        | 'description'
       >[]
     >`
-      SELECT id, updated_at, name, primary_category, city, state, description FROM resources
+      SELECT id, slug, updated_at, name, primary_category, city, state, description FROM resources
       WHERE id = ${id} AND status = 'active' LIMIT 1
     `
     resource = rows[0]
@@ -103,10 +121,17 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
     const rows = await sql<
       Pick<
         Resource,
-        'id' | 'updated_at' | 'name' | 'primary_category' | 'city' | 'state' | 'description'
+        | 'id'
+        | 'slug'
+        | 'updated_at'
+        | 'name'
+        | 'primary_category'
+        | 'city'
+        | 'state'
+        | 'description'
       >[]
     >`
-      SELECT id, updated_at, name, primary_category, city, state, description FROM resources
+      SELECT id, slug, updated_at, name, primary_category, city, state, description FROM resources
       WHERE slug = ${slug} AND state = ${state} AND city = ${city} AND status = 'active'
       LIMIT 1
     `
@@ -138,6 +163,9 @@ export async function generateMetadata({ params }: ResourceDetailPageProps): Pro
   return {
     title: `${resourceName} | Reentry Map`,
     description,
+    alternates: resource
+      ? { canonical: `https://reentrymap.org${generateResourceUrl(resource)}` }
+      : undefined,
     openGraph: {
       url: resource ? generateResourceUrl(resource) : '/resources',
       title: `${resourceName} | Reentry Map`,

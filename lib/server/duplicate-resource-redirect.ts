@@ -15,7 +15,7 @@ export async function resolveDuplicateResourceRedirect(
   if (!canonicalId) return null
 
   const canonicalRows = await sql<ResourceMergeTarget[]>`
-    SELECT id, name, city, state, status, provenance
+    SELECT id, name, city, state, status, slug, provenance
     FROM resources
     WHERE id = ${canonicalId} AND status = 'active'
     LIMIT 1
@@ -26,7 +26,7 @@ export async function resolveDuplicateResourceRedirect(
   }
 
   const activeCityPeers = await sql<ResourceSlugPeer[]>`
-    SELECT id, name, city, state, status
+    SELECT id, name, city, state, status, slug
     FROM resources
     WHERE status = 'active'
       AND LOWER(city) = LOWER(${canonical.city})
