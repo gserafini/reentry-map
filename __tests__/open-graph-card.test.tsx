@@ -81,6 +81,14 @@ describe('sharing image brand and phone readability', () => {
     expect(heading?.style.getPropertyValue('line-clamp')).toBe('4')
     expect(parseFloat(heading!.style.fontSize)).toBeGreaterThanOrEqual(60)
   })
+  it('shows geography once when the headline already includes it', async () => {
+    const dom = await card({
+      kind: 'city-category',
+      title: 'Housing help in Ventura, CA',
+      location: 'Ventura, CA',
+    })
+    expect(dom.textContent?.match(/Ventura, CA/g)).toHaveLength(1)
+  })
   it('keeps long and regional titles large without adding an invented map', async () => {
     const title =
       'Northern California Community Resource and Reentry Support Center for Returning People'

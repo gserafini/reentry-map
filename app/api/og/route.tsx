@@ -99,23 +99,24 @@ export async function GET(request: Request) {
           >
             {model.title}
           </div>
-          {model.location && (
-            <div
-              style={{
-                display: 'block',
-                marginTop: 12,
-                fontSize: 48,
-                lineHeight: 1.1,
-                lineClamp: titleSize === 88 ? 1 : 2,
-                wordBreak: 'break-word',
-                textOverflow: 'ellipsis',
-                fontWeight: 700,
-                color: '#fee36b',
-              }}
-            >
-              {model.location}
-            </div>
-          )}
+          {model.location &&
+            !model.title.toLocaleLowerCase().includes(model.location.toLocaleLowerCase()) && (
+              <div
+                style={{
+                  display: 'block',
+                  marginTop: 12,
+                  fontSize: 48,
+                  lineHeight: 1.1,
+                  lineClamp: titleSize === 88 ? 1 : 2,
+                  wordBreak: 'break-word',
+                  textOverflow: 'ellipsis',
+                  fontWeight: 700,
+                  color: '#fee36b',
+                }}
+              >
+                {model.location}
+              </div>
+            )}
         </div>
 
         {mapImage && (
