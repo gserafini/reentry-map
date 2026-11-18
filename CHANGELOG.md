@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-18
+
+- Update the Vite test dependency to 7.3.8 to fix a remote code execution vulnerability in network-exposed development servers (GHSA-p4f5-76q4-ffq7).
+
 ## 2026-11-16
 
 - Canonicalize production host/protocol aliases, publish the home canonical, and allow crawlers to fetch public rendering assets. Sitemaps use unique canonical resource identities and recorded modification dates; old colliding names offer an explicit location choice instead of selecting an arbitrary record. Pagination is crawlable, distinct pages identify themselves, and applied filters/search remain followable but are excluded from indexing.
