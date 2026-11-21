@@ -133,7 +133,9 @@ export function middleware(request: NextRequest) {
   // Staging and direct local runs: stay on the public Host, never Next's
   // internal proxy port; unrecognized hosts are not redirected.
   if (isLegacyHome && ['staging.reentrymap.org', 'localhost', '127.0.0.1'].includes(hostname)) {
-    const homeUrl = new URL(`${isSecureRequest ? 'https' : 'http'}://${requestHost}/`)
+    // The staging vhost is HTTPS-only but does not set the TLS marker.
+    const scheme = isSecureRequest || hostname === 'staging.reentrymap.org' ? 'https' : 'http'
+    const homeUrl = new URL(`${scheme}://${requestHost}/`)
     homeUrl.search = request.nextUrl.search
     return addSecurityHeaders(NextResponse.redirect(homeUrl, 308))
   }

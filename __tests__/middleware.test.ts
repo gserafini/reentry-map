@@ -230,6 +230,21 @@ describe('middleware', () => {
         )
       })
 
+      it('uses HTTPS on staging even without the production TLS marker', () => {
+        middleware(
+          createMockRequest(
+            '/home',
+            'GET',
+            { host: 'staging.reentrymap.org', 'x-https': '0' },
+            'http://localhost:3009/home'
+          )
+        )
+        expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+          new URL('https://staging.reentrymap.org/'),
+          308
+        )
+      })
+
       it.each(['/homeless-services', '/home/abc', '/ca/home'])(
         'does not redirect %s',
         (pathname) => {
