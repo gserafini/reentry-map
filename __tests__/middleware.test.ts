@@ -181,6 +181,76 @@ describe('middleware', () => {
       )
     })
 
+    describe('legacy /home (WordPress-era URL still listed by Brave)', () => {
+      it('permanently redirects /home on the canonical host to the home page, keeping the query', () => {
+        middleware(
+          createMockRequest(
+            '/home',
+            'GET',
+            { host: 'reentrymap.org' },
+            'https://reentrymap.org/home?utm_source=brave'
+          )
+        )
+        expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+          new URL('https://reentrymap.org/?utm_source=brave'),
+          308
+        )
+      })
+
+      it.each([
+        ['www.reentrymap.org', 'http://www.reentrymap.org/home/?q=jobs'],
+        ['reentrymap.com', 'https://reentrymap.com/home?q=jobs'],
+        ['reentrymap.org', 'http://reentrymap.org:3007/home?q=jobs'],
+      ])(
+        'sends %s /home straight to the canonical home page in one hop (%s)',
+        (host, requestUrl) => {
+          const { pathname } = new URL(requestUrl)
+          const secure = requestUrl.startsWith('https') ? '1' : '0'
+          middleware(createMockRequest(pathname, 'GET', { host, 'x-https': secure }, requestUrl))
+          expect(mockNextResponse.redirect).toHaveBeenCalledTimes(1)
+          expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+            new URL('https://reentrymap.org/?q=jobs'),
+            308
+          )
+        }
+      )
+
+      it('stays on the public staging host, never the internal proxy port', () => {
+        middleware(
+          createMockRequest(
+            '/home',
+            'GET',
+            { host: 'staging.reentrymap.org', 'x-https': '1' },
+            'http://localhost:3009/home?x=1'
+          )
+        )
+        expect(mockNextResponse.redirect).toHaveBeenCalledWith(
+          new URL('https://staging.reentrymap.org/?x=1'),
+          308
+        )
+      })
+
+      it.each(['/homeless-services', '/home/abc', '/ca/home'])(
+        'does not redirect %s',
+        (pathname) => {
+          middleware(createMockRequest(pathname, 'GET', { host: 'reentrymap.org', 'x-https': '1' }))
+          expect(mockNextResponse.redirect).not.toHaveBeenCalled()
+        }
+      )
+
+      it('does not redirect /home for an unrecognized Host', () => {
+        middleware(
+          createMockRequest(
+            '/home',
+            'GET',
+            { host: 'evil.example', 'x-https': '1' },
+            'https://evil.example/home'
+          )
+        )
+        expect(mockNextResponse.redirect).not.toHaveBeenCalled()
+      })
+    })
+
     it('does not redirect the canonical HTTPS host', () => {
       middleware(createMockRequest('/', 'GET', { host: 'reentrymap.org', 'x-https': '1' }))
       expect(mockNextResponse.redirect).not.toHaveBeenCalled()

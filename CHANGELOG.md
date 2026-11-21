@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-20
+
+- The WordPress-era `/home` address, still listed by search engines, now redirects permanently to the home page in one hop from every production host and protocol, keeping its query string. Other paths are unchanged.
+
 ## 2026-11-18
 
 - Update the Vite test dependency to 7.3.8 to fix a remote code execution vulnerability in network-exposed development servers (GHSA-p4f5-76q4-ffq7).

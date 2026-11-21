@@ -117,12 +117,25 @@ export function middleware(request: NextRequest) {
   // headers can otherwise be influenced by the client.
   const isSecureRequest = request.headers.get('x-https') === '1'
 
-  if (isProductionHost && (!isCanonicalHost || !isSecureRequest)) {
+  // The WordPress-era /home is still listed by search engines (Brave, Nov 2026):
+  // send it to the home page in the same single permanent hop.
+  const isLegacyHome = pathname === '/home' || pathname === '/home/'
+
+  if (isProductionHost && (!isCanonicalHost || !isSecureRequest || isLegacyHome)) {
     const canonicalUrl = new URL(request.nextUrl)
     canonicalUrl.protocol = 'https:'
     canonicalUrl.host = 'reentrymap.org'
     canonicalUrl.port = ''
+    if (isLegacyHome) canonicalUrl.pathname = '/'
     return addSecurityHeaders(NextResponse.redirect(canonicalUrl, 308))
+  }
+
+  // Staging and direct local runs: stay on the public Host, never Next's
+  // internal proxy port; unrecognized hosts are not redirected.
+  if (isLegacyHome && ['staging.reentrymap.org', 'localhost', '127.0.0.1'].includes(hostname)) {
+    const homeUrl = new URL(`${isSecureRequest ? 'https' : 'http'}://${requestHost}/`)
+    homeUrl.search = request.nextUrl.search
+    return addSecurityHeaders(NextResponse.redirect(homeUrl, 308))
   }
 
   // Limit mutating API calls generally, plus selected GET routes that perform
